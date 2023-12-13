@@ -1,0 +1,56 @@
+{
+  "profiles": {
+    "Docker": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "DockerLocal"
+      },
+      "publishAllPorts": true,
+      "useSSL": true
+    },
+    "ConsoleApp": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7245;http://localhost:5234"
+    },
+    "ConsoleAppSecure": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5234"
+    },
+    "IISExpress": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "ancmHostingModel": "OutOfProcess"
+    },
+    "Census": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Local"
+      },
+      "applicationUrl": "http://localhost:5038;https://localhost:7225"
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:39776",
+      "sslPort": 44393
+    }
+  }
+}

@@ -1,0 +1,45 @@
+@use '../../../../styles/core.scss';
+
+.content {
+  margin: 2em;
+}
+
+.filter-fields {
+  display: flex;
+  align-items: flex-start;
+  column-gap: 10px;
+}
+
+.audit-table-container {
+  border: solid 1px rgba(0, 0, 0, 0.12);
+}
+
+
+.table-record-detail {
+  overflow: hidden;
+  display: flex;
+}
+
+.table-record-description {
+  padding: 1em;
+}
+
+tr.table-record-row {
+  height: 0;
+}
+
+tr.table-record-row:hover {
+    cursor: pointer;
+}
+
+tr.table-record-row:not(.example-expanded-row):hover {
+  /*background: whitesmoke;*/
+}
+
+tr.table-record-row:not(.example-expanded-row):active {
+  /*background: #efefef;*/
+}
+
+.table-record-row td {
+  border-bottom-width: 0;
+}

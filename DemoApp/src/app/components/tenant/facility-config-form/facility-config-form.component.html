@@ -1,0 +1,101 @@
+<form [formGroup]="facilityConfigForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId">
+        <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="facilityIdControl.hasError('required')">
+          A facility id is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+
+    <div class="form-input">
+        <mat-form-field appearance="outline" class="subject-input form-input ">
+          <mat-label>Facility Name</mat-label>
+          <input matInput formControlName="facilityName">
+          <button *ngIf="facilityNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityName()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-error *ngIf="facilityNameControl.hasError('required')">
+            A facility name is <strong>required</strong>
+          </mat-error>
+        </mat-form-field>
+    </div>       
+   
+    <p>
+      <mat-toolbar class="form-section-bar">
+        <span class="title">Scheduled Tasks</span>
+        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()">
+          <mat-icon>add</mat-icon>
+        </button>
+      </mat-toolbar>
+    </p>
+
+      <div formArrayName="scheduledTasks">
+        <div *ngFor="let task of scheduledTasks.controls; let i=index">
+            <div class="input-container list-item-container" [formGroupName]="i">
+              <div style="display: flex;">
+                <div style="flex: auto;">
+                  <mat-form-field appearance="outline" class="tenant-facility-task-input">
+                    <mat-label>kafka Topic</mat-label>
+                    <input matInput formControlName="kafkaTopic">
+                  </mat-form-field>  
+                </div>
+                <div style="flex-shrink: 2;">
+                  <button mat-stroked-button (click)="addReportTypeSchedule(i)">
+                    Add Schedule
+                  </button>
+                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)">
+                    Delete Task
+                  </button>                  
+                </div> 
+              </div>
+             
+              <div formArrayName="reportTypeSchedules" *ngIf="getReportTypeSchedules(i).controls.length > 0">
+                <div *ngFor="let type of getReportTypeSchedules(i).controls; let j=index">  
+                  <div class="list-item-container" [formGroupName]="j">
+                    <div style="display: flex;">
+                      <div style="flex: auto;">
+                        <div class="input-container">
+                          <mat-form-field appearance="outline" class="tenant-facility-task-input">
+                              <mat-label>Report Type</mat-label>
+                              <input matInput formControlName="reportType">
+                          </mat-form-field>
+                        </div> 
+                      </div>  
+                      <div style="flex-shrink: 2;">
+                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)">
+                          Add Trigger
+                        </button>
+                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)">
+                          Delete Schedule           
+                        </button> 
+                      </div>                    
+                    </div>                 
+                    <div formArrayName="scheduledTriggers" *ngIf="getScheduledTriggers(i, j).controls.length > 0">
+                      <div *ngFor="let trigger of getScheduledTriggers(i, j).controls; let k=index">            
+                        <div class="input-container" [formGroupName]="k">
+                          <mat-form-field appearance="outline" class="tenant-facility-task-input">
+                              <mat-label>Trigger</mat-label>
+                              <input matInput formControlName="trigger">
+                          </mat-form-field>                         
+                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </div>                           
+                      </div>                   
+                    </div>                                
+                  </div> 
+                </div>
+              </div>
+
+            </div>          
+
+            
+        </div>
+        
+      </div>
+</form>

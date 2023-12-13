@@ -1,0 +1,58 @@
+version: '3.4'
+
+services:
+  account:
+    image: ${DOCKER_REGISTRY-}account
+    build:
+      context: .
+      dockerfile: Account/Dockerfile
+
+  api:
+    image: ${DOCKER_REGISTRY-}api
+    build:
+      context: .
+      dockerfile: Api/Dockerfile
+
+  tenant:
+    image: ${DOCKER_REGISTRY-}tenant
+    build:
+      context: .
+      dockerfile: Tenant/Dockerfile
+
+  query:
+    image: ${DOCKER_REGISTRY-}query
+    build:
+      context: .
+      dockerfile: Query/Dockerfile
+
+  validation:
+    image: ${DOCKER_REGISTRY-}validation
+    build:
+      context: .
+      dockerfile: Validation/Dockerfile
+
+  report:
+    image: ${DOCKER_REGISTRY-}report
+    build:
+      context: .
+      dockerfile: Report/Dockerfile
+
+  patientlist:
+    image: ${DOCKER_REGISTRY-}patientlist
+    build:
+      context: .
+      dockerfile: PatientList/Dockerfile
+
+  normalization:
+    image: ${DOCKER_REGISTRY-}normalization
+    build:
+      context: .
+      dockerfile: Normalization/Dockerfile
+
+
+  measureeval:
+    image: ${DOCKER_REGISTRY-}measureeval
+    build:
+      context: .
+      dockerfile: MeasureEval/Dockerfile
+

@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>bacfeb20-baaf-4367-a0cf-1b5dff6ed2e1</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<RootNamespace>LantanaGroup.Link.MeasureEval</RootNamespace>
+		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>$(AssemblyName)Tests</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Protobuf Include="Protos\measureeval.proto" GrpcServices="Server" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="7.1.0" />
+		<PackageReference Include="com.lantanagroup.link.Shared" Version="2023.8.28.1" />
+		<PackageReference Include="Confluent.Kafka" Version="2.2.0" />
+		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
+		<PackageReference Include="Flurl" Version="3.0.7" />
+		<PackageReference Include="Grpc.AspNetCore" Version="2.56.0" />
+		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.56.0" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.6.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.6.0" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.6.0" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.5.1-beta.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.5.1-beta.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.5.1" />
+		<PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.1.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Update="nuget.config">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
+</Project>

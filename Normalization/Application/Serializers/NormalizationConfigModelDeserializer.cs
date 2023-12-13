@@ -1,0 +1,73 @@
+﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Normalization.Application.Models;
+using LantanaGroup.Link.Normalization.Domain.Entities;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace LantanaGroup.Link.Normalization.Application.Serializers;
+
+public class NormalizationConfigModelDeserializer
+{
+    private static ConceptMapOperation DeserializeConceptMapOperation(JsonNode jsonNode, string facilityId)
+    {
+        var conceptMapOperation = new ConceptMapOperation();
+        conceptMapOperation.FhirContext = jsonNode["FhirContext"]?.ToString();
+        conceptMapOperation.FacilityId = facilityId;
+        conceptMapOperation.FhirConceptMap = JsonSerializer.Deserialize<ConceptMap>(jsonNode["FhirConceptMap"], 
+            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings
+        {
+            Validator = null
+        }));
+
+        return conceptMapOperation;
+    }
+
+    public static NormalizationConfigModel Deserialize(dynamic configdyn)
+    {
+        var deserializedConfig = new NormalizationConfigEntity();
+
+        JsonElement configEle = (JsonElement)configdyn;
+        var jsonNode = JsonNode.Parse(configEle.ToString());
+        var facilityId = jsonNode["FacilityId"].ToString();
+        var operationSequence = jsonNode["OperationSequence"];
+
+        var operationSeqDict = new Dictionary<string, INormalizationOperation>();
+
+        var incrementor = 0;
+        while (true)
+        {
+            var incVal = incrementor.ToString();
+            var operation = operationSequence[incVal];
+            if(operation == null)
+            {
+                break;
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            };
+
+            INormalizationOperation? deserializedOperation = operation["$type"]?.ToString() switch
+            {
+                "ConceptMapOperation" => DeserializeConceptMapOperation(operation, facilityId),
+                "ConditionalTransformationOperation" => JsonSerializer.Deserialize<ConditionalTransformationOperation>(operation, options),
+                "CopyElementOperation" => JsonSerializer.Deserialize<CopyElementOperation>(operation, options),
+                "CopyLocationIdentifierToTypeOperation" => JsonSerializer.Deserialize<CopyLocationIdentifierToTypeOperation>(operation, options),
+                _ => null,
+            };
+
+            if(deserializedOperation != null)
+                operationSeqDict.Add(incrementor.ToString(), deserializedOperation);
+            
+            incrementor++;
+        }
+
+        return new NormalizationConfigModel 
+        {
+            FacilityId = facilityId,
+            OperationSequence = operationSeqDict
+        };
+    }
+}

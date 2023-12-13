@@ -1,0 +1,46 @@
+@use '../../../../styles/core.scss';
+
+.dialog-form {
+  margin-top: 1em;
+}
+
+.chip-list {
+  width: 100%;
+}
+
+.select-container {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  grid-column-gap: 0.5em;
+}
+
+.select-container mat-form-field {
+  margin-bottom: 1em;
+  width: 100%;
+}
+
+.form-input {
+  margin-bottom: 1em;
+}
+
+.notification-type-input {
+  width: 50%;
+}
+
+.facility-input {
+  width: 50%;
+}
+
+.subject-input {
+  width: 100%;
+}
+
+.body-input {
+  min-height: 50px;
+  width: 100%;
+}
+
+.channelOptions {
+    margin: 1em;
+}

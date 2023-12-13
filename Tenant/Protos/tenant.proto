@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option csharp_namespace = "LantanaGroup.Link.Tenant";
+
+package LantanaGroup.Link.Tenant;
+
+// The greeting service definition.
+service TenantSvc {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply);
+  // Gets a Fhir Connection
+  rpc GetFhirConnection (GetFhirConnectionRequest) returns (GetFhirConnectionResponse);
+}
+
+// A GetFhirConnection Request
+message GetFhirConnectionRequest {
+	string tenantId = 1;
+}
+
+// A GetFhirConnection Response
+message GetFhirConnectionResponse {
+	string tenantId = 1;
+	string description = 2;
+	string authMethod = 3;
+	map<string,string> authProperties = 4;
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings.
+message HelloReply {
+  string message = 1;
+  string someOtherProperty = 2;
+  string bundle = 3;
+}

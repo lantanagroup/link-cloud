@@ -1,0 +1,22 @@
+@use '../../../../styles/core.scss';
+
+.input-container {
+  width: 50%;
+}
+
+.select-container {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  grid-column-gap: 0.5em;
+}
+
+.form-input {
+  width: 100%;
+  margin-bottom: 1em;
+}
+
+.form-select {
+  width: 100%;
+  margin-bottom: 1em;
+}

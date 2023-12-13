@@ -1,0 +1,70 @@
+.page-header-bar span {
+  font-size: 1.5em;
+  font-weight: 300;
+}
+
+.no-results-found-container {
+  border: solid 1px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 250px;
+  width: 100%;
+}
+
+.no-results-found-container span {
+    font-size: 1.5em;
+    font-weight: 300;
+}
+
+.mat-column-actions mat-icon {
+    color: rgba(0,0,0,.50);
+}
+
+.dialog-form-header {
+  font-size: large;
+  font-weight: 600;
+}
+
+.form-actions {
+    margin-top: 2em;
+}
+
+.dialog-form {
+  margin-top: 1em;
+}
+
+.select-container {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  grid-column-gap: 0.5em;
+}
+
+.select-container mat-form-field {
+  margin-bottom: 1em;
+  width: 100%;
+}
+
+.list-item-container {
+  border: solid 1px rgba(0, 0, 0, 0.12);
+  padding: 1em;
+  margin-bottom: .5em;
+}
+
+.form-input {
+  margin-bottom: 1em;
+  min-width: 100%;
+}
+
+.form-section-bar .title {
+  font-size: 1.2em;
+  font-weight: 400;
+}
+
+.form-section-bar button {
+  margin-left: auto;
+}
+    
+
+

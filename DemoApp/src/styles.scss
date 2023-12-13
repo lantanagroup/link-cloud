@@ -1,0 +1,67 @@
+/* You can add global styles to this file, and also import other style files */
+@use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
+@use 'styles/custom-themes/indigo-pink.scss';
+@use 'styles/custom-themes/purple-green.scss';
+@use 'styles/custom-themes/pink-bluegrey.scss';
+
+/* Account for the height of the fixed position toolbar */
+html, body { height: calc(100vh - 64px); }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+:root {
+  --primary-color: #153d77;
+  --secondary-color: #6c757d;
+  --white-color: #fff;
+  --success-color: #198754;
+  --error-color: #dc3545;
+  --info-color: #398eb4;
+  --background-color: #f2f2f2;
+}
+
+.info-snackbar {
+  color: white;
+  --mdc-snackbar-container-color: var(--info-color) !important;
+
+  .mat-simple-snackbar-action {
+    color: white;
+  }
+}
+
+.success-snackbar {
+  color: white;
+  --mdc-snackbar-container-color: var(--success-color) !important;
+
+  .mat-simple-snackbar-action {
+    color: white;
+  }
+}
+
+.error-snackbar {
+  max-width: max-content !important;
+  color: white;
+  --mdc-snackbar-container-color: var(--error-color) !important;
+  border-color: #f5c6cb;
+
+  .mat-simple-snackbar-action {
+    color: white;
+  }
+}
+
+.light-success-snackbar {
+  color: #155724;
+  --mdc-snackbar-container-color: #d4edda !important;
+
+  .mat-simple-snackbar-action {
+    color: darkgreen;
+  }
+}
+
+.light-error-snackbar {
+  color: #721c24;
+  --mdc-snackbar-container-color: #f8d7da !important;
+  border-color: #f5c6cb;
+
+  .mat-simple-snackbar-action {
+    color: darkred;
+  }
+}

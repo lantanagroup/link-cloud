@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>89e2822a-1e90-4904-9d40-8dc0fbea1ed4</UserSecretsId>
+	<RootNamespace>LantanaGroup.Link.Audit</RootNamespace>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+	
+  <ItemGroup>
+    <Protobuf Include="Protos\audit.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2023.8.28.1" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="7.1.0" />
+    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.56.0" />
+    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.56.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.10" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.5.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.5.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.5.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.5.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.5.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.5.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
+    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
+    <PackageReference Include="Serilog.Expressions" Version="3.4.1" />
+    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.1.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.32.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="nuget.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

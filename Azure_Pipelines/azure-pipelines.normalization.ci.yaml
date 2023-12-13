@@ -1,0 +1,70 @@
+trigger:
+  paths:
+    include:
+    - Normalization/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'Normalization/Normalization.csproj'
+  testProject: 'NormalizationUnitTests/NormalizationUnitTests.csproj'
+  nugetPath: 'Normalization/nuget.config'
+
+steps:
+  - task: PowerShell@2
+    displayName: 'Transform nuget.config'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $path = '$(System.DefaultWorkingDirectory)/Normalization/nuget.config'
+        $nugetUrl = '$(nuget)'
+        $sharedUrl = '$(Shared_BOTW_Feed)'
+        $token = '$(ClearTextPassword)'
+        $basePath = '$(System.DefaultWorkingDirectory)'
+        
+        $xml = [xml](Get-Content -Path $path)
+        
+        $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+        $node.value = $nugetUrl
+        
+        Write-Host "updated nuget url:"
+        Write-Host $node.value
+        
+        $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+        $node.value = $sharedUrl
+        
+        Write-Host "Shared botw url:"
+        Write-Host $node.value
+        
+        $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                where { $_.key -eq 'ClearTextPassword' }
+        $node.value = $token
+        
+        Write-Host "updated token:"
+        Write-Host $node.value
+        
+        $xml.Save($path)
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      nugetConfigPath: '$(nugetPath)'
+      feedsToUse: config
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+    displayName: 'Run Tests'
+

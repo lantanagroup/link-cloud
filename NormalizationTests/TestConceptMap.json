@@ -1,0 +1,85 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "ehr-test-epic-encounter-class",
+  "url": "https://nhsnlink.org/fhir/ConceptMap/ehr-test-epic-encounter-class",
+  "identifier": {
+    "system": "urn:ietf:rfc:3986",
+    "value": "urn:uuid:63cd62ee-033e-414c-9f58-3ca97b5ffc3b"
+  },
+  "version": "20220728",
+  "name": "ehr-test-epic-encounter-class",
+  "title": "Ehr-test Epic Encounter Class ConceptMap",
+  "status": "draft",
+  "experimental": true,
+  "date": "2022-07-28",
+  "description": "A mapping between the Epic's Encounter class codes and HL7 v3-ActEncounter codes",
+  "purpose": "To help implementers map from University of Michigan Epic to FHIR",
+  "group": [
+    {
+      "source": "urn:oid:1.2.840.114350.1.72.1.7.7.10.696784.13260",
+      "target": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+      "element": [
+        {
+          "code": "1",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        },
+        {
+          "code": "2",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        },
+        {
+          "code": "3",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        },
+        {
+          "code": "4",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        },
+        {
+          "code": "5",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        },
+        {
+          "code": "6",
+          "target": [
+            {
+              "code": "IMP",
+              "display": "inpatient",
+              "equivalence": "inexact"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

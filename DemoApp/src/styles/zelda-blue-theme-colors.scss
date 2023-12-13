@@ -1,0 +1,77 @@
+$black: rgba(black, 0.87);
+$white: white;
+$primary: #398eb4;
+$accent: #6039b4;
+$warn: #b4398d;
+
+$zelda-blue-primary: (
+  50: #e3f6f9,
+  100: #b9e6f0,
+  200: #8fd6e7,
+  300: #6dc6de,
+  400: #58b9d9,
+  500: #4aaed4,
+  600: #43a0c7,
+  700: $primary,
+  800: #357ca0,
+  900: #2a5d7e,
+    contrast: (
+      50: $black,
+     100: $black,
+     200: $black,
+     300: $black,
+     400: $white,
+     500: $white,
+     600: $white,
+     700: $white,
+     800: $white,
+     900: $white)
+);
+
+$zelda-blue-accent: (
+  50: #ede8f6,
+  100: #d2c5ea,
+  200: #b49fdd,
+  300: #9778cf,
+  400: #805ac5,
+  500: #693eba,
+  600: $accent,
+  700: #5331ab,
+  800: #472ba3,
+  900: #331f95,
+  contrast: (
+      50: $black,
+     100: $black,
+     200: $black,
+     300: $black,
+     400: $white,
+     500: $white,
+     600: $white,
+     700: $white,
+     800: $white,
+     900: $white)
+);
+
+$zelda-blue-warn: (
+  50: #f5e3ee,
+  100: #e6bad5,
+  200: #d68cba,
+  300: #c35da0,
+  400: $warn,
+  500: #a40c7c,
+  600: #990578,
+  700: #890071,
+  800: #7a006a,
+  900: #60005e,
+  contrast: (
+      50: $black,
+     100: $black,
+     200: $black,
+     300: $black,
+     400: $white,
+     500: $white,
+     600: $white,
+     700: $white,
+     800: $white,
+     900: $white)
+);

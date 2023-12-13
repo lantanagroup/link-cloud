@@ -1,0 +1,10 @@
+<h1 mat-dialog-title class="dialog-form-header">{{dialogTitle}}</h1>
+<div mat-dialog-content class="delete-dialog-msg">
+  {{dialogMessage}}
+</div>
+<div mat-dialog-actions align="end">
+  <button mat-raised-button color="primary" (click)="confirmDeletion()">    
+    Yes
+  </button>
+  <button mat-raised-button mat-dialog-close>No</button>
+</div>

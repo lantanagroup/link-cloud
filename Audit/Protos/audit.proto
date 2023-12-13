@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "LantanaGroup.Link.Audit.Protos";
+
+package LantanaGroup.Link.Audit;
+
+// The greeting service definition.
+service AuditService {
+  // Sends a greeting
+  rpc CreateAuditEvent (AuditEventMessage) returns (CreateAuditEventReply);
+}
+
+// The request message containing the user's name.
+message AuditEventMessage {
+  string facilityId = 1;
+  string serviceName = 2;
+  string correlationId = 3;
+  google.protobuf.Timestamp eventDate = 4;
+  string userId = 5;
+  string user = 6;
+  int32 action = 7;
+  string resource = 8;
+  repeated PropertyChangesMessage propertyChanges= 9;
+  string notes = 10;
+}
+
+message PropertyChangesMessage {
+	string propertyName = 1;
+	string initialPropertyValue = 2;
+	string newPropertyValue = 3;
+}
+
+// The response message containing the greetings.
+message CreateAuditEventReply {
+  string message = 1;
+  string id = 2;
+}

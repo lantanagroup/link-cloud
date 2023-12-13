@@ -1,0 +1,64 @@
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+    - Shared/*
+
+name: $(BuildDefinitionName)_$(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
+
+variables:
+  buildConfiguration: 'Release'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: restore
+      projects: 'Shared/Shared.csproj'
+      
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: 'Shared/Shared.csproj'
+      
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack'
+    inputs:
+      command: 'pack'
+      packagesToPack: 'Shared/Shared.csproj'
+      configuration: $(buildConfiguration)
+      versioningScheme: 'byBuildNumber'
+      packDirectory: '$(build.artifactstagingdirectory)/publish'
+      #arguments: '--output $(build.artifactstagingdirectory)/publish'
+      modifyOutputPath: false
+
+  # - task: DotNetCoreCLI@2
+  #   displayName: 'Publish'
+  #   inputs:
+  #     command: publish
+  #     publishWebProjects: false
+  #     projects: 'Shared/Shared.csproj'
+  #     arguments: '--output $(build.artifactstagingdirectory)/publish'
+  #     modifyOutputPath: false
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: drop'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
+
+  
+
+#  - task: NuGetAuthenticate@0
+#    displayName: 'NuGet Authenticate'
+
+#  - task: NuGetCommand@2
+#    displayName: 'NuGet push'
+#    inputs:
+#      command: push
+#      publishVstsFeed: 'nhsnlink/Shared_BOTW_Feed'
+#      allowPackageConflicts: true
+
+  

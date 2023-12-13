@@ -1,0 +1,56 @@
+@use '../../../../styles/core.scss';
+
+.content {
+  margin: 2em;
+}
+
+.page-header-bar button {
+    margin-left: auto;
+}
+
+.filter-fields {
+  display: flex;
+  align-items: flex-start;
+  column-gap: 10px;
+}
+
+.notification-table-container {
+  border: solid 1px rgba(0, 0, 0, 0.12);
+}
+
+.table-record-detail {
+  overflow: hidden;
+  display: flex;
+}
+
+.table-record-description {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  margin-top: .5em;
+  margin-bottom: .5em;
+  padding: 1em;
+  width: 100%;
+}
+
+.table-record-description .notification-details {
+    padding: .5em;
+}
+
+tr.table-record-row {
+  height: 0;
+}
+
+tr.table-record-row:hover {
+  cursor: pointer;
+}
+
+tr.table-record-row:not(.example-expanded-row):hover {
+  /*background: whitesmoke;*/
+}
+
+tr.table-record-row:not(.example-expanded-row):active {
+  /*background: #efefef;*/
+}
+
+.table-record-row td {
+  border-bottom-width: 0;
+}
