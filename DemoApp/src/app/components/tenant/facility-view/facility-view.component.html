@@ -1,0 +1,15 @@
+<div class="content">
+    <p>
+        <mat-toolbar class="page-header-bar" color="primary">
+          <span>Facility: {{facilityConfig?.facilityId}}</span>
+          <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard" [routerLink]="['/tenant']">
+            <mat-icon>arrow_back</mat-icon> Back
+          </button>
+        </mat-toolbar>
+    </p>
+
+    {{facilityConfig | json}}
+
+</div>
+
+
