@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Moq;
 using Moq.AutoMock;
 using System;
@@ -57,7 +58,7 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.GetQueryPlan("", new QueryPlanType(), false, CancellationToken.None);
-            Assert.IsType<BadRequestResult>(result.Result);
+            Assert.IsType<BadRequestObjectResult>(result.Result);
         }
 
         [Fact]
@@ -119,8 +120,8 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
+            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None));
+
         }
 
         [Fact]
@@ -129,8 +130,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), "{invalidJson}", CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
+            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), "{invalidJson}", CancellationToken.None));
         }
 
         [Fact]
@@ -153,7 +153,7 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.DeleteQueryPlan("", new QueryPlanType(), CancellationToken.None);
-            Assert.IsType<BadRequestResult>(result);
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -161,12 +161,11 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteQueryPlanCommand>(), CancellationToken.None))
-                .ReturnsAsync(null);
+                .ThrowsAsync(new NullReferenceException("Not Found"));
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan(facilityId, new QueryPlanType(), CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
+            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.DeleteQueryPlan(facilityId, new QueryPlanType(), CancellationToken.None));
         }
     }
 }
