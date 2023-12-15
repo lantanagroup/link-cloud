@@ -8,7 +8,20 @@
         </mat-toolbar>
     </p>
 
-    {{facilityConfig | json}}
+    <mat-card *ngIf="facilityConfig">
+        <mat-card-content>
+            <app-facility-config-form [viewOnly]="facilityConfigFormViewOnly" [item]="facilityConfig"></app-facility-config-form>       
+            <mat-card-actions align="end">                
+                <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
+                    <mat-icon>edit</mat-icon>
+                </button>
+            </mat-card-actions>              
+        </mat-card-content>
+    </mat-card>
+
+    <p>
+        {{facilityConfig | json}}
+    </p>    
 
 </div>
 

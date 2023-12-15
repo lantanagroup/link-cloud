@@ -28,7 +28,7 @@
     <p>
       <mat-toolbar class="form-section-bar">
         <span class="title">Scheduled Tasks</span>
-        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()">
+        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()" *ngIf="!viewOnly">
           <mat-icon>add</mat-icon>
         </button>
       </mat-toolbar>
