@@ -224,7 +224,7 @@ namespace LantanaGroup.Link.Report.Core
             bundle.Timestamp = DateTime.UtcNow;
 
             // add organization entry
-            var org = CreateOrganization();
+            var org = CreateOrganization(reportSchedule.FacilityId);
             bundle.AddResourceEntry(org, GetFullUrl(org));
 
             return bundle;
@@ -256,7 +256,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
 
-        protected Organization CreateOrganization()
+        protected Organization CreateOrganization(String facilityId)
         {
             Organization org = new Organization();
             org.Meta = new Meta
@@ -272,18 +272,10 @@ namespace LantanaGroup.Link.Report.Core
 
             org.Name = "EHR Test On Prem"; // should be org name from config?
 
-            // TODO: should be only if NPI is in config?
-            org.Identifier.Add(new Identifier
-            {
-                System = ReportConstants.Bundle.NationalProviderIdentifierSystemUrl,
-                Value = "someTestOrgId" //NPI from config
-            });
-
-            // TODO: should be only if CDC org ID is in config?
             org.Identifier.Add(new Identifier
             {
                 System = ReportConstants.Bundle.CdcOrgIdSystem,
-                Value = "testOrgCdcId" // CDC org ID from config
+                Value = facilityId // CDC org ID from config
             });
 
             // TODO: should phone and email be in config?
