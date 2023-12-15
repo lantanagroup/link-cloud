@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
@@ -11,6 +11,8 @@ import { FacilityConfigFormComponent } from '../facility-config-form/facility-co
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FacilityConfigDialogComponent } from '../facility-config-dialog/facility-config-dialog.component';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatAccordion, MatExpansionModule } from '@angular/material/expansion';
+import { MatTabsModule } from '@angular/material/tabs';
 
 
 @Component({
@@ -24,12 +26,16 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
     MatCardModule,
     RouterLink,   
     MatDialogModule,
+    MatExpansionModule,
+    MatTabsModule,
     FacilityConfigFormComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrls: ['./facility-view.component.scss']
 })
 export class FacilityViewComponent implements OnInit {
+  @ViewChild(MatAccordion) accordion!: MatAccordion;
+
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
   facilityConfigFormViewOnly: boolean = true;

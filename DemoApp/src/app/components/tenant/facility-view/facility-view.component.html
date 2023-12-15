@@ -1,7 +1,7 @@
 <div class="content">
     <p>
         <mat-toolbar class="page-header-bar" color="primary">
-          <span>Facility: {{facilityConfig?.facilityId}}</span>
+          <span *ngIf="facilityConfig">Facility: {{facilityConfig.facilityId}}</span>
           <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard" [routerLink]="['/tenant']">
             <mat-icon>arrow_back</mat-icon> Back
           </button>
@@ -19,9 +19,109 @@
         </mat-card-content>
     </mat-card>
 
-    <p>
+    <!-- <p>
         {{facilityConfig | json}}
-    </p>    
+    </p>     -->
+
+    <div class="example-action-buttons">
+        <button mat-button (click)="accordion.openAll()">Expand All</button>
+        <button mat-button (click)="accordion.closeAll()">Collapse All</button>
+      </div>
+      <mat-accordion class="example-headers-align" multi>
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Census Configuration
+            </mat-panel-title>
+            <mat-panel-description>                
+            </mat-panel-description>
+          </mat-expansion-panel-header>     
+        -- stuff here
+        </mat-expansion-panel>
+
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Data Acquisition Configuration
+            </mat-panel-title>
+            <mat-panel-description>             
+            </mat-panel-description>
+          </mat-expansion-panel-header>     
+          
+          <mat-tab-group>
+            <mat-tab label="Base"> 
+                -- base configuration content 
+            </mat-tab>
+            <mat-tab label="Authentication"> 
+                -- authentication configuration content
+            </mat-tab>
+            <mat-tab label="Query"> 
+                -- query configuration content
+            </mat-tab>
+            <mat-tab label="Query Plans"> 
+                -- Query plan content
+            </mat-tab>
+          </mat-tab-group>
+
+        </mat-expansion-panel>
+        
+        <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Normalization Configuration
+              </mat-panel-title>
+              <mat-panel-description>             
+              </mat-panel-description>
+            </mat-expansion-panel-header>     
+            -- stuff here
+          </mat-expansion-panel>
+
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Measure Evaluation Configuration
+              </mat-panel-title>
+              <mat-panel-description>             
+              </mat-panel-description>
+            </mat-expansion-panel-header>     
+            -- stuff here
+          </mat-expansion-panel>
+
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Report Configuration
+              </mat-panel-title>
+              <mat-panel-description>             
+              </mat-panel-description>
+            </mat-expansion-panel-header>     
+            -- stuff here
+          </mat-expansion-panel>
+
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Validation Configuration
+              </mat-panel-title>
+              <mat-panel-description>             
+              </mat-panel-description>
+            </mat-expansion-panel-header>     
+            -- stuff here
+          </mat-expansion-panel>
+
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                Submission Configuration
+              </mat-panel-title>
+              <mat-panel-description>             
+              </mat-panel-description>
+            </mat-expansion-panel-header>     
+            -- stuff here
+          </mat-expansion-panel>
+        
+      </mat-accordion>
+      
 
 </div>
 
