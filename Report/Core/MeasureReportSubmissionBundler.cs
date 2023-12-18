@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Report.Core
             }
             else
             {
-                submissionBundle = new FhirJsonParser().Parse<Bundle>(submission.SubmissionBundle);
+                submissionBundle = submission.SubmissionBundle;
             }
 
             // ensure aggregate patient list and measure report entries are created for reach measure
@@ -124,7 +124,7 @@ namespace LantanaGroup.Link.Report.Core
 
 
             // create or update the submission bundle to storage
-            submission.SubmissionBundle = new FhirJsonSerializer().SerializeToString(submissionBundle);
+            submission.SubmissionBundle = submissionBundle;
 
             //Disabled saving the bundle to the DB
             //if (string.IsNullOrEmpty(submission.Id))
