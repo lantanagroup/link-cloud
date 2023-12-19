@@ -28,7 +28,7 @@
         <button mat-button (click)="accordion.closeAll()">Collapse All</button>
       </div>
       <mat-accordion class="example-headers-align" multi>
-        <mat-expansion-panel>
+        <mat-expansion-panel (opened)="loadCensusConfig()">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Census Configuration
@@ -36,7 +36,7 @@
             <mat-panel-description>                
             </mat-panel-description>
           </mat-expansion-panel-header>     
-        -- stuff here
+          {{censusConfig | json}}
         </mat-expansion-panel>
 
         <mat-expansion-panel>

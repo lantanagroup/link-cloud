@@ -45,10 +45,10 @@
                   </mat-form-field>  
                 </div>
                 <div style="flex-shrink: 2;">
-                  <button mat-stroked-button (click)="addReportTypeSchedule(i)">
+                  <button mat-stroked-button (click)="addReportTypeSchedule(i)" *ngIf="!viewOnly">
                     Add Schedule
                   </button>
-                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)">
+                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)" *ngIf="!viewOnly">
                     Delete Task
                   </button>                  
                 </div> 
@@ -67,10 +67,10 @@
                         </div> 
                       </div>  
                       <div style="flex-shrink: 2;">
-                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)">
+                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)" *ngIf="!viewOnly">
                           Add Trigger
                         </button>
-                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)">
+                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)" *ngIf="!viewOnly">
                           Delete Schedule           
                         </button> 
                       </div>                    
@@ -82,7 +82,7 @@
                               <mat-label>Trigger</mat-label>
                               <input matInput formControlName="trigger">
                           </mat-form-field>                         
-                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)">
+                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)" *ngIf="!viewOnly">
                             <mat-icon>delete</mat-icon>
                           </button>
                         </div>                           

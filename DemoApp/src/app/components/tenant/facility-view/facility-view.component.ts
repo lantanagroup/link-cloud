@@ -13,6 +13,9 @@ import { FacilityConfigDialogComponent } from '../facility-config-dialog/facilit
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatAccordion, MatExpansionModule } from '@angular/material/expansion';
 import { MatTabsModule } from '@angular/material/tabs';
+import { CensusConfigDialogComponent } from '../../census/census-config-dialog/census-config-dialog.component';
+import { CensusService } from 'src/app/services/gateway/census/census.service';
+import { ICensusConfiguration } from 'src/app/interfaces/census/census-config-model.interface';
 
 
 @Component({
@@ -28,7 +31,8 @@ import { MatTabsModule } from '@angular/material/tabs';
     MatDialogModule,
     MatExpansionModule,
     MatTabsModule,
-    FacilityConfigFormComponent
+    FacilityConfigFormComponent,
+    CensusConfigDialogComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrls: ['./facility-view.component.scss']
@@ -41,16 +45,21 @@ export class FacilityViewComponent implements OnInit {
   facilityConfigFormViewOnly: boolean = true;
   facilityConfigFormIsInvalid: boolean = false;
 
-  constructor(private route: ActivatedRoute, private tenantService: TenantService, private dialog: MatDialog, private snackBar: MatSnackBar) { }
+  censusConfig!: ICensusConfiguration;
+
+  constructor(
+    private route: ActivatedRoute, 
+    private tenantService: TenantService, 
+    private censusService: CensusService,
+    private dialog: MatDialog, 
+    private snackBar: MatSnackBar) { }
 
   ngOnInit() {
     this.route.params.subscribe(params => {
       this.facilityId = params['id'];
-      this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
-        this.facilityConfig = data;
-      }); 
+      this.loadFacilityConfig();
     });    
-  }  
+  }    
 
   showFacilityDialog(): void {
     this.dialog.open(FacilityConfigDialogComponent,
@@ -59,7 +68,8 @@ export class FacilityViewComponent implements OnInit {
         data: { dialogTitle: 'Edit facility', viewOnly: false, facilityConfig: this.facilityConfig }
       }).afterClosed().subscribe(res => {
         console.log(res)
-        if (res) {          
+        if (res) {        
+          this.loadFacilityConfig();  
           this.snackBar.open(`${res}`, '', {
             duration: 3500,
             panelClass: 'success-snackbar',
@@ -69,5 +79,33 @@ export class FacilityViewComponent implements OnInit {
         }
       });
   }
+
+  //load facility configurations
+  loadFacilityConfig(): void { 
+    this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
+      this.facilityConfig = data;
+    }); 
+  }
+
+  loadCensusConfig(): void { 
+    if(!this.censusConfig) {
+      this.censusService.getConfiguration(this.facilityId).subscribe((data: ICensusConfiguration) => {
+        this.censusConfig = data;
+      }, error => {
+        if(error.status == 404) {
+          this.censusConfig = { facilityId: this.facilityConfig.facilityId, scheduledTrigger: ''} as ICensusConfiguration;
+        }
+        else {
+          this.snackBar.open(`Failed to load census configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      }); 
+    }
+  }
+  
 
 }
