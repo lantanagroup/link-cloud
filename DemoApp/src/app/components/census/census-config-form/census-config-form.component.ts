@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -33,8 +33,10 @@ import { CensusService } from 'src/app/services/gateway/census/census.service';
   templateUrl: './census-config-form.component.html',
   styleUrls: ['./census-config-form.component.scss']
 })
-export class CensusConfigFormComponent implements OnInit {
+export class CensusConfigFormComponent implements OnInit, OnChanges {
   @Input() item!: ICensusConfiguration;  
+
+  @Input() formMode!: FormMode;
 
   private _viewOnly: boolean = false;
   @Input()
@@ -44,8 +46,7 @@ export class CensusConfigFormComponent implements OnInit {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
-
-  formMode!: FormMode;
+ 
   configForm!: FormGroup;
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
@@ -60,22 +61,17 @@ export class CensusConfigFormComponent implements OnInit {
   }
   
   ngOnInit(): void {
-    this.configForm.reset();
+    this.configForm.reset(); 
 
     if(this.item) {
-      this.formMode = FormMode.Edit;
-
       //set form values
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);     
       this.scheduledTriggerControl.updateValueAndValidity();
-    }
-    else {
-      this.formMode = FormMode.Create;
-    }
-
+    }    
+ 
     //check if form is view only
     if(this.viewOnly) {
       this.facilityIdControl.disable();
@@ -87,13 +83,35 @@ export class CensusConfigFormComponent implements OnInit {
     });
   }
 
+  ngOnChanges(changes: SimpleChanges) {     
+    
+    if (changes['item'] && changes['item'].currentValue) {
+      this.facilityIdControl.setValue(this.item.facilityId);
+      this.facilityIdControl.updateValueAndValidity();
+
+      this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
+      this.scheduledTriggerControl.updateValueAndValidity();
+
+      //check if form is view only
+      if(this.viewOnly) {
+        this.facilityIdControl.disable();
+        this.scheduledTriggerControl.disable();
+      }
+    }
+  }
+
   //Form Mode enum getter
   get FormMode(): typeof FormMode {
     return FormMode;
   }
 
-  facilityIdControl = this.configForm.get('facilityId') as FormControl;
-  scheduledTriggerControl = this.configForm.get('scheduledTrigger') as FormControl;
+  get facilityIdControl(): FormControl {
+    return this.configForm.get('facilityId') as FormControl;
+  }
+
+  get scheduledTriggerControl(): FormControl {
+    return this.configForm.get('scheduledTrigger') as FormControl;
+  }  
 
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');

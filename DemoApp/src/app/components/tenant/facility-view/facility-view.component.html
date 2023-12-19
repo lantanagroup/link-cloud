@@ -10,7 +10,7 @@
 
     <mat-card *ngIf="facilityConfig">
         <mat-card-content>
-            <app-facility-config-form [viewOnly]="facilityConfigFormViewOnly" [item]="facilityConfig"></app-facility-config-form>       
+            <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>     
             <mat-card-actions align="end">                
                 <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
                     <mat-icon>edit</mat-icon>
@@ -28,7 +28,7 @@
         <button mat-button (click)="accordion.closeAll()">Collapse All</button>
       </div>
       <mat-accordion class="example-headers-align" multi>
-        <mat-expansion-panel (opened)="loadCensusConfig()">
+        <mat-expansion-panel id="censusPanel" (opened)="loadCensusConfig()">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Census Configuration
@@ -36,7 +36,16 @@
             <mat-panel-description>                
             </mat-panel-description>
           </mat-expansion-panel-header>     
-          {{censusConfig | json}}
+          <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage" *ngIf="showNoCensusConfigAlert"></app-link-alert>
+          <app-census-config-form [item]="censusConfig" [viewOnly]="true"></app-census-config-form>  
+          <mat-action-row>          
+            <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration" (click)="showCensusDialog()" *ngIf="showNoCensusConfigAlert">
+                <mat-icon>add</mat-icon>
+            </button>
+            <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration" (click)="showCensusDialog()" *ngIf="!showNoCensusConfigAlert">
+                <mat-icon>edit</mat-icon>
+            </button>
+          </mat-action-row>        
         </mat-expansion-panel>
 
         <mat-expansion-panel>

@@ -32,7 +32,7 @@ export class CensusConfigDialogComponent implements OnInit {
   @ViewChild(CensusConfigFormComponent) censusConfigForm!: CensusConfigFormComponent;
 
   constructor(
-    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, viewOnly: boolean, censusConfig: ICensusConfiguration },
+    @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, censusConfig: ICensusConfiguration },
     private dialogRef: MatDialogRef<CensusConfigDialogComponent>,
     private snackBar: MatSnackBar) { }
 
@@ -40,7 +40,7 @@ export class CensusConfigDialogComponent implements OnInit {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
     this.censusConfig = this.data.censusConfig;
-    this.formMode = this.censusConfig ? FormMode.Edit : FormMode.Create;
+    this.formMode = this.data.formMode;
   }
 
   //Form Mode enum getter

@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DemoApiGateway.Application.models.census;
 using LantanaGroup.Link.DemoApiGateway.Services.Client;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 using static LantanaGroup.Link.DemoApiGateway.settings.GatewayConstants;
 
 namespace LantanaGroup.Link.DemoApiGateway.Controllers
@@ -30,7 +31,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpPost("/config")]
+        [HttpPost("config")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Create([FromBody] CensusConfigModel censusConfig)
@@ -72,7 +73,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpDelete("/config/{censusId}")]
+        [HttpDelete("config/{censusId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Delete(string censusId)
@@ -113,7 +114,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpGet("/config/{censusId}")]
+        [HttpGet("config/{censusId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Get(string censusId)
@@ -131,6 +132,10 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
                 {
                     var result = await response.Content.ReadFromJsonAsync<CensusConfigModel>();
                     return Ok(result);
+                }
+                else if(response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return NotFound();
                 }
 
                 return StatusCode(500, "An error occurred while attempting to get a census configuration.");
@@ -155,7 +160,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpPut("/config/{censusId}")]
+        [HttpPut("config/{censusId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Update(string censusId, [FromBody] CensusConfigModel censusConfig)

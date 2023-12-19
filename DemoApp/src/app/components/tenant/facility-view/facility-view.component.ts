@@ -16,26 +16,31 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { CensusConfigDialogComponent } from '../../census/census-config-dialog/census-config-dialog.component';
 import { CensusService } from 'src/app/services/gateway/census/census.service';
 import { ICensusConfiguration } from 'src/app/interfaces/census/census-config-model.interface';
+import { CensusConfigFormComponent } from "../../census/census-config-form/census-config-form.component";
+import { LinkAlertComponent } from "../../core/link-alert/link-alert.component";
+import { LinkAlertType } from '../../core/link-alert/link-alert-type.enum';
+import { FormMode } from 'src/app/models/FormMode.enum';
 
 
 @Component({
-  selector: 'app-facility-view',
-  standalone: true,
-  imports: [
-    CommonModule,
-    MatToolbarModule,
-    MatButtonModule,
-    MatIconModule,
-    MatCardModule,
-    RouterLink,   
-    MatDialogModule,
-    MatExpansionModule,
-    MatTabsModule,
-    FacilityConfigFormComponent,
-    CensusConfigDialogComponent
-  ],
-  templateUrl: './facility-view.component.html',
-  styleUrls: ['./facility-view.component.scss']
+    selector: 'app-facility-view',
+    standalone: true,
+    templateUrl: './facility-view.component.html',
+    styleUrls: ['./facility-view.component.scss'],
+    imports: [
+        CommonModule,
+        MatToolbarModule,
+        MatButtonModule,
+        MatIconModule,
+        MatCardModule,
+        RouterLink,
+        MatDialogModule,
+        MatExpansionModule,
+        MatTabsModule,
+        FacilityConfigFormComponent,
+        CensusConfigFormComponent,
+        LinkAlertComponent
+    ]
 })
 export class FacilityViewComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
@@ -46,6 +51,10 @@ export class FacilityViewComponent implements OnInit {
   facilityConfigFormIsInvalid: boolean = false;
 
   censusConfig!: ICensusConfiguration;
+  linkNoConfigAlertType = LinkAlertType.info;
+  showNoCensusConfigAlert: boolean = false;
+  noCensusConfigAlertMessage = 'No census configuration found for this facility.';
+  
 
   constructor(
     private route: ActivatedRoute, 
@@ -76,9 +85,29 @@ export class FacilityViewComponent implements OnInit {
             horizontalPosition: 'end',
             verticalPosition: 'top'
           });
+        }        
+      });
+  }
+
+  showCensusDialog(): void {
+    this.dialog.open(CensusConfigDialogComponent,
+      {
+        width: '75%',
+        data: { dialogTitle: 'Census Configuration', formMode: this.showNoCensusConfigAlert ? FormMode.Create : FormMode.Edit, viewOnly: false, censusConfig: this.censusConfig }
+      }).afterClosed().subscribe(res => {
+        console.log(res)
+        if (res) {        
+          this.loadFacilityConfig();  
+          this.snackBar.open(`${res}`, '', {
+            duration: 3500,
+            panelClass: 'success-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
         }
       });
   }
+
 
   //load facility configurations
   loadFacilityConfig(): void { 
@@ -91,9 +120,24 @@ export class FacilityViewComponent implements OnInit {
     if(!this.censusConfig) {
       this.censusService.getConfiguration(this.facilityId).subscribe((data: ICensusConfiguration) => {
         this.censusConfig = data;
+        if(this.censusConfig) {
+          this.showNoCensusConfigAlert = false;
+        }
+        else {
+          this.showNoCensusConfigAlert = true;
+        }
+        
       }, error => {
         if(error.status == 404) {
+          this.snackBar.open(`No current census configuration found for facility ${this.facilityId}, please create one.`, '', {
+            duration: 3500,
+            panelClass: 'info-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
           this.censusConfig = { facilityId: this.facilityConfig.facilityId, scheduledTrigger: ''} as ICensusConfiguration;
+          this.showNoCensusConfigAlert = true;
+          this.showCensusDialog();
         }
         else {
           this.snackBar.open(`Failed to load census configuration for the facility, see error for details.`, '', {
