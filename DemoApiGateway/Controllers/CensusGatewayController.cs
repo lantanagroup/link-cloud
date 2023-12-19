@@ -128,12 +128,12 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
 
             try
             {
-                if (response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NoContent)
                 {
                     var result = await response.Content.ReadFromJsonAsync<CensusConfigModel>();
                     return Ok(result);
                 }
-                else if(response.StatusCode == HttpStatusCode.NotFound)
+                else if(response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
                 {
                     return NotFound();
                 }
