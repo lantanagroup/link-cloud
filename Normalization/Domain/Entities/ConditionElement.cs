@@ -13,5 +13,5 @@ public class ConditionElement
 
 public enum Operators
 {
-    Equal, GreaterThan, GreaterThanOrEqual,LessThan, LessThanOrEqual
+    Equal, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, NotEqual, Exists, NotExists
 }
