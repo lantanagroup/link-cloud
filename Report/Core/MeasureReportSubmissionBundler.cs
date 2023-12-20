@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Report.Core
 
 
                 // bundle based on configured bundling type
-                var config = configs.FirstOrDefault(c => c.ReportType == mr.Measure);
+                var config = configs.FirstOrDefault(c => c.ReportType == GetMeasureIdFromCanonical(mr.Measure));
 
                 if (config != null && config.BundlingType == BundlingType.SharedPatientLineLevel)
                     BundleSharedPatientLineLevel(submissionBundle, mr);
@@ -199,6 +199,10 @@ namespace LantanaGroup.Link.Report.Core
 
                 // remove this now bundled resource from the measure report
                 measureReport.Contained.RemoveAt(0);
+
+                // remove the ext that reference the contained resource
+
+               // measureReport.Extension
             }
 
 
