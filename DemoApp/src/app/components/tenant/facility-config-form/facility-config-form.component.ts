@@ -80,14 +80,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     }
     else {
       this.formMode = FormMode.Create;
-    }
-
-    //check if form is view only
-    if(this.viewOnly) {
-      this.facilityIdControl.disable();
-      this.facilityNameControl.disable();
-      this.scheduledTasks.disable();
-    }
+    }   
 
     this.facilityConfigForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
@@ -105,14 +98,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityNameControl.updateValueAndValidity();
 
       this.loadScheduledTasks(this.item.scheduledTasks);
-      this.scheduledTasks.updateValueAndValidity();
-
-      //check if form is view only
-      if(this.viewOnly) {
-        this.facilityIdControl.disable();
-        this.facilityNameControl.disable();
-        this.scheduledTasks.disable();
-      }
+      this.scheduledTasks.updateValueAndValidity();     
     }
   }
 

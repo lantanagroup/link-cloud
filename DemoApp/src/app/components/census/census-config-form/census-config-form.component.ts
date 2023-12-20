@@ -71,13 +71,7 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);     
       this.scheduledTriggerControl.updateValueAndValidity();
     }    
- 
-    //check if form is view only
-    if(this.viewOnly) {
-      this.facilityIdControl.disable();
-      this.scheduledTriggerControl.disable();
-    }
-
+   
     this.configForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.configForm.invalid);
     });
@@ -91,12 +85,6 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
-
-      //check if form is view only
-      if(this.viewOnly) {
-        this.facilityIdControl.disable();
-        this.scheduledTriggerControl.disable();
-      }
     }
   }
 

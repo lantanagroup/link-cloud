@@ -2,7 +2,7 @@
     <div class="form-input">
         <mat-form-field appearance="outline" class="subject-input form-input ">
           <mat-label>Facility Id</mat-label>
-          <input matInput formControlName="facilityId">
+          <input matInput formControlName="facilityId" [readonly]="viewOnly">
           <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
             <mat-icon>close</mat-icon>
           </button>
@@ -15,7 +15,7 @@
       <div class="form-input">
         <mat-form-field appearance="outline" class="subject-input form-input ">
           <mat-label>Scheduled Trigger</mat-label>
-          <input matInput formControlName="scheduledTrigger">
+          <input matInput formControlName="scheduledTrigger" [readonly]="viewOnly">
           <button *ngIf="scheduledTriggerControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearScheduledTrigger()">
             <mat-icon>close</mat-icon>
           </button>
