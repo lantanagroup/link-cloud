@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Report.Core
                 _logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
 
                 // add to aggregate measure report
-                AddToAggregateMeasureReport(submissionBundle, mr, orgId);
+                AddToAggregateMeasureReport(submissionBundle, ReportFormater(mr), orgId);
 
 
                 // bundle based on configured bundling type
@@ -214,6 +214,12 @@ namespace LantanaGroup.Link.Report.Core
 
         #region Common Methods
 
+        protected MeasureReport ReportFormater(MeasureReport measureReport)
+        {
+            measureReport.EvaluatedResource.ForEach(r => { if (r.Extension.Count > 0) r.Extension = new List<Extension>(); });
+            return measureReport;
+        }
+        
         protected Bundle CreateNewBundle(MeasureReportScheduleModel reportSchedule)
         {
             Bundle bundle = new Bundle();
