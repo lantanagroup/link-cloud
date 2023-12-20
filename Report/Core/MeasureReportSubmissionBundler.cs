@@ -89,6 +89,7 @@ namespace LantanaGroup.Link.Report.Core
                 try
                 {
                     mr = parser.Parse<MeasureReport>(entry.MeasureReport);
+                   // mr.Measure = mr.Measure + "|" + "1.0.0";
                 }
                 catch (Exception ex)
                 {

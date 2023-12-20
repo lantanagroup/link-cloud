@@ -64,7 +64,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<DatabaseHealthCheck>("Database");
 
     // Add controllers
-    builder.Services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
+    builder.Services.AddControllers();
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
