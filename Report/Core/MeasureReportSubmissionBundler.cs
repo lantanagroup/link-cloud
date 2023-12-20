@@ -71,11 +71,11 @@ namespace LantanaGroup.Link.Report.Core
                 }
 
                 // aggregate measure report
-                if (GetAggregateMeasureReport(submissionBundle, config.ReportType) is null)
+              /*  if (GetAggregateMeasureReport(submissionBundle, config.ReportType) is null)
                 {
                     var measureAgg = CreateAggregateMeasureReport(config.ReportType, orgId, new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)));
                     submissionBundle.AddResourceEntry(measureAgg, GetFullUrl(measureAgg));
-                }
+                }*/
             }
 
 
@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.Report.Core
 
 
                 // bundle based on configured bundling type
-                var config = configs.FirstOrDefault(c => c.ReportType == mr.Measure);
+                var config = configs.FirstOrDefault(c => c.ReportType == GetMeasureIdFromCanonical(mr.Measure));
 
                 if (config != null && config.BundlingType == BundlingType.SharedPatientLineLevel)
                     BundleSharedPatientLineLevel(submissionBundle, mr);
@@ -121,7 +121,6 @@ namespace LantanaGroup.Link.Report.Core
                     BundleDefault(submissionBundle, mr);
 
             }
-
 
             // create or update the submission bundle to storage
             submission.SubmissionBundle = submissionBundle;
@@ -199,6 +198,10 @@ namespace LantanaGroup.Link.Report.Core
 
                 // remove this now bundled resource from the measure report
                 measureReport.Contained.RemoveAt(0);
+
+                // remove the ext that reference the contained resource
+
+               // measureReport.Extension
             }
 
 
@@ -249,10 +252,19 @@ namespace LantanaGroup.Link.Report.Core
             }
 
             int index = measureCanonical.LastIndexOf('/');
-            if (index < 0)
-                return measureCanonical;
 
-            return measureCanonical.Substring(index+1);
+            int versionIndex = measureCanonical.LastIndexOf('|');
+    
+            // get the measure between index and versionIndex
+            if (versionIndex > 0)
+            {
+                return measureCanonical.Substring(index+1, versionIndex - index - 1);
+            }
+            else
+            {
+                // no version specified
+                return measureCanonical.Substring(index+1);
+            }
         }
 
 
@@ -307,7 +319,7 @@ namespace LantanaGroup.Link.Report.Core
 
         protected Bundle.EntryComponent GetAggregatePatientList(Bundle bundle, string measureCanonical)
         {
-
+ 
             return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "List"
                 && ((List)e.Resource).Identifier is not null
                 && ((List)e.Resource).Identifier.Any(i => i.System == ReportConstants.Bundle.MainSystem && i.Value == GetMeasureIdFromCanonical(measureCanonical))
@@ -359,6 +371,7 @@ namespace LantanaGroup.Link.Report.Core
 
         protected Bundle.EntryComponent GetAggregateMeasureReport(Bundle bundle, string measureCanonical)
         {
+
             return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "MeasureReport"
                 && ((MeasureReport)e.Resource).Measure == measureCanonical
                 && e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
@@ -376,11 +389,19 @@ namespace LantanaGroup.Link.Report.Core
             };
             mr.Contained = new List<Resource>
             {
-                new List() { Status = List.ListStatus.Current, Mode = ListMode.Snapshot }
+                new List() { Status = List.ListStatus.Current, Mode = ListMode.Snapshot, Id =  (mr.Contained.Count+1).ToString() }
             };
             mr.Status = MeasureReport.MeasureReportStatus.Complete;
             mr.Type = MeasureReport.MeasureReportType.SubjectList;
+
             mr.Measure = measureCanonical;
+            // remove version from measureCanonical
+            int versionIndex = measureCanonical.LastIndexOf('|');
+            if (versionIndex > 0)
+            {
+                mr.Measure = measureCanonical.Substring(0, versionIndex);
+            }
+    
             mr.Reporter = new ResourceReference($"Organization/{organizationId}");
             mr.Period = new Period(reportStart, reportEnd);
 
@@ -401,6 +422,7 @@ namespace LantanaGroup.Link.Report.Core
                 submissionBundle.Entry.Add(measureAgg);
             }
 
+  
             List aggList = (List)((MeasureReport)measureAgg.Resource).Contained.First(c => c.TypeName == "List");
             string mrReference = $"MeasureReport/{measureReport.Id}";
             var existing = aggList.Entry.FirstOrDefault(e => e.Item.Reference == mrReference);
@@ -410,9 +432,76 @@ namespace LantanaGroup.Link.Report.Core
                 aggList.Entry.Add(new List.EntryComponent() { Item = new ResourceReference(mrReference) });
             }
 
+            MeasureReport masterReport = (MeasureReport)measureAgg.Resource;
+            // add group
+            foreach (MeasureReport.GroupComponent group in measureReport.Group)
+            {
+                foreach (MeasureReport.PopulationComponent population in group.Population)
+                {
+
+                    // Check if group and population code exist in master, if not create
+                    MeasureReport.PopulationComponent measureGroupPopulation = getOrCreateGroupAndPopulation(masterReport, population, group);
+                    // Add population.count to the master group/population count
+                    //if measureGroupPopulation.Count is null return 0
+                    measureGroupPopulation.Count = (measureGroupPopulation.Count != null ? measureGroupPopulation.Count : 0) + (population.Count != null ? population.Count : 0);
+                    // If this population incremented the master
+                    if (population.Count > 0)
+                    {
+                        // set a reference to the aggList
+                        measureGroupPopulation.SubjectResults = new ResourceReference($"#{aggList.Id}");
+                    }
+
+                }
+            }
 
         }
 
+        protected MeasureReport.PopulationComponent getOrCreateGroupAndPopulation(MeasureReport masterReport, MeasureReport.PopulationComponent reportPopulation, MeasureReport.GroupComponent reportGroup)
+        {
+            // get the population and group codes
+
+            string populationCode = (reportPopulation.Code != null && reportPopulation.Code.Coding.Count > 0) ? reportPopulation.Code.Coding[0].Code : "";
+            string groupCode = (reportGroup.Code != null && reportGroup.Code.Coding.Count > 0) ? reportGroup.Code.Coding[0].Code : "";
+
+            MeasureReport.GroupComponent masterReportGroupValue = null;
+            MeasureReport.PopulationComponent masteReportGroupPopulationValue;
+            // find the group by code
+            MeasureReport.GroupComponent masterReportGroup;
+            masterReportGroup = masterReport.Group.FirstOrDefault(g => g.Code != null && g.Code.Coding.Count > 0 && g.Code.Coding[0].Code == groupCode);
+            // if empty find the group without the code
+            if (masterReportGroup != null)
+            {
+                masterReportGroupValue = masterReportGroup;
+            }
+            else
+            {
+                if (groupCode == "")
+                {
+                    masterReportGroupValue = (masterReport.Group != null && masterReport.Group.Count > 0) ? masterReport.Group[0] : null; // only one group with no code
+                }
+            }
+            // if still empty create it
+            if (masterReportGroupValue == null)
+            {
+                masterReportGroupValue = new MeasureReport.GroupComponent();
+                masterReportGroupValue.Code = (reportGroup.Code != null ? reportGroup.Code : null);
+                masterReport.Group.Add(masterReportGroupValue);
+            }
+            // find population by code
+            MeasureReport.PopulationComponent masterReportGroupPopulation = masterReportGroupValue.Population.FirstOrDefault(g => g.Code != null && g.Code.Coding.Count > 0 && g.Code.Coding[0].Code == populationCode);
+            // if empty create it
+            if (masterReportGroupPopulation != null)
+            {
+                masteReportGroupPopulationValue = masterReportGroupPopulation;
+            }
+            else
+            {
+                masteReportGroupPopulationValue = new MeasureReport.PopulationComponent();
+                masteReportGroupPopulationValue.Code = reportPopulation.Code;
+                masterReportGroupValue.Population.Add(masteReportGroupPopulationValue);
+            }
+            return masteReportGroupPopulationValue;
+        }
 
         /// <summary>
         /// Adds the given measure report to the given bundle.
@@ -447,7 +536,6 @@ namespace LantanaGroup.Link.Report.Core
         }
 
         #endregion
-
 
     }
 
