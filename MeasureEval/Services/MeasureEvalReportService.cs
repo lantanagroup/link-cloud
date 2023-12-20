@@ -76,10 +76,6 @@ public class MeasureEvalReportService : IMeasureEvalReportService
             FhirJsonParser parser = new FhirJsonParser();
             MeasureReport measureReport = parser.Parse<MeasureReport>(responseContent);
 
-            // read the measure from db
-
-           // measureReport.Measure = 
-
             return measureReport;
         }
         else
