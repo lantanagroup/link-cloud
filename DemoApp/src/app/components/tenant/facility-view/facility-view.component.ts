@@ -97,7 +97,12 @@ export class FacilityViewComponent implements OnInit {
       }).afterClosed().subscribe(res => {
         console.log(res)
         if (res) {        
-          this.loadFacilityConfig();  
+          this.censusService.getConfiguration(this.facilityId).subscribe((data: ICensusConfiguration) => {
+            if(data) {
+              this.showNoCensusConfigAlert = false;
+              this.censusConfig = data;
+            }           
+          }); 
           this.snackBar.open(`${res}`, '', {
             duration: 3500,
             panelClass: 'success-snackbar',
