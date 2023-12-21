@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Report.Core
                 _logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
 
                 // add to aggregate measure report
-                AddToAggregateMeasureReport(submissionBundle, ReportFormater(mr), orgId);
+                AddToAggregateMeasureReport(submissionBundle, mr, orgId);
 
 
                 // bundle based on configured bundling type
@@ -200,6 +200,7 @@ namespace LantanaGroup.Link.Report.Core
                 measureReport.Contained.RemoveAt(0);
 
                 // remove the ext that reference the contained resource
+                measureReport.Extension.RemoveAll(e => e.Value is Extension);
 
                // measureReport.Extension
             }
