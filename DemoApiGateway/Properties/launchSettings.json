@@ -5,10 +5,10 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Local"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:7152;http://localhost:5151"
+      "applicationUrl": "https://localhost:7777;http://localhost:7777"
     },
     "IIS Express": {
       "commandName": "IISExpress",

@@ -10,15 +10,17 @@ import { throwError } from "rxjs/internal/observable/throwError";
     handleError(err: any) {
         let errorMessage = '';
     
-        if (err.error instanceof ErrorEvent) {
+        if (err instanceof ErrorEvent) {
           errorMessage = `An error occured: ${err.error.message}`;
         }
         else {
           errorMessage = `Server returned code: ${err.status}, error message is: ${err.message}`;
         }
+
+        err.message = errorMessage;
     
         console.error(errorMessage);
-        return throwError(() => errorMessage);
+        return throwError(() => err);
     
       }
 

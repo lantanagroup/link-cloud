@@ -1,4 +1,5 @@
 export interface IFacilityConfigModel {
+  id?: string;
   facilityId: string;
   facilityName: string;
   scheduledTasks: IScheduledTaskModel[];

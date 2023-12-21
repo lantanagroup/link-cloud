@@ -10,6 +10,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FacilityConfigDialogComponent } from '../facility-config-dialog/facility-config-dialog.component';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'demo-tenant-dashboard',
@@ -22,7 +23,8 @@ import { FacilityConfigDialogComponent } from '../facility-config-dialog/facilit
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    RouterLink
   ],
   templateUrl: './tenant-dashboard.component.html',
   styleUrls: ['./tenant-dashboard.component.scss']
