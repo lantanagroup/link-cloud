@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -33,7 +33,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
   templateUrl: './facility-config-form.component.html',
   styleUrls: ['./facility-config-form.component.scss']
 })
-export class FacilityConfigFormComponent implements OnInit {
+export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   @Input() item!: IFacilityConfigModel;  
 
@@ -74,22 +74,32 @@ export class FacilityConfigFormComponent implements OnInit {
 
       this.facilityNameControl.setValue(this.item.facilityName);     
       this.facilityNameControl.updateValueAndValidity();
+
+      this.loadScheduledTasks(this.item.scheduledTasks);
+      this.scheduledTasks.updateValueAndValidity();
     }
     else {
       this.formMode = FormMode.Create;
-    }
-
-    //check if form is view only
-    if(this.viewOnly) {
-      this.facilityIdControl.disable();
-      this.facilityNameControl.disable();
-      this.scheduledTasks.disable();
-    }
+    }   
 
     this.facilityConfigForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
 
+  }
+
+  ngOnChanges(changes: SimpleChanges) {     
+    
+    if (changes['item'] && changes['item'].currentValue) {
+      this.facilityIdControl.setValue(this.item.facilityId);
+      this.facilityIdControl.updateValueAndValidity();
+
+      this.facilityNameControl.setValue(this.item.facilityName);     
+      this.facilityNameControl.updateValueAndValidity();
+
+      this.loadScheduledTasks(this.item.scheduledTasks);
+      this.scheduledTasks.updateValueAndValidity();     
+    }
   }
 
   //Form Mode enum getter
@@ -179,6 +189,11 @@ export class FacilityConfigFormComponent implements OnInit {
     this.facilityNameControl.updateValueAndValidity();
   }
 
+  clearScheduledTasks(): void {
+    this.scheduledTasks.clear();
+    this.scheduledTasks.updateValueAndValidity();
+  }
+
   removeScheduledTask(index: number): void {
     this.scheduledTasks.removeAt(index);
     this.scheduledTasks.updateValueAndValidity();
@@ -187,25 +202,14 @@ export class FacilityConfigFormComponent implements OnInit {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
       if(this.formMode == FormMode.Create) {
-        let scheduledTasks: IScheduledTaskModel[] = this.scheduledTasks.value.map((task: any) => { 
-          return {
-            kafkaTopic: task.kafkaTopic,
-            reportTypeSchedules: task.reportTypeSchedules.map((schedule: any) => {
-              return {
-                reportType: schedule.reportType,
-                scheduledTriggers: schedule.scheduledTriggers.map((trigger: any) => {
-                  return trigger.trigger;
-                })
-              }
-            })
-          }
-        });
-        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
+        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
+        this.tenantService.createFacility(this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit(response);
         });
       }
       else if(this.formMode == FormMode.Edit) {
-        this.tenantService.updateFacility(this.facilityIdControl.value, this.facilityNameControl.value, []).subscribe((response: IEntityCreatedResponse) => {
+        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
+        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit(response);
         });
       }
@@ -218,6 +222,46 @@ export class FacilityConfigFormComponent implements OnInit {
         verticalPosition: 'top'
       });
     }
+  }
+
+  private mapScheduledTasks(): IScheduledTaskModel[] {
+    return this.scheduledTasks.value.map((task: any) => {
+      return {
+        kafkaTopic: task.kafkaTopic,
+        reportTypeSchedules: task.reportTypeSchedules.map((schedule: any) => {
+          return {
+            reportType: schedule.reportType,
+            scheduledTriggers: schedule.scheduledTriggers.map((trigger: any) => {
+              return trigger.trigger;
+            })
+          }
+        })
+      }
+    });
+  }
+
+  private loadScheduledTasks(scheduledTasks: IScheduledTaskModel[]): void {
+
+    this.scheduledTasks.clear();
+    this.scheduledTasks.updateValueAndValidity();
+
+    scheduledTasks.forEach((task: IScheduledTaskModel) => {
+      this.scheduledTasks.push(new FormGroup({
+        kafkaTopic: new FormControl(task.kafkaTopic, Validators.required),
+        reportTypeSchedules: new FormArray(
+          task.reportTypeSchedules.map((schedule: any) => {
+            return new FormGroup({
+              reportType: new FormControl(schedule.reportType, Validators.required),
+              scheduledTriggers: new FormArray(
+                schedule.scheduledTriggers.map((trigger: any) => {
+                  return new FormGroup({ trigger: new FormControl(trigger, Validators.required) });
+                })
+              )
+            })
+          })
+        )
+      }));
+    });
   }
 
 }

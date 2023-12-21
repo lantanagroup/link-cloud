@@ -31,14 +31,15 @@ export class TenantService {
       )
   }
 
-  updateFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
+      id: id,
       facilityId: facilityId,
       facilityName: facilityName,
       scheduledTasks: scheduledTasks
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/tenant/facility/${facilityId}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/tenant/facility/${id}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
