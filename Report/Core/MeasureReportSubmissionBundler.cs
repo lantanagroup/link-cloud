@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
 using System.Configuration;
+using System.Linq;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -197,12 +198,22 @@ namespace LantanaGroup.Link.Report.Core
                 }
 
                 // remove this now bundled resource from the measure report
+                string id = measureReport.Contained[0].Id;
                 measureReport.Contained.RemoveAt(0);
-
+                Extension extToRemove = null;
                 // remove the ext that reference the contained resource
-                measureReport.Extension.RemoveAll(e => e.Value is Extension);
+                measureReport.Extension.ForEach(e =>
+                {
+                    if (e.Value is ResourceReference)
+                    {
+                        var s = (ResourceReference)e.Value;
+                        if (s.Reference.Contains(id))
+                            extToRemove = e;
+                    }
+                });
 
-               // measureReport.Extension
+                if (extToRemove != null)
+                    measureReport.Extension.Remove(extToRemove);
             }
 
 
