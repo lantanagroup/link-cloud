@@ -2,7 +2,7 @@
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Facility Id</mat-label>
-        <input matInput formControlName="facilityId">
+        <input matInput formControlName="facilityId" [readonly]="viewOnly">
         <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
           <mat-icon>close</mat-icon>
         </button>
@@ -15,7 +15,7 @@
     <div class="form-input">
         <mat-form-field appearance="outline" class="subject-input form-input ">
           <mat-label>Facility Name</mat-label>
-          <input matInput formControlName="facilityName">
+          <input matInput formControlName="facilityName" [readonly]="viewOnly">
           <button *ngIf="facilityNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityName()">
             <mat-icon>close</mat-icon>
           </button>
@@ -28,7 +28,7 @@
     <p>
       <mat-toolbar class="form-section-bar">
         <span class="title">Scheduled Tasks</span>
-        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()">
+        <button mat-icon-button aria-label="Add a new scheduled task" (click)="addScheduledTask()" *ngIf="!viewOnly">
           <mat-icon>add</mat-icon>
         </button>
       </mat-toolbar>
@@ -41,14 +41,14 @@
                 <div style="flex: auto;">
                   <mat-form-field appearance="outline" class="tenant-facility-task-input">
                     <mat-label>kafka Topic</mat-label>
-                    <input matInput formControlName="kafkaTopic">
+                    <input matInput formControlName="kafkaTopic" [readonly]="viewOnly">
                   </mat-form-field>  
                 </div>
                 <div style="flex-shrink: 2;">
-                  <button mat-stroked-button (click)="addReportTypeSchedule(i)">
+                  <button mat-stroked-button (click)="addReportTypeSchedule(i)" *ngIf="!viewOnly">
                     Add Schedule
                   </button>
-                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)">
+                  <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeScheduledTask(i)" *ngIf="!viewOnly">
                     Delete Task
                   </button>                  
                 </div> 
@@ -62,15 +62,15 @@
                         <div class="input-container">
                           <mat-form-field appearance="outline" class="tenant-facility-task-input">
                               <mat-label>Report Type</mat-label>
-                              <input matInput formControlName="reportType">
+                              <input matInput formControlName="reportType" [readonly]="viewOnly">
                           </mat-form-field>
                         </div> 
                       </div>  
                       <div style="flex-shrink: 2;">
-                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)">
+                        <button mat-stroked-button aria-label="Add a schedule trigger" (click)="addScheduledTrigger(i, j)" *ngIf="!viewOnly">
                           Add Trigger
                         </button>
-                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)">
+                        <button mat-stroked-button color="warn" style="margin-left: .5em;" aria-label="Remove report type schedule" (click)="deleteReportTypeSchedule(i, j)" *ngIf="!viewOnly">
                           Delete Schedule           
                         </button> 
                       </div>                    
@@ -80,9 +80,9 @@
                         <div class="input-container" [formGroupName]="k">
                           <mat-form-field appearance="outline" class="tenant-facility-task-input">
                               <mat-label>Trigger</mat-label>
-                              <input matInput formControlName="trigger">
+                              <input matInput formControlName="trigger" [readonly]="viewOnly">
                           </mat-form-field>                         
-                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)">
+                          <button mat-icon-button aria-label="Delete trigger" (click)="deleteScheduledTrigger(i, j, k)" *ngIf="!viewOnly">
                             <mat-icon>delete</mat-icon>
                           </button>
                         </div>                           

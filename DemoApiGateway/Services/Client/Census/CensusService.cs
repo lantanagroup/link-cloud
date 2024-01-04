@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            HttpResponseMessage response = await _httpClient.PostAsJsonAsync($"api/census", model);
+            HttpResponseMessage response = await _httpClient.PostAsJsonAsync($"api/census/config", model);
 
             return response;
         }
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            HttpResponseMessage response = await _httpClient.GetAsync($"api/census/{censusId}");
+            HttpResponseMessage response = await _httpClient.GetAsync($"api/census/config/{censusId}");
 
             return response;
         }
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            HttpResponseMessage response = await _httpClient.PutAsJsonAsync($"api/census/{censusId}", model);
+            HttpResponseMessage response = await _httpClient.PutAsJsonAsync($"api/census/config/{censusId}", model);
 
             return response;
         } 

@@ -7,7 +7,6 @@ import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { V } from '@angular/cdk/keycodes';
 import { FacilityConfigFormComponent } from '../facility-config-form/facility-config-form.component';
 
 @Component({
