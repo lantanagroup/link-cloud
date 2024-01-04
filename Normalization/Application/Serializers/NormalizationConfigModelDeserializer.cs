@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Serializers;
 
@@ -47,6 +48,7 @@ public class NormalizationConfigModelDeserializer
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
             };
 
             INormalizationOperation? deserializedOperation = operation["$type"]?.ToString() switch
@@ -55,11 +57,12 @@ public class NormalizationConfigModelDeserializer
                 "ConditionalTransformationOperation" => JsonSerializer.Deserialize<ConditionalTransformationOperation>(operation, options),
                 "CopyElementOperation" => JsonSerializer.Deserialize<CopyElementOperation>(operation, options),
                 "CopyLocationIdentifierToTypeOperation" => JsonSerializer.Deserialize<CopyLocationIdentifierToTypeOperation>(operation, options),
+                "PeriodDateFixerOperation" => JsonSerializer.Deserialize<PeriodDateFixerOperation>(operation, options),
                 _ => null,
             };
 
             if(deserializedOperation != null)
-                operationSeqDict.Add(incrementor.ToString(), deserializedOperation);
+                operationSeqDict.Add(incrementor.ToString(), deserializedOperation); 
             
             incrementor++;
         }
