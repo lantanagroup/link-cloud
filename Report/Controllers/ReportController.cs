@@ -1,8 +1,10 @@
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -28,7 +30,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportId"></param>
         /// <returns></returns>
         [HttpGet("GetSubmissionBundle")]
-        public async Task<MeasureReportSubmissionModel> GetSubmissionBundle(string reportId)
+        public async Task<JsonElement> GetSubmissionBundle(string reportId)
         {
             try
             {
@@ -39,9 +41,9 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 _logger.LogInformation($"Executing GenerateSubmissionBundleJob for MeasureReportScheduleModel {reportId}");
 
-                var submission = await _bundler.GenerateBundle(reportId);
+                MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
 
-                return submission;
+                return JsonSerializer.SerializeToElement(submission.SubmissionBundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
             }
             catch (Exception ex)
             {
