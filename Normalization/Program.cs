@@ -67,6 +67,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
+    builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
     builder.Services.AddSingleton<IConfigRepository, ConfigRepository>();
     builder.Services.AddHostedService<PatientDataAcquiredListener>();
 
