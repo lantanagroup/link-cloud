@@ -131,6 +131,41 @@ stages:
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Account/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Account"
       condition: always()
@@ -160,6 +195,41 @@ stages:
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.apiChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Api/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)   
     - task: Docker@2
       displayName: "Build & Push API"
       condition: always()
@@ -189,6 +259,41 @@ stages:
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Audit/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)   
     - task: Docker@2
       displayName: "Build & Push Audit"
       condition: always()
@@ -247,7 +352,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/DataAcquisition/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Data Acquisition"
       condition: always()
@@ -276,7 +416,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.measureChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/MeasureEval/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Measure Eval"
       condition: always()
@@ -305,7 +480,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Normalization/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Normalization"
       condition: always()
@@ -334,7 +544,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Notification/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Notification"
       condition: always()
@@ -392,7 +637,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientqueryChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/PatientsToQuery/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push PatientQuery"
       condition: always()
@@ -421,7 +701,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/QueryDispatch/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push QueryDispatch"
       condition: always()
@@ -450,7 +765,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.reportChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Report/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Report"
       condition: always()
@@ -480,7 +830,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Submission/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Submission"
       condition: always()
@@ -510,7 +895,42 @@ stages:
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps: 
+    steps:
+    - task: PowerShell@2
+      displayName: 'Transform nuget.config'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $path = '$(System.DefaultWorkingDirectory)/Tenant/nuget.config'
+          $nugetUrl = '$(nuget)'
+          $sharedUrl = '$(Shared_BOTW_Feed)'
+          $token = '$(ClearTextPassword)'
+          $basePath = '$(System.DefaultWorkingDirectory)'
+        
+          $xml = [xml](Get-Content -Path $path)
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'nuget' }
+          $node.value = $nugetUrl
+        
+          Write-Host "updated nuget url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSources.add |
+                where { $_.key -eq 'Shared_BOTW_Feed' }
+          $node.value = $sharedUrl
+        
+          Write-Host "Shared botw url:"
+          Write-Host $node.value
+        
+          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
+                  where { $_.key -eq 'ClearTextPassword' }
+          $node.value = $token
+        
+          Write-Host "updated token:"
+          Write-Host $node.value
+        
+          $xml.Save($path)    
     - task: Docker@2
       displayName: "Build & Push Tenant"
       condition: always()
