@@ -93,7 +93,8 @@ public class QueryConfigController : Controller
     }
 
     /// <summary>
-    /// Creates a FhirQueryConfiguration record for a facility
+    /// Creates a FhirQueryConfiguration record for a facility. Should only be used for initial configuration.
+    /// Supported Authentication Types: Basic, Epic
     /// </summary>
     /// <param name="fhirQueryConfiguration"></param>
     /// <param name="cancellationToken"></param>
@@ -135,6 +136,7 @@ public class QueryConfigController : Controller
 
     /// <summary>
     /// Updates a FhirQueryConfiguration record for a facility. This update will do a clean replace of the existing record and will not update the delta between the 2 records.
+    /// Supported Authentication Types: Basic, Epic
     /// </summary>
     /// <param name="fhirQueryConfiguration"></param>
     /// <param name="cancellationToken"></param>

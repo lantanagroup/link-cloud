@@ -100,7 +100,8 @@ public class AuthenticationConfigController : Controller
     }
 
     /// <summary>
-    /// Creates a AuthenticationSettings for a facility
+    /// Creates a AuthenticationSettings for a facility.
+    /// Supported Authentication Types: Basic, Epic
     /// </summary>
     /// <param name="facilityId"></param>
     /// <param name="queryConfigurationTypePathParameter"></param>
@@ -164,7 +165,8 @@ public class AuthenticationConfigController : Controller
     }
 
     /// <summary>
-    /// 
+    /// Updates a AuthenticationSettings for a facility.
+    /// Supported Authentication Types: Basic, Epic
     /// </summary>
     /// <param name="facilityId"></param>
     /// <param name="queryConfigurationTypePathParameter"></param>

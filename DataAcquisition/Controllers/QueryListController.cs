@@ -55,6 +55,14 @@ public class QueryListController : Controller
         }
     }
 
+    /// <summary>
+    /// Creates or updates a FhirQueryConfiguration record for a given facilityId.
+    /// Supported Authentication Types: Basic, Epic
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="fhirListConfiguration"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPost("{facilityId}/fhirQueryList")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
