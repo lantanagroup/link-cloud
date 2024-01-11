@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
                 }
                 else if(eleToUpdate is Code<EncounterStatus>)
                 {
-                    ((Code<EncounterStatus>)eleToUpdate).Value = (EncounterStatus)Enum.Parse(typeof(EncounterStatus), request.Operation.TransformValue);
+                    ((Code<EncounterStatus>)eleToUpdate).Value = (EncounterStatus)Enum.Parse(typeof(EncounterStatus), request.Operation.TransformValue, true);
                 }
                 else
                 {

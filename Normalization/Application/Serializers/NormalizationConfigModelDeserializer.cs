@@ -57,11 +57,12 @@ public class NormalizationConfigModelDeserializer
                 "ConditionalTransformationOperation" => JsonSerializer.Deserialize<ConditionalTransformationOperation>(operation, options),
                 "CopyElementOperation" => JsonSerializer.Deserialize<CopyElementOperation>(operation, options),
                 "CopyLocationIdentifierToTypeOperation" => JsonSerializer.Deserialize<CopyLocationIdentifierToTypeOperation>(operation, options),
+                "PeriodDateFixerOperation" => JsonSerializer.Deserialize<PeriodDateFixerOperation>(operation, options),
                 _ => null,
             };
 
             if(deserializedOperation != null)
-                operationSeqDict.Add(incrementor.ToString(), deserializedOperation);
+                operationSeqDict.Add(incrementor.ToString(), deserializedOperation); 
             
             incrementor++;
         }
