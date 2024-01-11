@@ -10,6 +10,7 @@ public static class NormalizationConstants
         public const string Mongo = "MongoDB";
         public const string Redis = "Redis";
         public const string Telemetry = "TelemetryConfig";
+        public const string TenantApiSettings = "TenantApiSettings";
     }
 
     public static class FixResourceIDCommand
