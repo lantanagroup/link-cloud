@@ -37,6 +37,13 @@ public class PeriodDateFixerCommandHandler : IRequestHandler<PeriodDateFixerComm
 
                     period.EndElement.Value = endDateTime.ToString("yyyy-MM-ddThh:mm:ss") + "Z";
                     period.StartElement.Value = startDateTime.ToString("yyyy-MM-ddThh:mm:ss") + "Z";
+
+                    propertyChanges.Add(new PropertyChangeModel
+                    {
+                        PropertyName = $"{resource.TypeName}.period",
+                        InitialPropertyValue = endDate.ToString(),
+                        NewPropertyValue = endDateTime.ToString("yyyy-MM-ddThh:mm:ss") + "Z"
+                    });
                 }
 
             }
