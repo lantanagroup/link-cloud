@@ -1,9 +1,7 @@
-﻿using Amazon.Runtime.Internal;
-using Hl7.Fhir.FhirPath;
+﻿using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models;
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
@@ -24,32 +22,31 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
             var bundle = request.Bundle;
             var propertyChanges = request.PropertyChanges;
 
-            var resourceTypes = new List<ResourceType>();
-            try
-            {
-                request.Operation.Resources.ToList().ForEach(resource =>
-                {
-                    resourceTypes.Add(GetFhirResourceType(request.Operation.Resources));
-                });
-            }
-            catch (Exception ex)
-            {
-                //add audit event and other error handling and toss exception to caller
-                throw ex;
-            }
-
+            
             foreach (var entry in bundle.Entry)
             {
-                foreach (var resourceType in resourceTypes)
+                var resource = entry.Resource;
+                var resourceType = GetFhirResourceType(resource.TypeName);
+                var fromFhirPath = request.Operation.FromFhirPath;
+                var toFhirPath = request.Operation.ToFhirPath;
+                var fromElement = resource.Select(fromFhirPath).FirstOrDefault();
+                var toElement = resource.Select(toFhirPath).FirstOrDefault();
+                if (fromElement != null && toElement != null)
                 {
-                    if (entry.Resource.TypeName == resourceType.ToString())
+                    if (toElement is Code)
                     {
-                        // todo: implement me!
-                        // will most likely need to use reflection to cast entry.Resource to the type defined in config
-                        // and then use reflection (again) to pull the appropriate property for that type.
-                        // config may need to change so that we know the type of the toElement in case we need to create a new object
-                        // like in CopyLocationIdentifierToTypeCommand
+                        assignElement(fromElement, (Code)toElement);
                     }
+                    else
+                    {
+                        toElement = new FhirString(fromElement.ToString());
+                    }
+                    propertyChanges.Add(new PropertyChangeModel
+                    {
+                        InitialPropertyValue = toElement?.ToString(),
+                        NewPropertyValue = fromElement?.ToString(),
+                        PropertyName = $"{resourceType}.{toFhirPath}"
+                    });
                 }
             }
 
@@ -58,6 +55,18 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
                 Bundle = bundle,
                 PropertyChanges = propertyChanges
             };
+        }
+
+        private void assignElement(Base? fromElement, Code toElement)
+        {
+            if (fromElement is Code)
+            {
+                toElement.Value = ((Code)fromElement).Value;
+            }
+            else
+            {
+                toElement.Value = fromElement?.ToString();
+            }
         }
 
         private ResourceType GetFhirResourceType(string requestedResource)
