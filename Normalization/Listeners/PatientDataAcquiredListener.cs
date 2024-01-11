@@ -181,6 +181,11 @@ public class PatientDataAcquiredListener : BackgroundService
                             Bundle = bundle,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
+                        PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
+                        {
+                            Bundle = bundle,
+                            PropertyChanges = operationCommandResult.PropertyChanges
+                        }),
                         _ => await _mediator.Send(new UnknownOperationCommand
                         {
                             Bundle = bundle,
