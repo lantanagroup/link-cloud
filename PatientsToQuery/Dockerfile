@@ -8,8 +8,8 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
 COPY ["PatientsToQuery/PatientsToQuery.csproj", "PatientsToQuery/"]
-COPY ["Shared/Shared.csproj", "Shared/"]
-RUN dotnet restore "PatientsToQuery/PatientsToQuery.csproj"
+COPY ["PatientsToQuery/nuget.config", "PatientsToQuery/"]
+RUN dotnet restore "PatientsToQuery/PatientsToQuery.csproj" --configfile "PatientsToQuery/nuget.config"
 COPY . .
 WORKDIR "/src/PatientsToQuery"
 RUN dotnet build "PatientsToQuery.csproj" -c Release -o /app/build

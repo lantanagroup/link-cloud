@@ -139,7 +139,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Account/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -203,7 +203,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Api/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -267,7 +267,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Audit/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -361,7 +361,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/DataAcquisition/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -425,7 +425,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/MeasureEval/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -489,7 +489,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Normalization/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -553,7 +553,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Notification/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -646,7 +646,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/PatientsToQuery/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -710,7 +710,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/QueryDispatch/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -774,7 +774,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Report/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -839,7 +839,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Submission/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
@@ -904,7 +904,7 @@ stages:
           $path = '$(System.DefaultWorkingDirectory)/Tenant/nuget.config'
           $nugetUrl = '$(nuget)'
           $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
+          $token = '$(ClearTextPassword)'
           $basePath = '$(System.DefaultWorkingDirectory)'
         
           $xml = [xml](Get-Content -Path $path)
