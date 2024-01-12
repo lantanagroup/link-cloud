@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Services;
+using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using MediatR;
 
@@ -17,6 +18,7 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
 {
     private readonly ILogger<SaveConfigEntityCommandHandler> _logger;
     private readonly IConfigRepository _configRepo;
+    private readonly ITenantApiService _tenantApiService;
 
     public SaveConfigEntityCommandHandler(ILogger<SaveConfigEntityCommandHandler> logger, IConfigRepository configRepo)
     {
@@ -26,6 +28,22 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
 
     public async Task Handle(SaveConfigEntityCommand request, CancellationToken cancellationToken)
     {
+        bool tenantExists;
+        try
+        {
+            tenantExists = await _tenantApiService.CheckFacilityExists(request.NormalizationConfigModel.FacilityId, cancellationToken);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, $"Error checking if facility ({request.FacilityId}) exists in Tenant Service.");
+            throw;
+        }
+        
+        if(!tenantExists)
+        {
+            throw new TenantNotFoundException($"{request.FacilityId} not found in Tenant Service.");
+        }
+
         if(request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
         {
             var message = "FacilityId property is null in request. Unable to proceed with update.";

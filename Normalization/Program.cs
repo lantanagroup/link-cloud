@@ -44,6 +44,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
 
+    var tenantApiSettings = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>();
+    if(tenantApiSettings != null)
+        builder.Services.AddSingleton<TenantApiSettings>(tenantApiSettings);
+
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
@@ -54,6 +58,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         >();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
     
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+
     builder.Services.AddControllers();
 
     // Logging using Serilog
