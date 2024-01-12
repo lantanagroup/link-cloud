@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
@@ -19,6 +20,18 @@ namespace LantanaGroup.Link.Report.Core
     {
         private readonly ILogger<MeasureReportSubmissionBundler> _logger;
         private readonly IMediator _mediator;
+
+        private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
+        "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
+        "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference",
+        "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-criteriaReference",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/ip-admit-datetime",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/specialty",
+        "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
+        "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
         public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IMediator mediator)
         {
@@ -72,11 +85,11 @@ namespace LantanaGroup.Link.Report.Core
                 }
 
                 // aggregate measure report
-              /*  if (GetAggregateMeasureReport(submissionBundle, config.ReportType) is null)
-                {
-                    var measureAgg = CreateAggregateMeasureReport(config.ReportType, orgId, new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)));
-                    submissionBundle.AddResourceEntry(measureAgg, GetFullUrl(measureAgg));
-                }*/
+                /*  if (GetAggregateMeasureReport(submissionBundle, config.ReportType) is null)
+                  {
+                      var measureAgg = CreateAggregateMeasureReport(config.ReportType, orgId, new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)));
+                      submissionBundle.AddResourceEntry(measureAgg, GetFullUrl(measureAgg));
+                  }*/
             }
 
 
@@ -100,12 +113,17 @@ namespace LantanaGroup.Link.Report.Core
                 // ensure we have an id to reference
                 if (string.IsNullOrEmpty(mr.Id))
                     mr.Id = Guid.NewGuid().ToString();
-
+                // ensure we have a meta object
                 // set individual measure report profile
                 mr.Meta = new Meta
                 {
                     Profile = new List<string> { ReportConstants.Bundle.IndividualMeasureReportProfileUrl }
                 };
+
+                // clean up resource
+                cleanupResource(mr);
+                // Clean up the contained resources within the measure report
+                cleanupContainedResource(mr);
 
                 _logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
 
@@ -135,6 +153,27 @@ namespace LantanaGroup.Link.Report.Core
             return submission;
         }
 
+        private void cleanupContainedResource(MeasureReport mr)
+        {
+            mr.Contained.ForEach(cr =>
+            {
+                if (cr.Id != null && cr.Id.StartsWith("LCR-"))
+                {
+                    // Remove the LCR- prefix added by CQL
+                    cr.Id = cr.Id.Substring(4);
+
+                }
+                else if (cr.Id != null && cr.Id.StartsWith("#LCR-"))
+                {
+                    // Remove the LCR- prefix added by CQL
+                    cr.Id = cr.Id.Substring(5);
+                }
+                // update references in the evaluated resource to point to the contained reference (for validation purposes)
+                mr.EvaluatedResource.Where(er => er.Reference != null && er.Reference == GetRelativeReference(cr)).ToList().ForEach(er => er.Reference = "#" + cr.Id);
+
+            });
+        }
+
 
 
 
@@ -154,6 +193,36 @@ namespace LantanaGroup.Link.Report.Core
             AddMeasureReportToBundle(bundle, measureReport);
         }
 
+
+        private void cleanupResource(Resource resource)
+        {
+            if (resource is DomainResource)
+            {
+                DomainResource domainResource = (DomainResource)resource;
+
+                // Remove extensions from resources
+                domainResource.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
+
+                // Remove extensions from group/populations of MeasureReports
+                if (resource is MeasureReport)
+                {
+                    MeasureReport measureReport = (MeasureReport)resource;
+                    measureReport.Group.ForEach(g =>
+                    {
+                        g.Population.ForEach(p =>
+                        {
+                            p.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
+                        });
+                    });
+                    measureReport.EvaluatedResource.ForEach(er =>
+                    {
+                        er.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
+
+                    });
+
+                }
+            }
+        }
 
 
         /// <summary>
@@ -177,7 +246,7 @@ namespace LantanaGroup.Link.Report.Core
 
                 // check for existing resource in the bundle with same type and id
                 var existingEntryIndex = bundle.Entry.FindIndex(e => e.Resource.TypeName == resource.TypeName && e.Resource.Id == resource.Id);
-                if (existingEntryIndex < 0) 
+                if (existingEntryIndex < 0)
                 {
                     // no duplicate in the bundle so we can just add it
                     bundle.AddResourceEntry(resource, GetFullUrl(resource));
@@ -185,7 +254,7 @@ namespace LantanaGroup.Link.Report.Core
                 else
                 {
                     Resource existingResource = bundle.Entry[existingEntryIndex].Resource;
-                    
+
                     // if this is not an exact match to the existing resource then we have to merge
                     if (!resource.IsExactly(existingResource))
                     {
@@ -193,29 +262,17 @@ namespace LantanaGroup.Link.Report.Core
                         _logger.LogError($"Need to merge duplicate \"{GetRelativeReference(resource)}\"");
 
                         // for now... update existing completely
-                        bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = resource, FullUrl = GetFullUrl(resource) };
+                        //bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = resource, FullUrl = GetFullUrl(resource) };
                     }
                 }
 
-                // remove this now bundled resource from the measure report
-                string id = measureReport.Contained[0].Id;
+                //  change the resource reference in the measure report to point to the top level bundle
+                var found =  measureReport.EvaluatedResource.FirstOrDefault(e => e.Reference != null && e.Reference == "#" + resource.Id);
+                if (found != null) found.Reference = GetRelativeReference(resource);
+
                 measureReport.Contained.RemoveAt(0);
-                Extension extToRemove = null;
-                // remove the ext that reference the contained resource
-                measureReport.Extension.ForEach(e =>
-                {
-                    if (e.Value is ResourceReference)
-                    {
-                        var s = (ResourceReference)e.Value;
-                        if (s.Reference.Contains(id))
-                            extToRemove = e;
-                    }
-                });
 
-                if (extToRemove != null)
-                    measureReport.Extension.Remove(extToRemove);
             }
-
 
         }
 
@@ -231,7 +288,7 @@ namespace LantanaGroup.Link.Report.Core
             measureReport.EvaluatedResource.ForEach(r => { if (r.Extension.Count > 0) r.Extension = new List<Extension>(); });
             return measureReport;
         }
-        
+
         protected Bundle CreateNewBundle(MeasureReportScheduleModel reportSchedule)
         {
             Bundle bundle = new Bundle();
@@ -272,16 +329,16 @@ namespace LantanaGroup.Link.Report.Core
             int index = measureCanonical.LastIndexOf('/');
 
             int versionIndex = measureCanonical.LastIndexOf('|');
-    
+
             // get the measure between index and versionIndex
             if (versionIndex > 0)
             {
-                return measureCanonical.Substring(index+1, versionIndex - index - 1);
+                return measureCanonical.Substring(index + 1, versionIndex - index - 1);
             }
             else
             {
                 // no version specified
-                return measureCanonical.Substring(index+1);
+                return measureCanonical.Substring(index + 1);
             }
         }
 
@@ -337,7 +394,7 @@ namespace LantanaGroup.Link.Report.Core
 
         protected Bundle.EntryComponent GetAggregatePatientList(Bundle bundle, string measureCanonical)
         {
- 
+
             return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "List"
                 && ((List)e.Resource).Identifier is not null
                 && ((List)e.Resource).Identifier.Any(i => i.System == ReportConstants.Bundle.MainSystem && i.Value == GetMeasureIdFromCanonical(measureCanonical))
@@ -382,7 +439,7 @@ namespace LantanaGroup.Link.Report.Core
             if (res is null)
             {
                 list.Entry.Add(new List.EntryComponent() { Item = new ResourceReference(refVal) });
-            }            
+            }
         }
 
 
@@ -419,7 +476,7 @@ namespace LantanaGroup.Link.Report.Core
             {
                 mr.Measure = measureCanonical.Substring(0, versionIndex);
             }
-    
+
             mr.Reporter = new ResourceReference($"Organization/{organizationId}");
             mr.Period = new Period(reportStart, reportEnd);
 
@@ -440,7 +497,7 @@ namespace LantanaGroup.Link.Report.Core
                 submissionBundle.Entry.Add(measureAgg);
             }
 
-  
+
             List aggList = (List)((MeasureReport)measureAgg.Resource).Contained.First(c => c.TypeName == "List");
             string mrReference = $"MeasureReport/{measureReport.Id}";
             var existing = aggList.Entry.FirstOrDefault(e => e.Item.Reference == mrReference);
