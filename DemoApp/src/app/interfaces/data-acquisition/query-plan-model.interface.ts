@@ -1,4 +1,5 @@
 export interface IQueryPlanModel {
+    id: string;
     planName: string;
     reportType: string;
     facilityId: string;
