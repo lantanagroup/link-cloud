@@ -35,7 +35,7 @@ steps:
         $path = '$(System.DefaultWorkingDirectory)/DataAcquisition/nuget.config'
         $nugetUrl = '$(nuget)'
         $sharedUrl = '$(Shared_BOTW_Feed)'
-        $token = '$(ClearTextPassword)'
+        $token = '$(System.AccessToken)'
         $basePath = '$(System.DefaultWorkingDirectory)'
         
         $xml = [xml](Get-Content -Path $path)
