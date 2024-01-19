@@ -27,5 +27,5 @@ public class KafkaConnection
 
     public List<string> BootstrapServers { get; set; } = new List<string>();
     public string ClientId { get; set; } = string.Empty;
-    public string GroupId { get; set; } = "default";    
+    public string GroupId { get; set; } = "default";
 }
