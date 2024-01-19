@@ -69,7 +69,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<TempKafkaConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Mongo));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
 
