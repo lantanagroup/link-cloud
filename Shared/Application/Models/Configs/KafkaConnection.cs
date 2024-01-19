@@ -6,7 +6,7 @@ public class KafkaConnection
 {
     public ConsumerConfig CreateConsumerConfig()
     {
-        var config = new ConsumerConfig
+        return new ConsumerConfig
         {
             BootstrapServers = string.Join(", ", BootstrapServers),
             ClientId = ClientId,
@@ -14,41 +14,18 @@ public class KafkaConnection
             AutoOffsetReset = AutoOffsetReset.Earliest,
             AllowAutoCreateTopics = true
         };
-
-        if(SaslProtocolEnabled)
-        {
-            config.SecurityProtocol = SecurityProtocol.SaslSsl;
-            config.SaslUsername = SaslUsername;
-            config.SaslPassword = SaslPassword;
-            config.SaslMechanism = SaslMechanism.Plain;
-        }
-
-        return config;
     }
 
     public ProducerConfig CreateProducerConfig()
     {
-        var config = new ProducerConfig
+        return new ProducerConfig
         {
             BootstrapServers = string.Join(", ", BootstrapServers),
             ClientId = ClientId
         };
-
-        if(SaslProtocolEnabled)
-        {
-            config.SecurityProtocol = SecurityProtocol.SaslSsl;
-            config.SaslUsername = SaslUsername;
-            config.SaslPassword = SaslPassword;
-            config.SaslMechanism = SaslMechanism.Plain;
-        }
-
-        return config;
     }
 
     public List<string> BootstrapServers { get; set; } = new List<string>();
     public string ClientId { get; set; } = string.Empty;
-    public string GroupId { get; set; } = "default";
-    public bool SaslProtocolEnabled { get; set; } = false;
-    public string? SaslUsername { get; set; } = null;
-    public string? SaslPassword { get; set; } = null;    
+    public string GroupId { get; set; } = "default";    
 }
