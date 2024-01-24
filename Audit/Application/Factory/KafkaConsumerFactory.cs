@@ -43,6 +43,8 @@ namespace LantanaGroup.Link.Audit.Application.Factory
                 config.SaslUsername = SaslUsername;
                 config.SaslPassword = SaslPassword;
                 config.SaslMechanism = SaslMechanism.Plain;
+                config.ApiVersionRequest = ApiVersionRequest;
+                config.ReceiveMessageMaxBytes = ReceiveMessageMaxBytes;
             }
 
             return config;
@@ -62,6 +64,8 @@ namespace LantanaGroup.Link.Audit.Application.Factory
                 config.SaslUsername = SaslUsername;
                 config.SaslPassword = SaslPassword;
                 config.SaslMechanism = SaslMechanism.Plain;
+                config.ApiVersionRequest = ApiVersionRequest;
+                config.ReceiveMessageMaxBytes = ReceiveMessageMaxBytes;
             }
 
             return config;
@@ -73,6 +77,8 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         public bool SaslProtocolEnabled { get; set; } = false;
         public string? SaslUsername { get; set; } = null;
         public string? SaslPassword { get; set; } = null;
+        public bool? ApiVersionRequest { get; set; } = null;
+        public int? ReceiveMessageMaxBytes { get; set; } = null;
     }
 
 }
