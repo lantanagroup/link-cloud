@@ -157,7 +157,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 if (string.IsNullOrWhiteSpace(model.FacilityId))
                 {
-                    _logger.LogInformation(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "Facility Id was not provided for audit event creation.");
+                    _logger.LogWarning(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "Facility Id was not provided for audit event creation.");
                 }
 
                 //Create audit event
