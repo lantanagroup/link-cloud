@@ -96,7 +96,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddCorsService(builder.Environment);
 
     //configure service api security    
-    var idpConfig = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
+    var idpConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
     if (idpConfig != null)
     {
         builder.Services.AddAuthenticationService(idpConfig, builder.Environment);        
@@ -131,6 +131,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration)
                     .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()                  
@@ -139,7 +140,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
+    var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
     if (telemetryConfig != null)
     {
         builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);        
