@@ -19,7 +19,6 @@ RUN dotnet publish "Audit.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore7-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Audit.dll"]
 #
