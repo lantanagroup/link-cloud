@@ -13,11 +13,13 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         private readonly ILogger<CreateAuditEventCommand> _logger;
         private readonly IAuditRepository _datastore;
         private readonly IAuditFactory _factory;
+        private readonly AuditServiceMetrics _metrics;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, IAuditHelper auditHelper) {
+        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, AuditServiceMetrics metrics, IAuditHelper auditHelper) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
-            _factory = factory ?? throw new ArgumentNullException(nameof(factory));           
+            _factory = factory ?? throw new ArgumentNullException(nameof(factory));        
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
         
         /// <summary>
@@ -53,7 +55,12 @@ namespace LantanaGroup.Link.Audit.Application.Commands
 
             //Log creation of new audit event                        
             _logger.LogInformation(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "New audit event ({auditLogId}) created for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Id, auditLog.Action, auditLog.Resource, auditLog.ServiceName);
-            Counters.AuditableEventObserved.Add(1, new KeyValuePair<string, object?>("Id", auditLog.Id));
+            _metrics.AuditableEventCounter.Add(1, 
+                new KeyValuePair<string, object?>("service", auditLog.ServiceName),
+                new KeyValuePair<string, object?>("facility", auditLog.FacilityId),
+                new KeyValuePair<string, object?>("action", auditLog.Action),
+                new KeyValuePair<string, object?>("resource", auditLog.Resource)                
+            );
             return auditLog.Id;
 
             
