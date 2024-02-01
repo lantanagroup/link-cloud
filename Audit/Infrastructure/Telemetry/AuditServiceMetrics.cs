@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
         public AuditServiceMetrics(IMeterFactory meterFactory)
         {
             Meter meter = meterFactory.Create("LinkAuditService");
-            AuditableEventCounter = meter.CreateCounter<int>("audit_event_count");
+            AuditableEventCounter = meter.CreateCounter<int>("audit.event.count");
         }
 
         public Counter<int> AuditableEventCounter { get; private set; }

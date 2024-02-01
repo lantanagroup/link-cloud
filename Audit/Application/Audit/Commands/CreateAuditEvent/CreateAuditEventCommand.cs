@@ -3,6 +3,7 @@ using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Audit.Settings;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
@@ -49,6 +50,10 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex, new TagList { 
+                    { "service.name", model.ServiceName } 
+                });
                 _logger.LogDebug(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), ex, "New audit event creation failed for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Action, auditLog.Resource, auditLog.ServiceName);
                 throw;
             }

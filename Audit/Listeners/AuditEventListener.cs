@@ -7,6 +7,7 @@ using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
@@ -48,16 +49,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                             await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) => {
 
                                 if (result != null && result.Message.Value != null)
-                                {
-                                    //using Activity? activity = ServiceActivitySource.Instance.StartActivity("Kafka - Consume Auditable Event Message");
-                                    var currentActivity = Activity.Current;
-                                    if(currentActivity != null)
-                                    {
-                                        currentActivity.AddTag("link.service", ServiceActivitySource.Instance.Name);
-                                        currentActivity.AddTag("link.service.version", ServiceActivitySource.Instance.Version);
-                                    }
-                                    
-
+                                {      
                                     AuditEventMessage messageValue = result.Message.Value;
 
                                     if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
@@ -87,6 +79,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (ConsumeException ex)
                         {
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
                             _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Consumer error: {ErrorReason}", ex.Error.Reason);
                             if (ex.Error.IsFatal)
                             {
@@ -95,6 +88,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (Exception ex)
                         {
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
                             _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Failed to generate an audit event from kafka message: {message}", ex.Message);
                             break;
                         }
@@ -106,6 +100,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                 }
                 catch(OperationCanceledException oce)
                 {
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
                     _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), oce, "Operation Canceled: {oceMessage}", oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();

@@ -18,15 +18,15 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
 
             //configure OpenTelemetry resources with application name
             otel.ConfigureResource(resource => resource
-                .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
+                .AddService(ServiceActivitySource.Instance.Name, "LantanaGroup.Link", ServiceActivitySource.Instance.Version));
 
             otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder
                         .AddSource(ServiceActivitySource.Instance.Name)
                         .AddAspNetCoreInstrumentation(options =>
                             {
-                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                                options.Filter = (httpContext) => httpContext.Request.Path != "/swagger"; //do not capture traces for the swagger endpoint
+                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                              
+                                options.Filter = (httpContext) => httpContext.Request.Path.ToString().Contains("/swagger"); //do not capture traces for the swagger endpoint
                             })
                         .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
