@@ -18,7 +18,12 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
 
             //configure OpenTelemetry resources with application name
             otel.ConfigureResource(resource => resource
-                .AddService(ServiceActivitySource.Instance.Name, "LantanaGroup.Link", ServiceActivitySource.Instance.Version));
+                .AddService(
+                    serviceName: ServiceActivitySource.Instance.Name, 
+                    serviceVersion: ServiceActivitySource.Instance.Version
+                ));
+
+            
 
             otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder
