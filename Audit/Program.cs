@@ -21,6 +21,8 @@ using LantanaGroup.Link.Audit.Infrastructure.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
+using Serilog.Settings.Configuration;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +36,15 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    builder.Configuration.AddAzureAppConfiguration(options =>
+    {
+        options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+            // Load configuration values with no label
+            .Select("Link:Audit*", LabelFilter.Null)
+            // Override with any configuration values specific to current hosting env
+            .Select("Link:Audit*", builder.Environment.EnvironmentName);
+    });
+
     var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
@@ -128,8 +139,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = "Serilog" };
     Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration)
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
                     .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
