@@ -7,9 +7,11 @@
             public const string ServiceInformation = "Link:Audit:ServiceInformation";
             public const string Kafka = "Link:Audit:KafkaConnection";
             public const string Mongo = "Link:Audit:MongoDB";
-            public const string IdentityProvider = "IdentityProviderConfig";
-            public const string Telemetry = "TelemetryConfig";
+            public const string IdentityProvider = "Link:Audit:IdentityProviderConfig";
+            public const string Telemetry = "Link:Audit:TelemetryConfig";
             public const string Serilog = "Link:Audit:Logging:Serilog";
+            public const string EnableSwagger = "Link:Audit:EnableSwagger";
+            public const string AllowReflection = "Link:Audit:AllowReflection";
         }
 
         public static class AuditErrorMessages 
