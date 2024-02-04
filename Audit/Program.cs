@@ -139,7 +139,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = "Serilog" };
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };    
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
