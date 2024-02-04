@@ -179,7 +179,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
+    if (app.Configuration.GetValue<bool>(AuditConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
@@ -199,7 +199,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());   
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
+    if (app.Configuration.GetValue<bool>(AuditConstants.AppSettingsSectionNames.AllowReflection))
     {
         app.MapGrpcReflectionService();
     }
