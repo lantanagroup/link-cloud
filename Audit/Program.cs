@@ -23,6 +23,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,14 +37,30 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    builder.Configuration.AddAzureAppConfiguration(options =>
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    if(!string.IsNullOrEmpty(externalConfigurationSource))
     {
-        options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-            // Load configuration values with no label
-            .Select("Link:Audit*", LabelFilter.Null)
-            // Override with any configuration values specific to current hosting env
-            .Select("Link:Audit*", builder.Environment.EnvironmentName);
-    });
+        switch (externalConfigurationSource)
+        { 
+            case("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                        // Load configuration values with no label
+                        .Select("Link:Audit*", LabelFilter.Null)
+                        // Override with any configuration values specific to current hosting env
+                        .Select("Link:Audit*", builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }   
 
     var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
