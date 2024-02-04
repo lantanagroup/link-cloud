@@ -5,10 +5,11 @@
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "Link:Audit:ServiceInformation";
-            public const string Kafka = "KafkaConnection";
-            public const string Mongo = "MongoDB";
+            public const string Kafka = "Link:Audit:KafkaConnection";
+            public const string Mongo = "Link:Audit:MongoDB";
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string Telemetry = "TelemetryConfig";
+            public const string Serilog = "Link:Audit:Logging:Serilog";
         }
 
         public static class AuditErrorMessages 
