@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Audit.Settings;
 using OpenTelemetry.Trace;
@@ -59,7 +60,8 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             }
 
             //Log creation of new audit event                        
-            _logger.LogInformation(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "New audit event ({auditLogId}) created for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Id, auditLog.Action, auditLog.Resource, auditLog.ServiceName);
+            //_logger.LogInformation(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "New audit event ({auditLogId}) created for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Id, auditLog.Action, auditLog.Resource, auditLog.ServiceName);
+            _logger.LogAuditEventCreation(auditLog);
             _metrics.AuditableEventCounter.Add(1, 
                 new KeyValuePair<string, object?>("service", auditLog.ServiceName),
                 new KeyValuePair<string, object?>("facility", auditLog.FacilityId),
