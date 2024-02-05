@@ -24,6 +24,9 @@ using System.Diagnostics;
 using Serilog.Settings.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
+using Microsoft.Extensions.Compliance.Redaction;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using Microsoft.Extensions.Compliance.Classification;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -152,6 +155,22 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+    });
+
+    //Add logging redaction
+    builder.Logging.EnableRedaction();
+    builder.Services.AddRedaction(x => {
+        x.SetRedactor<ErasingRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
+
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");        
+        if (!string.IsNullOrEmpty(hmacKey))
+        {
+            var hmacKeyBytes = System.Text.Encoding.UTF8.GetBytes(hmacKey);
+            x.SetHmacRedactor(opts => {
+                opts.Key = Convert.ToBase64String(hmacKeyBytes);
+                opts.KeyId = 808;
+            }, new DataClassificationSet(DataTaxonomy.PiiData));
+        }        
     });
 
     // Logging using Serilog
