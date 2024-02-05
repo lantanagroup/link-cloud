@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
-using LantanaGroup.Link.Notification.Presentation.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
@@ -19,8 +18,9 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         private readonly INotificationRepository _datastore;
         private readonly INotificationFactory _notificationFactory;
         private readonly IGetFacilityConfigurationQuery _getFacilityConfigurationQuery;
+        private readonly NotificationServiceMetrics _metrics;
 
-        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery)
+        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, NotificationServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));    
             _auditEventFactory = auditEventFactory ?? throw new ArgumentNullException(nameof(auditEventFactory));
@@ -28,6 +28,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
             _getFacilityConfigurationQuery = getFacilityConfigurationQuery ?? throw new ArgumentNullException(nameof(getFacilityConfigurationQuery));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         public async Task<string> Execute(CreateNotificationModel model)
@@ -103,8 +104,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     }
                         
 
-                    //update notification creation metric counter
-                    Counters.NotificationCreated.Add(1, new KeyValuePair<string, object?>("Id", entity.Id));
+                    //update notification creation metric counter                    
+                    _metrics.NotificationCreatedCounter.Add(1, 
+                        new KeyValuePair<string, object?>("facility", entity.FacilityId), 
+                        new KeyValuePair<string, object?>("type", entity.NotificationType));
 
                     //Log creation of new notification configuration                        
                     _logger.LogInformation(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification"), "New notification '{id}' created for '{facilityId}'.", entity.Id, entity.FacilityId);

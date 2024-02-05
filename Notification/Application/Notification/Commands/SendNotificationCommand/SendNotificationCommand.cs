@@ -14,13 +14,15 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         private readonly IOptions<Channels> _channels;
         private readonly IEmailService _emailService;
         private readonly INotificationRepository _datastore;
+        private readonly NotificationServiceMetrics _metrics;
 
-        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, INotificationRepository datastore)
+        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, INotificationRepository datastore, NotificationServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _channels = channels ?? throw new ArgumentNullException(nameof(channels));
             _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         public async Task<bool> Execute(SendNotificationModel model)
@@ -60,8 +62,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             currentActivity?.AddTag("notification id", model.Id);
                             currentActivity?.AddTag("facility id", model.FacilityConfig?.FacilityId);
 
-                            //update notification creation metric counter
-                            Counters.NotificationSent.Add(1, new KeyValuePair<string, object?>("Id", model.Id));
+                            //update notification creation metric counter                            
+                            _metrics.NotificationSentCounter.Add(1, 
+                                new KeyValuePair<string, object?>("facility", model.FacilityConfig?.FacilityId),
+                                new KeyValuePair<string, object?>("channel", "Email"));
                         }
                         
                     }
