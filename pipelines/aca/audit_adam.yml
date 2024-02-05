@@ -19,11 +19,11 @@ variables:
 - name: nugetPath
   value: 'Audit/nuget.config'
 - name: tags1
-  value: 'aca-audit-dotnet8'
+  value: 'dotnet8'
 - name: tags2
   value: '$(Build.BuildId)'
 - name: registry-repo-Name
-  value: 'aca-audit'
+  value: 'aca-audit:dotnet8'
 - name: dockerPath
   value: '**/Audit/Dockerfile'
 steps:
