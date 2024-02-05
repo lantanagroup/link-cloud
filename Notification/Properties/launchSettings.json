@@ -1,5 +1,15 @@
 {
   "profiles": {
+    "Notification": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:7434/swagger",
+      "applicationUrl": "http://localhost:7434;https://localhost:7435"
+    },
     "Docker": {
       "commandName": "Docker",
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
