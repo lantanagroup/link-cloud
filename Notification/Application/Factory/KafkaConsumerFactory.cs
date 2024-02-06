@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
                 ex.Data.Add("topic", nameof(KafkaTopic.NotificationRequested));
                 var currentActivity = Activity.Current;
                 currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to create Notification Requested Kafka consumer.");
-                _logger.LogError(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Create kafka consumer factory"), ex, "Failed to create Notification Requested Kafka consumer.");
+                _logger.LogError(new EventId(NotificationLoggingIds.EventConsumerException, "Notification Service - Create kafka consumer factory"), ex, "Failed to create Notification Requested Kafka consumer.");
                 throw;
             }
         }

@@ -4,6 +4,7 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Presentation.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -209,14 +210,15 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, int pageSize = 10, int pageNumber = 1)
         {
-            //TODO check for authorization
-
             try
             {
                 //make sure page size does not exceed the max page size allowed
                 if (pageSize > maxNotificationConfigurationPageSize) { pageSize = maxNotificationConfigurationPageSize; }
 
                 if (pageNumber < 1) { pageNumber = 1; }
+
+                NotificationSearchRecord searchFilter = _notificationFactory.CreateNotificationSearchRecord(searchText, filterFacilityBy, filterNotificationTypeBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationModel notificationList = await _getNotificationListQuery.Execute(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, pageSize, pageNumber);
@@ -229,7 +231,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notifications"), ex, "An exception occurred while attempting to retrieve notifications.");
+                NotificationSearchRecord searchFilter = _notificationFactory.CreateNotificationSearchRecord(searchText, filterFacilityBy, filterNotificationTypeBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationListQueryException(ex.Message, searchFilter);
                 return StatusCode(500, ex);
             }
 
@@ -367,6 +370,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 if (pageNumber < 1) { pageNumber = 1; }
 
+                NotificationConfigurationSearchRecord searchRecord = _configurationFactory.CreateNotificationConfigurationSearchRecord(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationConfigurationsListQuery(searchRecord);
+
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
 
@@ -377,8 +383,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             }
             catch (Exception ex)
-            {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notification configurations"), ex, "An exception occurred while attempting to retrieve notification configurations.");
+            {                
+                NotificationConfigurationSearchRecord searchRecord = _configurationFactory.CreateNotificationConfigurationSearchRecord(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationConfigurationsListQueryException(ex.Message, searchRecord);
                 return StatusCode(500, ex);
             }
 

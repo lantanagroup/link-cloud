@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Operations;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
@@ -72,171 +73,188 @@ namespace LantanaGroup.Link.Audit.Persistance
 
         public (IEnumerable<AuditEntity>, PaginationMetadata) Find(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
         {
-            #region Create Filters
-            //create filter bulder and definition
-            FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
-            FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
-
-            if (!string.IsNullOrEmpty(searchText))
+            try 
             {
-                var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
-                filter &= searchTextFilter;
+                #region Create Filters
+                //create filter bulder and definition
+                FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
+                FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
+
+                if (!string.IsNullOrEmpty(searchText))
+                {
+                    var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
+                    filter &= searchTextFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterFacilityBy))
+                {
+                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    filter &= facilityFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterFacilityBy))
+                {
+                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    filter &= facilityFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterCorrelationBy))
+                {
+                    var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
+                    filter &= correlationFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterActionBy))
+                {
+                    var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
+                    filter &= actionFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterUserBy))
+                {
+                    var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
+                    var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
+                    filter &= userIdFilter | userNameFilter;
+                }
+
+                #endregion
+
+                #region Create Sort Definitions
+                //TODO: Add sort direction logic
+                //create sort builder and definition, if no sort field specified then sort by eventDate descending            
+                SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
+                List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
+
+                if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
+                {
+                    //sortBy exists in sortableColumns         
+                    sortDefinitions.Add(sortBuilder.Descending(sortBy));
+                }
+
+                //combine sort definitions
+                SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
+
+                #endregion
+
+                //get total count
+                long count = 0;
+                using (ServiceActivitySource.Instance.StartActivity("Get total count"))
+                {
+                    count = _collection.CountDocuments(filter);
+                }
+                PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+                //filter collection            
+                List<AuditEntity> auditEvents = new List<AuditEntity>();
+                using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
+                {
+                    auditEvents = _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToList();
+                }
+
+                return (auditEvents, metadata);
             }
-
-            if (!string.IsNullOrEmpty(filterFacilityBy))
+            catch (Exception ex)
             {
-                var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
-                filter &= facilityFilter;
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                throw;
             }
-
-            if (!string.IsNullOrEmpty(filterFacilityBy))
-            {
-                var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
-                filter &= facilityFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterCorrelationBy))
-            {
-                var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
-                filter &= correlationFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterActionBy))
-            {
-                var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
-                filter &= actionFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterUserBy))
-            {
-                var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
-                var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
-                filter &= userIdFilter | userNameFilter;
-            }                
-
-            #endregion
-
-            #region Create Sort Definitions
-            //TODO: Add sort direction logic
-            //create sort builder and definition, if no sort field specified then sort by eventDate descending            
-            SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
-            List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
-
-            if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
-            {
-                //sortBy exists in sortableColumns         
-                sortDefinitions.Add(sortBuilder.Descending(sortBy));
-            }
- 
-            //combine sort definitions
-            SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
-
-            #endregion
-
-            //get total count
-            long count = 0;
-            using (ServiceActivitySource.Instance.StartActivity("Get total count"))
-            {
-                count = _collection.CountDocuments(filter);
-            }
-            PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
-
-            //filter collection            
-            List<AuditEntity> auditEvents = new List<AuditEntity>();
-            using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
-            {
-                auditEvents = _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToList();
-            }
-
-            return (auditEvents, metadata);            
+                     
         }
 
         public async Task<(IEnumerable<AuditEntity>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Repository - Find Async");
-
-            #region Create Filters
-            //create filter bulder and definition
-            FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
-            FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
-
-            if (!string.IsNullOrEmpty(searchText))
+            try
             {
-                var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
-                filter &= searchTextFilter;
+                #region Create Filters
+                //create filter bulder and definition
+                FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
+                FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
+
+                if (!string.IsNullOrEmpty(searchText))
+                {
+                    var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
+                    filter &= searchTextFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterFacilityBy))
+                {
+                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    filter &= facilityFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterCorrelationBy))
+                {
+                    var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
+                    filter &= correlationFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterServiceBy))
+                {
+                    var serviceFilter = Builders<AuditEntity>.Filter.Eq(x => x.ServiceName, filterServiceBy);
+                    filter &= serviceFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterActionBy))
+                {
+                    var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
+                    filter &= actionFilter;
+                }
+
+                if (!string.IsNullOrEmpty(filterUserBy))
+                {
+                    var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
+                    var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
+                    filter &= userIdFilter | userNameFilter;
+                }
+
+
+                #endregion
+
+                #region Create Sort Definitions
+                //TODO: Add sort direction logic
+                //create sort builder and definition, if no sort field specified then sort by eventDate descending            
+                SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
+                List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
+
+                if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
+                {
+                    //sortBy exists in sortableColumns         
+                    sortDefinitions.Add(sortBuilder.Descending(sortBy));
+                }
+
+                //combine sort definitions
+                SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
+
+                #endregion
+
+                //get total count
+                long count = 0;
+                using (ServiceActivitySource.Instance.StartActivity("Get total count"))
+                {
+                    count = await _collection.CountDocumentsAsync(filter);
+                }
+                PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+                //filter collection
+                //var timer = new Stopwatch();
+                //timer.Start();
+                List<AuditEntity> auditEvents = new List<AuditEntity>();
+                using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
+                {
+                    auditEvents = await _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToListAsync();
+                }
+
+                //timer.Stop();
+                //_logger.LogDebug(AuditLoggingIds.ListItems, "Finding audit events finished in {milliseconds} milliseconds", timer.ElapsedMilliseconds);                
+                return (auditEvents, metadata);
             }
-    
-            if (!string.IsNullOrEmpty(filterFacilityBy))
+            catch(Exception ex)
             {
-                var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
-                filter &= facilityFilter;
+                var currentActivity = Activity.Current;
+                currentActivity?.SetStatus(ActivityStatusCode.Error);
+                throw;
             }
-
-            if (!string.IsNullOrEmpty(filterCorrelationBy))
-            {
-                var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
-                filter &= correlationFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterServiceBy))
-            {
-                var serviceFilter = Builders<AuditEntity>.Filter.Eq(x => x.ServiceName, filterServiceBy);
-                filter &= serviceFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterActionBy))
-            {
-                var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
-                filter &= actionFilter;
-            }
-
-            if (!string.IsNullOrEmpty(filterUserBy))
-            {
-                var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
-                var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
-                filter &= userIdFilter | userNameFilter;
-            }
-                              
-
-            #endregion
-
-            #region Create Sort Definitions
-            //TODO: Add sort direction logic
-            //create sort builder and definition, if no sort field specified then sort by eventDate descending            
-            SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
-            List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
-
-            if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
-            {
-                //sortBy exists in sortableColumns         
-                sortDefinitions.Add(sortBuilder.Descending(sortBy));
-            }
-
-            //combine sort definitions
-            SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
-
-            #endregion
-
-            //get total count
-            long count = 0;
-            using (ServiceActivitySource.Instance.StartActivity("Get total count"))
-            {                    
-                count = await _collection.CountDocumentsAsync(filter);                    
-            }
-            PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
-
-            //filter collection
-            //var timer = new Stopwatch();
-            //timer.Start();
-            List<AuditEntity> auditEvents = new List<AuditEntity>();
-            using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
-            {
-                auditEvents = await _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToListAsync();
-            } 
-            
-            //timer.Stop();
-            //_logger.LogDebug(AuditLoggingIds.ListItems, "Finding audit events finished in {milliseconds} milliseconds", timer.ElapsedMilliseconds);                
-            return (auditEvents, metadata);                   
 
         }
 

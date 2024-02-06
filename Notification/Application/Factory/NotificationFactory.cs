@@ -155,5 +155,22 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             return model;
         }
+
+        public NotificationSearchRecord CreateNotificationSearchRecord(string? searchText, string? filterFacilityBy, string? filterNotificationType, string? sortBy, int pageSize, int pageNumber)
+        {
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Factory - Create NotificationSearchRecord");
+
+            NotificationSearchRecord model = new()
+            {
+                SearchText = searchText,
+                FilterFacilityBy = filterFacilityBy,
+                FilterNotificationTypeBy = filterNotificationType,                
+                SortBy = sortBy,
+                PageSize = pageSize,
+                PageNumber = pageNumber
+            };
+
+            return model;
+        }
     }
 }

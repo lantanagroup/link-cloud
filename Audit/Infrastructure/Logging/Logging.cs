@@ -11,8 +11,8 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         //Microsoft.Extensions.Compliance.Redaction
         [LoggerMessage(
             AuditLoggingIds.EventConsumerInit,
-            LogLevel.Information, 
-            "Started auditable event consumer for topic '{topic}' at {timestamp}.")]
+            LogLevel.Information,
+            "Started audit service consumer for topic(s) '{topic}' at {timestamp}.")]
         public static partial void LogConsumerStarted(this ILogger logger, string topic, DateTime timestamp);
 
         [LoggerMessage(
@@ -48,8 +48,8 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         [LoggerMessage(
             AuditLoggingIds.SearchException,
             LogLevel.Error,
-            "An exception occurred while attempting to perform a search for audit events.")]
-        public static partial void LogAuditEventListQueryException(this ILogger logger, [LogProperties]AuditSearchFilterRecord filter);
+            "An exception occurred while attempting to perform a search for audit events: {exceptionMessage}")]
+        public static partial void LogAuditEventListQueryException(this ILogger logger, string exceptionMessage, [LogProperties]AuditSearchFilterRecord filter);
 
         [LoggerMessage(
             AuditLoggingIds.GetItem,
@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         [LoggerMessage(
             AuditLoggingIds.GetItemException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve an audit event with an id of {id}.")]
-        public static partial void LogGetAuditEventByIdException(this ILogger logger, string id);
+            "An exception occurred while attempting to retrieve an audit event with an id of '{id}': {exceptionMessage}")]
+        public static partial void LogGetAuditEventByIdException(this ILogger logger, string id, string exceptionMessage);
     }
 }

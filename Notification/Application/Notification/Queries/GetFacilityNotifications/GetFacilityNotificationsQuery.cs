@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             }
             catch (Exception ex)
             {         
-                _logger.LogError(NotificationLoggingIds.ListItems, ex, "Failed to find notifications for facility '{facilityId}'.", facilityId);
+                _logger.LogError(NotificationLoggingIds.SearchException, ex, "Failed to find notifications for facility '{facilityId}'.", facilityId);
                 var currentActivity = Activity.Current;
                 currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to execute the request to find notifications for facility");
                 throw;
