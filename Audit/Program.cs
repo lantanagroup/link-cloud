@@ -69,7 +69,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
     }
     else
     {
@@ -160,7 +159,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add logging redaction
     builder.Logging.EnableRedaction();
     builder.Services.AddRedaction(x => {
-        x.SetRedactor<ErasingRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
+
+        x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
         var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");        
         if (!string.IsNullOrEmpty(hmacKey))

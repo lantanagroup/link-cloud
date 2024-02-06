@@ -18,6 +18,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         }
     }
 
+    //prefix key = 808
     public class PiiDataAttribute : DataClassificationAttribute
     {
         public PiiDataAttribute() : base(DataTaxonomy.PiiData)

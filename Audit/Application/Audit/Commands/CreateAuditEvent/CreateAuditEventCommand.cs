@@ -3,7 +3,6 @@ using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
-using LantanaGroup.Link.Audit.Settings;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
@@ -37,7 +36,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
 
             if (string.IsNullOrWhiteSpace(model.ServiceName))
             {
-                throw new ArgumentException((string?)AuditConstants.AuditErrorMessages.NullOrWhiteSpaceServiceName);
+                throw new ArgumentException((string?)AuditExceptionMessages.NullOrWhiteSpaceServiceName);
             }
 
             model.EventDate ??= DateTime.Now;

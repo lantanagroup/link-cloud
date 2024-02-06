@@ -30,8 +30,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                         .AddSource(ServiceActivitySource.Instance.Name)
                         .AddAspNetCoreInstrumentation(options =>
                             {
-                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                              
-                                options.Filter = (httpContext) => httpContext.Request.Path.ToString().Contains("/swagger"); //do not capture traces for the swagger endpoint
+                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                             })
                         .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
