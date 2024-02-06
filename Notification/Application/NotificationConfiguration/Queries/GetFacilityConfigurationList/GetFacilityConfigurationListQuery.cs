@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             }
             catch (NullReferenceException ex)
             {                
-                _logger.LogDebug(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notification configurations"), ex, "Failed to find notification configurations.");
+                _logger.LogDebug(new EventId(NotificationLoggingIds.SearchPerformed, "Notification Service - List notification configurations"), ex, "Failed to find notification configurations.");
                 var queryEx = new ApplicationException("Failed to execute the request to find notification configurations.", ex);
                 throw queryEx;                
             }

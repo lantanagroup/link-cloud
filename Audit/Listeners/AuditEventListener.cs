@@ -73,8 +73,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (ConsumeException ex)
                         {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
-                            //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Consumer error: {ErrorReason}", ex.Error.Reason);
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                                                     
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             if (ex.Error.IsFatal)
                             {
@@ -83,8 +82,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (Exception ex)
                         {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                            //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Failed to generate an audit event from kafka message: {message}", ex.Message);
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             break;
                         }
@@ -96,8 +94,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                 }
                 catch(OperationCanceledException oce)
                 {
-                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                    //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), oce, "Operation Canceled: {oceMessage}", oce.Message);
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);                    
                     _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();

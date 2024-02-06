@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             }
             catch (NullReferenceException ex)
             {
-                _logger.LogError(NotificationLoggingIds.ListItems, ex, "Failed to find notification records.");
+                _logger.LogError(NotificationLoggingIds.SearchException, ex, "Failed to find notification records.");
                 var currentActivity = Activity.Current;
                 currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to execute the request to find notifications");
                 throw;

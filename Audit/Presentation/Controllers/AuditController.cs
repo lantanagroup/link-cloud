@@ -79,10 +79,10 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
-                _logger.LogAuditEventListQueryException(searchFilter);
+                _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 return StatusCode(500, ex);
             }
-
+                    
         }
 
         /// <summary>
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 ex.Data.Add("audit-event-id", id);
-                _logger.LogGetAuditEventByIdException(id);
+                _logger.LogGetAuditEventByIdException(id, ex.Message);
                 return StatusCode(500, ex);
             }
 

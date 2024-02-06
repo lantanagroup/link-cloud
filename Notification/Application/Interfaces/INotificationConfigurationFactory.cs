@@ -15,5 +15,7 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
         public NotificationConfig NotificationConfigEntityCreate(string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
 
         public NotificationConfig NotificationConfigEntityCreate(string id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
+
+        NotificationConfigurationSearchRecord CreateNotificationConfigurationSearchRecord(string searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
     }
 }
