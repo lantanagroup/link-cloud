@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 {
@@ -26,32 +25,22 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Audit Events Query");
 
-            try 
-            { 
-                var result = await _datastore.GetAllAsync();
+            var result = await _datastore.GetAllAsync();
 
-                List<AuditModel> auditEvents = result.Select(x => new AuditModel
-                {
-                    Id = x.Id,
-                    FacilityId = x.FacilityId,
-                    ServiceName = x.ServiceName,
-                    EventDate = x.EventDate,
-                    User = x.User,
-                    Action = x.Action,
-                    Resource = x.Resource,
-                    PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                    Notes = x.Notes
-                }).ToList();
-
-                return auditEvents;
-            }
-            catch (NullReferenceException ex)
+            List<AuditModel> auditEvents = result.Select(x => new AuditModel
             {
-                _logger.LogDebug(new EventId(AuditLoggingIds.ListItems, "Audit Service - Get all events"), ex, "Failed to get all audit event records.");
-                var queryEx = new ApplicationException("Failed to execute the request to get all audit events.", ex);
-                throw queryEx;
-            }
+                Id = x.Id,
+                FacilityId = x.FacilityId,
+                ServiceName = x.ServiceName,
+                EventDate = x.EventDate,
+                User = x.User,
+                Action = x.Action,
+                Resource = x.Resource,
+                PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                Notes = x.Notes
+            }).ToList();
 
+            return auditEvents;
         }
     }
 }

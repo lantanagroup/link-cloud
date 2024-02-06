@@ -22,38 +22,38 @@ namespace LantanaGroup.Link.Audit.Presentation.Services
             _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(_createAuditEventCommand));
         }
 
-        public override async Task<CreateAuditEventReply> CreateAuditEvent(AuditEventMessage model, ServerCallContext context)
-        {
-            try 
-            {
-                //Create audit event
-                CreateAuditEventModel auditEvent = _auditFactory.Create(
-                    model.FacilityId,
-                    model.ServiceName,
-                    model.CorrelationId,
-                    model.EventDate == null ? null : Convert.ToDateTime(model.EventDate),
-                    model.UserId == null ? null : model.UserId,
-                    model.User,
-                    (AuditEventType)(Convert.ToInt32(model.Action)),
-                    model.Resource,
-                    model.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                    model.Notes);
+        //public override async Task<CreateAuditEventReply> CreateAuditEvent(AuditEventMessage model, ServerCallContext context)
+        //{
+        //    try 
+        //    {
+        //        //Create audit event
+        //        CreateAuditEventModel auditEvent = _auditFactory.Create(
+        //            model.FacilityId,
+        //            model.ServiceName,
+        //            model.CorrelationId,
+        //            model.EventDate == null ? null : Convert.ToDateTime(model.EventDate),
+        //            model.UserId == null ? null : model.UserId,
+        //            model.User,
+        //            (AuditEventType)(Convert.ToInt32(model.Action)),
+        //            model.Resource,
+        //            model.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+        //            model.Notes);
 
-                string auditEventId = await _createAuditEventCommand.Execute(auditEvent);
+        //        string auditEventId = await _createAuditEventCommand.Execute(auditEvent);
 
-                CreateAuditEventReply response = new CreateAuditEventReply();
-                response.Id = auditEventId;
-                response.Message = "The audit event was created succcessfully.";
+        //        CreateAuditEventReply response = new CreateAuditEventReply();
+        //        response.Id = auditEventId;
+        //        response.Message = "The audit event was created succcessfully.";
 
-                return response;
-            }
-            catch (Exception ex) 
-            {
-                _logger.LogError(AuditLoggingIds.GenerateItems, ex, $"Failed to create a new audit event from grpc request {model} with context {context}.");
-                throw new ApplicationException($"Failed to create a new audit event from grpc request.");
-            }           
+        //        return response;
+        //    }
+        //    catch (Exception ex) 
+        //    {
+        //        _logger.LogError(AuditLoggingIds.GenerateItems, ex, $"Failed to create a new audit event from grpc request {model} with context {context}.");
+        //        throw new ApplicationException($"Failed to create a new audit event from grpc request.");
+        //    }           
 
-        }
+        //}
 
     }
 }

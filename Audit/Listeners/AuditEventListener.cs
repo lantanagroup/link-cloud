@@ -4,6 +4,7 @@ using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
@@ -39,8 +40,8 @@ namespace LantanaGroup.Link.Audit.Listeners
             {
                 try 
                 {                
-                    _consumer.Subscribe(nameof(KafkaTopic.AuditableEventOccurred));
-                    _logger.LogInformation(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), "Started auditable event consumer for topic '{KafkaTopicAuditableEventOccurred}' at {DateTimeUtcNow}.", nameof(KafkaTopic.AuditableEventOccurred), DateTime.UtcNow);
+                    _consumer.Subscribe(nameof(KafkaTopic.AuditableEventOccurred));                    
+                    _logger.LogConsumerStarted(nameof(KafkaTopic.AuditableEventOccurred), DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
@@ -54,21 +55,14 @@ namespace LantanaGroup.Link.Audit.Listeners
 
                                     if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
-                                        messageValue.CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                                        _logger.LogInformation(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), "Received message with correlation ID {messageValue.CorrelationId}: {consumeResultTopic}", messageValue.CorrelationId, result.Topic);
-                                    }
-                                    else
-                                    {
-                                        _logger.LogInformation(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), "Received message without correlation ID: {consumeResultTopic}", result.Topic);
-                                    }
-
-                                    _logger.LogInformation(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), "Consume Event for: Facility '{consumeResultMessageKey}' had an action of '{messageValueAction}' against resource '{messageValueResource}' from the service '{messageValueServiceName}'.", result.Message.Key, messageValue.Action, messageValue.Resource, messageValue.ServiceName);
+                                        messageValue.CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);                                        
+                                    }                                   
 
                                     //create audit event
-                                    CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);
+                                    CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);                                                                      
+                                    _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, eventModel);
 
-                                    string auditEventId = await _createAuditEventCommand.Execute(eventModel);
-                                    _logger.LogInformation(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), "Successfully created new audit event '{auditEventId}'.", auditEventId);
+                                    string auditEventId = await _createAuditEventCommand.Execute(eventModel);                                    
 
                                     //consume the result and offset
                                     _consumer.Commit(result);
@@ -80,7 +74,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                         catch (ConsumeException ex)
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
-                            _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Consumer error: {ErrorReason}", ex.Error.Reason);
+                            //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Consumer error: {ErrorReason}", ex.Error.Reason);
+                            _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             if (ex.Error.IsFatal)
                             {
                                 break;
@@ -89,7 +84,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                         catch (Exception ex)
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                            _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Failed to generate an audit event from kafka message: {message}", ex.Message);
+                            //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), ex, "Failed to generate an audit event from kafka message: {message}", ex.Message);
+                            _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             break;
                         }
                     }
@@ -101,7 +97,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                 catch(OperationCanceledException oce)
                 {
                     Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                    _logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), oce, "Operation Canceled: {oceMessage}", oce.Message);
+                    //_logger.LogCritical(new EventId(AuditLoggingIds.EventConsumer, "Audit Service - Auditable event consumer"), oce, "Operation Canceled: {oceMessage}", oce.Message);
+                    _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();
                 }

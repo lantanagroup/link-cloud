@@ -98,5 +98,27 @@ namespace LantanaGroup.Link.Audit.Application.Factory
             return audit;
         }
 
+        public AuditSearchFilterRecord CreateAuditSearchFilterRecord(string? searchText, string? filterFacilityBy,
+            string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy,
+            string? sortBy, int pageSize, int pageNumber)
+        { 
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Search Filter Record");
+
+            AuditSearchFilterRecord auditSearchFilterRecord = new AuditSearchFilterRecord
+            {
+                SearchText = searchText,
+                FilterFacilityBy = filterFacilityBy,
+                FilterCorrelationBy = filterCorrelationBy,
+                FilterServiceBy = filterServiceBy,
+                FilterActionBy = filterActionBy,
+                FilterUserBy = filterUserBy,
+                SortBy = sortBy,
+                PageSize = pageSize,
+                PageNumber = pageNumber
+            };
+
+            return auditSearchFilterRecord;
+        }
+
     }
 }
