@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Notification.Application.Models;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 using System.Text;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Infrastructure;

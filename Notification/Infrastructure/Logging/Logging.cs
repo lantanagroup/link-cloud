@@ -1,10 +1,7 @@
 ﻿
-
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
-using Microsoft.Extensions.Configuration;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Infrastructure.Logging

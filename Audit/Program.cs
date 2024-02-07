@@ -12,7 +12,6 @@ using Serilog.Exceptions;
 using Serilog.Enrichers.Span;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using System.Reflection;
 using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;

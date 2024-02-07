@@ -21,9 +21,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                 .AddService(
                     serviceName: ServiceActivitySource.Instance.Name, 
                     serviceVersion: ServiceActivitySource.Instance.Version
-                ));
-
-            
+                ));            
 
             otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder

@@ -1,5 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
-using LantanaGroup.Link.Notification.Application.Interfaces;
+﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
@@ -8,7 +7,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Presentation.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.Json;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
