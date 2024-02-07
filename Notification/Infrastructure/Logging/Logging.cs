@@ -13,31 +13,31 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.EventConsumerInit,
             LogLevel.Information, 
-            "Started notification service consumer for topic(s) '{topic}' at {timestamp}.")]
+            "Started notification service consumer for topic(s) {topic} at {timestamp}.")]
         public static partial void LogConsumerStarted(this ILogger logger, string topic, DateTime timestamp);
 
         [LoggerMessage(
             NotificationLoggingIds.EventConsumerObserved, 
             LogLevel.Information,
-            "New notification requested event observed for a '{notificationType}' notification.")]
+            "New notification requested event observed for a {notificationType} notification.")]
         public static partial void LogNotificationRequestedConsumption(this ILogger logger, string notificationType);
 
         [LoggerMessage(
             NotificationLoggingIds.EventConsumerInvalidEmailAddress,
             LogLevel.Warning,
-            "The email addresss '{emailAddress}' is invalid, removing from recipients.")]
+            "The email addresss {emailAddress} is invalid, removing from recipients.")]
         public static partial void LogNotificationRequestedInvalidEmailAddress(this ILogger logger, string emailAddress);
 
         [LoggerMessage(
             NotificationLoggingIds.EventConsumerException,
             LogLevel.Critical,
-            "Consumer Exception for topic '{topic}': {exceptionMessage}")]
+            "Consumer Exception for topic {topic}: {exceptionMessage}")]
         public static partial void LogConsumerException(this ILogger logger, string topic, string exceptionMessage);
 
         [LoggerMessage(
             NotificationLoggingIds.EventConsumerOperationCanceled,
             LogLevel.Critical,
-            "Consumer Operation Canceled for topic '{topic}' : {exceptionMessage}")]
+            "Consumer Operation Canceled for topic {topic}: {exceptionMessage}")]
         public static partial void LogOperationCanceledException(this ILogger logger, string topic, string exceptionMessage);
 
         #region Notification Configuration Logging
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationCreation,
             LogLevel.Information,
-            "New notification configuration created with id '{id}' for facility '{facilityId}'.")]
+            "New notification configuration created with id {id} for facility {facilityId}.")]
         public static partial void LogNotificationConfigurationCreation(this ILogger logger, string id, string facilityId, [LogProperties] CreateFacilityConfigurationModel config);
 
         [LoggerMessage(
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationUpdate,
             LogLevel.Information,
-            "A notification configuration with an id of '{id}' was updated.")]
+            "A notification configuration with an id of {id} was updated.")]
         public static partial void LogNotificationConfigurationUpdate(this ILogger logger, string id, [LogProperties] UpdateFacilityConfigurationModel config);
 
         [LoggerMessage(
@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationConfigurationById,
             LogLevel.Information,
-            "A request was made for a notification configuration with an id of '{id}'.")]
+            "A request was made for a notification configuration with an id of {id}.")]
         public static partial void LogGetNotificationConfigurationById(this ILogger logger, string id);
 
         [LoggerMessage(
@@ -94,13 +94,13 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationConfigurationByIdException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve the nofitication configuration with an id of '{id}': {exceptionMessage}")]
+            "An exception occurred while attempting to retrieve the nofitication configuration with an id of {id}: {exceptionMessage}")]
         public static partial void LogGetNotificationConfigurationByIdException(this ILogger logger, string id, string exceptionMessage);
 
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationConfigurationByFacilityId,
             LogLevel.Information,
-            "A request was made for a notification configuration with a facility id of '{id}'.")]
+            "A request was made for a notification configuration with a facility id of {id}.")]
         public static partial void LogGetNotificationConfigurationByFacilityId(this ILogger logger, string id);
 
         [LoggerMessage(
@@ -112,13 +112,13 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationConfigurationByFacilityIdException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve the nofitication configuration with a facility id of '{id}': {exceptionMessage}")]
+            "An exception occurred while attempting to retrieve the nofitication configuration with a facility id of {id}: {exceptionMessage}")]
         public static partial void LogGetNotificationConfigurationByFacilityIdException(this ILogger logger, string id, string exceptionMessage);
 
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationDelete,
             LogLevel.Information,
-            "A request was made to delete a notification configuration with an id of '{id}': {message}")]
+            "A request was made to delete a notification configuration with an id of {id}: {message}")]
         public static partial void LogNotificationConfigurationDeletion(this ILogger logger, string id, string message);
 
         [LoggerMessage(
@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationDeleteException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve the nofitication configuration with a facility id of '{id}'.: {exceptionMessage}")]
+            "An exception occurred while attempting to retrieve the nofitication configuration with a facility id of {id}.: {exceptionMessage}")]
         public static partial void LogNotificationConfigurationDeleteException(this ILogger logger, string id, string exceptionMessage);
 
         [LoggerMessage(
@@ -153,7 +153,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.NotificationCreation,
             LogLevel.Information,
-            "New notification created with id '{id}'.")]
+            "New notification created with id {id}.")]
         public static partial void LogNotificationCreation(this ILogger logger, string id, [LogProperties] CreateNotificationModel notification);
 
         [LoggerMessage(
@@ -165,13 +165,13 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationById,
             LogLevel.Information,
-            "A request was made for a notification with an id of '{id}'.")]
+            "A request was made for a notification with an id of {id}.")]
         public static partial void LogGetNotificationById(this ILogger logger, string id);
 
         [LoggerMessage(
             NotificationLoggingIds.GetNotificationByIdException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve the nofitication with an id of '{id}': {exceptionMessage}")]
+            "An exception occurred while attempting to retrieve the nofitication with an id of {id}: {exceptionMessage}")]
         public static partial void LogGetNotificationByIdException(this ILogger logger, string id, string exceptionMessage);
 
         [LoggerMessage(
@@ -205,19 +205,19 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         [LoggerMessage(
             NotificationLoggingIds.SendNotification,
             LogLevel.Information,
-            "A notification was sent through channel '{channel}' at {timestamp}.")]
+            "A notification was sent through channel {channel} at {timestamp}.")]
         public static partial void LogNotificationSent(this ILogger logger, string channel, DateTime timestamp);
 
         [LoggerMessage(
             NotificationLoggingIds.SendNotificationWarning,
             LogLevel.Warning,
-            "An issue occured while proccessing a notification to be sent through channel '{channel}': {exceptionMessage}")]
+            "An issue occured while proccessing a notification to be sent through channel {channel}: {exceptionMessage}")]
         public static partial void LogNotificationSentWarning(this ILogger logger, string channel, string exceptionMessage);
 
         [LoggerMessage(
             NotificationLoggingIds.SendNotificationException,
             LogLevel.Warning,
-            "An exception occured while attempting to send a notification through channel '{channel}': {exceptionMessage}")]
+            "An exception occured while attempting to send a notification through channel {channel}: {exceptionMessage}")]
         public static partial void LogNotificationSentException(this ILogger logger, string channel, string exceptionMessage);
 
         #endregion
