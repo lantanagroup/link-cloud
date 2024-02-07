@@ -40,10 +40,8 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
                 return notification;
             }
             catch (ArgumentNullException ex)
-            {
-                _logger.LogError(NotificationLoggingIds.GetItem, ex, "Failed to get notification, no id provided.");
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, $"Failed to get notification, no id provided.");
+            {                
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to get notification, no id provided.");
                 throw;
             }
         }

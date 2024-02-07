@@ -76,6 +76,9 @@
             public const int GetNotificationConfigurationByFacilityIdWarning = 1052;    
             public const int GetNotificationConfigurationByFacilityIdException = 1053;
             public const int NotificationConfigurationDeleteWarning = 1054;
+            public const int SendNotification = 1055;
+            public const int SendNotificationWarning = 1056;
+            public const int SendNotificationException = 1057;
             public const int EventConsumerInit = 2000;
             public const int EventConsumerObserved = 2001;
             public const int EventConsumerException = 2002;

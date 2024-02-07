@@ -3,6 +3,7 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
@@ -109,17 +110,16 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         new KeyValuePair<string, object?>("facility", entity.FacilityId), 
                         new KeyValuePair<string, object?>("type", entity.NotificationType));
 
-                    //Log creation of new notification configuration                        
-                    _logger.LogInformation(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification"), "New notification '{id}' created for '{facilityId}'.", entity.Id, entity.FacilityId);
+                    //Log creation of new notification configuration
+                    _logger.LogNotificationCreation(entity.Id, model);                    
                     return entity.Id;
                 }              
             }
             catch (Exception ex)
-            {
-                ex.Data.Add("model", model);
-                _logger.LogError(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification"), ex, "Failed to create notification");
+            {               
                 var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to create notification.");
+                currentActivity?.SetStatus(ActivityStatusCode.Error);
+                _logger.LogNotificationCreationException(model, ex.Message);
                 throw;
             }
         }

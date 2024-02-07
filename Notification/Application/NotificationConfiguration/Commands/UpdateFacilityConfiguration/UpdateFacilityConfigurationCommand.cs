@@ -4,6 +4,7 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
@@ -45,17 +46,13 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                 AuditEventMessage auditEventMessage = _auditEventFactory.CreateAuditEvent(null, null, "SystemUser", AuditEventType.Update, typeof(NotificationConfig).Name, notes);
                 _ = Task.Run(() => _createAuditEventCommand.Execute(model.FacilityId, auditEventMessage));
 
-                //Log update of existing notification configuration                        
-                _logger.LogInformation(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), "Notification configuration '{id}' updated for '{facilityId}'.", entity.Id, entity.FacilityId);
+                _logger.LogNotificationConfigurationUpdate(model.Id, model);
                 return entity.Id;
 
             }
             catch (Exception ex)
-            {
-                ex.Data.Add("facility id", model.FacilityId);
-                _logger.LogError(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), ex, "Failed to update notification configuration for facility {facilityId}.", model.FacilityId);
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, $"Failed to updated notification configuration for facility {model.FacilityId}.");
+            {                 
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
         }

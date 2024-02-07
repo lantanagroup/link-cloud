@@ -3,6 +3,8 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Presentation.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
@@ -37,7 +39,8 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                 {
                     if (!_datastore.Exists(id))
                     {
-                        _logger.LogWarning(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), "No notification configuration with an id of {id} found.", id);
+                        var message = $"No notification configuration with an id of {id} found.";
+                        _logger.LogNotificationConfigurationDeleteWarning(message);                        
                         return false;
                     }
                 }
@@ -50,8 +53,9 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 
                     if (result)
                     {
-                        _logger.LogInformation(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), "Notificaiton configuration {id} was deleted.", id);
-                                          
+                        var message = $"Notificaiton configuration {id} was deleted.";
+                        _logger.LogNotificationConfigurationDeletion(id, message);
+
                         //TODO: Get user info
                         //Create audit event
                         string notes = $"Notification configuration ({id}) for facility {config.FacilityId} was deleted by TODO-USER.";
@@ -60,17 +64,15 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                     }
                     else
                     {
-                        _logger.LogInformation(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), "Notificaiton configuration {id} was not deleted.", id);
+                        _logger.LogNotificationConfigurationDeletion(id, $"Notificaiton configuration {id} was not deleted.");
                     }
 
                     return result;
                 }                
             }
             catch (NullReferenceException ex)
-            {
-                _logger.LogError(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), ex, "Failed to delete notificaiton configuration {id}", id);
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, $"Failed to delete notificaiton configuration {id}");
+            {                
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to delete notificaiton configuration {id}");
                 throw;
             }
             

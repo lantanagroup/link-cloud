@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -50,15 +51,16 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     if (model.FacilityConfig is null || (model.FacilityConfig.Channels is not null && model.FacilityConfig.Channels.Any(x => x.Name.Equals(ChannelType.Email.ToString()) && x.Enabled)))
                     {
                         var currentActivity = Activity.Current;
-                        currentActivity?.AddEvent(new("Sending request to email channel service.", DateTimeOffset.UtcNow));
+                        var sentDate = DateTimeOffset.UtcNow;
+                        currentActivity?.AddEvent(new("Sending request to email channel service.", sentDate));
                         await _emailService.Send(model.Id, model.Recipients, model.Bcc, model.Subject, model.Message, null);
-                        
+                        _logger.LogNotificationSent("Email", sentDate.DateTime);
+                            
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))
                         {
                             await _datastore.SetNotificationSentOn(model.Id);
 
-                            //add id to current activity
-                            
+                            //add id to current activity                            
                             currentActivity?.AddTag("notification id", model.Id);
                             currentActivity?.AddTag("facility id", model.FacilityConfig?.FacilityId);
 
@@ -71,7 +73,8 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     }
                     else
                     {
-                        _logger.LogWarning(new EventId(NotificationLoggingIds.EmailChannel, "Notification Service - Send Email"), "Facility {facilityId} does not have channels configured for email notifications. Did not send notification {id}.", model.FacilityConfig.FacilityId, model.Id);
+                        var message = $"Facility {model.FacilityConfig.FacilityId} does not have channels configured for email notifications. Did not send notification {model.Id}.";
+                        _logger.LogNotificationSentWarning("Email", message);                        
                         var currentActivity = Activity.Current;
                         currentActivity?.SetStatus(ActivityStatusCode.Ok, "Facility does not have channels configured for email notifications. Did not send notification.");
                     }
@@ -80,10 +83,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 return true;
             }
             catch(Exception ex)
-            {
-                //_logger.LogError(NotificationLoggingIds.EmailChannel, ex, "Failed to send notification");
+            {                
                 var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to send notification.");
+                currentActivity?.SetStatus(ActivityStatusCode.Error);
+                _logger.LogNotificationSentException("Email", ex.Message);
                 throw;
             }
 
