@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {                
                 CreateNotificationModel notification = _notificationFactory.CreateNotificationModelCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
-                _logger.LogNotificationCreationException(notification);
+                _logger.LogNotificationCreationException(notification, ex.Message);
                 return StatusCode(500, ex);
             }
         }
@@ -429,7 +429,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 //Create notification configuration
                 CreateFacilityConfigurationModel config = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
                 string id = await _createFacilityConfigurationCommand.Execute(config);
-                _logger.LogNotificationConfigurationCreation(id, config);
+                
                 EntityCreatedResponse response = new EntityCreatedResponse("The notification configuration was created succcessfully.", id);
 
                 return Ok(response);
@@ -494,8 +494,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 //Update notification configuration
                 UpdateFacilityConfigurationModel config = _configurationFactory.UpdateFacilityConfigurationModelCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                string id = await _updateFacilityConfigurationCommand.Execute(config);
-                _logger.LogNotificationConfigurationUpdate(id, model);
+                string id = await _updateFacilityConfigurationCommand.Execute(config);                
                 EntityUpdateddResponse response = new EntityUpdateddResponse("The notification configuration was updated succcessfully.", id);
 
                 return Ok(response);
@@ -641,8 +640,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 EntityDeletedResponse entityDeletedResponse = new EntityDeletedResponse();
                 entityDeletedResponse.Id = id;
                 entityDeletedResponse.Message = result ? $"Notificatioin configuration {id} was deleted succesfully." : $"Failed to delete notificatioin configuration {id}, check log for details.";
-                _logger.LogNotificationConfigurationDeletion(id, entityDeletedResponse.Message);
-
+                
                 return Ok(entityDeletedResponse);
             }
             catch (Exception ex)

@@ -4,6 +4,7 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
@@ -54,17 +55,14 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                     currentActivity?.AddTag("notification id", entity.Id);
                     currentActivity?.AddTag("facility id", entity.FacilityId);
 
-                    //Log creation of new notification configuration                        
-                    _logger.LogInformation(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification configuration"), "New notification configuration {id}' created for '{facilityId}'.", entity.Id, entity.FacilityId);
+                    //Log creation of new notification configuration                       
+                    _logger.LogNotificationConfigurationCreation(entity.Id, model.FacilityId, model);
                     return entity.Id;
                 }                           
             }
             catch (Exception ex)
             {
-                ex.Data.Add("facility id", model.FacilityId);
-                _logger.LogError(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification configuration"), ex, "Failed to create notification configuration for facility '{facilityId}'.", model.FacilityId);
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, $"Failed to create notification configuration for facility {model.FacilityId}.");
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to create notification configuration for facility {model.FacilityId}.");
                 throw;
             }
 
