@@ -1,10 +1,7 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Notification.Application.Interfaces;
+﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.Notification.Queries
 {

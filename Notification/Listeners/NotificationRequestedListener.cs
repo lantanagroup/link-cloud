@@ -9,9 +9,6 @@ using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
-using static Confluent.Kafka.ConfigPropertyNames;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Listeners
 {

@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoDB.Driver.Core.Operations;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
