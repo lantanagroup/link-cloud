@@ -12,13 +12,13 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         [LoggerMessage(
             AuditLoggingIds.EventConsumerInit,
             LogLevel.Information,
-            "Started audit service consumer for topic(s) '{topic}' at {timestamp}.")]
+            "Started audit service consumer for topic(s) {topic} at {timestamp}.")]
         public static partial void LogConsumerStarted(this ILogger logger, string topic, DateTime timestamp);
 
         [LoggerMessage(
             AuditLoggingIds.EventConsumerObserved, 
             LogLevel.Information, 
-            "New auditable event observed for facility '{facility}' from service '{serviceName}'.")]
+            "New auditable event observed for facility {facility} from service {serviceName}.")]
         public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties]CreateAuditEventModel auditEvent);
         
         [LoggerMessage(
@@ -30,13 +30,13 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         [LoggerMessage(
             AuditLoggingIds.EventConsumerException, 
             LogLevel.Critical,
-            "Consumer Exception for topic '{topic}': {exceptionMessage}")]
+            "Consumer Exception for topic {topic}: {exceptionMessage}")]
         public static partial void LogConsumerException(this ILogger logger, string topic, string exceptionMessage);
 
         [LoggerMessage(
             AuditLoggingIds.EventConsumerOperationCanceled,
             LogLevel.Critical,
-            "Consumer Operation Canceled for topic '{topic}' : {exceptionMessage}")]
+            "Consumer Operation Canceled for topic {topic} : {exceptionMessage}")]
         public static partial void LogOperationCanceledException(this ILogger logger, string topic, string exceptionMessage);
 
         [LoggerMessage(
@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         [LoggerMessage(
             AuditLoggingIds.GetItemException,
             LogLevel.Error,
-            "An exception occurred while attempting to retrieve an audit event with an id of '{id}': {exceptionMessage}")]
+            "An exception occurred while attempting to retrieve an audit event with an id of {id}: {exceptionMessage}")]
         public static partial void LogGetAuditEventByIdException(this ILogger logger, string id, string exceptionMessage);
     }
 }
