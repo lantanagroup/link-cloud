@@ -3,7 +3,6 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -14,19 +13,21 @@ namespace LantanaGroup.Link.Notification.Application.Factory
     public class KafkaProducerFactory : IKafkaProducerFactory
     {
         private readonly ILogger<KafkaProducerFactory> _logger;
-        private readonly IOptions<KafkaConnection> _kafkaConnection;
+        private readonly IOptions<BrokerConnection> _brokerConnection;
 
-        public KafkaProducerFactory(ILogger<KafkaProducerFactory> logger, IOptions<KafkaConnection> kafkaConnection)
+        public KafkaProducerFactory(ILogger<KafkaProducerFactory> logger, IOptions<BrokerConnection> brokerConnection)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
+            _brokerConnection = brokerConnection ?? throw new ArgumentNullException(nameof(brokerConnection));
         }
 
-        public IProducer<string, AuditEventMessage> CreateAuditEventProducer()
+        public IProducer<string, AuditEventMessage> CreateAuditEventProducer(bool useOpenTelemetry = true)
         {
             try 
             {
-                return new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).BuildWithInstrumentation();
+                var config = _brokerConnection.Value.CreateProducerConfig();
+                var builder = new ProducerBuilder<string, AuditEventMessage>(_brokerConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>());
+                return useOpenTelemetry ? builder.BuildWithInstrumentation() : builder.Build();
             }
             catch (Exception ex)
             {

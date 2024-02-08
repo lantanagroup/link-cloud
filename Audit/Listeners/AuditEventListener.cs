@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Audit.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateAuditableEventConsumer(false))
+            using (var _consumer = _kafkaConsumerFactory.CreateAuditableEventConsumer(enableAutoCommit: false))
             {
                 try 
                 {                
