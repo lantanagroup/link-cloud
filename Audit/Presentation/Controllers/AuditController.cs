@@ -3,6 +3,7 @@ using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Text.Json;
@@ -19,14 +20,16 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         private readonly IGetAuditEventListQuery _getAuditEventListQuery;
         private readonly IGetAuditEventQuery _getAuditEventQuery;
         private int maxAuditEventsPageSize = 20;
+        private readonly AuditServiceMetrics _auditServiceMetrics;
 
-        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, ICreateAuditEventCommand createAuditEventCommand, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery)
+        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, ICreateAuditEventCommand createAuditEventCommand, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, AuditServiceMetrics auditServiceMetrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));           
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
             _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
             _getAuditEventListQuery = getAuditEventListQuery ?? throw new ArgumentNullException(nameof(getAuditEventListQuery));
             _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
+            _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
         }
 
         /// <summary>
@@ -54,7 +57,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? 
             filterActionBy, string? filterUserBy, string? sortBy, int pageSize = 10, int pageNumber = 1)
-        {               
+        {           
+            using var _ = _auditServiceMetrics.MeasureAuditSearchDuration();
 
             try
             {
