@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Audit Event");
             
-            using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
+            using (var producer = _kafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: true))
             {
                 try 
                 {

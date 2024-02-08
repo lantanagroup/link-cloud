@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Notification.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer())
+            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false))
             {
                 try
                 {

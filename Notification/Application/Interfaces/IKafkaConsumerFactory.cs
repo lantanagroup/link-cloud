@@ -5,6 +5,6 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
 {
     public interface IKafkaConsumerFactory
     {
-        public IConsumer<string, NotificationMessage> CreateNotificationRequestedConsumer();
+        public IConsumer<string, NotificationMessage> CreateNotificationRequestedConsumer(bool enableAutoCommit);
     }
 }
