@@ -102,6 +102,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Mongo));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
+    builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
     //Add commands
     builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
