@@ -4,7 +4,6 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
-using LantanaGroup.Link.Audit.Presentation.Services;
 using LantanaGroup.Link.Audit.Application.Audit.Queries;
 using LantanaGroup.Link.Audit.Infrastructure.AuditHelper;
 using Serilog;
@@ -233,14 +232,8 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());   
-
-    if (app.Configuration.GetValue<bool>(AuditConstants.AppSettingsSectionNames.AllowReflection))
-    {
-        app.MapGrpcReflectionService();
-    }
-
-    app.MapGrpcService<AuditService>();    
+    app.UseEndpoints(endpoints => endpoints.MapControllers());  
+     
 }
 
 #endregion
