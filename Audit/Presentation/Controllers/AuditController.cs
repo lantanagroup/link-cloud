@@ -129,50 +129,6 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 return StatusCode(500, ex);
             }
 
-        }
-
-        /// <summary>
-        /// Creates an audit event.
-        /// </summary>
-        /// <param name="model"></param>
-        /// <returns>
-        ///     Success: 200
-        ///     Bad Reqeust: 400
-        ///     Unautorized: 401
-        ///     Forbidden: 403
-        ///     Server Error: 500
-        /// </returns>
-        //[HttpPost]
-        //[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(EntityCreatedResponse))]
-        //[ProducesResponseType(StatusCodes.Status400BadRequest)]
-        //[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        //[ProducesResponseType(StatusCodes.Status403Forbidden)]
-        //[ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        //public async Task<ActionResult<EntityCreatedResponse>> CreateAuditEventAsync(AuditEventMessage model)
-        //{           
-        //    try
-        //    {
-        //        if (model == null) { return BadRequest("No audit event provided."); }
-
-        //        if (string.IsNullOrWhiteSpace(model.FacilityId))
-        //        {
-        //            _logger.LogWarning(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "Facility Id was not provided for audit event creation.");
-        //        }
-
-        //        //Create audit event
-        //        CreateAuditEventModel auditEvent = _auditFactory.Create(model.FacilityId, model.ServiceName, model.CorrelationId, model.EventDate, model.UserId, model.User, model.Action, model.Resource, model.PropertyChanges, model.Notes);
-        //        string auditEventId = await _createAuditEventCommand.Execute(auditEvent);
-        //        EntityCreatedResponse response = new EntityCreatedResponse("The audit event was created succcessfully.", auditEventId);
-
-        //        return Ok(response);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        ex.Data.Add("model", model);
-        //        _logger.LogError(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), ex, "An exception occurred while attempting to create a new audit event.");
-        //        return StatusCode(500, ex);
-        //    }
-
-        //}
+        }        
     }
 }
