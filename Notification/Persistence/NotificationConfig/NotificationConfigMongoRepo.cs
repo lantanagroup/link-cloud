@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Persistence
 {
@@ -98,14 +97,8 @@ namespace LantanaGroup.Link.Notification.Persistence
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notification configurations"), ex, "Failed to execute find notification configurations.");
-                var repoEx = new ApplicationException("Failed to execute the request to find notification configurations.", ex);
-                //repoEx.Data.Add("searchText", searchText);
-                repoEx.Data.Add("filterFacilityBy", filterFacilityBy);
-                repoEx.Data.Add("sortBy", sortBy);
-                repoEx.Data.Add("pageSize", pageSize);
-                repoEx.Data.Add("pageNumber", pageNumber);
-                throw repoEx;              
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                throw;              
             }
 
         }
@@ -171,14 +164,8 @@ namespace LantanaGroup.Link.Notification.Persistence
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notification configurations"), ex, "Failed to execute find notification configurations asynchronously.");
-                var repoEx = new ApplicationException("Failed to execute the request to find notification configurations.", ex);
-                //repoEx.Data.Add("searchText", searchText);
-                repoEx.Data.Add("filterFacilityBy", filterFacilityBy);
-                repoEx.Data.Add("sortBy", sortBy);
-                repoEx.Data.Add("pageSize", pageSize);
-                repoEx.Data.Add("pageNumber", pageNumber);
-                throw repoEx;
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);                
+                throw;
             }
 
         }

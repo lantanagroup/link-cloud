@@ -1,0 +1,11 @@
+﻿@Audit_HostAddress = http://localhost:7334
+@AuditId = 5a8cf663-fbf9-4397-a6de-1e5c81882c84
+
+GET {{Audit_HostAddress}}/api/audit?sortBy=EventDate&pageNumber=1&pageSize=100
+Accept: application/json
+
+###
+
+GET {{Audit_HostAddress}}/api/audit/{{AuditId}}
+
+###

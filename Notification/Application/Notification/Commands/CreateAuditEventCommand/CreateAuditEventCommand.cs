@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Notification.Application.Models;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 using System.Text;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Infrastructure;
@@ -24,7 +23,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Audit Event");
             
-            using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
+            using (var producer = _kafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: true))
             {
                 try 
                 {
@@ -48,10 +47,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 }
                 catch (Exception ex)
                 {
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
                     ex.Data.Add("producer", producer);
-                    ex.Data.Add("facility_id", facilityId);
-                    ex.Data.Add("audit_event", auditEvent);
-                    _logger.LogCritical(new EventId(NotificationLoggingIds.KafkaProducer, "Notification Service - Create Audit Event"), ex, "Failed to generate an audit event");
+                    ex.Data.Add("facility-id", facilityId);
+                    ex.Data.Add("audit-event", auditEvent);                    
                     throw;
                 }
                 

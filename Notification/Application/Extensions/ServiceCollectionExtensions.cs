@@ -18,14 +18,17 @@ namespace LantanaGroup.Link.Notification.Application.Extensions
 
             //configure OpenTelemetry resources with application name
             otel.ConfigureResource(resource => resource
-                .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
+                .AddService(
+                    serviceName: ServiceActivitySource.Instance.Name,
+                    serviceVersion: ServiceActivitySource.Instance.Version
+                ));
 
             otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder
                         .AddSource(ServiceActivitySource.Instance.Name)
                         .AddAspNetCoreInstrumentation(options =>
                         {
-                            options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
+                            options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                            
                         })
                         .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
@@ -33,9 +36,16 @@ namespace LantanaGroup.Link.Notification.Application.Extensions
             otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
                         .AddAspNetCoreInstrumentation()
-                        .AddRuntimeInstrumentation()
-                        .AddMeter(Counters.meter.Name)
+                        .AddProcessInstrumentation()
+                        .AddMeter("LinkNotificationService")
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+
+            if (telemetryConfig.EnableRuntimeInstrumentation)
+            {
+                otel.WithMetrics(metricsProviderBuilder =>
+                    metricsProviderBuilder
+                        .AddRuntimeInstrumentation());
+            }
 
             if (env.IsDevelopment())
             {
@@ -48,6 +58,8 @@ namespace LantanaGroup.Link.Notification.Application.Extensions
                 //    metricsProviderBuilder
                 //        .AddConsoleExporter());                
             }
+
+            services.AddSingleton<NotificationServiceMetrics>();
 
             return services;
         }

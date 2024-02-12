@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 {
@@ -36,38 +35,29 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
 
-            try
-            {
-                var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+            var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
 
-                //convert AuditEntity to AuditModel
-                using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
+            //convert AuditEntity to AuditModel
+            using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
+            {
+
+                List<AuditModel> auditEvents = result.Select(x => new AuditModel
                 {
+                    Id = x.Id,
+                    FacilityId = x.FacilityId,
+                    CorrelationId = x.CorrelationId,
+                    ServiceName = x.ServiceName,
+                    EventDate = x.EventDate,
+                    User = x.User,
+                    Action = x.Action,
+                    Resource = x.Resource,
+                    PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                    Notes = x.Notes
+                }).ToList();
 
-                    List<AuditModel> auditEvents = result.Select(x => new AuditModel
-                    {
-                        Id = x.Id,
-                        FacilityId = x.FacilityId,
-                        CorrelationId = x.CorrelationId,
-                        ServiceName = x.ServiceName,
-                        EventDate = x.EventDate,
-                        User = x.User,
-                        Action = x.Action,
-                        Resource = x.Resource,
-                        PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                        Notes = x.Notes
-                    }).ToList();
+                PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
 
-                    PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
-
-                    return pagedAuditEvents;
-                }
-            }
-            catch (NullReferenceException ex)
-            {
-                _logger.LogDebug(new EventId(AuditLoggingIds.ListItems, "Audit Service - List events"), ex, "Failed to find event records.");
-                var queryEx = new ApplicationException("Failed to execute the request to find audit events.", ex);
-                throw queryEx;
+                return pagedAuditEvents;
             }
         }
     }

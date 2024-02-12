@@ -149,7 +149,9 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
         [Then(@"the other properties of the AuditEvent should match those of the received AuditEventMessage")]
         public void ThenTheAuditEventPropertiesShouldMatchTheReceivedAuditMessage()
         {
-            Assert.AreEqual(auditMessage.ServiceName, auditEntity.ServiceName);
+            Assert.That(auditMessage.ServiceName, Is.Not.Null);
+            Assert.That(auditEntity.ServiceName, Is.Not.Null);
+            Assert.Equals(auditMessage.ServiceName, auditEntity.ServiceName);
         }
 
     }

@@ -4,9 +4,9 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Presentation.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.Json;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
@@ -161,6 +161,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 //send notification
                 NotificationModel createdNotification = await _getNotificationQuery.Execute(id);
+                _logger.LogNotificationCreation(id, notification);
                 SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(createdNotification.Id, createdNotification.Recipients, createdNotification.Bcc, createdNotification.Subject, createdNotification.Body);
 
                 //if a facility based notification, get their configuration and add it to the send model
@@ -176,9 +177,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 return Ok(response);
             }
             catch (Exception ex)
-            {
-                ex.Data.Add("model", model);
-                _logger.LogError(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification"), ex, "An exception occurred while attempting to create a new notification");                
+            {                
+                CreateNotificationModel notification = _notificationFactory.CreateNotificationModelCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
+                _logger.LogNotificationCreationException(notification, ex.Message);
                 return StatusCode(500, ex);
             }
         }
@@ -209,14 +210,15 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, int pageSize = 10, int pageNumber = 1)
         {
-            //TODO check for authorization
-
             try
             {
                 //make sure page size does not exceed the max page size allowed
                 if (pageSize > maxNotificationConfigurationPageSize) { pageSize = maxNotificationConfigurationPageSize; }
 
                 if (pageNumber < 1) { pageNumber = 1; }
+
+                NotificationSearchRecord searchFilter = _notificationFactory.CreateNotificationSearchRecord(searchText, filterFacilityBy, filterNotificationTypeBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationModel notificationList = await _getNotificationListQuery.Execute(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, pageSize, pageNumber);
@@ -229,7 +231,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notifications"), ex, "An exception occurred while attempting to retrieve notifications.");
+                NotificationSearchRecord searchFilter = _notificationFactory.CreateNotificationSearchRecord(searchText, filterFacilityBy, filterNotificationTypeBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationListQueryException(ex.Message, searchFilter);
                 return StatusCode(500, ex);
             }
 
@@ -268,12 +271,12 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 if (notification == null) { return NotFound(); }
 
+                _logger.LogGetNotificationById(id);
                 return Ok(notification);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("notification id", id);
-                _logger.LogError(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification by id"), ex, "An exception occurred while attempting to retrieve the nofitication with an id of '{id}'.", id);
+                _logger.LogGetNotificationByIdException(id, ex.Message);
                 return StatusCode(500, ex);
             }
 
@@ -315,6 +318,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 if (pageSize > maxNotificationsPageSize) { pageSize = maxNotificationsPageSize; }
 
                 if (pageNumber < 1) { pageNumber = 1; }
+                _logger.LogGetNotificationByFacilityId(facilityId);
 
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, pageSize, pageNumber);
@@ -326,8 +330,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                ex.Data.Add("facility id", facilityId);
-                _logger.LogError(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notifications by facility id"), ex, "An exception occurred while attempting to retrieve nofitications with a facility id of '{facilityId}'.", facilityId);
+                _logger.LogGetNotificationByFacilityIdException(facilityId, ex.Message);               
                 return StatusCode(500, ex);
             }
 
@@ -365,7 +368,10 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 //make sure page size does not exceed the max page size allowed
                 if (pageSize > maxNotificationConfigurationPageSize) { pageSize = maxNotificationConfigurationPageSize; }
 
-                if (pageNumber < 1) { pageNumber = 1; }
+                if (pageNumber < 1) { pageNumber = 1; }                
+
+                NotificationConfigurationSearchRecord searchRecord = _configurationFactory.CreateNotificationConfigurationSearchRecord(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationConfigurationsListQuery(searchRecord);
 
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
@@ -377,8 +383,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             }
             catch (Exception ex)
-            {
-                _logger.LogError(new EventId(NotificationLoggingIds.ListItems, "Notification Service - List notification configurations"), ex, "An exception occurred while attempting to retrieve notification configurations.");
+            {                
+                NotificationConfigurationSearchRecord searchRecord = _configurationFactory.CreateNotificationConfigurationSearchRecord(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                _logger.LogNotificationConfigurationsListQueryException(ex.Message, searchRecord);
                 return StatusCode(500, ex);
             }
 
@@ -410,10 +417,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             if (string.IsNullOrWhiteSpace(model.FacilityId))
             {
-                var apiEx = new ArgumentNullException("The Facility Id was not provided in the new notification configuration.");
-                apiEx.Data.Add("notification-configuration", model);
-                _logger.LogWarning(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification configuration"), apiEx, apiEx.Message);                
-                return BadRequest("Facility Id is required in order to create a notification configuration.");
+                var message = "The Facility Id was not provided in the new notification configuration.";
+                _logger.LogInvalidNotificationConfigurationCreationWarning(model, message);                
+                return BadRequest(message);
             }
 
             try
@@ -421,14 +427,15 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 //Create notification configuration
                 CreateFacilityConfigurationModel config = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
                 string id = await _createFacilityConfigurationCommand.Execute(config);
+                
                 EntityCreatedResponse response = new EntityCreatedResponse("The notification configuration was created succcessfully.", id);
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("model", model);
-                _logger.LogError(new EventId(NotificationLoggingIds.GenerateItems, "Notification Service - Create notification configuration"), ex, "An exception occurred while attempting to create a new notification configuration");
+                CreateFacilityConfigurationModel config = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
+                _logger.LogNotificationConfigurationCreationException(config, ex.Message);               
                 return StatusCode(500, ex);
             }
 
@@ -460,18 +467,16 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             if(string.IsNullOrEmpty(model.Id)) 
             {
-                var apiEx = new ArgumentNullException("The Configuration Id was not provided in the updated notification configuration.");
-                apiEx.Data.Add("notification-configuration", model);
-                _logger.LogWarning(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), apiEx, apiEx.Message);               
-                return BadRequest("No notification configuration id provided.");             
+                var message = "The configuration Id was not provided in the updated notification configuration.";
+                _logger.LogInvalidNotificationConfigurationUpdateWarning(model, message);
+                return BadRequest(message);             
             }
 
             if (string.IsNullOrWhiteSpace(model.FacilityId))
             {
-                var apiEx = new ArgumentNullException("The Facility Id was not provided in the updated notification configuration.");
-                apiEx.Data.Add("notification-configuration", model);
-                _logger.LogWarning(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), apiEx, apiEx.Message);
-                return BadRequest("Facility Id is required in order to create a notification configuration.");
+                var message = "The Facility Id was not provided in the updated notification configuration.";
+                _logger.LogInvalidNotificationConfigurationUpdateWarning(model, message);
+                return BadRequest(message);
             }
 
             try
@@ -480,21 +485,21 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 bool exists = await _facilityConfigurationExistsQuery.Execute(model.Id);
                 if (!exists) 
                 {
-                    _logger.LogWarning(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), "No configuration with the id of {id} was found.", model.Id);
-                    return BadRequest($"No configuration with the id of {model.Id} was found."); 
+                    var notFoundMessage = $"No configuration with the id of {model.Id} was found.";
+                    _logger.LogInvalidNotificationConfigurationUpdateWarning(model, notFoundMessage);
+                    return BadRequest(notFoundMessage); 
                 }
 
                 //Update notification configuration
                 UpdateFacilityConfigurationModel config = _configurationFactory.UpdateFacilityConfigurationModelCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                string id = await _updateFacilityConfigurationCommand.Execute(config);
+                string id = await _updateFacilityConfigurationCommand.Execute(config);                
                 EntityUpdateddResponse response = new EntityUpdateddResponse("The notification configuration was updated succcessfully.", id);
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("model", model);
-                _logger.LogError(new EventId(NotificationLoggingIds.UpdateItem, "Notification Service - Update notification configuration"), ex, "An exception occurred while attempting to updated an existing notification configuration.");
+                _logger.LogNotificationConfigurationUpdateException(model, ex.Message);
                 return StatusCode(500, ex);
             }
 
@@ -519,31 +524,29 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<NotificationConfigurationModel>> GetFacilityConfiguration(string facilityId)
         {
-            //TODO check for authorization
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                var message = "The Facility Id was not provided in the request for the notification configuration.";
+                _logger.LogGetNotificationConfigurationByFacilityIdWarning(message);
+                return BadRequest(message); 
+            }
 
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("facility id", facilityId);
-
-            if (string.IsNullOrEmpty(facilityId))
-            {
-                var apiEx = new ArgumentNullException("The Facility Id was not provided in the request for the notification configuration.");               
-                _logger.LogWarning(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by facility id"), apiEx, apiEx.Message);                
-                return BadRequest("No facility id provided."); 
-            }
+            activity?.AddTag("facility-id", facilityId);
+            _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
 
             try
             {
                 NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId);
 
-                if (config == null) { return NotFound(); }
+                if (config == null) { return NotFound(); }                
 
                 return Ok(config);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("facility id", facilityId);
-                _logger.LogError(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by facility id"), ex, "An exception occurred while attempting to retrieve the notification configuration of a facility with an id of {facilityId}", facilityId);
+                _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
                 return StatusCode(500, ex);
             }
 
@@ -568,30 +571,29 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(string id)
         {
-            //TODO check for authorization
+            if (string.IsNullOrEmpty(id)) 
+            {
+                var message = "No configuration id provided while attempting to retrieve a notification configuration.";
+                _logger.LogGetNotificationConfigurationByIdWarning(message);
+                return BadRequest(message); 
+            }
 
             //add id to current activity
             var activity = Activity.Current;
             activity?.AddTag("notification configuration id", id);
-
-            if (string.IsNullOrEmpty(id)) 
-            {
-                _logger.LogWarning(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by id"), "No configuration id provided while attempting to retrieve a configuration by id.");
-                return BadRequest("No configuration id provided."); 
-            }
 
             try
             {
                 NotificationConfigurationModel config = await _getNotificationConfigurationQuery.Execute(id);
 
                 if (config == null) { return NotFound(); }
+                _logger.LogGetNotificationConfigurationById(id);
 
                 return Ok(config);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("configuration id", id);
-                _logger.LogError(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by id"), ex, "An exception occurred while attempting to retrieve the notification configuration of a facility with an id of {id}", id);
+                _logger.LogGetNotificationConfigurationByIdException(id, ex.Message);
                 return StatusCode(500, ex);
             }
 
@@ -624,8 +626,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             if (string.IsNullOrEmpty(id)) 
             {
-                _logger.LogWarning(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), "No configuration id provided while attempting to delete a configuration.");
-                return BadRequest("No configuration id provided."); 
+                var message = "No configuration id provided while attempting to delete a notification configuration.";
+                _logger.LogNotificationConfigurationDeleteWarning(message);
+                return BadRequest(message);
             }
 
             try
@@ -635,13 +638,12 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 EntityDeletedResponse entityDeletedResponse = new EntityDeletedResponse();
                 entityDeletedResponse.Id = id;
                 entityDeletedResponse.Message = result ? $"Notificatioin configuration {id} was deleted succesfully." : $"Failed to delete notificatioin configuration {id}, check log for details.";
-
+                
                 return Ok(entityDeletedResponse);
             }
             catch (Exception ex)
             {
-                ex.Data.Add("configuration id", id);
-                _logger.LogError(new EventId(NotificationLoggingIds.DeleteItem, "Notification Service - Delete notification configuration"), ex, "An exception occurred while attempting to delete the notification configuration of a facility with an id of {id}", id);
+                _logger.LogNotificationConfigurationDeleteException(id, ex.Message);
                 return StatusCode(500, ex);
             }
 
