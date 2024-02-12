@@ -4,7 +4,6 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
-using LantanaGroup.Link.Audit.Presentation.Services;
 using LantanaGroup.Link.Audit.Application.Audit.Queries;
 using LantanaGroup.Link.Audit.Infrastructure.AuditHelper;
 using Serilog;
@@ -12,7 +11,6 @@ using Serilog.Exceptions;
 using Serilog.Enrichers.Span;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using System.Reflection;
 using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -21,6 +19,13 @@ using LantanaGroup.Link.Audit.Infrastructure.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
+using Serilog.Settings.Configuration;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Azure.Identity;
+using Microsoft.Extensions.Compliance.Redaction;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using Microsoft.Extensions.Compliance.Classification;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,11 +39,35 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    if(!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        { 
+            case("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                        // Load configuration values with no label
+                        .Select("Link:Audit*", LabelFilter.Null)
+                        // Override with any configuration values specific to current hosting env
+                        .Select("Link:Audit*", builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }   
+
     var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
     }
     else
     {
@@ -69,9 +98,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
-    builder.Services.Configure<TempKafkaConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Mongo));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
+    builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
     //Add commands
     builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
@@ -96,7 +126,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddCorsService(builder.Environment);
 
     //configure service api security    
-    var idpConfig = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
+    var idpConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
     if (idpConfig != null)
     {
         builder.Services.AddAuthenticationService(idpConfig, builder.Environment);        
@@ -126,11 +156,29 @@ static void RegisterServices(WebApplicationBuilder builder)
         c.IncludeXmlComments(xmlPath);
     });
 
+    //Add logging redaction
+    builder.Logging.EnableRedaction();
+    builder.Services.AddRedaction(x => {
+
+        x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
+
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");        
+        if (!string.IsNullOrEmpty(hmacKey))
+        {           
+            x.SetHmacRedactor(opts => {
+                opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
+                opts.KeyId = 808;
+            }, new DataClassificationSet(DataTaxonomy.PiiData));
+        }        
+    });
+
     // Logging using Serilog
     builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = AuditConstants.AppSettingsSectionNames.Serilog };    
     Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration)
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()                  
@@ -139,7 +187,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
+    var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
     if (telemetryConfig != null)
     {
         builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);        
@@ -166,7 +214,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
+    if (app.Configuration.GetValue<bool>(AuditConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
@@ -184,14 +232,8 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());   
-
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
-    app.MapGrpcService<AuditService>();    
+    app.UseEndpoints(endpoints => endpoints.MapControllers());  
+     
 }
 
 #endregion

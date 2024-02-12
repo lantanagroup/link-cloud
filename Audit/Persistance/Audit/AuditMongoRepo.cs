@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                     var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
                     var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
                     filter &= userIdFilter | userNameFilter;
-                }                
+                }
 
                 #endregion
 
@@ -129,7 +129,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                     //sortBy exists in sortableColumns         
                     sortDefinitions.Add(sortBuilder.Descending(sortBy));
                 }
- 
+
                 //combine sort definitions
                 SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
 
@@ -154,27 +154,16 @@ namespace LantanaGroup.Link.Audit.Persistance
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(new EventId(AuditLoggingIds.ListItems, "Audit Service - List events"), ex, "Failed to execute find audit events.");
-                var repoEx = new ApplicationException("Failed to execute the request to find audit events.", ex);
-                //repoEx.Data.Add("searchText", searchText);
-                repoEx.Data.Add("filterFacilityBy", filterActionBy);
-                repoEx.Data.Add("filterCorrelationBy", filterCorrelationBy);
-                repoEx.Data.Add("filterServiceBy", filterServiceBy);
-                repoEx.Data.Add("filterActionBy", filterActionBy);
-                repoEx.Data.Add("filterUserBy", filterUserBy);
-                repoEx.Data.Add("sortBy", sortBy);
-                repoEx.Data.Add("pageSize", pageSize);
-                repoEx.Data.Add("pageNumber", pageNumber);
-                throw repoEx;
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                throw;
             }
-            
+                     
         }
 
         public async Task<(IEnumerable<AuditEntity>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Repository - Find Async");
-
-            try 
+            try
             {
                 #region Create Filters
                 //create filter bulder and definition
@@ -186,7 +175,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                     var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
                     filter &= searchTextFilter;
                 }
-    
+
                 if (!string.IsNullOrEmpty(filterFacilityBy))
                 {
                     var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
@@ -217,7 +206,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                     var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
                     filter &= userIdFilter | userNameFilter;
                 }
-                              
+
 
                 #endregion
 
@@ -241,8 +230,8 @@ namespace LantanaGroup.Link.Audit.Persistance
                 //get total count
                 long count = 0;
                 using (ServiceActivitySource.Instance.StartActivity("Get total count"))
-                {                    
-                    count = await _collection.CountDocumentsAsync(filter);                    
+                {
+                    count = await _collection.CountDocumentsAsync(filter);
                 }
                 PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
@@ -253,28 +242,18 @@ namespace LantanaGroup.Link.Audit.Persistance
                 using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
                 {
                     auditEvents = await _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToListAsync();
-                }                     
+                }
+
                 //timer.Stop();
                 //_logger.LogDebug(AuditLoggingIds.ListItems, "Finding audit events finished in {milliseconds} milliseconds", timer.ElapsedMilliseconds);                
                 return (auditEvents, metadata);
             }
-            catch(Exception ex) 
+            catch(Exception ex)
             {
-                _logger.LogDebug(new EventId(AuditLoggingIds.ListItems, "Audit Service - List events"), ex, "Failed to execute find audit events asynchronously.");
-                var repoEx = new Exception("Failed to execute the request to find audit events.", ex);
-                //repoEx.Data.Add("searchText", searchText);
-                repoEx.Data.Add("filterFacilityBy", filterFacilityBy);
-                repoEx.Data.Add("filterCorrelationBy", filterCorrelationBy);
-                repoEx.Data.Add("filterServiceBy", filterServiceBy);
-                repoEx.Data.Add("filterActionBy", filterActionBy);
-                repoEx.Data.Add("filterUserBy", filterUserBy);
-                repoEx.Data.Add("sortBy", sortBy);
-                repoEx.Data.Add("pageSize", pageSize);
-                repoEx.Data.Add("pageNumber", pageNumber);
-                throw repoEx;
+                var currentActivity = Activity.Current;
+                currentActivity?.SetStatus(ActivityStatusCode.Error);
+                throw;
             }
-
-                   
 
         }
 

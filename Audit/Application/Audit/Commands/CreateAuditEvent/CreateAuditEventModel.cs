@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Infrastructure.Logging;
 
 namespace LantanaGroup.Link.Audit.Application.Commands
 {
@@ -9,6 +10,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         public string? CorrelationId { get; set; }
         public DateTime? EventDate { get; set; }
         public string? UserId { get; set; }
+        [SensitiveData]
         public string? User { get; set; }
         public string? Action { get; set; }
         public string? Resource { get; set; }

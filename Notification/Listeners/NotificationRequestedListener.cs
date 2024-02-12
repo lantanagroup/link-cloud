@@ -6,10 +6,9 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Infrastructure;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Listeners
 {
@@ -45,23 +44,21 @@ namespace LantanaGroup.Link.Notification.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _notificationRequestedConsumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer())
+            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false))
             {
                 try
                 {
-                    _notificationRequestedConsumer.Subscribe(nameof(KafkaTopic.NotificationRequested));
-                    _logger.LogInformation(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), "Started consumer for topic '{notificationRequested}' at {date}.", nameof(KafkaTopic.NotificationRequested), DateTime.UtcNow);
+                    _consumer.Subscribe(nameof(KafkaTopic.NotificationRequested));
+                    _logger.LogConsumerStarted(nameof(KafkaTopic.NotificationRequested), DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         try
-                        {
-                            //var consumeResult = _notificationRequestedConsumer.Consume(cancellationToken);
-                            await _notificationRequestedConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        {                            
+                            await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                             {
                                 if (result != null && result.Message.Value != null)
-                                {
-                                    //using Activity? activity = ServiceActivitySource.Instance.StartActivity("Kafka - Consume Notification Requested Message");
+                                {                                    
                                     var currentActivity = Activity.Current;
                                     if (currentActivity != null)
                                     {
@@ -74,14 +71,9 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
                                         messageValue.CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                                        _logger.LogInformation(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), "Received message with correlation ID {correlationId}: {topic}", messageValue.CorrelationId, result.Topic);
-                                    }
-                                    else
-                                    {
-                                        _logger.LogInformation(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), "Received message without correlation ID: {topic}", result.Topic);
-                                    }
+                                    }                                   
 
-                                    _logger.LogInformation(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), "Consume Event for: A '{notificationType}' notification request was made for facility '{key}'.", messageValue.NotificationType, result.Message.Key);
+                                    _logger.LogNotificationRequestedConsumption(messageValue.NotificationType);
 
                                     //remove any email addresses that are not valid
                                     List<string> recipients = new List<string>();
@@ -95,11 +87,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                                 bool isValid = await _validateEmailAddressCommand.Execute(recipient);
                                                 if (!isValid)
                                                 {
-                                                    var invalidEmailEx = new ArgumentException("Invalid email address received.");
-                                                    //var pattern = @"(?<=[\w]{1})[\w-\._\+%]*(?=[\w]{1}@)";
-                                                    //var maskedUsername = Regex.Replace(recipient ?? "", pattern, m => new string('*', m.Length));
-                                                    invalidEmailEx.Data.Add("email-address", recipient);
-                                                    _logger.LogWarning(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), invalidEmailEx, "The email addresss '{email}' is invalid. Please only use valid email addresses.", recipient);
+                                                    _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
                                                 }
                                                 else
                                                 {
@@ -115,9 +103,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                                 bool isValid = await _validateEmailAddressCommand.Execute(recipient);
                                                 if (!isValid)
                                                 {
-                                                    var invalidEmailEx = new ArgumentException("Invalid email address received.");
-                                                    invalidEmailEx.Data.Add("email-address", recipient);
-                                                    _logger.LogWarning(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), invalidEmailEx, "The email addresss '{email}' is invalid. Please only use valid email addresses.", recipient);                                                   
+                                                    _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
                                                 }
                                                 else 
                                                 { 
@@ -127,11 +113,11 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         }
                                     }
 
-                                    //create audit event
+                                    //create notification
                                     CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, result.Message.Key, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                               
 
                                     string notificationId = await _createNotificationCommand.Execute(notificationModel);
-                                    _logger.LogInformation(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), "Successfully created new notification '{notificationId}'.", notificationId);
+                                    _logger.LogNotificationCreation(notificationId, notificationModel);
 
                                     //send notification
                                     NotificationModel notification = await _getNotificationQuery.Execute(notificationId);
@@ -146,14 +132,18 @@ namespace LantanaGroup.Link.Notification.Listeners
 
                                     //asynchrounously send the email
                                     _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel));
+
+                                    //consume the result and offset
+                                    _consumer.Commit(result);
                                 }
 
                             }, cancellationToken);
 
-                    }
+                        }
                         catch (ConsumeException ex)
                         {
-                            _logger.LogCritical(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), ex, "Consumer error: {reason}", ex.Error.Reason);
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                            _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
                             if (ex.Error.IsFatal)
                             {
                                 break;
@@ -161,20 +151,22 @@ namespace LantanaGroup.Link.Notification.Listeners
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogCritical(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), ex, "Failed to generate notification from kafka message.");
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                            _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
                             break;
                         }
                     }
 
-                    _notificationRequestedConsumer.Close();
-                    _notificationRequestedConsumer.Dispose();
+                    _consumer.Close();
+                    _consumer.Dispose();
 
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogCritical(new EventId(NotificationLoggingIds.KafkaConsumer, "Notification Service - Notification requested consumer"), oce, "Operation Canceled: {message}", oce.Message);
-                    _notificationRequestedConsumer.Close();
-                    _notificationRequestedConsumer.Dispose();
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                    _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
+                    _consumer.Close();
+                    _consumer.Dispose();
                 }
             }
         }

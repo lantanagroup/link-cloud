@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.Notification.Queries
 {
@@ -49,10 +48,8 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
                 
             }
             catch (Exception ex)
-            {         
-                _logger.LogError(NotificationLoggingIds.ListItems, ex, "Failed to find notifications for facility '{facilityId}'.", facilityId);
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to execute the request to find notifications for facility");
+            {     
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);                
                 throw;
             }
         }

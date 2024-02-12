@@ -13,5 +13,7 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
         public NotificationModel NotificationModelCreate(string id, string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc, DateTime createdOn, DateTime? sentOn);
 
         public SendNotificationModel CreateSendNotificationModel(string id, List<string> recipients, List<string>? bcc, string subject, string message);
+
+        NotificationSearchRecord CreateNotificationSearchRecord(string? searchText, string? filterFacilityBy, string? filterNotificationType, string? sortBy, int pageSize, int pageNumber);
     }
 }

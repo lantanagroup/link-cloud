@@ -1,10 +1,7 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Notification.Application.Interfaces;
+﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.Notification.Queries
 {
@@ -55,9 +52,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             }
             catch (NullReferenceException ex)
             {
-                _logger.LogError(NotificationLoggingIds.ListItems, ex, "Failed to find notification records.");
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, "Failed to execute the request to find notifications");
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
         }

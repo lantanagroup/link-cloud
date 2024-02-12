@@ -1,3 +1,4 @@
+using Azure.Identity;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Notification.Application.Extensions;
 using LantanaGroup.Link.Notification.Application.Factory;
@@ -10,7 +11,7 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
-using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
+using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Notification;
@@ -19,11 +20,16 @@ using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,11 +43,35 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                        // Load configuration values with no label
+                        .Select("Link:Notification*", LabelFilter.Null)
+                        // Override with any configuration values specific to current hosting env
+                        .Select("Link:Notification*", builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
     }
     else
     {
@@ -72,7 +102,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
@@ -147,11 +177,29 @@ static void RegisterServices(WebApplicationBuilder builder)
         c.IncludeXmlComments(xmlPath);
     });
 
+    //Add logging redaction
+    builder.Logging.EnableRedaction();
+    builder.Services.AddRedaction(x => {
+
+        x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
+
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
+        if (!string.IsNullOrEmpty(hmacKey))
+        {            
+            x.SetHmacRedactor(opts => {
+                opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
+                opts.KeyId = 808;
+            }, new DataClassificationSet(DataTaxonomy.PiiData));
+        }
+    });
+
     // Logging using Serilog
     builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = NotificationConstants.AppSettingsSectionNames.Serilog };
     Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration)
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()
@@ -188,7 +236,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
+    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
@@ -209,7 +257,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
+    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
     {
         app.MapGrpcReflectionService();
     }
