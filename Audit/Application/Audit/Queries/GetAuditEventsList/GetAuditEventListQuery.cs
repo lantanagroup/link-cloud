@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
 
-            var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+            var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
 
             //convert AuditEntity to AuditModel
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))

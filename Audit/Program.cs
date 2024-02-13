@@ -1,5 +1,4 @@
 using LantanaGroup.Link.Audit.Settings;
-using LantanaGroup.Link.Audit.Persistance;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
@@ -16,7 +15,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Infrastructure.Extensions;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
@@ -26,6 +24,9 @@ using Microsoft.Extensions.Compliance.Redaction;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using Microsoft.Extensions.Compliance.Classification;
 using System.Text;
+using LantanaGroup.Link.Audit.Persistance.Repositories;
+using LantanaGroup.Link.Audit.Persistance;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,7 +100,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Mongo));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -108,15 +108,27 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add queries
     builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
-    builder.Services.AddTransient<IGetAllAuditEventsQuery, GetAllAuditEventsQuery>();
+    builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
     builder.Services.AddTransient<IGetAuditEventListQuery, GetAuditEventListQuery>();
 
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
 
+    //Add database context
+    builder.Services.AddDbContext<AuditDbContext>(options => {
+        switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
+        {
+            case "SqlServer":
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DatabaseConnection"));
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });       
+
     //Add repositories
-    builder.Services.AddSingleton<IAuditRepository, AuditMongoRepo>();
+    builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -219,6 +231,14 @@ static void SetupMiddleware(WebApplication app)
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
+    }
+
+    //TODO: Discuss migrations rather than ensure created
+    // Ensure database created
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        context.Database.EnsureCreated();
     }
 
     app.UseRouting();

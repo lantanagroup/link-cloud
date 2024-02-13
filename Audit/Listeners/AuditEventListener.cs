@@ -3,28 +3,25 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
-using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
-using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
     public class AuditEventListener : BackgroundService
     {
         private readonly ILogger<AuditEventListener> _logger;
-        private readonly ICreateAuditEventCommand _createAuditEventCommand;      
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IAuditFactory _auditFactory;
         private readonly IKafkaConsumerFactory _kafkaConsumerFactory;      
       
-        public AuditEventListener(ILogger<AuditEventListener> logger, ICreateAuditEventCommand createAuditEventCommand, IAuditFactory auditFactory, IKafkaConsumerFactory kafkaConsumerFactory, IOptions<KafkaConnection> kafkaConnection) 
+        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory kafkaConsumerFactory, IOptions<KafkaConnection> kafkaConnection) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));           
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));     
         }
@@ -62,7 +59,13 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);                                                                      
                                     _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, eventModel);
 
-                                    string auditEventId = await _createAuditEventCommand.Execute(eventModel);                                    
+                                    //create scoped create audit event command
+                                    //deals with issue of non-singleton services being used within singleton hosted service
+                                    using (var scope = _scopeFactory.CreateScope())
+                                    {
+                                        var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
+                                        _ = await _createAuditEventCommand.Execute(eventModel);
+                                    }                                                                      
 
                                     //consume the result and offset
                                     _consumer.Commit(result);
