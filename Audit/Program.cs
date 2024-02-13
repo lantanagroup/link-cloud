@@ -101,7 +101,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Mongo));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -130,7 +129,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });       
 
     //Add repositories
-    builder.Services.AddSingleton<IAuditRepository, AuditLogRepository>();
+    builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -233,6 +232,14 @@ static void SetupMiddleware(WebApplication app)
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
+    }
+
+    //TODO: Discuss migrations rather than ensure created
+    // Ensure database created
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        context.Database.EnsureCreated();
     }
 
     app.UseRouting();
