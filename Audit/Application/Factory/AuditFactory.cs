@@ -66,12 +66,12 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         /// <param name="propertyChanges"></param>
         /// <param name="notes"></param>
         /// <returns></returns>
-        public AuditEntity Create(string? facilityId, string? serviceName, string? correlationId, DateTime? eventDate, string? userId, string? user, string? action, string? resource, List<PropertyChangeModel>? propertyChanges, string? notes)
+        public AuditLog Create(string? facilityId, string? serviceName, string? correlationId, DateTime? eventDate, string? userId, string? user, string? action, string? resource, List<PropertyChangeModel>? propertyChanges, string? notes)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Entity");
 
-            AuditEntity audit = new AuditEntity();
-            audit.Id = Guid.NewGuid().ToString();
+            AuditLog audit = new AuditLog();
+            audit.Id = AuditId.NewId();
             audit.FacilityId = facilityId;
             audit.ServiceName = serviceName;
             audit.CorrelationId = correlationId;

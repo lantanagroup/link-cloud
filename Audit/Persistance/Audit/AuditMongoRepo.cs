@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Audit.Persistance
 {
     public class AuditMongoRepo : IAuditRepository
     {
-        private readonly IMongoCollection<AuditEntity> _collection;
+        private readonly IMongoCollection<AuditLog> _collection;
         private readonly IMongoDatabase _database;
         private readonly MongoClient _client;
         private readonly ILogger<AuditMongoRepo> _logger;
@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Audit.Persistance
 
             _client = new MongoClient(mongoSettings.Value.ConnectionString);
             _database = _client.GetDatabase(mongoSettings.Value.DatabaseName);
-            _collection = _database.GetCollection<AuditEntity>(GetCollectionName(typeof(AuditEntity)));
+            _collection = _database.GetCollection<AuditLog>(GetCollectionName(typeof(AuditLog)));
 
             //build out indexes
             foreach(var col in _sortableColumns)
@@ -34,8 +34,8 @@ namespace LantanaGroup.Link.Audit.Persistance
             }
 
             //create text index
-            var indexDefinition = Builders<AuditEntity>.IndexKeys.Text(f => f.Notes);
-            _collection.Indexes.CreateOneAsync(new CreateIndexModel<AuditEntity>(indexDefinition));
+            var indexDefinition = Builders<AuditLog>.IndexKeys.Text(f => f.Notes);
+            _collection.Indexes.CreateOneAsync(new CreateIndexModel<AuditLog>(indexDefinition));
 
         }
 
@@ -53,66 +53,66 @@ namespace LantanaGroup.Link.Audit.Persistance
         {
             //if you try to create the same index again, the command is ignored - the duplicated index creation is not possible
             var index = new BsonDocument { { indexField, 1 } };
-            var indexModel = new CreateIndexModel<AuditEntity>(index);
+            var indexModel = new CreateIndexModel<AuditLog>(index);
             _collection.Indexes.CreateOneAsync(indexModel);
         }      
         
-        public bool Add(AuditEntity entity)
+        public bool Add(AuditLog entity)
         {
             _collection.InsertOne(entity);
             return true;
         }
 
-        public async Task<bool> AddAsync(AuditEntity entity)
+        public async Task<bool> AddAsync(AuditLog entity)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Repository - Insert One Async");
             await _collection.InsertOneAsync(entity);
             return true;
         }
 
-        public (IEnumerable<AuditEntity>, PaginationMetadata) Find(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
+        public (IEnumerable<AuditLog>, PaginationMetadata) Find(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
         {
             try 
             {
                 #region Create Filters
                 //create filter bulder and definition
-                FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
-                FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
+                FilterDefinitionBuilder<AuditLog> filterBuilder = Builders<AuditLog>.Filter;
+                FilterDefinition<AuditLog> filter = filterBuilder.Empty;
 
                 if (!string.IsNullOrEmpty(searchText))
                 {
-                    var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
+                    var searchTextFilter = Builders<AuditLog>.Filter.Text(searchText);
                     filter &= searchTextFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterFacilityBy))
                 {
-                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    var facilityFilter = Builders<AuditLog>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
                     filter &= facilityFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterFacilityBy))
                 {
-                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    var facilityFilter = Builders<AuditLog>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
                     filter &= facilityFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterCorrelationBy))
                 {
-                    var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
+                    var correlationFilter = Builders<AuditLog>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
                     filter &= correlationFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterActionBy))
                 {
-                    var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
+                    var actionFilter = Builders<AuditLog>.Filter.Eq(x => x.Action, filterActionBy);
                     filter &= actionFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterUserBy))
                 {
-                    var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
-                    var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
+                    var userIdFilter = Builders<AuditLog>.Filter.Eq(x => x.UserId, filterUserBy);
+                    var userNameFilter = Builders<AuditLog>.Filter.Eq(x => x.User, filterUserBy);
                     filter &= userIdFilter | userNameFilter;
                 }
 
@@ -121,8 +121,8 @@ namespace LantanaGroup.Link.Audit.Persistance
                 #region Create Sort Definitions
                 //TODO: Add sort direction logic
                 //create sort builder and definition, if no sort field specified then sort by eventDate descending            
-                SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
-                List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
+                SortDefinitionBuilder<AuditLog> sortBuilder = Builders<AuditLog>.Sort;
+                List<SortDefinition<AuditLog>> sortDefinitions = new List<SortDefinition<AuditLog>>();
 
                 if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
                 {
@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                 }
 
                 //combine sort definitions
-                SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
+                SortDefinition<AuditLog> sortDef = sortBuilder.Combine(sortDefinitions);
 
                 #endregion
 
@@ -144,7 +144,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                 PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
                 //filter collection            
-                List<AuditEntity> auditEvents = new List<AuditEntity>();
+                List<AuditLog> auditEvents = new List<AuditLog>();
                 using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
                 {
                     auditEvents = _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToList();
@@ -160,50 +160,50 @@ namespace LantanaGroup.Link.Audit.Persistance
                      
         }
 
-        public async Task<(IEnumerable<AuditEntity>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
+        public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Repository - Find Async");
             try
             {
                 #region Create Filters
                 //create filter bulder and definition
-                FilterDefinitionBuilder<AuditEntity> filterBuilder = Builders<AuditEntity>.Filter;
-                FilterDefinition<AuditEntity> filter = filterBuilder.Empty;
+                FilterDefinitionBuilder<AuditLog> filterBuilder = Builders<AuditLog>.Filter;
+                FilterDefinition<AuditLog> filter = filterBuilder.Empty;
 
                 if (!string.IsNullOrEmpty(searchText))
                 {
-                    var searchTextFilter = Builders<AuditEntity>.Filter.Text(searchText);
+                    var searchTextFilter = Builders<AuditLog>.Filter.Text(searchText);
                     filter &= searchTextFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterFacilityBy))
                 {
-                    var facilityFilter = Builders<AuditEntity>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
+                    var facilityFilter = Builders<AuditLog>.Filter.Eq(x => x.FacilityId, filterFacilityBy);
                     filter &= facilityFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterCorrelationBy))
                 {
-                    var correlationFilter = Builders<AuditEntity>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
+                    var correlationFilter = Builders<AuditLog>.Filter.Eq(x => x.CorrelationId, filterCorrelationBy);
                     filter &= correlationFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterServiceBy))
                 {
-                    var serviceFilter = Builders<AuditEntity>.Filter.Eq(x => x.ServiceName, filterServiceBy);
+                    var serviceFilter = Builders<AuditLog>.Filter.Eq(x => x.ServiceName, filterServiceBy);
                     filter &= serviceFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterActionBy))
                 {
-                    var actionFilter = Builders<AuditEntity>.Filter.Eq(x => x.Action, filterActionBy);
+                    var actionFilter = Builders<AuditLog>.Filter.Eq(x => x.Action, filterActionBy);
                     filter &= actionFilter;
                 }
 
                 if (!string.IsNullOrEmpty(filterUserBy))
                 {
-                    var userIdFilter = Builders<AuditEntity>.Filter.Eq(x => x.UserId, filterUserBy);
-                    var userNameFilter = Builders<AuditEntity>.Filter.Eq(x => x.User, filterUserBy);
+                    var userIdFilter = Builders<AuditLog>.Filter.Eq(x => x.UserId, filterUserBy);
+                    var userNameFilter = Builders<AuditLog>.Filter.Eq(x => x.User, filterUserBy);
                     filter &= userIdFilter | userNameFilter;
                 }
 
@@ -213,8 +213,8 @@ namespace LantanaGroup.Link.Audit.Persistance
                 #region Create Sort Definitions
                 //TODO: Add sort direction logic
                 //create sort builder and definition, if no sort field specified then sort by eventDate descending            
-                SortDefinitionBuilder<AuditEntity> sortBuilder = Builders<AuditEntity>.Sort;
-                List<SortDefinition<AuditEntity>> sortDefinitions = new List<SortDefinition<AuditEntity>>();
+                SortDefinitionBuilder<AuditLog> sortBuilder = Builders<AuditLog>.Sort;
+                List<SortDefinition<AuditLog>> sortDefinitions = new List<SortDefinition<AuditLog>>();
 
                 if (!string.IsNullOrEmpty(sortBy) && _sortableColumns.Contains(sortBy))
                 {
@@ -223,7 +223,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                 }
 
                 //combine sort definitions
-                SortDefinition<AuditEntity> sortDef = sortBuilder.Combine(sortDefinitions);
+                SortDefinition<AuditLog> sortDef = sortBuilder.Combine(sortDefinitions);
 
                 #endregion
 
@@ -238,7 +238,7 @@ namespace LantanaGroup.Link.Audit.Persistance
                 //filter collection
                 //var timer = new Stopwatch();
                 //timer.Start();
-                List<AuditEntity> auditEvents = new List<AuditEntity>();
+                List<AuditLog> auditEvents = new List<AuditLog>();
                 using (ServiceActivitySource.Instance.StartActivity("Get filtered list"))
                 {
                     auditEvents = await _collection.Find(filter).Sort(sortDef).Skip(pageSize * (pageNumber - 1)).Limit(pageSize).ToListAsync();
@@ -257,30 +257,30 @@ namespace LantanaGroup.Link.Audit.Persistance
 
         }
 
-        public AuditEntity Get(string id)
+        public AuditLog Get(AuditId id)
         {    
-            var filter = Builders<AuditEntity>.Filter.Eq(x => x.Id, id);
-            AuditEntity auditEvent = _collection.Find(filter).FirstOrDefault();
+            var filter = Builders<AuditLog>.Filter.Eq(x => x.Id, id);
+            AuditLog auditEvent = _collection.Find(filter).FirstOrDefault();
             return auditEvent;                            
         }
 
-        public IEnumerable<AuditEntity> GetAll()
+        public IEnumerable<AuditLog> GetAll()
         {
             var set = _collection.Find(_ => true);
             return set.ToList();           
         }
 
-        public async Task<IEnumerable<AuditEntity>> GetAllAsync()
+        public async Task<IEnumerable<AuditLog>> GetAllAsync()
         {
             var set = await _collection.FindAsync(_ => true);
             return set.ToList();            
         }
 
-        public async Task<AuditEntity> GetAsync(string id)
+        public async Task<AuditLog> GetAsync(AuditId id)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Repository - Get By Id Async");
-            var filter = Builders<AuditEntity>.Filter.Eq(x => x.Id, id);
-            AuditEntity auditEvent = await _collection.Find(filter).FirstOrDefaultAsync();
+            var filter = Builders<AuditLog>.Filter.Eq(x => x.Id, id);
+            AuditLog auditEvent = await _collection.Find(filter).FirstOrDefaultAsync();
             return auditEvent;            
         }
 
@@ -297,6 +297,26 @@ namespace LantanaGroup.Link.Audit.Persistance
             }
 
             return true;
+        }
+
+        Task<bool> IAuditRepository.Add(AuditLog entity)
+        {
+            throw new NotImplementedException();
+        }
+
+        Task<AuditLog> IAuditRepository.Get(AuditId id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacility(string facilityId, int pageSize, int pageNumber)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<(IEnumerable<AuditLog>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
+        {
+            throw new NotImplementedException();
         }
     }
 }

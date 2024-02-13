@@ -3,17 +3,10 @@ using LantanaGroup.Link.Audit.Domain.Entities;
 
 namespace LantanaGroup.Link.Audit.Application.Interfaces
 {
-    public interface IAuditRepository
+    public interface IAuditRepository : ISearchRepository
     {
-        bool Add(AuditEntity entity);
-        Task<bool> AddAsync(AuditEntity entity);
-        AuditEntity Get(string id);
-        Task<AuditEntity> GetAsync(string id);
-        IEnumerable<AuditEntity> GetAll();
-        Task<IEnumerable<AuditEntity>> GetAllAsync();
-        (IEnumerable<AuditEntity>, PaginationMetadata) Find(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber);
-        Task<(IEnumerable<AuditEntity>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber);
-        Task<bool> HealthCheck();
-
+        Task<bool> Add(AuditLog entity);
+        Task<AuditLog> Get(AuditId id);
+        Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacility(string facilityId, int pageSize, int pageNumber);
     }
 }
