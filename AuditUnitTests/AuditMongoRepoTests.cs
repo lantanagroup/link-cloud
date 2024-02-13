@@ -11,10 +11,10 @@ namespace LantanaGroup.Link.AuditUnitTests
     {        
         private Mock<IMongoClient> mongoClient;
         private Mock<IMongoDatabase> mongodb;
-        private Mock<IMongoCollection<AuditEntity>> auditEntityCollection;
+        private Mock<IMongoCollection<AuditLog>> auditEntityCollection;
         private string auditCollectionName = "AuditEvents";
-        private List<AuditEntity> auditEntityList;
-        private Mock<IAsyncCursor<AuditEntity>> auditEntityCursor;
+        private List<AuditLog> auditEntityList;
+        private Mock<IAsyncCursor<AuditLog>> auditEntityCursor;
 
         private static readonly string _auditId = new Guid("aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856").ToString();
         private const string FacilityId = "TestFacility_001";
@@ -32,12 +32,12 @@ namespace LantanaGroup.Link.AuditUnitTests
         public void SetUp() 
         {
             this.mongoClient = new Mock<IMongoClient>();
-            this.auditEntityCollection = new Mock<IMongoCollection<AuditEntity>>();
+            this.auditEntityCollection = new Mock<IMongoCollection<AuditLog>>();
             this.mongodb = new Mock<IMongoDatabase>();
-            this.auditEntityCursor = new Mock<IAsyncCursor<AuditEntity>>();
+            this.auditEntityCursor = new Mock<IAsyncCursor<AuditLog>>();
 
             //create audit entities
-            AuditEntity _auditEvent = new AuditEntity();
+            AuditLog _auditEvent = new AuditLog();
             #region Setup for _auditEvent
             _auditEvent.Id = _auditId;
             _auditEvent.FacilityId = FacilityId;
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             _auditEvent.Notes = Notes;
             #endregion
 
-            auditEntityList = new List<AuditEntity>
+            auditEntityList = new List<AuditLog>
             {
                 _auditEvent
             };
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.AuditUnitTests
 
         [Test]
         public void TestAddAuditEntity() {
-            var auditEntity = new AuditEntity();
+            var auditEntity = new AuditLog();
             auditEntity.Id = Guid.NewGuid().ToString();
 
             InitializeMongoAuditEventCollection();
@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.AuditUnitTests
 
         private void InitializeMongoDb()
         {
-            mongodb.Setup(x => x.GetCollection<AuditEntity>(auditCollectionName,
+            mongodb.Setup(x => x.GetCollection<AuditLog>(auditCollectionName,
                 default)).Returns(auditEntityCollection.Object);
             mongoClient.Setup(x => x.GetDatabase(It.IsAny<string>(),
                 default)).Returns(mongodb.Object);
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             auditEntityCursor.Setup(x => x.Current).Returns(this.auditEntityList);
             auditEntityCursor.SetupSequence(x => x.MoveNext(It.IsAny<CancellationToken>())).Returns(true).Returns(false);
             auditEntityCursor.SetupSequence(x => x.MoveNextAsync(It.IsAny<CancellationToken>())).Returns(Task.FromResult(true)).Returns(Task.FromResult(false));
-            auditEntityCollection.Setup(x => x.AggregateAsync(It.IsAny<PipelineDefinition<AuditEntity, AuditEntity>>(), It.IsAny<AggregateOptions>(), It.IsAny<CancellationToken>())).ReturnsAsync(this.auditEntityCursor.Object);
+            auditEntityCollection.Setup(x => x.AggregateAsync(It.IsAny<PipelineDefinition<AuditLog, AuditLog>>(), It.IsAny<AggregateOptions>(), It.IsAny<CancellationToken>())).ReturnsAsync(this.auditEntityCursor.Object);
             InitializeMongoDb();
         }
     }

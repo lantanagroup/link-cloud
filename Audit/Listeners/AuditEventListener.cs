@@ -3,6 +3,7 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -62,7 +63,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);                                                                      
                                     _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, eventModel);
 
-                                    string auditEventId = await _createAuditEventCommand.Execute(eventModel);                                    
+                                    AuditLog log = await _createAuditEventCommand.Execute(eventModel);                                    
 
                                     //consume the result and offset
                                     _consumer.Commit(result);

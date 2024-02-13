@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         private AutoMocker _mocker;
         private CreateAuditEventModel _model;
         private CreateAuditEventModel _getSetModel;
-        private AuditEntity _auditEvent;              
+        private AuditLog _auditEvent;              
 
         private const string FacilityId = "TestFacility_001";
         private const string ServiceName = "Account Service";
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             };                       
 
             //set up audit entity
-            _auditEvent = new AuditEntity();
+            _auditEvent = new AuditLog();
             _auditEvent.Id = Guid.NewGuid().ToString();
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;

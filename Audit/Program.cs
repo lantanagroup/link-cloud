@@ -1,5 +1,4 @@
 using LantanaGroup.Link.Audit.Settings;
-using LantanaGroup.Link.Audit.Persistance;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
@@ -26,6 +25,7 @@ using Microsoft.Extensions.Compliance.Redaction;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using Microsoft.Extensions.Compliance.Classification;
 using System.Text;
+using LantanaGroup.Link.Audit.Persistance.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,7 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
 
     //Add repositories
-    builder.Services.AddSingleton<IAuditRepository, AuditMongoRepo>();
+    builder.Services.AddSingleton<IAuditRepository, AuditLogRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()

@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.AuditUnitTests
     {
         private AutoMocker _mocker;
         private GetAuditEventQuery _query;
-        private AuditEntity _auditEvent;
+        private AuditLog _auditEvent;
 
         private static readonly string _auditId = new Guid("aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856").ToString();
 
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             #region Set Up Models
 
             //set up audit entity
-            _auditEvent = new AuditEntity();
+            _auditEvent = new AuditLog();
             _auditEvent.Id = _auditId;
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             _query = _mocker.CreateInstance<GetAuditEventQuery>();
 
             _mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.GetAsync(_auditId)).Returns(Task.FromResult<AuditEntity>(_auditEvent));
+                .Setup(p => p.GetAsync(_auditId)).Returns(Task.FromResult<AuditLog>(_auditEvent));
    
         }
 
