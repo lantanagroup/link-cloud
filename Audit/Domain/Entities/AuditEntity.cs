@@ -6,6 +6,7 @@ namespace LantanaGroup.Link.Audit.Domain.Entities
     {
         public static AuditId Empty => new(Guid.Empty);
         public static AuditId NewId() => new(Guid.NewGuid());
+        public static AuditId FromString(string id) => new(new Guid(id));
     }   
    
     public class AuditLog : BaseEntity
