@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using System.Diagnostics;
 
@@ -23,13 +24,11 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// <returns>An audit event with and id equal to the id parameter</returns>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<AuditModel> Execute(string id)
+        public async Task<AuditModel> Execute(AuditId id)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Audit Event By Id Query");
-
-            if (string.IsNullOrEmpty(id)) throw new ArgumentNullException(nameof(id));
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Audit Event By Id Query");            
             
-            var result = await _datastore.GetAsync(id);
+            var result = await _datastore.Get(id);
             AuditModel? auditEvent = null;
             if (result != null)
             {

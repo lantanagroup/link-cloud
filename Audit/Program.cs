@@ -26,6 +26,8 @@ using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using Microsoft.Extensions.Compliance.Classification;
 using System.Text;
 using LantanaGroup.Link.Audit.Persistance.Repositories;
+using LantanaGroup.Link.Audit.Persistance;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,12 +110,24 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add queries
     builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
-    builder.Services.AddTransient<IGetAllAuditEventsQuery, GetAllAuditEventsQuery>();
+    builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
     builder.Services.AddTransient<IGetAuditEventListQuery, GetAuditEventListQuery>();
 
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
+
+    //Add database context
+    builder.Services.AddDbContext<AuditDbContext>(options => {
+        switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
+        {
+            case "SqlServer":
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DatabaseConnection"));
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });       
 
     //Add repositories
     builder.Services.AddSingleton<IAuditRepository, AuditLogRepository>();
