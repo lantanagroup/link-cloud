@@ -15,7 +15,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Infrastructure.Extensions;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
