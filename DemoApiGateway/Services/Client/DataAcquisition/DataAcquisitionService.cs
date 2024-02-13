@@ -227,6 +227,27 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client.DataAcquisition
             HttpResponseMessage response = await _httpClient.DeleteAsync($"api/{facilityId}/{queryPlanType}");
 
             return response;
-        }   
+        }
+        
+        // * Get a data acquisition fhir list
+        // * @param {string} facilityId
+        // * @returns {Promise<HttpResponseMessage>}
+        public async Task<HttpResponseMessage> GetDataAcquisitionFhirList(string facilityId)
+        {
+            InitHttpClient();
+
+            HttpResponseMessage response = await _httpClient.GetAsync($"api/{facilityId}/fhirQueryList");
+
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> PostDataAcquisitionFhirList(DataAcquisitionQueryListConfigModel model)
+        {
+            InitHttpClient();
+
+            HttpResponseMessage response = await _httpClient.PostAsJsonAsync($"api/{model.FacilityId}/fhirQueryList", model);
+
+            return response;
+        }
     }
 }

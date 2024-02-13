@@ -2,9 +2,9 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "edge",
+      "type": "msedge",
       "request": "launch",
-      "name": "localhost (Edge)",
+      "name": "Launch Edge against localhost",
       "url": "http://localhost:4200",
       "webRoot": "${workspaceFolder}"
     },
