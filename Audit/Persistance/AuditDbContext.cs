@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Audit.Domain.Entities;
-using LantanaGroup.Link.Audit.Persistance.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Audit.Persistance
@@ -15,6 +14,7 @@ namespace LantanaGroup.Link.Audit.Persistance
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
+            base.OnModelCreating(modelBuilder);
         }
     }
 }
