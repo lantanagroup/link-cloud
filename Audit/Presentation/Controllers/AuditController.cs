@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Mvc;
@@ -105,14 +106,14 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<AuditModel>> GetAuditEvent(string id)
+        public async Task<ActionResult<AuditModel>> GetAuditEvent(AuditId id)
         {
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("audit-id", id);
+            activity?.AddTag("audit-id", id.Value);
 
-            if (string.IsNullOrEmpty(id)) { return BadRequest("No audit event id provided."); }
-            _logger.LogGetAuditEventById(id);
+            if (string.IsNullOrEmpty(id.Value.ToString())) { return BadRequest("No audit event id provided."); }
+            _logger.LogGetAuditEventById(id.Value.ToString());
 
             try
             {
@@ -124,8 +125,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                ex.Data.Add("audit-event-id", id);
-                _logger.LogGetAuditEventByIdException(id, ex.Message);
+                ex.Data.Add("audit-event-id", id.Value);
+                _logger.LogGetAuditEventByIdException(id.Value.ToString(), ex.Message);
                 return StatusCode(500, ex);
             }
 
