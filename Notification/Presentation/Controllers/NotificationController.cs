@@ -443,7 +443,16 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                     default:
                         throw new Exception($"Failed to verify facility with id {model.FacilityId}. Status code: {verifyResponse.StatusCode}");
                 }
-            }        
+            }
+
+            //check if the facility already has an existing configuration
+            NotificationConfigurationModel existingConfig = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+            if (existingConfig is not null) 
+            { 
+                var message = $"A configuration for facility {model.FacilityId} already exists.";
+                _logger.LogInvalidNotificationConfigurationCreationWarning(model, message);
+                return BadRequest(message);        
+            }
 
             try
             {              
