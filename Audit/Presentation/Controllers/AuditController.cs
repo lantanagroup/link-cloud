@@ -17,7 +17,6 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     {
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
-        private readonly ICreateAuditEventCommand _createAuditEventCommand;
         private readonly IGetAuditEventListQuery _getAuditEventListQuery;
         private readonly IGetAuditEventQuery _getAuditEventQuery;
         private int maxAuditEventsPageSize = 20;
@@ -27,7 +26,6 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));           
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
-            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
             _getAuditEventListQuery = getAuditEventListQuery ?? throw new ArgumentNullException(nameof(getAuditEventListQuery));
             _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
@@ -84,7 +82,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
-                return StatusCode(500, ex);
+                throw;
             }
                     
         }
@@ -127,7 +125,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 ex.Data.Add("audit-event-id", id);
                 _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }        

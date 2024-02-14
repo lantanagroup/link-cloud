@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
@@ -7,6 +8,7 @@ using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
+using System.Net;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands
 {
@@ -17,14 +19,16 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
         private readonly INotificationConfigurationFactory _notificationConfigurationFactory;
         private readonly IAuditEventFactory _auditEventFactory;
         private readonly ICreateAuditEventCommand _createAuditEventCommand;
+        private readonly IFacilityClient _facilityClient;
 
-        public UpdateFacilityConfigurationCommand(ILogger<GetFacilityConfigurationQuery> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, IKafkaProducerFactory kafkaProducerFactory, INotificationConfigurationRepository datastore, INotificationConfigurationFactory notificationConfigurationFactory)
+        public UpdateFacilityConfigurationCommand(ILogger<GetFacilityConfigurationQuery> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, IKafkaProducerFactory kafkaProducerFactory, INotificationConfigurationRepository datastore, INotificationConfigurationFactory notificationConfigurationFactory, IFacilityClient facilityClient)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _auditEventFactory = auditEventFactory ?? throw new ArgumentNullException(nameof(auditEventFactory));
             _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
+            _facilityClient = facilityClient ?? throw new ArgumentNullException(nameof(facilityClient));
         }
 
         public async Task<string> Execute(UpdateFacilityConfigurationModel model)
@@ -32,7 +36,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Update Facility Configuration");
 
             if (string.IsNullOrEmpty(model.Id)) { throw new ArgumentNullException(nameof(model.Id));  }
-            if (string.IsNullOrEmpty(model.FacilityId)) { throw new ArgumentNullException(nameof(model.FacilityId)); }
+            if (string.IsNullOrEmpty(model.FacilityId)) { throw new ArgumentNullException(nameof(model.FacilityId)); }            
 
             try
             {               
