@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Audit.Persistance.Repositories
 {
@@ -30,7 +31,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
 
         public Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacility(string facilityId, int pageSize, int pageNumber)
         {
-            var logs = _dbContext.AuditLogs.Where(x => x.FacilityId == facilityId)
+            var logs = _dbContext.AuditLogs.AsNoTracking().Where(x => x.FacilityId == facilityId)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
@@ -42,9 +43,9 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
         }
 
         public Task<(IEnumerable<AuditLog>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
-        {
+        {            
             IEnumerable<AuditLog?> logs;
-            var query = _dbContext.AuditLogs.AsQueryable();
+            var query = _dbContext.AuditLogs.AsNoTracking().AsQueryable();
 
             #region Build Query
             if (searchText is not null && searchText.Length > 0)
