@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
-                return StatusCode(500, ex);
+                throw;
             }
                     
         }
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 ex.Data.Add("audit-event-id", id);
                 _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }        
