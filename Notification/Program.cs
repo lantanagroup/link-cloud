@@ -3,6 +3,7 @@ using HealthChecks.UI.Client;
 using LantanaGroup.Link.Notification.Application.Extensions;
 using LantanaGroup.Link.Notification.Application.Factory;
 using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
@@ -15,6 +16,7 @@ using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Notification;
+using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -106,6 +108,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceRegistry));
+
+    // Add HttpClients
+    builder.Services.AddHttpClient<IFacilityClient, FacilityClient>();
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682

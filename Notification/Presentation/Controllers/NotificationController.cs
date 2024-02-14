@@ -1,13 +1,17 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Presentation.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Data;
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
@@ -20,6 +24,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         private readonly ILogger<NotificationController> _logger;
         private readonly INotificationConfigurationFactory _configurationFactory;
         private readonly INotificationFactory _notificationFactory;
+        private readonly IFacilityClient _facilityClient;
         private int maxNotificationConfigurationPageSize = 20;
         private int maxNotificationsPageSize = 20;
 
@@ -41,15 +46,17 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         private readonly IGetNotificationListQuery _getNotificationListQuery;
 
 
-        public NotificationController(ILogger<NotificationController> logger, INotificationConfigurationFactory configurationFactory, INotificationFactory notificationFactory, ICreateFacilityConfigurationCommand createFacilityConfigurationCommand, 
-            IUpdateFacilityConfigurationCommand updateFacilityConfigurationCommand, IFacilityConfigurationExistsQuery facilityConfigurationExistsQuery, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, 
+        public NotificationController(ILogger<NotificationController> logger, INotificationConfigurationFactory configurationFactory, INotificationFactory notificationFactory, ICreateFacilityConfigurationCommand createFacilityConfigurationCommand,
+            IUpdateFacilityConfigurationCommand updateFacilityConfigurationCommand, IFacilityConfigurationExistsQuery facilityConfigurationExistsQuery, IGetFacilityConfigurationQuery getFacilityConfigurationQuery,
             IGetNotificationConfigurationQuery getNotificationConfigurationQuery, IGetFacilityConfigurationListQuery getFacilityConfigurationListQuery, ICreateNotificationCommand createNotificationCommand,
-            ISendNotificationCommand sendNotificationCommand, IValidateEmailAddressCommand validateEmailAddressCommand, IGetNotificationQuery getNotificationQuery, IGetFacilityNotificatonsQuery getFacilityNotificatonsQuery, 
-            IGetNotificationListQuery getNotificationListQuery, IDeleteFacilityConfigurationCommand deleteFacilityConfigurationCommand)
+            ISendNotificationCommand sendNotificationCommand, IValidateEmailAddressCommand validateEmailAddressCommand, IGetNotificationQuery getNotificationQuery, IGetFacilityNotificatonsQuery getFacilityNotificatonsQuery,
+            IGetNotificationListQuery getNotificationListQuery, IDeleteFacilityConfigurationCommand deleteFacilityConfigurationCommand, IFacilityClient facilityClient)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger)); 
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configurationFactory = configurationFactory ?? throw new ArgumentNullException(nameof(configurationFactory));
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
+            _facilityClient = facilityClient ?? throw new ArgumentNullException(nameof(facilityClient));
+
             _createFacilityConfigurationCommand = createFacilityConfigurationCommand ?? throw new ArgumentNullException(nameof(createFacilityConfigurationCommand));
             _updateFacilityConfigurationCommand = updateFacilityConfigurationCommand ?? throw new ArgumentNullException(nameof(updateFacilityConfigurationCommand));
             _facilityConfigurationExistsQuery = facilityConfigurationExistsQuery ?? throw new ArgumentNullException(nameof(facilityConfigurationExistsQuery));
@@ -180,7 +187,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             {                
                 CreateNotificationModel notification = _notificationFactory.CreateNotificationModelCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
                 _logger.LogNotificationCreationException(notification, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
         }
 
@@ -233,7 +240,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             {
                 NotificationSearchRecord searchFilter = _notificationFactory.CreateNotificationSearchRecord(searchText, filterFacilityBy, filterNotificationTypeBy, sortBy, pageSize, pageNumber);
                 _logger.LogNotificationListQueryException(ex.Message, searchFilter);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -277,7 +284,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogGetNotificationByIdException(id, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -331,7 +338,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogGetNotificationByFacilityIdException(facilityId, ex.Message);               
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -386,7 +393,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             {                
                 NotificationConfigurationSearchRecord searchRecord = _configurationFactory.CreateNotificationConfigurationSearchRecord(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
                 _logger.LogNotificationConfigurationsListQueryException(ex.Message, searchRecord);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -422,6 +429,31 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 return BadRequest(message);
             }
 
+            //Verify facility exists
+            HttpResponseMessage verifyResponse = await _facilityClient.VerifyFacilityExists(model.FacilityId);
+            if (!verifyResponse.IsSuccessStatusCode)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                switch (verifyResponse.StatusCode)
+                {
+                    case HttpStatusCode.NotFound:
+                        throw new ArgumentException($"Facility with id {model.FacilityId} does not exist.");
+                    case HttpStatusCode.InternalServerError:
+                        throw new Exception($"Failed to verify facility with id {model.FacilityId}.");
+                    default:
+                        throw new Exception($"Failed to verify facility with id {model.FacilityId}. Status code: {verifyResponse.StatusCode}");
+                }
+            }
+
+            //check if the facility already has an existing configuration
+            NotificationConfigurationModel existingConfig = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+            if (existingConfig is not null) 
+            { 
+                var message = $"A configuration for facility {model.FacilityId} already exists.";
+                _logger.LogInvalidNotificationConfigurationCreationWarning(model, message);
+                return BadRequest(message);        
+            }
+
             try
             {              
                 //Create notification configuration
@@ -435,8 +467,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 CreateFacilityConfigurationModel config = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                _logger.LogNotificationConfigurationCreationException(config, ex.Message);               
-                return StatusCode(500, ex);
+                _logger.LogNotificationConfigurationCreationException(config, ex.Message);
+                throw;
             }
 
         }
@@ -459,8 +491,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<EntityCreatedResponse>> UpdateNotificationConfigurationAsync(NotificationConfigurationModel model)
-        {
-            //TODO check for authorization
+        {           
 
             //validate config values
             if (model == null) { return BadRequest("No notification configuration provided."); }
@@ -478,6 +509,22 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogInvalidNotificationConfigurationUpdateWarning(model, message);
                 return BadRequest(message);
             }
+
+            //Verify facility exists
+            HttpResponseMessage verifyResponse = await _facilityClient.VerifyFacilityExists(model.FacilityId);
+            if (!verifyResponse.IsSuccessStatusCode)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                switch (verifyResponse.StatusCode)
+                {
+                    case HttpStatusCode.NotFound:
+                        throw new ArgumentException($"Facility with id {model.FacilityId} does not exist.");
+                    case HttpStatusCode.InternalServerError:
+                        throw new Exception($"Failed to verify facility with id {model.FacilityId}.");
+                    default:
+                        throw new Exception($"Failed to verify facility with id {model.FacilityId}. Status code: {verifyResponse.StatusCode}");
+                }
+            }            
 
             try
             {
@@ -500,7 +547,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogNotificationConfigurationUpdateException(model, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -547,7 +594,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -594,7 +641,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogGetNotificationConfigurationByIdException(id, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
@@ -644,7 +691,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogNotificationConfigurationDeleteException(id, ex.Message);
-                return StatusCode(500, ex);
+                throw;
             }
 
         }
