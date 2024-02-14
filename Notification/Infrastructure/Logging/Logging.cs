@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
         
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationCreationException,
-            LogLevel.Information,
+            LogLevel.Error,
             "An exception occurred while attempting to create a new notification configuration: {exceptionMessage}")]
         public static partial void LogNotificationConfigurationCreationException(this ILogger logger, [LogProperties] CreateFacilityConfigurationModel config, string exceptionMessage);
 
@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
 
         [LoggerMessage(
             NotificationLoggingIds.NotificationConfigurationUpdateException,
-            LogLevel.Information,
+            LogLevel.Error,
             "An exception occurred while attempting to update an existing notification configuration: {exceptionMessage}")]
         public static partial void LogNotificationConfigurationUpdateException(this ILogger logger, [LogProperties] NotificationConfigurationModel config, string exceptionMessage);
 
@@ -158,7 +158,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
 
         [LoggerMessage(
             NotificationLoggingIds.NotificationCreationException,
-            LogLevel.Information,
+            LogLevel.Error,
             "An exception occurred while attempting to create a new notification: {exceptionMessage}")]
         public static partial void LogNotificationCreationException(this ILogger logger, [LogProperties] CreateNotificationModel notification, string exceptionMessage);
 
@@ -216,7 +216,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Logging
 
         [LoggerMessage(
             NotificationLoggingIds.SendNotificationException,
-            LogLevel.Warning,
+            LogLevel.Error,
             "An exception occured while attempting to send a notification through channel {channel}: {exceptionMessage}")]
         public static partial void LogNotificationSentException(this ILogger logger, string channel, string exceptionMessage);
 
