@@ -8,6 +8,7 @@
         {
             public const string ExternalConfigurationSource = "Link:Notification:ExternalConfigurationSource";
             public const string ServiceInformation = "Link:Notification:ServiceInformation";
+            public const string ServiceRegistry = "Link:Notification:ServiceRegistry";
             public const string Kafka = "Link:Notification:KafkaConnection";
             public const string Mongo = "Link:Notification:MongoDB";
             public const string Smtp = "Link:Notification:SmtpConnection";
