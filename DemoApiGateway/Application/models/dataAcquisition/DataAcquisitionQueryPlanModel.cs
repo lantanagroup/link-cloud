@@ -1,9 +1,8 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DemoApiGateway.Application.models.dataAcquisition
 {
-    public class DataAcquisitionQueryPlanModel
+    public class DataAcquisitionQueryPlanModel : BaseModel
     {    
         public string PlanName { get; set; }
         public string ReportType { get; set; }

@@ -48,7 +48,7 @@
           </mat-action-row>        
         </mat-expansion-panel>
 
-        <mat-expansion-panel>
+        <mat-expansion-panel id="dataacqPanel" (opened)="loadDataAcquisitionConfig()">
           <mat-expansion-panel-header>
             <mat-panel-title>
               Data Acquisition Configuration
@@ -58,17 +58,20 @@
           </mat-expansion-panel-header>     
           
           <mat-tab-group>
-            <mat-tab label="Base"> 
-                -- base configuration content 
+            <mat-tab label="Fhir Query" id="fhirQueryTab"> 
+              <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage" *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
+              <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig" [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>  
             </mat-tab>
-            <mat-tab label="Authentication"> 
-                -- authentication configuration content
+            <mat-tab label="Fhir List">
+              <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage" *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
+              <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig" [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
             </mat-tab>
-            <mat-tab label="Query"> 
-                -- query configuration content
+            <mat-tab label="Query Plan"> 
+                -- Query Plan Configuration
             </mat-tab>
-            <mat-tab label="Query Plans"> 
-                -- Query plan content
+            <mat-tab label="Authentication">
+              <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage" *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
+              <app-data-acquisition-authentication-config-form [queryAuthConfig]="dataAcqAuthQueryConfig" [queryListAuthConfig]="dataAcqAuthQueryListConfig" [facilityId]="facilityId" [viewOnly]="true"></app-data-acquisition-authentication-config-form>
             </mat-tab>
           </mat-tab-group>
 
