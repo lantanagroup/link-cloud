@@ -371,6 +371,182 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
 
         #endregion
 
+        #region Data Acquisition Fhir List Configuration
+
+        /// <summary>
+        /// Create a new data acquisition query list configuration
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     Bad Reqeust: 400
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
+        [HttpPost("list/config")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> CreateDataAcquisitionQueryListConfig([FromBody] DataAcquisitionQueryListConfigModel model)
+        {
+            if (model == null)
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var response = await _dataAcquisitionService.PostDataAcquisitionFhirList(model);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    //var result = await response.Content.ReadFromJsonAsync<EntityActionResponse>();
+                    var result = new EntityActionResponse() { Id = "temp", Message = "Data Acquisition Query List Configuration created." };
+                    return Ok(result);
+                }
+
+                return StatusCode(500, "An error occurred while attempting to create a new data acquisition query list configuration.");
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("dataAcquisitionQueryConfig", model);
+                _logger.LogError(new EventId(LoggingIds.GenerateItems, "Create a data acquisition query list configuration"), ex, "An error occurred while attempting to create a new data acquisition query list configuration.");
+                return StatusCode(500, "An error occurred while attempting to create a new data acquisition query list configuration.");
+            }
+        }
+
+        /// <summary>
+        /// Update a data acquisition query list configuration
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="model"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     Bad Reqeust: 400
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
+        [HttpPut("list/{facilityId}/config")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdateDataAcquisitionQueryListConfig(string facilityId, [FromBody] DataAcquisitionQueryListConfigModel model)
+        {
+            if (model == null)
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var response = await _dataAcquisitionService.PostDataAcquisitionFhirList(model);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    //var result = await response.Content.ReadFromJsonAsync<EntityActionResponse>();
+                    var result = new EntityActionResponse() { Id = "temp", Message = "Data Acquisition Query List Configuration updated." };
+                    return Ok(result);
+                }
+
+                return StatusCode(500, "An error occurred while attempting to update a data acquisition query list configuration.");
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("dataAcquisitionQueryConfig", model);
+                _logger.LogError(new EventId(LoggingIds.UpdateItem, "Update a data acquisition query list configuration"), ex, "An error occurred while attempting to update a data acquisition query list configuration.");
+                return StatusCode(500, "An error occurred while attempting to update a data acquisition query list configuration.");
+            }
+        }
+
+        /// <summary>
+        /// Get a data acquisition query list configuration
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     Bad Reqeust: 400
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
+        [HttpGet("list/{facilityId}/config")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetDataAcquisitionQueryListConfig(string facilityId)
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var response = await _dataAcquisitionService.GetDataAcquisitionFhirList(facilityId);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<DataAcquisitionQueryListConfigModel>();
+                    return Ok(result);
+                }
+
+                return StatusCode(500, "An error occurred while attempting to get a data acquisition query list configuration.");
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("facilityId", facilityId);
+                _logger.LogError(new EventId(LoggingIds.GetItem, "Get a data acquisition query list configuration"), ex, "An error occurred while attempting to get a data acquisition query list configuration.");
+                return StatusCode(500, "An error occurred while attempting to get a data acquisition query list configuration.");
+            }
+        }
+
+        /// <summary>
+        /// Delete a data acquisition query list configuration
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     Bad Reqeust: 400
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
+        [HttpDelete("list/{facilityId}/config")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteDataAcquisitionFhirListConfig(string facilityId)
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                var response = await _dataAcquisitionService.PostDataAcquisitionFhirList(new DataAcquisitionQueryListConfigModel { FacilityId = facilityId });
+
+                if (response.IsSuccessStatusCode)
+                {
+                    //var result = await response.Content.ReadFromJsonAsync<EntityActionResponse>();
+                    var result = new EntityActionResponse() { Id = "temp", Message = "Data Acquisition Query List Configuration deleted." };
+                    return Ok(result);
+                }
+
+                return StatusCode(500, "An error occurred while attempting to delete a data acquisition query list configuration.");
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("facilityId", facilityId);
+                _logger.LogError(new EventId(LoggingIds.DeleteItem, "Delete a data acquisition query list configuration"), ex, "An error occurred while attempting to delete a data acquisition query list configuration.");
+                return StatusCode(500, "An error occurred while attempting to delete a data acquisition query list configuration.");
+            }
+        }
+
+        #endregion
+
         #region Data Acquisition Authentication Configuration
 
         /// <summary>

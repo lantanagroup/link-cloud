@@ -1,4 +1,5 @@
 import { FhirVersion } from "src/app/models/FhirVersion.enum";
+import { IDataAcquisitionAuthenticationConfigModel } from "./data-acquisition-auth-config-model.interface";
 
 export interface ITenantDataAcquisitionConfigModel {
     id: string;
@@ -14,15 +15,23 @@ export interface IDataAcquisitionFacilityModel {
     resourceSettings: IDataAcquisitionConfigResourceModel[];
 }
 
-export interface IDataAcquisitionAuthenticationConfigModel {
-    authType: string;
-    key: string;
-    tokenUrl: string;
-    audience: string;
-    clientId: string;
-    userName: string;
-    password: string;
+export interface IDataAcquisitionQueryConfigModel {
+    id: string;
+    facilityId: string;
+    fhirServerBaseUrl: string;
+    authentication?: IDataAcquisitionAuthenticationConfigModel;
+    queryPlanIds: string[];
 }
+
+//export interface IDataAcquisitionAuthenticationConfigModel {
+//    authType: string;
+//    key: string;
+//    tokenUrl: string;
+//    audience: string;
+//    clientId: string;
+//    userName: string;
+//    password: string;
+//}
 
 export interface IDataAcquisitionConfigResourceModel {
     resourceType: string[];
