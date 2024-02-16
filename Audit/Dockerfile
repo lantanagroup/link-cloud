@@ -20,6 +20,8 @@ RUN dotnet restore "Audit/Audit.csproj" --configfile "Audit/nuget.config"
 COPY . .
 WORKDIR "/src/Audit"
 RUN dotnet build "Audit.csproj" -c Release -o /app/build
+ENV \
+    ASPNETCORE_HTTP_PORTS=80
 
 FROM build AS publish
 RUN dotnet publish "Audit.csproj" -c Release -o /app/publish /p:UseAppHost=false
