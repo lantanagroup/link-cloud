@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 using Moq;
 using Moq.AutoMock;
 

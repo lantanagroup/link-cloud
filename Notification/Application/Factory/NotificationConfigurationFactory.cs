@@ -143,7 +143,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             NotificationConfig config = new()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = NotificationConfigId.NewId(),
                 FacilityId = facilityId,
                 CreatedOn= DateTime.UtcNow
             };
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             NotificationConfig config = new()
             {
-                Id = id,
+                Id = NotificationConfigId.FromString(id),
                 FacilityId = facilityId,
                 CreatedOn = DateTime.UtcNow
             };
