@@ -85,9 +85,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 using (ServiceActivitySource.Instance.StartActivity("Create the notification"))
                 {
                     NotificationEntity entity = _notificationFactory.NotificationEntityCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
-                    if (string.IsNullOrEmpty(entity.Id)) { entity.Id = Guid.NewGuid().ToString(); } //create new GUID for audit event
-                                                                                                    //entity.CreatedBy =
-                    _ = await _datastore.AddAsync(entity);                    
+                    _ = await _datastore.AddAsync(entity);       
 
                     //TODO: Get user info
                     //Create audit event
@@ -110,7 +108,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         new KeyValuePair<string, object?>("type", entity.NotificationType));
 
                     //Log creation of new notification configuration
-                    _logger.LogNotificationCreation(entity.Id, model);                    
+                    _logger.LogNotificationCreation(entity.Id.Value.ToString(), model);                    
                     return entity.Id;
                 }              
             }

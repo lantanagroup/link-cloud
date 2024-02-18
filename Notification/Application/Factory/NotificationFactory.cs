@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             NotificationEntity model = new()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = NotificationId.NewId(),
                 NotificationType = notificationType,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,

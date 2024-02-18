@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
-using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Notification.Domain;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;

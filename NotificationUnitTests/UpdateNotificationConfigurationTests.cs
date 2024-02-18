@@ -3,6 +3,7 @@ using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 using Moq;
 using Moq.AutoMock;
 

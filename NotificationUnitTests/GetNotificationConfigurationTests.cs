@@ -4,6 +4,7 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using Moq.AutoMock;
 using Moq;
+using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 
 namespace LantanaGroup.Link.NotificationUnitTests
 {

@@ -188,7 +188,7 @@ namespace LantanaGroup.Link.Notification.Persistence
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Notification Configuration Repository - Delete Async");
 
-            await _collection.DeleteOneAsync(x => x.Id == id);
+            await _collection.DeleteOneAsync(x => x.Id == NotificationConfigId.FromString(id));
             return true;
         }
     }
