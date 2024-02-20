@@ -20,4 +20,16 @@
     <Folder Include="src\app\interceptors\" />
     <Folder Include="src\assets\img\" />
   </ItemGroup>
+  <ItemGroup>
+    <TypeScriptConfiguration Remove="src\app\services\gateway\NewFolder\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="src\app\services\gateway\NewFolder\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <TypeScriptConfiguration Remove="src\app\services\gateway\NewFolder1\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="src\app\services\gateway\NewFolder1\**" />
+  </ItemGroup>
 </Project>
