@@ -1,0 +1,49 @@
+<div class="input-container list-item-container">
+  <form [formGroup]="configForm" class="dialog-form">
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId" [readonly]="true">
+        <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="facilityIdControl.hasError('required')">
+          A facility id is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Report Type</mat-label>
+        <input matInput formControlName="reportType" [readonly]="viewOnly">
+        <button *ngIf="reportTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearReportType()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="reportTypeControl.hasError('required')">
+          A Report type is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <div class="form-input">
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Bundling Type</mat-label>
+        <input matInput formControlName="bundlingType" [readonly]="viewOnly">
+        <button *ngIf="bundlingTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundlingType()">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-error *ngIf="bundlingTypeControl.hasError('required')">
+          A bundling type is <strong>required</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+    <div class="action-row" *ngIf="viewOnly">
+      <button mat-mini-fab aria-label="Delete report configuration" matTooltip="Delete report configuration" (click)="deleteReportConfiguration()">
+        <mat-icon>delete</mat-icon>
+      </button>
+      <button mat-mini-fab aria-label="Edit report configuration" matTooltip="Edit report configuration" (click)="editReportDialog()">
+        <mat-icon>edit</mat-icon>
+      </button>
+    </div>
+
+  </form>
+</div>

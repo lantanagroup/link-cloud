@@ -1,0 +1,8 @@
+@use '../../../../styles/core.scss';
+div.action-row {
+  border: none;
+  padding: 2;
+  margin: 0;
+  display: flex;
+  justify-content: flex-end;
+}
