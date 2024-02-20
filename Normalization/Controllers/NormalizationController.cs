@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -21,7 +20,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IMediator _mediator;
         private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _kafkaProducerFactory;
 
-        public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory, IMediator mediator, ILogger<NormalizationController> logger)
+        public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory,
+            IMediator mediator, ILogger<NormalizationController> logger)
         {
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -60,13 +60,18 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
+
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
                     Source = SaveTypeSource.Create
                 });
             }
-            catch(ConfigOperationNullException ex) 
+            catch (TenantNotFoundException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (ConfigOperationNullException ex) 
             {
                 _logger.LogError(ex.Message, ex);
                 return BadRequest(ex.Message);
@@ -156,12 +161,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
+
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
                     Source = SaveTypeSource.Update,
                     FacilityId = facilityId,
                 });
+            }
+            catch (TenantNotFoundException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (ConfigOperationNullException ex)
             {
