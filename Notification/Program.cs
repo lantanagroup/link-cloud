@@ -14,8 +14,7 @@ using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
-using LantanaGroup.Link.Notification.Persistence;
-using LantanaGroup.Link.Notification.Persistence.Notification;
+using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
@@ -145,8 +144,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
     //Add repositories
-    builder.Services.AddSingleton<INotificationConfigurationRepository, NotificationConfigMongoRepo>();
-    builder.Services.AddSingleton<INotificationRepository, NotificationMongoRepo>();
+    builder.Services.AddSingleton<INotificationConfigurationRepository, NotificationConfigurationRepository>();
+    builder.Services.AddSingleton<INotificationRepository, NotificationRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()

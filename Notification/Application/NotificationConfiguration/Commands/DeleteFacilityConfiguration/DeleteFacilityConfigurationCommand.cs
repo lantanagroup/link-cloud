@@ -25,44 +25,44 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
         }
        
 
-        public async Task<bool> Execute(string id)
+        public async Task<bool> Execute(string facilityId)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete Notification Configuration Command");
 
             try 
             {
-                if (string.IsNullOrEmpty(id)) throw new ArgumentNullException(nameof(id));
+                if (string.IsNullOrEmpty(facilityId)) throw new ArgumentNullException(nameof(facilityId));
+                var config = await _datastore.GetFacilityNotificationConfig(facilityId);
 
                 using (ServiceActivitySource.Instance.StartActivity("Check if notification configuration exists"))
-                {
-                    if (!_datastore.Exists(id))
+                {                    
+                    if (config is null)
                     {
-                        var message = $"No notification configuration with an id of {id} found.";
+                        var message = $"No notification configuration with an id of {facilityId} found.";
                         _logger.LogNotificationConfigurationDeleteWarning(message);                        
                         return false;
                     }
                 }
 
-                using (ServiceActivitySource.Instance.StartActivity("Get existing configuration and delete it"))
-                {
-                    NotificationConfig config = await _datastore.GetAsync(id);
+                using (ServiceActivitySource.Instance.StartActivity("Delete the facility configuration"))
+                {                   
 
-                    bool result = await _datastore.DeleteAsync(id);                    
+                    bool result = await _datastore.Delete(config.Id);                    
 
                     if (result)
                     {
-                        var message = $"Notificaiton configuration {id} was deleted.";
-                        _logger.LogNotificationConfigurationDeletion(id, message);
+                        var message = $"Notificaiton configuration {config.Id.Value} was deleted.";
+                        _logger.LogNotificationConfigurationDeletion(config.Id.Value.ToString(), message);
 
                         //TODO: Get user info
                         //Create audit event
-                        string notes = $"Notification configuration ({id}) for facility {config.FacilityId} was deleted by TODO-USER.";
+                        string notes = $"Notification configuration ({config.Id.Value}) for facility {config.FacilityId} was deleted by TODO-USER.";
                         AuditEventMessage auditEventMessage = _auditEventFactory.CreateAuditEvent(null, null, "SystemUser", AuditEventType.Delete, typeof(NotificationEntity).Name, notes);
                         _ = Task.Run(() => _createAuditEventCommand.Execute(config.FacilityId, auditEventMessage));                  
                     }
                     else
                     {
-                        _logger.LogNotificationConfigurationDeletion(id, $"Notificaiton configuration {id} was not deleted.");
+                        _logger.LogNotificationConfigurationDeletion(config.Id.Value.ToString(), $"Notificaiton configuration {config.Id.Value} was not deleted.");
                     }
 
                     return result;
@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             }
             catch (NullReferenceException ex)
             {                
-                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to delete notificaiton configuration {id}");
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to delete notificaiton configuration for facility {facilityId}");
                 throw;
             }
             

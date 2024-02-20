@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             try
             {               
                 NotificationConfig entity = _notificationConfigurationFactory.NotificationConfigEntityCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                bool outcome = await _datastore.UpdateAsync(entity);                
+                bool outcome = await _datastore.Update(entity);                
 
                 //TODO: Get user info
                 //Create audit event
