@@ -17,18 +17,18 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber)
+        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Find Notification Configurations Query");
 
             try
             {
-                var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber);
 
                 //convert AuditEntity to AuditModel
                 List<NotificationConfigurationModel> configs = result.Select(x => new NotificationConfigurationModel
                 {
-                    Id = x.Id,
+                    Id = x.Id.Value.ToString(),
                     FacilityId = x.FacilityId,
                     EmailAddresses = x.EmailAddresses,
                     EnabledNotifications = x.EnabledNotifications,
@@ -39,11 +39,10 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 
                 return pagedNotificationConfigurations;
             }
-            catch (NullReferenceException ex)
+            catch (NullReferenceException)
             {                
-                _logger.LogDebug(new EventId(NotificationLoggingIds.SearchPerformed, "Notification Service - List notification configurations"), ex, "Failed to find notification configurations.");
-                var queryEx = new ApplicationException("Failed to execute the request to find notification configurations.", ex);
-                throw queryEx;                
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                throw;             
             }
         }
     }

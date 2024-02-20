@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<string> Execute(UpdateFacilityConfigurationModel model)
+        public async Task<bool> Execute(UpdateFacilityConfigurationModel model)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Update Facility Configuration");
 
@@ -37,19 +37,13 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             try
             {               
                 NotificationConfig entity = _notificationConfigurationFactory.NotificationConfigEntityCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                bool outcome = await _datastore.Update(entity);                
-
-                //TODO: Get user info
-                //Create audit event
-                string notes = $"Updated notification configuration ({entity.Id}) for '{entity.FacilityId}'.";
-                AuditEventMessage auditEventMessage = _auditEventFactory.CreateAuditEvent(null, null, "SystemUser", AuditEventType.Update, typeof(NotificationConfig).Name, notes);
-                _ = Task.Run(() => _createAuditEventCommand.Execute(model.FacilityId, auditEventMessage));
+                bool outcome = await _datastore.Update(entity);              
 
                 _logger.LogNotificationConfigurationUpdate(model.Id, model);
-                return entity.Id.Value.ToString();
+                return outcome;
 
             }
-            catch (Exception ex)
+            catch (Exception)
             {                 
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;

@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
@@ -57,7 +58,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))
                         {
-                            await _datastore.SetNotificationSentOn(model.Id);
+                            await _datastore.SetNotificationSentOn(NotificationId.FromString(model.Id));
 
                             //add id to current activity                            
                             currentActivity?.AddTag("notification id", model.Id);

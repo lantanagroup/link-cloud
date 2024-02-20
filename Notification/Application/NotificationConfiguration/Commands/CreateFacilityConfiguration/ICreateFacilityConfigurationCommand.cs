@@ -1,7 +1,9 @@
-﻿namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands
+﻿using LantanaGroup.Link.Notification.Application.Models;
+
+namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands
 { 
     public interface ICreateFacilityConfigurationCommand
     {
-        Task<string> Execute(CreateFacilityConfigurationModel model);
+        Task<NotificationConfigurationModel> Execute(CreateFacilityConfigurationModel model);
     }
 }

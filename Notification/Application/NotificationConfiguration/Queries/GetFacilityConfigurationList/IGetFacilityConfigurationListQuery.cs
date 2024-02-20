@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 {
     public interface IGetFacilityConfigurationListQuery
     {
-        Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
+        Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
     }
 }

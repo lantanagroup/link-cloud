@@ -1,22 +1,22 @@
-﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+﻿using LantanaGroup.Link.Notification.Persistence;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Notification.Infrastructure.Health
-{  
+{
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly INotificationConfigurationRepository _datastore;
+        protected readonly NotificationDbContext _dataContext;
 
-        public DatabaseHealthCheck(INotificationConfigurationRepository datastore)
-        {
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+        public DatabaseHealthCheck(NotificationDbContext dataContext)
+        {            
+            _dataContext = dataContext;
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             try 
             {
-                bool outcome = await _datastore.HealthCheck();
+                bool outcome = await _dataContext.Database.CanConnectAsync();
 
                 if (outcome)
                 {

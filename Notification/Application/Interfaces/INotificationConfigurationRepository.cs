@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
     {   
         public Task<NotificationConfig?> Get(NotificationConfigId id);
         public Task<NotificationConfig?> GetFacilityNotificationConfig(string facilityId);
-        public (IEnumerable<NotificationConfig>, PaginationMetadata) Search(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
+        public Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
         public Task<bool> Delete(NotificationConfigId id);
 
     }

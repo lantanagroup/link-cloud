@@ -5,6 +5,7 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -120,7 +121,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     _logger.LogNotificationCreation(notificationId, notificationModel);
 
                                     //send notification
-                                    NotificationModel notification = await _getNotificationQuery.Execute(notificationId);
+                                    NotificationModel notification = await _getNotificationQuery.Execute(NotificationId.FromString(notificationId));
                                     SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(notification.Id, notification.Recipients, notification.Bcc, notification.Subject, notification.Body);
 
                                     //if a facility based notification, get their configuration and add it to the send model
