@@ -3,13 +3,11 @@ using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Serializers;
-using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Controllers
@@ -21,17 +19,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ILogger<NormalizationController> _logger;
         private readonly IMediator _mediator;
         private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _kafkaProducerFactory;
-        private readonly TenantApiSettings _tenantApiSettings;
-        private readonly HttpClient _httpClient;
 
         public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory,
-            IMediator mediator, IOptions<TenantApiSettings> tenantServiceConfig,
-            HttpClient httpClient, ILogger<NormalizationController> logger)
+            IMediator mediator, ILogger<NormalizationController> logger)
         {
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-            _tenantApiSettings = tenantServiceConfig.Value;
-            _httpClient = httpClient;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 

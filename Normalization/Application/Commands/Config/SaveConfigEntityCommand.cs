@@ -42,7 +42,7 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
         
         if(!tenantExists)
         {
-            throw new TenantNotFoundException($"{request.FacilityId} not found in Tenant Service.");
+            throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
         }
 
         if(request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
