@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Settings;
+﻿namespace LantanaGroup.Link.QueryDispatch.Application.Settings;
 
 public class TenantApiSettings
 {

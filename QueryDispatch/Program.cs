@@ -1,39 +1,39 @@
-using Serilog;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Confluent.Kafka.Extensions.OpenTelemetry;
+using HealthChecks.UI.Client;
+using LanatanGroup.Link.QueryDispatch.Jobs;
+using LantanaGroup.Link.QueryDispatch;
+using LantanaGroup.Link.QueryDispatch.Application.Factory;
+using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+using LantanaGroup.Link.QueryDispatch.Application.Models;
+using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
+using LantanaGroup.Link.QueryDispatch.Application.Queries;
+using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
+using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
+using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
+using LantanaGroup.Link.QueryDispatch.Application.Services;
+using LantanaGroup.Link.QueryDispatch.Application.Settings;
+using LantanaGroup.Link.QueryDispatch.Listeners;
+using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
+using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
+using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
+using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Listeners;
-using LantanaGroup.Link.QueryDispatch.Application.Factory;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
-using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
-using LanatanGroup.Link.QueryDispatch.Jobs;
-using Quartz.Spi;
-using Quartz;
-using Quartz.Impl;
-using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
-using LantanaGroup.Link.QueryDispatch.Presentation.Services;
-using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
-using System.Text.Json.Serialization;
-using System.Reflection;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using QueryDispatch.Presentation.Services;
-using HealthChecks.UI.Client;
-using QueryDispatch.Application.Services;
-using LantanaGroup.Link.QueryDispatch;
-using QueryDispatch.Application.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Confluent.Kafka.Extensions.OpenTelemetry;
-using LantanaGroup.Link.Normalization.Application.Services;
-using LantanaGroup.Link.Normalization.Application.Settings;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
+using QueryDispatch.Application.Models;
+using QueryDispatch.Application.Services;
+using QueryDispatch.Presentation.Services;
+using Serilog;
+using System.Reflection;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,7 +61,8 @@ if (tenantApiSettings != null)
 
 // Add services to the container.
 builder.Services.AddGrpc();
-builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters().AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));   
+builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters().AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddHttpClient();
 
 //Add commands
 builder.Services.AddTransient<ICreateScheduledReportCommand, CreateScheduledReportCommand>();

@@ -1,8 +1,8 @@
 ﻿
-using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.QueryDispatch.Application.Settings;
 using System.Net;
 
-namespace LantanaGroup.Link.Normalization.Application.Services;
+namespace LantanaGroup.Link.QueryDispatch.Application.Services;
 
 public class TenantApiService : ITenantApiService
 {
@@ -19,7 +19,10 @@ public class TenantApiService : ITenantApiService
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
-        var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}?facilityId={facilityId}";
+        if (!_settings.CheckIfFacilityExists)
+            return true;
+
+        var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}/{facilityId}";
         var response = await _httpClient.GetAsync(endpoint, cancellationToken);
 
         if(response.IsSuccessStatusCode)

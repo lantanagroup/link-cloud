@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Services;
+﻿namespace LantanaGroup.Link.QueryDispatch.Application.Services;
 
 public interface ITenantApiService
 {
