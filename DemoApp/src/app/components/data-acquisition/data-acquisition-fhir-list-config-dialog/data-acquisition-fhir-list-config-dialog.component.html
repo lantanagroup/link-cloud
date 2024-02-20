@@ -1,0 +1,11 @@
+<h1 mat-dialog-title class="dialog-form-header">{{dialogTitle}}</h1>
+<div mat-dialog-content>
+  <app-data-acquisition-fhir-list-config-form [item]="config" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-data-acquisition-fhir-list-config-form>
+</div>
+<div mat-dialog-actions align="end">
+  <button *ngIf="!viewOnly" mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
+    <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+    {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Fhir List Configuration
+  </button>
+  <button mat-raised-button mat-dialog-close>Close</button>
+</div>

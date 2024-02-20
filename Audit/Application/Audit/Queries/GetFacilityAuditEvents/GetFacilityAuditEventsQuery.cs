@@ -5,12 +5,12 @@ using System.Diagnostics;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 {
-    public class GetAllAuditEventsQuery : IGetAllAuditEventsQuery
+    public class GetFacilityAuditEventsQuery : IGetFacilityAuditEventsQuery
     {
-        private readonly ILogger<GetAllAuditEventsQuery> _logger;
+        private readonly ILogger<GetFacilityAuditEventsQuery> _logger;
         private readonly IAuditRepository _datastore;
 
-        public GetAllAuditEventsQuery(ILogger<GetAllAuditEventsQuery> logger, IAuditRepository datastore) 
+        public GetFacilityAuditEventsQuery(ILogger<GetFacilityAuditEventsQuery> logger, IAuditRepository datastore) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger)); 
             _datastore = datastore?? throw new ArgumentNullException(nameof(datastore));
@@ -21,11 +21,11 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// </summary>
         /// <returns>A list of Audit events</returns>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<List<AuditModel>> Execute()
+        public async Task<PagedAuditModel> Execute(string facilityId, int pageNumber, int PageSize)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Audit Events Query");
 
-            var result = await _datastore.GetAllAsync();
+            var (result, metadata) = await _datastore.GetByFacility(facilityId, PageSize, pageNumber);
 
             List<AuditModel> auditEvents = result.Select(x => new AuditModel
             {
@@ -40,7 +40,9 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
                 Notes = x.Notes
             }).ToList();
 
-            return auditEvents;
+            PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
+
+            return pagedAuditEvents;
         }
     }
 }

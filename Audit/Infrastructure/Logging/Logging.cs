@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
             AuditLoggingIds.GenerateItems, 
             LogLevel.Information, 
             "New audit event created")]
-        public static partial void LogAuditEventCreation(this ILogger logger, [LogProperties]AuditEntity auditEvent);
+        public static partial void LogAuditEventCreation(this ILogger logger, [LogProperties]AuditLog auditEvent);
 
         [LoggerMessage(
             AuditLoggingIds.EventConsumerException, 

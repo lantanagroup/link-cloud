@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,6 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     {
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
-        private readonly ICreateAuditEventCommand _createAuditEventCommand;
         private readonly IGetAuditEventListQuery _getAuditEventListQuery;
         private readonly IGetAuditEventQuery _getAuditEventQuery;
         private int maxAuditEventsPageSize = 20;
@@ -26,7 +26,6 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));           
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
-            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
             _getAuditEventListQuery = getAuditEventListQuery ?? throw new ArgumentNullException(nameof(getAuditEventListQuery));
             _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
@@ -83,7 +82,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
-                return StatusCode(500, ex);
+                throw;
             }
                     
         }
@@ -105,18 +104,18 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<AuditModel>> GetAuditEvent(string id)
+        public async Task<ActionResult<AuditModel>> GetAuditEvent(Guid id)
         {
             //add id to current activity
             var activity = Activity.Current;
             activity?.AddTag("audit-id", id);
 
-            if (string.IsNullOrEmpty(id)) { return BadRequest("No audit event id provided."); }
-            _logger.LogGetAuditEventById(id);
+            if (id == Guid.Empty) { return BadRequest("No audit event id provided."); }
+            _logger.LogGetAuditEventById(id.ToString());
 
             try
             {
-                AuditModel auditEvent = await _getAuditEventQuery.Execute(id);                
+                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id));                
 
                 if (auditEvent == null) { return NotFound(); }
                 
@@ -125,8 +124,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             catch (Exception ex)
             {
                 ex.Data.Add("audit-event-id", id);
-                _logger.LogGetAuditEventByIdException(id, ex.Message);
-                return StatusCode(500, ex);
+                _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
+                throw;
             }
 
         }        
