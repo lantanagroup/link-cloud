@@ -28,6 +28,22 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             return Task.FromResult(notification);
         }
 
+        public Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        {
+            IEnumerable<NotificationEntity> notifications;
+            var query = _dbContext.Notifications.AsNoTracking().Where(x => x.FacilityId == facilityId).AsQueryable();
+            var count = query.Count();
+            query = _dbContext.SetSortBy(query, sortBy, sortOrder.Equals(SortOrder.Ascending));
+            notifications = query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+            return Task.FromResult<(IEnumerable<NotificationEntity>, PaginationMetadata)>((notifications, metadata));
+        }
+
         public Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
             IEnumerable<NotificationEntity> notifications;

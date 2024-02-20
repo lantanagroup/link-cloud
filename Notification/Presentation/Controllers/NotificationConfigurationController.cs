@@ -56,6 +56,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="searchText"></param>
         /// <param name="filterFacilityBy"></param>
         /// <param name="sortBy"></param>
+        /// <param name="sortOrder"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -69,7 +70,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {
             //TODO check for authorization
 

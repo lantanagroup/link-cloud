@@ -83,20 +83,19 @@ namespace LantanaGroup.Link.Notification.Application.Factory
             return model;
         }
 
-        public NotificationModel NotificationModelCreate(string id, string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc, DateTime createdOn, DateTime? sentOn)
+        public NotificationModel NotificationModelCreate(NotificationId id, string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc, DateTime createdOn, List<DateTime> sentOn)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Factory - Create NotificationModel");
 
             NotificationModel model = new()
             {
-                Id = id,
+                Id = id.Value.ToString(),
                 NotificationType = notificationType,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
                 Subject = subject,
                 Body = body,
-                CreatedOn = createdOn,
-                SentOn = sentOn
+                CreatedOn = createdOn
             };
 
             if (recipients is not null)
@@ -117,6 +116,16 @@ namespace LantanaGroup.Link.Notification.Application.Factory
                     model.Bcc = new List<string>();
 
                 model.Bcc.AddRange(bcc);
+            }
+
+            if (sentOn is not null)
+            { 
+                if(model.SentOn is not null)
+                    model.SentOn.Clear();
+                else
+                    model.SentOn = new List<DateTime>();
+
+                model.SentOn.AddRange(sentOn);
             }
 
             return model;
