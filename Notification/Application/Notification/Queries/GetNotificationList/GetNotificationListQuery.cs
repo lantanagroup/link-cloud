@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationModel> Execute(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, int pageSize, int pageNumber)
+        public async Task<PagedNotificationModel> Execute(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Find Notifications Query");
 
             try
             {
-                var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, pageSize, pageNumber);
+                var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, sortOrder, pageSize, pageNumber);
 
                 List<NotificationModel> notifications = new List<NotificationModel>();
                 if (result != null)
@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
                     {
                         notifications.AddRange(result.Select(x => new NotificationModel
                         {
-                            Id = x.Id,
+                            Id = x.Id.Value.ToString(),
                             NotificationType = x.NotificationType,
                             FacilityId = x.FacilityId,
                             CorrelationId = x.CorrelationId,
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
                 return pagedNotifications;
                                 
             }
-            catch (NullReferenceException ex)
+            catch (NullReferenceException)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
