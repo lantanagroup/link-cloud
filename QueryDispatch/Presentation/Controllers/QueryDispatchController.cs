@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
+using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
+using LantanaGroup.Link.QueryDispatch.Application.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
@@ -17,8 +17,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         private readonly IGetQueryDispatchConfigurationQuery _getQueryDispatchConfigurationQuery;
         private readonly IDeleteQueryDispatchConfigurationCommand _deleteQueryDispatchConfigurationCommand;
         private readonly IUpdateQueryDispatchConfigurationCommand _updateQueryDispatchConfigurationCommand;
+        private readonly ITenantApiService _tenantApiService;
 
-        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ICreateQueryDispatchConfigurationCommand createQueryDispatchConfigurationCommand, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IDeleteQueryDispatchConfigurationCommand deleteQueryDispatchConfigurationCommand, IUpdateQueryDispatchConfigurationCommand updateQueryDispatchConfigurationCommand) 
+        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ICreateQueryDispatchConfigurationCommand createQueryDispatchConfigurationCommand, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IDeleteQueryDispatchConfigurationCommand deleteQueryDispatchConfigurationCommand, IUpdateQueryDispatchConfigurationCommand updateQueryDispatchConfigurationCommand, ITenantApiService tenantApiService)
         {
             _logger = logger;
             _configurationFactory = configurationFactory;
@@ -26,6 +27,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             _getQueryDispatchConfigurationQuery = getQueryDispatchConfigurationQuery;
             _deleteQueryDispatchConfigurationCommand = deleteQueryDispatchConfigurationCommand;
             _updateQueryDispatchConfigurationCommand = updateQueryDispatchConfigurationCommand;
+            _tenantApiService = tenantApiService;
         }
 
         //TODO: Daniel - Add authorization policies
@@ -90,11 +92,17 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             try
             {
-                QueryDispatchConfigurationEntity config = _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId, model.DispatchSchedules);
+                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+                    if (!facilityCheckResult)
+                        return BadRequest($"Facility {model.FacilityId} does not exist.");
+
+                var config =
+                    _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId,
+                        model.DispatchSchedules);
 
                 await _createQueryDispatchConfigurationCommand.Execute(config);
 
-                RequestResponse response = new RequestResponse()
+                var response = new RequestResponse
                 {
                     Id = config.Id,
                     Message = "The query dispatch configuration was created successfully."
@@ -171,10 +179,13 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             try
             {
+                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+                if (!facilityCheckResult)
+                    return BadRequest($"Facility {model.FacilityId} does not exist.");
 
                 await _updateQueryDispatchConfigurationCommand.Execute(existingConfig, model.DispatchSchedules);
 
-                RequestResponse response = new RequestResponse()
+                var response = new RequestResponse
                 {
                     Id = existingConfig.Id,
                     Message = "The query dispatch configuration was updated successfully."
