@@ -16,8 +16,8 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
         private AuditEventMessage auditMessage;
         private CreateAuditEventModel createAuditEventModel;
         private CreateAuditEventCommand command;
-        private string createdAuditEventId = string.Empty;
-        private AuditEntity auditEntity;
+        private AuditId createdAuditEventId = AuditId.Empty;
+        private AuditLog auditEntity;
 
         private static readonly string Id = new Guid("aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856").ToString();
         private const string FacilityId = "TestFacility_001";
@@ -42,8 +42,8 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
             createAuditEventModel = new CreateAuditEventModel(); 
 
             //set up audit entity
-            auditEntity = new AuditEntity();
-            auditEntity.Id = Id;
+            auditEntity = new AuditLog();
+            auditEntity.Id = AuditId.NewId();
             auditEntity.FacilityId = FacilityId;
             auditEntity.ServiceName = ServiceName;
             auditEntity.CorrelationId = CorrelationId;
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
                 .Returns(auditEntity);
 
             mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.AddAsync(auditEntity)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.Add(auditEntity)).Returns(Task.FromResult<bool>(true));
 
         }
 
@@ -133,9 +133,9 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
             createAuditEventModel.Notes = auditMessage.Notes;
 
 
-            Task<string> outcome = command.Execute(createAuditEventModel);
+            Task<AuditLog> outcome = command.Execute(createAuditEventModel);
 
-            createdAuditEventId = outcome.Result;
+            createdAuditEventId = outcome.Result.Id;
 
         }
 

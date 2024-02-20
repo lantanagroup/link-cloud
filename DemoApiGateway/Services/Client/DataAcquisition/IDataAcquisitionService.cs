@@ -24,6 +24,10 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client.DataAcquisition
         Task<HttpResponseMessage> CreateDataAcquisitionAuthenticationConfiguration(string facilityId, QueryConfigurationTypePathParameter queryType, AuthenticationConfiguration model);
         Task<HttpResponseMessage> UpdateDataAcquisitionAuthenticationConfiguration(string facilityId, QueryConfigurationTypePathParameter queryType, AuthenticationConfiguration model);
         Task<HttpResponseMessage> DeleteDataAcquisitionAuthenticationConfiguration(string facilityId, QueryConfigurationTypePathParameter queryType);
-            
+
+        Task<HttpResponseMessage> GetDataAcquisitionFhirList(string facilityId);
+        Task<HttpResponseMessage> PostDataAcquisitionFhirList(DataAcquisitionQueryListConfigModel model);
+
+
     }
 }

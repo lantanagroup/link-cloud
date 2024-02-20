@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         /// <returns>The id of the new autid event created</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<string> Execute(CreateAuditEventModel model)
+        public async Task<AuditLog> Execute(CreateAuditEventModel model)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Audit Event Command");
 
@@ -41,12 +41,11 @@ namespace LantanaGroup.Link.Audit.Application.Commands
 
             model.EventDate ??= DateTime.Now;
 
-            AuditEntity auditLog = _factory.Create(model.FacilityId, model.ServiceName, model.CorrelationId, model.EventDate, model.UserId, model.User, model.Action, model.Resource, model.PropertyChanges, model.Notes);
-            if (String.IsNullOrEmpty(auditLog.Id)) { auditLog.Id = Guid.NewGuid().ToString(); } //create new GUID for audit event
-           
+            AuditLog auditLog = _factory.Create(model.FacilityId, model.ServiceName, model.CorrelationId, model.EventDate, model.UserId, model.User, model.Action, model.Resource, model.PropertyChanges, model.Notes);
+                       
             try
             {
-                await _datastore.AddAsync(auditLog);
+                await _datastore.Add(auditLog);
             }
             catch (Exception ex)
             {
@@ -67,7 +66,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
                 new KeyValuePair<string, object?>("action", auditLog.Action),
                 new KeyValuePair<string, object?>("resource", auditLog.Resource)                
             );
-            return auditLog.Id;
+            return auditLog;
 
             
          

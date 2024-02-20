@@ -1,22 +1,23 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
+using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Audit.Infrastructure.Health
 {  
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IAuditRepository _datastore;
+        protected readonly AuditDbContext _dataContext;
 
-        public DatabaseHealthCheck(IAuditRepository datastore)
+        public DatabaseHealthCheck(AuditDbContext dataContext)
         {
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             try 
             {
-                bool outcome = await _datastore.HealthCheck();
+                bool outcome = await _dataContext.Database.CanConnectAsync();
 
                 if (outcome)
                 {

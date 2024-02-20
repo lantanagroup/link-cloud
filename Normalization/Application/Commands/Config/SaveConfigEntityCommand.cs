@@ -20,10 +20,11 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
     private readonly IConfigRepository _configRepo;
     private readonly ITenantApiService _tenantApiService;
 
-    public SaveConfigEntityCommandHandler(ILogger<SaveConfigEntityCommandHandler> logger, IConfigRepository configRepo)
+    public SaveConfigEntityCommandHandler(ILogger<SaveConfigEntityCommandHandler> logger, IConfigRepository configRepo, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configRepo = configRepo ?? throw new ArgumentNullException(nameof(configRepo));
+        _tenantApiService = tenantApiService;
     }
 
     public async Task Handle(SaveConfigEntityCommand request, CancellationToken cancellationToken)
@@ -41,7 +42,7 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
         
         if(!tenantExists)
         {
-            throw new TenantNotFoundException($"{request.FacilityId} not found in Tenant Service.");
+            throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
         }
 
         if(request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
