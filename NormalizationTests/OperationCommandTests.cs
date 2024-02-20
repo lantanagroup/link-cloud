@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Commands;
+using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
@@ -52,7 +53,7 @@ public class OperationCommandTests
             Conditions = new List<ConditionElement>()
         };
 
-        var command = new ConditionalTransformationHandler(logger.Object);
+        var command = new ConditionalTransformationHandler(logger.Object, new ConditionalTransformationEvaluationService());
         var result = await command.Handle(new ConditionalTransformationCommand
         {
             Bundle = bundle,
