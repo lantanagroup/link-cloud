@@ -17,6 +17,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.Normalization.Application.Models.Tenant;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.Configure<TenantServiceConfig>(builder.Configuration.GetRequiredSection(nameof(TenantServiceConfig)));
 
     var tenantApiSettings = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>();
     if(tenantApiSettings != null)
@@ -61,6 +63,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     builder.Services.AddControllers();
+    builder.Services.AddHttpClient();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();

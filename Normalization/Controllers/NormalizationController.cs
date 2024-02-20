@@ -10,6 +10,8 @@ using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using LantanaGroup.Link.Normalization.Application.Models.Tenant;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -20,11 +22,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ILogger<NormalizationController> _logger;
         private readonly IMediator _mediator;
         private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _kafkaProducerFactory;
+        private readonly TenantServiceConfig _tenantServiceConfig;
+        private readonly HttpClient _httpClient;
 
-        public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory, IMediator mediator, ILogger<NormalizationController> logger)
+        public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory,
+            IMediator mediator, IOptions<TenantServiceConfig> tenantServiceConfig,
+            HttpClient httpClient, ILogger<NormalizationController> logger)
         {
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+            _tenantServiceConfig = tenantServiceConfig.Value;
+            _httpClient = httpClient;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -60,6 +68,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
+
+                //#if !DEBUG
+                //Verify that a Tenant/Facility already exists for this FacilityId
+                var requestUrl = _tenantServiceConfig.TenantServiceLookupFacilityUrl + configModel.FacilityId;
+                var response = await _httpClient.GetAsync(requestUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return BadRequest(await response.Content.ReadAsStringAsync());
+                }
+               //#endif
+
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
