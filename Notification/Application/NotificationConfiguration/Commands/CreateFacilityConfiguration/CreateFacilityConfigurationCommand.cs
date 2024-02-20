@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                 {
                     NotificationConfig entity = _notificationConfigurationFactory.NotificationConfigEntityCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
                     
-                    _ = await _datastore.AddAsync(entity);
+                    _ = await _datastore.Add(entity);
 
                     //TODO: Get user info
                     //Create audit event

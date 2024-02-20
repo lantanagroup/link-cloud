@@ -17,7 +17,7 @@
         public string Body { get; set; } = string.Empty;
         public List<string> Recipients { get; set; } = new List<string>();
         public List<string>? Bcc { get; set; }
-        public DateTime? SentOn { get; set; }
+        public List<DateTime> SentOn { get; set; } = new List<DateTime>();
 
     }
 }

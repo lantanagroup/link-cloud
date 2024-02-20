@@ -231,7 +231,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 PagedNotificationModel notificationList = await _getNotificationListQuery.Execute(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, pageSize, pageNumber);
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
 
                 return Ok(notificationList);
 
@@ -331,7 +331,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, pageSize, pageNumber);
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
 
                 return Ok(notificationList);
             }
@@ -384,7 +384,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(configList.Metadata));
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(configList.Metadata));
 
                 return Ok(configList);
 
