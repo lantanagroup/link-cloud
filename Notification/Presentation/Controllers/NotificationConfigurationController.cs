@@ -9,6 +9,7 @@ using System.Text.Json;
 using LantanaGroup.Link.Notification.Presentation.Models;
 using System.Diagnostics;
 using System.Net;
+using LantanaGroup.Link.Notification.Domain.Entities;
 
 namespace LantanaGroup.Link.Notification.Presentation.Controllers
 {
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogNotificationConfigurationsListQuery(searchRecord);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+                PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(configList.Metadata));
@@ -121,10 +122,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<EntityCreatedResponse>> CreateNotificationConfigurationAsync(NotificationConfigurationModel model)
         {
-            //TODO check for authorization
-
             //validate config values
-            if (model == null) { return BadRequest("No notification configuration provided."); }
+            if (model is null) { return BadRequest("No notification configuration provided."); }
 
             if (string.IsNullOrWhiteSpace(model.FacilityId))
             {
@@ -161,12 +160,10 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             try
             {
                 //Create notification configuration
-                CreateFacilityConfigurationModel config = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                string id = await _createFacilityConfigurationCommand.Execute(config);
+                CreateFacilityConfigurationModel createConfigModel = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
+                var config = await _createFacilityConfigurationCommand.Execute(createConfigModel);                
 
-                EntityCreatedResponse response = new EntityCreatedResponse("The notification configuration was created succcessfully.", id);
-
-                return Ok(response);
+                return Ok(config);
             }
             catch (Exception ex)
             {
@@ -198,7 +195,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         {
 
             //validate config values
-            if (model == null) { return BadRequest("No notification configuration provided."); }
+            if (model is null) { return BadRequest("No notification configuration provided."); }
 
             if (string.IsNullOrEmpty(model.Id))
             {
@@ -233,7 +230,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             try
             {
                 //check if the configuration exists
-                bool exists = await _facilityConfigurationExistsQuery.Execute(model.Id);
+                bool exists = await _facilityConfigurationExistsQuery.Execute(NotificationConfigId.FromString(model.Id));
                 if (!exists)
                 {
                     var notFoundMessage = $"No configuration with the id of {model.Id} was found.";
@@ -243,8 +240,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 //Update notification configuration
                 UpdateFacilityConfigurationModel config = _configurationFactory.UpdateFacilityConfigurationModelCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                string id = await _updateFacilityConfigurationCommand.Execute(config);
-                EntityUpdateddResponse response = new EntityUpdateddResponse("The notification configuration was updated succcessfully.", id);
+                bool result = await _updateFacilityConfigurationCommand.Execute(config);
+                var msg = result ? "The notification configuration was updated succcessfully." : "Failed to update the notification configuration, check log for details.";
+                EntityUpdateddResponse response = new EntityUpdateddResponse(msg, model.Id);
 
                 return Ok(response);
             }
@@ -320,9 +318,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(string id)
+        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(Guid id)
         {
-            if (string.IsNullOrEmpty(id))
+            if (id == Guid.Empty)
             {
                 var message = "No configuration id provided while attempting to retrieve a notification configuration.";
                 _logger.LogGetNotificationConfigurationByIdWarning(message);
@@ -335,16 +333,16 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             try
             {
-                NotificationConfigurationModel config = await _getNotificationConfigurationQuery.Execute(id);
+                NotificationConfigurationModel config = await _getNotificationConfigurationQuery.Execute(new NotificationConfigId(id));
 
                 if (config == null) { return NotFound(); }
-                _logger.LogGetNotificationConfigurationById(id);
+                _logger.LogGetNotificationConfigurationById(config.Id);
 
                 return Ok(config);
             }
             catch (Exception ex)
             {
-                _logger.LogGetNotificationConfigurationByIdException(id, ex.Message);
+                _logger.LogGetNotificationConfigurationByIdException(id.ToString(), ex.Message);
                 throw;
             }
 
@@ -367,34 +365,32 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(string id)
+        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(Guid id)
         {
-            //TODO check for authorization
-
-            //add id to current activity
-            var activity = Activity.Current;
-            activity?.AddTag("notification id", id);
-
-            if (string.IsNullOrEmpty(id))
+            if (id == Guid.Empty)
             {
                 var message = "No configuration id provided while attempting to delete a notification configuration.";
                 _logger.LogNotificationConfigurationDeleteWarning(message);
                 return BadRequest(message);
             }
 
+            //add id to current activity
+            var activity = Activity.Current;
+            activity?.AddTag("notification id", id);
+
             try
             {
-                bool result = await _deleteFacilityConfigurationCommand.Execute(id);
+                bool result = await _deleteFacilityConfigurationCommand.Execute(new NotificationConfigId(id));
 
                 EntityDeletedResponse entityDeletedResponse = new EntityDeletedResponse();
-                entityDeletedResponse.Id = id;
+                entityDeletedResponse.Id = id.ToString();
                 entityDeletedResponse.Message = result ? $"Notificatioin configuration {id} was deleted succesfully." : $"Failed to delete notificatioin configuration {id}, check log for details.";
 
                 return Ok(entityDeletedResponse);
             }
             catch (Exception ex)
             {
-                _logger.LogNotificationConfigurationDeleteException(id, ex.Message);
+                _logger.LogNotificationConfigurationDeleteException(id.ToString(), ex.Message);
                 throw;
             }
 

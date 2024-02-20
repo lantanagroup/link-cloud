@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Notification.Persistence.Repositories
 {
@@ -45,9 +46,37 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             return Task.FromResult(config);
         }
 
-        public (IEnumerable<NotificationConfig>, PaginationMetadata) Search(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber)
+        public Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
-            throw new NotImplementedException();
+            IEnumerable<NotificationConfig> configs;
+            var query = _dbContext.NotificationConfigs.AsNoTracking().AsQueryable();
+
+            #region Build Query
+            if (searchText is not null && searchText.Length > 0)
+            {
+                query = query.Where(x =>
+                    (x.FacilityId != null && x.FacilityId.Contains(searchText)) ||
+                    (x.EmailAddresses != null && x.EmailAddresses.Contains(searchText))); //||
+                    //(x.EnabledNotifications != null && x.EnabledNotifications.Any(y => y.NotificationType.Contains(searchText))) ||
+                    //(x.Channels != null && x.Channels.Any(y => y.Name.Contains(searchText))));
+            }
+
+            if (filterFacilityBy is not null && filterFacilityBy.Length > 0)
+            {
+                query = query.Where(x => x.FacilityId == filterFacilityBy);
+            }
+            #endregion
+
+            var count = query.Count();
+            query = _dbContext.SetSortBy(query, sortBy, sortOrder.Equals(SortOrder.Ascending));
+            configs = query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+            return Task.FromResult<(IEnumerable<NotificationConfig>, PaginationMetadata)>((configs, metadata));
         }
 
         public Task<bool> Update(NotificationConfig entity)
