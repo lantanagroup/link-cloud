@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
 
-                //#if !DEBUG
+                #if !DEBUG
                 //Verify that a Tenant/Facility already exists for this FacilityId
                 var requestUrl = _tenantServiceConfig.TenantServiceLookupFacilityUrl + configModel.FacilityId;
                 var response = await _httpClient.GetAsync(requestUrl);
@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return BadRequest(await response.Content.ReadAsStringAsync());
                 }
-               //#endif
+                #endif
 
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
@@ -175,6 +175,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
             try
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
+
+                #if !DEBUG
+                //Verify that a Tenant/Facility already exists for this FacilityId
+                var requestUrl = _tenantServiceConfig.TenantServiceLookupFacilityUrl + configModel.FacilityId;
+                var response = await _httpClient.GetAsync(requestUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return BadRequest(await response.Content.ReadAsStringAsync());
+                }
+                #endif
+
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
