@@ -4,7 +4,6 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using System.Threading;
 
 namespace LantanaGroup.Link.Census.Repositories;
 
@@ -96,15 +95,15 @@ public class CensusPatientListRepository : MongoDbRepository<CensusPatientListEn
 
         if (existingEntity != null)
         {
-            entity.Id = existingEntity.Id;
-            entity.CreatedDate = existingEntity.CreatedDate;
-            await _collection.ReplaceOneAsync(filter, entity);
+            existingEntity.UpdatedDate = entity.UpdatedDate;
+            existingEntity.AdmitDate = entity.AdmitDate;
+            existingEntity.IsDischarged = entity.IsDischarged;
+            existingEntity.DischargeDate = entity.DischargeDate;
+            await _collection.ReplaceOneAsync(filter, existingEntity, cancellationToken: cancellationToken);
         }
         else
         {
-            //entity.Id = Guid.NewGuid().ToString();
-            entity.CreatedDate = DateTime.UtcNow;
-            entity.UpdatedDate = DateTime.UtcNow;
+            entity.CreatedDate = entity.UpdatedDate;
             await AddAsync(entity);
         }
         return entity;
