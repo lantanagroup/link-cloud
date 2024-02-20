@@ -32,6 +32,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.Normalization.Application.Services;
+using LantanaGroup.Link.Normalization.Application.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +54,10 @@ else
 
 builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
+
+var tenantApiSettings = builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>();
+if (tenantApiSettings != null)
+    builder.Services.AddSingleton(tenantApiSettings);
 
 // Add services to the container.
 builder.Services.AddGrpc();
@@ -88,6 +94,9 @@ builder.Services.AddTransient<IUpdateScheduledReportCommand, UpdateScheduledRepo
 builder.Services.AddTransient<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
 builder.Services.AddTransient<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
 builder.Services.AddTransient<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
+
+//Add Services
+builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
 builder.Services.AddHostedService<PatientEventListener>();

@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         private readonly IGetQueryDispatchConfigurationQuery _getQueryDispatchConfigurationQuery;
         private readonly IDeleteQueryDispatchConfigurationCommand _deleteQueryDispatchConfigurationCommand;
         private readonly IUpdateQueryDispatchConfigurationCommand _updateQueryDispatchConfigurationCommand;
+        private 
 
         public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ICreateQueryDispatchConfigurationCommand createQueryDispatchConfigurationCommand, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IDeleteQueryDispatchConfigurationCommand deleteQueryDispatchConfigurationCommand, IUpdateQueryDispatchConfigurationCommand updateQueryDispatchConfigurationCommand) 
         {
