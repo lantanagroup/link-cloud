@@ -11,7 +11,7 @@ namespace NormalizationTests;
 public class CRUDCommandTests
 {
     [Fact]
-    public async Task DeleteConfigCommand_Success() 
+    public async Task DeleteConfigCommand_Success()
     {
         var logger = new Mock<ILogger<DeleteConfigCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
@@ -37,7 +37,7 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task DeleteConfigCommand_NullFacilityId() 
+    public async Task DeleteConfigCommand_NullFacilityId()
     {
         var logger = new Mock<ILogger<DeleteConfigCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
@@ -65,7 +65,7 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task GetConfigurationEntityQuery_Success() 
+    public async Task GetConfigurationEntityQuery_Success()
     {
         var logger = new Mock<ILogger<GetConfigurationEntityQueryHandler>>();
         var configRepo = new Mock<IConfigRepository>();
@@ -91,7 +91,7 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task GetConfigurationEntityQuery_NoConfigExists() 
+    public async Task GetConfigurationEntityQuery_NoConfigExists()
     {
         var logger = new Mock<ILogger<GetConfigurationEntityQueryHandler>>();
         var configRepo = new Mock<IConfigRepository>();
@@ -110,7 +110,7 @@ public class CRUDCommandTests
             var result = await handler.Handle(command, CancellationToken.None);
             Assert.Null(result);
         }
-        catch(NoEntityFoundException)
+        catch (NoEntityFoundException)
         {
             Assert.True(true);
         }
@@ -121,8 +121,8 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task GetConfigurationModelQuery_Success() 
-    { 
+    public async Task GetConfigurationModelQuery_Success()
+    {
         var logger = new Mock<ILogger<GetConfigurationModelQueryHandler>>();
         var configRepo = new Mock<IConfigRepository>();
 
@@ -147,7 +147,7 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task GetConfigurationMoldeQuery_NoConfigExists() 
+    public async Task GetConfigurationMoldeQuery_NoConfigExists()
     {
         var logger = new Mock<ILogger<GetConfigurationModelQueryHandler>>();
         var configRepo = new Mock<IConfigRepository>();
@@ -166,7 +166,7 @@ public class CRUDCommandTests
             var result = await handler.Handle(command, CancellationToken.None);
             Assert.Null(result);
         }
-        catch(NoEntityFoundException)
+        catch (NoEntityFoundException)
         {
             Assert.True(true);
         }
@@ -177,10 +177,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_Update_Success() 
+    public async Task SaveConfigEntityCommand_Update_Success()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new NormalizationConfigEntity());
         configRepo.Setup(x => x.UpdateAsync(It.IsAny<NormalizationConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
@@ -193,13 +194,13 @@ public class CRUDCommandTests
                 FacilityId = "test",
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -213,10 +214,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_Create_Success() 
+    public async Task SaveConfigEntityCommand_Create_Success()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
         configRepo.Setup(x => x.AddAsync(It.IsAny<NormalizationConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -228,13 +230,13 @@ public class CRUDCommandTests
                 FacilityId = "test",
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Create
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -248,10 +250,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_Update_NoFacilityId() 
+    public async Task SaveConfigEntityCommand_Update_NoFacilityId()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -260,13 +263,13 @@ public class CRUDCommandTests
                 FacilityId = "",
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -284,10 +287,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_NullConfigModel() 
+    public async Task SaveConfigEntityCommand_NullConfigModel()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -295,7 +299,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -313,10 +317,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_NullFacilityId() 
+    public async Task SaveConfigEntityCommand_NullFacilityId()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -325,13 +330,13 @@ public class CRUDCommandTests
                 FacilityId = null,
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -349,10 +354,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_NullOperationSequence() 
+    public async Task SaveConfigEntityCommand_NullOperationSequence()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -364,7 +370,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -382,10 +388,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_EmptyOperationSequence() 
+    public async Task SaveConfigEntityCommand_EmptyOperationSequence()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -397,7 +404,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -415,10 +422,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_Create_EntityAlreadyExists() 
+    public async Task SaveConfigEntityCommand_Create_EntityAlreadyExists()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new NormalizationConfigEntity { FacilityId = "test" });
 
@@ -429,13 +437,13 @@ public class CRUDCommandTests
                 FacilityId = "test",
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Create
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
@@ -453,10 +461,11 @@ public class CRUDCommandTests
     }
 
     [Fact]
-    public async Task SaveConfigEntityCommand_Update_NoEntityFound() 
+    public async Task SaveConfigEntityCommand_Update_NoEntityFound()
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
+        var apiService = new Mock<ITenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
 
@@ -468,13 +477,13 @@ public class CRUDCommandTests
                 FacilityId = "test",
                 OperationSequence = new Dictionary<string, INormalizationOperation>
                 {
-                    { "1", new CopyElementOperation{ Name = "copyElement" } }   
+                    { "1", new CopyElementOperation{ Name = "copyElement" } }
                 }
             },
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
 
         try
         {
