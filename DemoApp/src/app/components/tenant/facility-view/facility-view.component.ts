@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, Input, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
@@ -20,7 +20,9 @@ import { CensusConfigFormComponent } from "../../census/census-config-form/censu
 import { LinkAlertComponent } from "../../core/link-alert/link-alert.component";
 import { LinkAlertType } from '../../core/link-alert/link-alert-type.enum';
 import { FormMode } from 'src/app/models/FormMode.enum';
-
+import { ReportConfigFormComponent } from '../../report/report-config-form/report-config-form.component';
+import { ReportService } from '../../../services/gateway/report/report.service';
+import { ReportDashboardComponent } from '../../report/report-dashboard/report-dashboard.component';
 
 @Component({
     selector: 'app-facility-view',
@@ -39,7 +41,9 @@ import { FormMode } from 'src/app/models/FormMode.enum';
         MatTabsModule,
         FacilityConfigFormComponent,
         CensusConfigFormComponent,
-        LinkAlertComponent
+        LinkAlertComponent,
+        ReportConfigFormComponent,
+        ReportDashboardComponent
     ]
 })
 export class FacilityViewComponent implements OnInit {
@@ -54,7 +58,14 @@ export class FacilityViewComponent implements OnInit {
   linkNoConfigAlertType = LinkAlertType.info;
   showNoCensusConfigAlert: boolean = false;
   noCensusConfigAlertMessage = 'No census configuration found for this facility.';
-  
+
+  private _displayReportDashboard: boolean = false;
+
+  @Input() set displayReportDashboard(v: boolean) {
+    if (v !== null)
+      this._displayReportDashboard = v;
+  }
+  get displayReportDashboard() { return this._displayReportDashboard; }
 
   constructor(
     private route: ActivatedRoute, 
@@ -68,7 +79,8 @@ export class FacilityViewComponent implements OnInit {
       this.facilityId = params['id'];
       this.loadFacilityConfig();
     });    
-  }    
+  }
+
 
   showFacilityDialog(): void {
     this.dialog.open(FacilityConfigDialogComponent,
@@ -155,6 +167,9 @@ export class FacilityViewComponent implements OnInit {
       }); 
     }
   }
+
+ 
+
   
 
 }
