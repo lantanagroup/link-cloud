@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, Input} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
@@ -22,10 +22,9 @@ import { LinkAlertComponent } from "../../core/link-alert/link-alert.component";
 import { LinkAlertType } from '../../core/link-alert/link-alert-type.enum';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { DataAcquisitionConfigFormComponent } from '../../data-acquisition/data-acquisition-config-form/data-acquisition-config-form.component';
-import { IDataAcquisitionConfigResourceModel, IDataAcquisitionQueryConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
+import { IDataAcquisitionQueryConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
 import { IDataAcquisitionFhirListConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
-import { IQueryConfigModel, IQueryPlanModel } from '../../../interfaces/data-acquisition/query-plan-model.interface';
-import { DataAcquisitionConfigDialogComponent } from '../../data-acquisition/data-acquisition-config-dialog/data-acquisition-config-dialog.component';
+import { IQueryPlanModel } from '../../../interfaces/data-acquisition/query-plan-model.interface';
 import { DataAcquisitionFhirQueryConfigDialogComponent } from '../../data-acquisition/data-acquisition-fhir-query-config-dialog/data-acquisition-fhir-query-config-dialog.component';
 import { DataAcquisitionFhirQueryConfigFormComponent } from '../../data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
 import { DataAcquisitionFhirListConfigDialogComponent } from '../../data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
@@ -35,7 +34,6 @@ import { DataAcquisitionAuthenticationConfigDialogComponent } from '../../data-a
 import { DataAcquisitionAuthenticationConfigFormComponent } from '../../data-acquisition/data-acquisition-authentication-config-form/data-acquisition-authentication-config-form.component';
 
 import { ReportConfigFormComponent } from '../../report/report-config-form/report-config-form.component';
-import { ReportService } from '../../../services/gateway/report/report.service';
 import { ReportDashboardComponent } from '../../report/report-dashboard/report-dashboard.component';
 
 @Component({
@@ -57,7 +55,7 @@ import { ReportDashboardComponent } from '../../report/report-dashboard/report-d
         CensusConfigFormComponent,
         LinkAlertComponent,
         ReportConfigFormComponent,
-        ReportDashboardComponent
+        ReportDashboardComponent,
         DataAcquisitionConfigFormComponent,
         DataAcquisitionFhirQueryConfigFormComponent,
         DataAcquisitionFhirListConfigFormComponent,
@@ -70,6 +68,8 @@ export class FacilityViewComponent implements OnInit {
 
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
+
+
   facilityConfigFormViewOnly: boolean = true;
   facilityConfigFormIsInvalid: boolean = false;
 
@@ -91,6 +91,7 @@ export class FacilityViewComponent implements OnInit {
   noDataAcqAuthQueryListConfigAlertMessage = 'No FHIR List Authentication configuration found for this facility.';
   showNoDataAcqAuthQueryListConfigAlert: boolean = false;
 
+  _displayReportDashboard: boolean = false;
   @Input() set displayReportDashboard(v: boolean) {
     if (v !== null)
       this._displayReportDashboard = v;
