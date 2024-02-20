@@ -1,22 +1,22 @@
-using LantanaGroup.Link.Normalization.Listeners;
-using Serilog;
-using System.Reflection;
-using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
+using Confluent.Kafka.Extensions.OpenTelemetry;
+using HealthChecks.UI.Client;
 using Hellang.Middleware.ProblemDetails;
+using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-using LantanaGroup.Link.Normalization.Application.Models;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using OpenTelemetry.Metrics;
-using Confluent.Kafka.Extensions.OpenTelemetry;
+using Serilog;
+using Serilog.Enrichers.Span;
+using Serilog.Exceptions;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,7 +46,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var tenantApiSettings = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>();
     if(tenantApiSettings != null)
-        builder.Services.AddSingleton<TenantApiSettings>(tenantApiSettings);
+        builder.Services.AddSingleton(tenantApiSettings);
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
@@ -61,6 +61,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     builder.Services.AddControllers();
+    builder.Services.AddHttpClient();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
