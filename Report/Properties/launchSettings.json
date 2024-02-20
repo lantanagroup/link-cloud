@@ -12,7 +12,7 @@
     "ConsoleApp": {
       "commandName": "Project",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Local"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "http://localhost:5110;https://localhost:7110",
       "dotnetRunMessages": true
