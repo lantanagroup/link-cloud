@@ -2,16 +2,15 @@
 using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Serializers;
+using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using LantanaGroup.Link.Normalization.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -22,16 +21,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ILogger<NormalizationController> _logger;
         private readonly IMediator _mediator;
         private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _kafkaProducerFactory;
-        private readonly TenantServiceConfig _tenantServiceConfig;
+        private readonly TenantApiSettings _tenantApiSettings;
         private readonly HttpClient _httpClient;
 
         public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory,
-            IMediator mediator, IOptions<TenantServiceConfig> tenantServiceConfig,
+            IMediator mediator, IOptions<TenantApiSettings> tenantServiceConfig,
             HttpClient httpClient, ILogger<NormalizationController> logger)
         {
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-            _tenantServiceConfig = tenantServiceConfig.Value;
+            _tenantApiSettings = tenantServiceConfig.Value;
             _httpClient = httpClient;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -69,23 +68,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
 
-                #if !DEBUG
-                //Verify that a Tenant/Facility already exists for this FacilityId
-                var requestUrl = _tenantServiceConfig.TenantServiceLookupFacilityUrl + configModel.FacilityId;
-                var response = await _httpClient.GetAsync(requestUrl);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return BadRequest(await response.Content.ReadAsStringAsync());
-                }
-                #endif
-
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
                     Source = SaveTypeSource.Create
                 });
             }
-            catch(ConfigOperationNullException ex) 
+            catch (TenantNotFoundException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (ConfigOperationNullException ex) 
             {
                 _logger.LogError(ex.Message, ex);
                 return BadRequest(ex.Message);
@@ -176,22 +169,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 configModel = NormalizationConfigModelDeserializer.Deserialize(config);
 
-                #if !DEBUG
-                //Verify that a Tenant/Facility already exists for this FacilityId
-                var requestUrl = _tenantServiceConfig.TenantServiceLookupFacilityUrl + configModel.FacilityId;
-                var response = await _httpClient.GetAsync(requestUrl);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return BadRequest(await response.Content.ReadAsStringAsync());
-                }
-                #endif
-
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
                     Source = SaveTypeSource.Update,
                     FacilityId = facilityId,
                 });
+            }
+            catch (TenantNotFoundException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (ConfigOperationNullException ex)
             {
