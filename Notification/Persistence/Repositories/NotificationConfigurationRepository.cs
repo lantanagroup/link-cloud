@@ -67,8 +67,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             }
             #endregion
 
-            var count = query.Count();
-            query = _dbContext.SetSortBy(query, sortBy, sortOrder.Equals(SortOrder.Ascending));
+            var count = query.Count();        
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationConfig>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationConfig>(sortBy)),
+                _ => query.OrderBy(x => x.CreatedOn)
+            };
+            
             configs = query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
