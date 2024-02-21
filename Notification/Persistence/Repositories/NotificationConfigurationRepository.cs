@@ -97,6 +97,12 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 return null;
             }
 
+            //check if channels were updated
+            //if (originalEntity.Channels.Count != entity.Channels.Count || !originalEntity.Channels.SequenceEqual(entity.Channels))
+            //{
+
+            //}
+
             _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);          
             return Task.FromResult(_dbContext.SaveChanges() > 0);
         }
