@@ -95,10 +95,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 
                     //add id to current activity
                     var currentActivity = Activity.Current;
-                    currentActivity?.AddTag("notification id", entity.Id);
+                    currentActivity?.AddTag("notification.id", entity.Id);
                     if (entity.FacilityId != null)
                     {
-                        currentActivity?.AddTag("facility id", entity.FacilityId);
+                        currentActivity?.AddTag("facility.id", entity.FacilityId);
                     }
                         
 

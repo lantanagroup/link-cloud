@@ -61,8 +61,8 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             await _datastore.SetNotificationSentOn(NotificationId.FromString(model.Id));
 
                             //add id to current activity                            
-                            currentActivity?.AddTag("notification id", model.Id);
-                            currentActivity?.AddTag("facility id", model.FacilityConfig?.FacilityId);
+                            currentActivity?.AddTag("notification.id", model.Id);
+                            currentActivity?.AddTag("facility.id", model.FacilityConfig?.FacilityId);
 
                             //update notification creation metric counter                            
                             _metrics.NotificationSentCounter.Add(1, 

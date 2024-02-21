@@ -43,8 +43,8 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 
                     //add id to current activity
                     var currentActivity = Activity.Current;
-                    currentActivity?.AddTag("notification-id", entity.Id.Value);
-                    currentActivity?.AddTag("facility-id", entity.FacilityId);
+                    currentActivity?.AddTag("notification.id", entity.Id.Value);
+                    currentActivity?.AddTag("facility.id", entity.FacilityId);
 
                     //Log creation of new notification configuration                       
                     _logger.LogNotificationConfigurationCreation(entity.Id.Value.ToString(), model.FacilityId, model);
