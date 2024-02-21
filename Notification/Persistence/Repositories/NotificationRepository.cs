@@ -33,7 +33,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             IEnumerable<NotificationEntity> notifications;
             var query = _dbContext.Notifications.AsNoTracking().Where(x => x.FacilityId == facilityId).AsQueryable();
             var count = query.Count();
-            query = _dbContext.SetSortBy(query, sortBy, sortOrder.Equals(SortOrder.Ascending));
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                _ => query.OrderBy(x => x.CreatedOn)
+            };
+
             notifications = query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -92,7 +99,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             #endregion
 
             var count = query.Count();
-            query = _dbContext.SetSortBy(query, sortBy, sortOrder.Equals(SortOrder.Ascending));
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                _ => query.OrderBy(x => x.CreatedOn)
+            };
+
             notifications = query                
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
