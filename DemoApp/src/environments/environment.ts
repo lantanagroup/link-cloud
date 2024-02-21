@@ -5,8 +5,6 @@
 export const environment = {
   production: false,
   baseApiUrl: "http://localhost:7777",
-  //idpIssuer: "https://oauth.nhsnlink.org/auth/realms/NHSNLink",
-  //idpClientId: 'link-botw',
   idpIssuer : "",
   idpClientId: '',
   idpClientSecret: '',
