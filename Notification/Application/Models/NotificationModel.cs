@@ -2,7 +2,7 @@
 {
     public class NotificationModel
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Id { get; set; } = null!;
         public string NotificationType { get; set; } = string.Empty;
         public string? FacilityId { get; set; }
         public string? CorrelationId { get; set; }

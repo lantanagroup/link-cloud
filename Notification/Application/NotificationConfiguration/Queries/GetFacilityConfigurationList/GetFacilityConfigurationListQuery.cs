@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries
 {
@@ -24,8 +23,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             try
             {
                 var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber);
-
-                //convert AuditEntity to AuditModel
+               
                 List<NotificationConfigurationModel> configs = result.Select(x => new NotificationConfigurationModel
                 {
                     Id = x.Id.Value.ToString(),
