@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Notification.Persistence
             return base.SaveChanges();
         }
 
-        public IQueryable<T> SetSortBy<T>(IQueryable<T> query, string sortBy, bool ascending = true)
+        public IQueryable<T> SetSortBy<T>(IQueryable<T> query, string? sortBy, bool ascending = true)
         {
             if (string.IsNullOrEmpty(sortBy))
             {

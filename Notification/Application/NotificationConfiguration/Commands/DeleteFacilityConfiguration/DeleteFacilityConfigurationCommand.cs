@@ -67,9 +67,9 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                     return result;
                 }                
             }
-            catch (NullReferenceException ex)
+            catch (NullReferenceException)
             {                
-                Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to delete notificaiton configuration {id.Value}");
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
             
