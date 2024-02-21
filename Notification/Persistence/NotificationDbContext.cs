@@ -5,7 +5,9 @@ using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Linq.Expressions;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Notification.Persistence
 {
@@ -30,6 +32,11 @@ namespace LantanaGroup.Link.Notification.Persistence
         public override int SaveChanges()
         {
             PreSaveData();
+            var messages = GetAuditMessages();
+            foreach(var message in messages)
+            {
+                _ = Task.Run(() => _createAuditEventCommand.Execute(message.FacilityId, message));
+            }          
             return base.SaveChanges();
         }
 
@@ -56,75 +63,143 @@ namespace LantanaGroup.Link.Notification.Persistence
         /// </summary>
         protected void PreSaveData()
         {
-            //_logger.LogInformation($"PreSaveData: {ChangeTracker.Entries().Count()}");
-
             foreach (var changed in ChangeTracker.Entries())
-            {                           
+            {
 
                 if (changed.Entity is IBaseEntity entity)
                 {
-                    AuditEventMessage msg = new AuditEventMessage()
-                    {
-                        ServiceName = NotificationConstants.ServiceName
-                    };
-
-                    switch(changed.State)
+                    switch (changed.State)
                     {
                         // Entity modified -- set LastModifiedOn and ensure original CreatedOn is retained
                         case EntityState.Modified:
-                            msg.Action = AuditEventType.Update;
                             entity.CreatedOn = changed.OriginalValues.GetValue<DateTime>(nameof(entity.CreatedOn));
                             entity.LastModifiedOn = DateTime.UtcNow;
-                            msg.EventDate = entity.LastModifiedOn;
-
-                            // Collect property changes
-                            msg.PropertyChanges = new List<PropertyChangeModel>();
-                            foreach (var prop in changed.OriginalValues.Properties)
-                            {
-                                var original = changed.OriginalValues[prop];
-                                var current = changed.CurrentValues[prop];
-                                if (!Equals(original, current))
-                                {
-                                    msg.PropertyChanges.Add(new PropertyChangeModel()
-                                    {
-                                        PropertyName = prop.Name,
-                                        InitialPropertyValue = original?.ToString(),
-                                        NewPropertyValue = current?.ToString()
-                                    });
-                                }
-                            }                         
                             break;
                         // Entity created -- set CreatedOn
                         case EntityState.Added:
-                            msg.Action = AuditEventType.Create;
                             entity.CreatedOn = DateTime.UtcNow;
-                            msg.EventDate = entity.CreatedOn;
-                            break;
-                        case EntityState.Deleted:
-                            msg.Action = AuditEventType.Delete;
-                            msg.EventDate = DateTime.UtcNow;
-                            // Do nothing
                             break;
                     }
+                }
+            }
+        }
 
-                    //Geneate notes and create audit event
-                    switch(changed.Metadata.Name)
+        protected List<AuditEventMessage> GetAuditMessages()
+        {
+            List<AuditEventMessage> changes = new List<AuditEventMessage>();
+
+            EntityState[] states = { EntityState.Added, EntityState.Modified, EntityState.Deleted };
+
+
+            foreach (var changed in ChangeTracker.Entries())
+            {
+
+                if (!states.Contains(changed.State))
+                    continue;
+
+                AuditEventType eventType;               
+                string entityType = GetEntityTypeName(changed);
+
+                switch (changed.State)
+                {
+                    case EntityState.Modified:
+                        eventType = AuditEventType.Update;                       
+                        break;
+                    case EntityState.Deleted:
+                        eventType = AuditEventType.Delete;                     
+                        break;
+                    case EntityState.Added:
+                    default:
+                        eventType = AuditEventType.Create;                       
+                        break;
+                }
+
+
+                AuditEventMessage msg = new AuditEventMessage()
+                {
+                    ServiceName = NotificationConstants.ServiceName,
+                    EventDate = DateTime.UtcNow,
+                    //UserId
+                    //User
+                    Action = eventType,
+                    Resource = entityType
+                };
+
+
+                // process individual property changes if this is an update
+                if (eventType == AuditEventType.Update)
+                {
+                    msg.PropertyChanges = new List<PropertyChangeModel>();
+
+                    foreach (var prop in changed.Properties)
+                    {
+                        if (prop.Metadata.Name == "LastModifiedOn")
+                            break;
+
+                        var oldVal = JsonSerializer.Serialize(prop.OriginalValue);
+                        var newVal = JsonSerializer.Serialize(prop.CurrentValue);
+                        if (oldVal == newVal)
+                            continue;
+                        //_logger.LogInformation($"Changed prop {prop.Metadata.Name} -- {oldVal} -> {newVal}");                        
+
+                        msg.PropertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = prop.Metadata.Name,
+                            InitialPropertyValue = oldVal,
+                            NewPropertyValue = newVal
+                        });
+                    }
+                }
+               
+                if (changed.Entity is IBaseEntity entity)
+                {
+                    //Geneate notes 
+                    switch (changed.Metadata.ClrType.Name)
                     {
                         case nameof(NotificationEntity):
-                            var notification = (NotificationEntity)entity;
-                            msg.Resource = nameof(NotificationEntity);
+                            var notification = (NotificationEntity)entity;                            
+                            msg.FacilityId = notification.FacilityId;
                             msg.Notes = $"Notification {notification.Id.Value} was {msg.Action?.ToString().ToLower()}d.";
-                            _ = Task.Run(() => _createAuditEventCommand.Execute(notification.FacilityId, msg));
+                            //_ = Task.Run(() => _createAuditEventCommand.Execute(notification.FacilityId, msg));
                             break;
                         case nameof(NotificationConfig):
-                            var config = (NotificationConfig)entity;
-                            msg.Resource = nameof(NotificationConfig);
+                            var config = (NotificationConfig)entity;                           
+                            msg.FacilityId = config.FacilityId;
                             msg.Notes = $"Notification Configuration {config.Id.Value} {msg.Action?.ToString().ToLower()}d.";
-                            _ = Task.Run(() => _createAuditEventCommand.Execute(config.FacilityId, msg));
+                            //_ = Task.Run(() => _createAuditEventCommand.Execute(config.FacilityId, msg));
                             break;
-                    }                    
-                }                
+                    }
+                }
+                // unhandled type that will not produce an audit message
+                else
+                {
+                    continue;
+                }
+
+                // done setting up this message
+                changes.Add(msg);
             }
+
+            return changes;
+        }
+
+        protected string GetEntityTypeName(EntityEntry entityEntry)
+        {
+            // regular defined entity types
+            if (entityEntry.Entity is IBaseEntity entity)
+            {
+                switch (entity.GetType().Name)
+                {
+                    case nameof(NotificationEntity):
+                        return "Notification";
+                    case nameof(NotificationConfig):
+                        return "NotificationConfig";                
+                    default:
+                        return entity.GetType().Name;
+                }
+            }           
+
+            return entityEntry.Entity.GetType().Name;
         }
     }
 }
