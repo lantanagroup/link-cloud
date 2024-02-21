@@ -22,9 +22,11 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             return Task.FromResult(_dbContext.SaveChanges() > 0);
         }
 
-        public Task<NotificationEntity?> Get(NotificationId id)
+        public Task<NotificationEntity?> Get(NotificationId id, bool noTracking = false)
         {
-            var notification = _dbContext.Notifications.Find(id);
+            var notification = noTracking ? 
+                _dbContext.Notifications.AsNoTracking().FirstOrDefault(x => x.Id == id) :
+                _dbContext.Notifications.Find(id);
             return Task.FromResult(notification);
         }
 
@@ -131,7 +133,13 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
         public Task<bool> Update(NotificationEntity entity)
         {
-            _dbContext.Notifications.Update(entity);
+            var originalEntity = Get(entity.Id).Result;
+            if (originalEntity == null)
+            {
+                return null;
+            }
+
+            _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);
             return Task.FromResult(_dbContext.SaveChanges() > 0);
         }        
     }

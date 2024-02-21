@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 
             try 
             {
-                bool exists = await _datastore.Get(id) is not null;
+                bool exists = await _datastore.Exists(id);
                 return exists;
             }
             catch(ArgumentNullException)

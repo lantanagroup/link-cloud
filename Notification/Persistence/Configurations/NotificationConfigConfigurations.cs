@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Configurations
             });
 
             builder.OwnsMany(b => b.Channels, navBuilder =>
-            {
+            {                
                 navBuilder.ToJson();
             });
 

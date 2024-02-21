@@ -59,15 +59,16 @@ namespace LantanaGroup.Link.Notification.Persistence
             //_logger.LogInformation($"PreSaveData: {ChangeTracker.Entries().Count()}");
 
             foreach (var changed in ChangeTracker.Entries())
-            {
-                AuditEventMessage msg = new AuditEventMessage()
-                {
-                    ServiceName = NotificationConstants.ServiceName                   
-                };             
+            {                           
 
                 if (changed.Entity is IBaseEntity entity)
                 {
-                    switch (changed.State)
+                    AuditEventMessage msg = new AuditEventMessage()
+                    {
+                        ServiceName = NotificationConstants.ServiceName
+                    };
+
+                    switch(changed.State)
                     {
                         // Entity modified -- set LastModifiedOn and ensure original CreatedOn is retained
                         case EntityState.Modified:
@@ -91,8 +92,7 @@ namespace LantanaGroup.Link.Notification.Persistence
                                         NewPropertyValue = current?.ToString()
                                     });
                                 }
-                            }                          
-
+                            }                         
                             break;
                         // Entity created -- set CreatedOn
                         case EntityState.Added:

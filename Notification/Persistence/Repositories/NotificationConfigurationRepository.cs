@@ -34,15 +34,19 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             return Task.FromResult(_dbContext.SaveChanges() > 0);            
         }
 
-        public Task<NotificationConfig?> Get(NotificationConfigId id)
+        public Task<NotificationConfig?> Get(NotificationConfigId id, bool noTracking = false)
         {
-            var config = _dbContext.NotificationConfigs.Find(id);
+            var config = noTracking ? 
+                _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(x => x.Id == id) : 
+                _dbContext.NotificationConfigs.Find(id);
             return Task.FromResult(config);
         }
 
-        public Task<NotificationConfig?> GetFacilityNotificationConfig(string facilityId)
+        public Task<NotificationConfig?> GetFacilityNotificationConfig(string facilityId, bool noTracking = false)
         {
-            var config = _dbContext.NotificationConfigs.FirstOrDefault(x => x.FacilityId == facilityId);
+            var config = noTracking ? 
+                _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(x => x.FacilityId == facilityId) :
+                _dbContext.NotificationConfigs.FirstOrDefault(x => x.FacilityId == facilityId);
             return Task.FromResult(config);
         }
 
@@ -87,8 +91,21 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
         public Task<bool> Update(NotificationConfig entity)
         {
-            _dbContext.NotificationConfigs.Update(entity);
+            var originalEntity = Get(entity.Id).Result;
+            if (originalEntity == null)
+            {
+                return null;
+            }
+
+            _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);          
             return Task.FromResult(_dbContext.SaveChanges() > 0);
+        }
+        public Task<bool> Exists(NotificationConfigId id)
+        {
+            var res = _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(a => a.Id == id);
+            if (res != null)
+                return Task.FromResult<bool>(true);
+            return Task.FromResult<bool>(false);
         }
     }
 }
