@@ -95,7 +95,15 @@ public class CensusListener : BackgroundService
                     deserializedMessage = message;
                     messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
 
-                    if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
+
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
+                        {
+                            throw new MissingFacilityIdException("No Facility ID provided. Unable to process message.");
+                        }
+                    }
+                    catch (MissingFacilityIdException ex)
                     {
                         _nonTransientExceptionHandler.HandleException(rawmessage, ex);
                         var errorMessage = $"No Facility ID provided. Unable to process message: {message}";

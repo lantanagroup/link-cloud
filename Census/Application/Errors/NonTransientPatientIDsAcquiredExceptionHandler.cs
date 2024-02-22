@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Application.Errors;
 
@@ -42,7 +43,23 @@ public class NonTransientPatientIDsAcquiredExceptionHandler<K, V> : INonTransien
 
     public void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
     {
-        throw new NotImplementedException();
+        _logger.LogError($"Failed to process Patient Event.", ex);
+
+        var auditValue = new AuditEventMessage
+        {
+            FacilityId = consumeResult.Message.Key as string,
+            Action = AuditEventType.Query,
+            ServiceName = CensusConstants.ServiceName,
+            EventDate = DateTime.UtcNow,
+            Notes = $"Patient IDs Acquired processing failure \nException Message: {ex}",
+        };
+
+        ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+
+        var key = consumeResult.Message.Key as string;
+        var value = JsonSerializer.Serialize<string>(consumeResult.Message.Value as string);
+
+        ProduceDeadLetter(key, value, consumeResult.Message.Headers, ex.Message);
     }
 
     private void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
