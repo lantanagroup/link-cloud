@@ -88,7 +88,8 @@ namespace LantanaGroup.Link.Notification.Persistence
         {
             List<AuditEventMessage> changes = new List<AuditEventMessage>();
 
-            EntityState[] states = { EntityState.Added, EntityState.Modified, EntityState.Deleted };
+            // only interested in modified entities for change tracking
+            EntityState[] states = { EntityState.Modified };
 
 
             foreach (var changed in ChangeTracker.Entries())
