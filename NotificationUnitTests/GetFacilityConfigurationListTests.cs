@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using Moq.AutoMock;
 using Moq;
-using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 
 namespace LantanaGroup.Link.NotificationUnitTests
 {
@@ -43,7 +42,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             //NotificationConfig entity
             _config = new NotificationConfig
             {
-                Id = id,
+                Id = NotificationConfigId.FromString(id),
                 FacilityId = facilityId,
                 EmailAddresses = new List<string>(),
                 EnabledNotifications = new List<EnabledNotification>(),
@@ -71,16 +70,16 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
             var output = (configs: _configs, metaData: _pagedMetaData);
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.FindAsync(searchText, filterFacilityBy, sortBy, pageSize, pageNumber))
+                .Setup(p => p.Search(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber))
                 .ReturnsAsync(output);
         }
 
         [Test]
         public void TestExecuteShouldReturnAllMatchingConfigurations()
         {
-            Task<PagedNotificationConfigurationModel> _config = _query.Execute(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
+            Task<PagedNotificationConfigurationModel> _config = _query.Execute(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.FindAsync(searchText, filterFacilityBy, sortBy, pageSize, pageNumber), Times.Once());
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Search(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
 
         }
     }

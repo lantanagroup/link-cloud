@@ -3,7 +3,6 @@ using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
-using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 using Moq;
 using Moq.AutoMock;
 using Task = System.Threading.Tasks.Task;
@@ -47,7 +46,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             //NotificationConfig entity
             _entity = new NotificationConfig
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = NotificationConfigId.NewId(),
                 FacilityId = facilityId,
                 EmailAddresses = new List<string>(),
                 EnabledNotifications = new List<EnabledNotification>(),
@@ -74,10 +73,10 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _command = _mocker.CreateInstance<CreateFacilityConfigurationCommand>();
 
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.AddAsync(_entity)).Returns(Task.FromResult<bool>(true));          
+                .Setup(p => p.Add(_entity)).Returns(Task.FromResult<bool>(true));          
             
             _mocker.GetMock<IKafkaProducerFactory>()
-                .Setup(p => p.CreateAuditEventProducer())
+                .Setup(p => p.CreateAuditEventProducer(false))
                 .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
         }
@@ -85,9 +84,9 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldAddNotificationConfigurationToTheDatabase()
         {
-            Task<string> _createdConfigId = _command.Execute(_model);
+            Task<NotificationConfigurationModel> _createdConfigId = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.AddAsync(_entity), Times.Once());
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Add(_entity), Times.Once());
 
             Assert.That(_createdConfigId.Result, Is.Not.Empty);
 

@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
             _entity = new NotificationEntity
             {
-                Id = id,
+                Id = NotificationId.FromString(id),
                 NotificationType = notificaitonType,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
@@ -80,16 +80,16 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _query = _mocker.CreateInstance<GetNotificationQuery>();            
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.GetAsync(id))
+                .Setup(p => p.Get(NotificationId.FromString(id), true))
                 .ReturnsAsync(_entity);
         }
 
         [Test]
         public void TestExecuteShouldReturnANotificationWithIdFromTheDatabase()
         {
-            Task<NotificationModel> results = _query.Execute(id);
+            Task<NotificationModel> results = _query.Execute(NotificationId.FromString(id));
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.GetAsync(id), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.Get(NotificationId.FromString(id), true), Times.Once());
 
         }
     }
