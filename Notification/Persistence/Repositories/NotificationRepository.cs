@@ -65,7 +65,8 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                     (x.FacilityId != null && x.FacilityId.Contains(searchText)) ||
                     (x.NotificationType != null && x.NotificationType.Contains(searchText)) ||
                     (x.Subject != null && x.Subject.Contains(searchText)) ||
-                    (x.Body != null && x.Body.Contains(searchText)));                                                                                                                           
+                    (x.Body != null && x.Body.Contains(searchText)) ||
+                    (x.Recipients != null && x.Recipients.Contains(searchText)));                                                                                                                          
             }
 
             if (!string.IsNullOrEmpty(filterFacilityBy))

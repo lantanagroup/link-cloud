@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))
                         {
                             //create scope to get repository independant of current scope
-                            //this is to avoid issues with async operations in the current scope
+                            //this allows this command to be run asynchonously regardless of the scope that called it
                             using (var scope = _scopeFactory.CreateScope())
                             {
                                 var _datastore = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
