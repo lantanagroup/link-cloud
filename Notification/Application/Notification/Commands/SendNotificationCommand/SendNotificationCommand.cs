@@ -12,18 +12,18 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
     public class SendNotificationCommand : ISendNotificationCommand
     {
         private readonly ILogger<SendNotificationCommand> _logger;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IOptions<Channels> _channels;
         private readonly IEmailService _emailService;
-        private readonly INotificationRepository _datastore;
         private readonly NotificationServiceMetrics _metrics;
 
-        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, INotificationRepository datastore, NotificationServiceMetrics metrics)
+        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, NotificationServiceMetrics metrics, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
             _channels = channels ?? throw new ArgumentNullException(nameof(channels));
-            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));            
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
         }
 
         public async Task<bool> Execute(SendNotificationModel model)
@@ -58,7 +58,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))
                         {
-                            await _datastore.SetNotificationSentOn(NotificationId.FromString(model.Id));
+                            //create scope to get repository independant of current scope
+                            //this is to avoid issues with async operations in the current scope
+                            using (var scope = _scopeFactory.CreateScope())
+                            {
+                                var _datastore = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
+                                await _datastore.SetNotificationSentOn(NotificationId.FromString(model.Id));
+                            }                                
 
                             //add id to current activity                            
                             currentActivity?.AddTag("notification.id", model.Id);
