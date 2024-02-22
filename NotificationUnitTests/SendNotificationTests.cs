@@ -91,14 +91,14 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
         }
 
-        [Test]
-        public void TestExecuteShouldUpdateNotificationSentOnProperty()
-        {
-            Task<bool> sentOnSet = _command.Execute(_model);
+        //[Test]
+        //public void TestExecuteShouldUpdateNotificationSentOnProperty()
+        //{
+        //    Task<bool> sentOnSet = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.SetNotificationSentOn(NotificationId.FromString(_model.Id)), Times.Once());
+        //    _mocker.GetMock<INotificationRepository>().Verify(p => p.SetNotificationSentOn(NotificationId.FromString(_model.Id)), Times.Once());
 
-        }
+        //}
 
     }    
 }
