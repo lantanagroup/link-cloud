@@ -2,8 +2,8 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
 WORKDIR /app
-EXPOSE 80
-EXPOSE 443
+#EXPOSE 80
+#EXPOSE 443
 ENV \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     LC_ALL=en_US.UTF-8 \
@@ -20,8 +20,8 @@ RUN dotnet restore "Audit/Audit.csproj" --configfile "Audit/nuget.config"
 COPY . .
 WORKDIR "/src/Audit"
 RUN dotnet build "Audit.csproj" -c Release -o /app/build
-ENV \
-    ASPNETCORE_HTTP_PORTS=80
+#ENV \
+#    ASPNETCORE_HTTP_PORTS=80
 
 FROM build AS publish
 RUN dotnet publish "Audit.csproj" -c Release -o /app/publish /p:UseAppHost=false
