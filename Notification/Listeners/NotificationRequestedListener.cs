@@ -72,7 +72,8 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     List<string> bccs = new List<string>();
 
                                     //create scoped create audit event command
-                                    //deals with issue of non-singleton services being used within singleton hosted service
+                                    //deals with issue of scoped services being used within singleton hosted service
+                                    //that does not have any context of the scoped repository/dbContext used within the commands
                                     using (var scope = _scopeFactory.CreateScope())
                                     {
                                         var _validateEmailAddressCommand = scope.ServiceProvider.GetRequiredService<IValidateEmailAddressCommand>();
