@@ -3,7 +3,6 @@ using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
-using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 using Moq;
 using Moq.AutoMock;
 
@@ -48,7 +47,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             //NotificationConfig entity
             _config = new NotificationConfig
             {
-                Id = id,
+                Id = NotificationConfigId.FromString(id),
                 FacilityId = facilityId,
                 EmailAddresses = new List<string>(),
                 EnabledNotifications = new List<EnabledNotification>(),
@@ -76,10 +75,10 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _command = _mocker.CreateInstance<UpdateFacilityConfigurationCommand>();
 
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.UpdateAsync(_config)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.Update(_config)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory>()
-                .Setup(p => p.CreateAuditEventProducer())
+                .Setup(p => p.CreateAuditEventProducer(false))
                 .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
         }
@@ -87,9 +86,9 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldUpdateExistingNotificationConfigurationInTheDatabase()
         {
-            Task<string> _createdConfigId = _command.Execute(_model);
+            Task<bool> _createdConfigId = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.UpdateAsync(_config), Times.Once());
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Update(_config), Times.Once());
 
             Assert.That(_createdConfigId.Result, Is.Not.Empty);            
 

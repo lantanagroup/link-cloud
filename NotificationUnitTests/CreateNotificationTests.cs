@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             //Notification entity
             _entity = new NotificationEntity
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = NotificationId.NewId(),
                 NotificationType = notificaitonType,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
@@ -115,10 +115,10 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 .Returns(Task.FromResult< NotificationConfigurationModel>(_config));
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.AddAsync(_entity)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.Add(_entity)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory>()
-                .Setup(p => p.CreateAuditEventProducer())
+                .Setup(p => p.CreateAuditEventProducer(false))
                 .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
         }
@@ -128,7 +128,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<string> _createdNotificationId = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.AddAsync(_entity), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.Add(_entity), Times.Once());
 
             Assert.That(_createdNotificationId.Result, Is.Not.Empty);
         }

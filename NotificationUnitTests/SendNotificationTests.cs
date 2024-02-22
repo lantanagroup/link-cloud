@@ -3,6 +3,7 @@ using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Domain.Entities;
 using Microsoft.Extensions.Options;
 using Moq;
 using Moq.AutoMock;
@@ -77,7 +78,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 .Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.SetNotificationSentOn(_model.Id)).Returns(Task.FromResult<bool>(true));           
+                .Setup(p => p.SetNotificationSentOn(NotificationId.FromString(_model.Id))).Returns(Task.FromResult<bool>(true));           
 
         }
 
@@ -95,7 +96,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<bool> sentOnSet = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.SetNotificationSentOn(_model.Id), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.SetNotificationSentOn(NotificationId.FromString(_model.Id)), Times.Once());
 
         }
 

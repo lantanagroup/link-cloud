@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
-using LantanaGroup.Link.Notification.Domain.Entities.NotificationConfig;
 using Moq;
 using Moq.AutoMock;
 
@@ -48,7 +47,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             //NotificationConfig entity
             _config = new NotificationConfig
             {
-                Id = id,
+                Id = NotificationConfigId.FromString(id),
                 FacilityId = facilityId,
                 EmailAddresses = new List<string>(),
                 EnabledNotifications = new List<EnabledNotification>(),
@@ -66,7 +65,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _query = _mocker.CreateInstance<GetFacilityConfigurationQuery>();
 
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.GetNotificationConfigByFacilityAsync(facilityId)).Returns(Task.FromResult<NotificationConfig>(_config));
+                .Setup(p => p.GetFacilityNotificationConfig(facilityId, true)).Returns(Task.FromResult<NotificationConfig?>(_config));
 
         }
 
@@ -75,7 +74,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<NotificationConfigurationModel> _config = _query.Execute(facilityId);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.GetNotificationConfigByFacilityAsync(facilityId), Times.Once());            
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.GetFacilityNotificationConfig(facilityId, true), Times.Once());            
 
         }
 
