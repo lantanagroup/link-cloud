@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
             #endregion
 
-            _mocker = new AutoMocker();
+            _mocker = new AutoMocker();            
 
             _query = _mocker.CreateInstance<GetFacilityNotificationsQuery>();
 
@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldReturnAllMatchingFacilityNotificationsFromTheDatabase()
         {
-            Task<PagedNotificationModel> results = _query.Execute(filterFacilityBy,sortBy, SortOrder.Ascending, pageSize, pageNumber);
+            Task<PagedNotificationModel> results = _query.Execute(filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber);
 
             _mocker.GetMock<INotificationRepository>().Verify(p => p.Search(searchText, filterFacilityBy, filterNontificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
 

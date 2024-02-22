@@ -88,9 +88,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<bool> _createdConfigId = _command.Execute(_model);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Update(_config), Times.Once());
-
-            Assert.That(_createdConfigId.Result, Is.Not.Empty);            
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Update(_config), Times.Once());                        
 
         }
 

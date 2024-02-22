@@ -4,8 +4,11 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.AutoMock;
+using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.NotificationUnitTests
 {
@@ -17,6 +20,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         private CreateNotificationModel _model;
         private NotificationEntity _entity;
         private NotificationConfigurationModel _config;
+        private NotificationServiceMetrics _meter;
 
         //private static readonly string id = "A0BB04F0-3418-4052-B1FA-22828DE7C5F8";
         private const string notificaitonType = "MeasureEvaluationFailed";
@@ -108,7 +112,8 @@ namespace LantanaGroup.Link.NotificationUnitTests
                     ))
                 .Returns(_entity);
 
-            _command = _mocker.CreateInstance<CreateNotificationCommand>();
+            //create mock for the CreateNotificationCommand
+            _command = _mocker.CreateInstance<CreateNotificationCommand>();            
 
             _mocker.GetMock<IGetFacilityConfigurationQuery>()
                 .Setup(p => p.Execute(facilityId))

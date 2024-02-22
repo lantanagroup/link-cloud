@@ -14,7 +14,8 @@ namespace LantanaGroup.Link.NotificationUnitTests
     {
         private AutoMocker _mocker;
         private CreateFacilityConfigurationCommand _command;
-        private CreateFacilityConfigurationModel _model;
+        private CreateFacilityConfigurationModel _createModel;
+        private NotificationConfigurationModel _model;
         private NotificationConfig _entity;
 
         private const string facilityId = "TestFacility_001";
@@ -32,7 +33,18 @@ namespace LantanaGroup.Link.NotificationUnitTests
             channels.Add(new FacilityChannel() { Name = ChannelType.Email.ToString(), Enabled = true });
 
             //CreateFacilityConfigurationModel
-            _model = new CreateFacilityConfigurationModel()
+            _createModel = new CreateFacilityConfigurationModel()
+            {
+                FacilityId = facilityId,
+                EmailAddresses = new List<string>(),
+                EnabledNotifications = new List<EnabledNotification>(),
+                Channels = new List<FacilityChannel>()
+            };
+            _createModel.EmailAddresses.AddRange(emailAddresses);
+            _createModel.EnabledNotifications.AddRange(enabledNotifications);
+            _createModel.Channels.AddRange(channels);
+
+            _model = new NotificationConfigurationModel()
             {
                 FacilityId = facilityId,
                 EmailAddresses = new List<string>(),
@@ -70,6 +82,16 @@ namespace LantanaGroup.Link.NotificationUnitTests
                     ))
                 .Returns(_entity);
 
+            _mocker.GetMock<INotificationConfigurationFactory>()
+                 .Setup(p => p.NotificationConfigurationModelCreate(
+                     _entity.Id,
+                     facilityId,
+                     emailAddresses,
+                     enabledNotifications,
+                     channels
+                     ))
+                 .Returns(_model);
+
             _command = _mocker.CreateInstance<CreateFacilityConfigurationCommand>();
 
             _mocker.GetMock<INotificationConfigurationRepository>()
@@ -84,11 +106,11 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldAddNotificationConfigurationToTheDatabase()
         {
-            Task<NotificationConfigurationModel> _createdConfigId = _command.Execute(_model);
+            Task<NotificationConfigurationModel> _createdConfig = _command.Execute(_createModel);
 
             _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Add(_entity), Times.Once());
 
-            Assert.That(_createdConfigId.Result, Is.Not.Empty);
+            Assert.That(_createdConfig.Result, Is.Not.Null);
 
         }
 
