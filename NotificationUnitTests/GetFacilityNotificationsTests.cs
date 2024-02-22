@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             var output = (records: _entities, metaData: _pagedMetaData);
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.Search(searchText, filterFacilityBy, filterNontificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, SortOrder.Ascending, pageSize, pageNumber))
+                .Setup(p => p.GetFacilityNotifications(facilityId, sortBy, SortOrder.Ascending, pageSize, pageNumber))
                 .ReturnsAsync(output);
         }
 
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<PagedNotificationModel> results = _query.Execute(filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.Search(searchText, filterFacilityBy, filterNontificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.GetFacilityNotifications(facilityId, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
 
         }    
 

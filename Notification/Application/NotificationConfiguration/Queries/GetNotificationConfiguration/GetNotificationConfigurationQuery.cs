@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
         {     
             try
             {
-                var config = await _datastore.Get(id);
+                var config = await _datastore.Get(id, true);
 
                 if (config is null)
                 {
