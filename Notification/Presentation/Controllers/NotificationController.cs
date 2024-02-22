@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             _getNotificationQuery = getNotificationQuery ?? throw new ArgumentNullException(nameof(getNotificationQuery));
             _getFacilityNotificatonsQuery = getFacilityNotificatonsQuery ?? throw new ArgumentNullException(nameof(getFacilityNotificatonsQuery));
             _getNotificationListQuery = getNotificationListQuery ?? throw new ArgumentNullException(nameof(getNotificationListQuery));
-        }  
+        }
 
         /// <summary>
         /// Returns a list of notifications based on filters provided.
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="sentOnStart"></param>
         /// <param name="sentOnEnd"></param>
         /// <param name="sortBy"></param>
-        /// <param name="sortOrder"></param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="sortBy"></param>
-        /// <param name="sortOrder"></param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
