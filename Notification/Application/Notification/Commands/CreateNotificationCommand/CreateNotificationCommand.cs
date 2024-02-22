@@ -18,9 +18,9 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         private readonly INotificationRepository _datastore;
         private readonly INotificationFactory _notificationFactory;
         private readonly IGetFacilityConfigurationQuery _getFacilityConfigurationQuery;
-        private readonly NotificationServiceMetrics _metrics;
+        private readonly INotificationServiceMetrics _metrics;
 
-        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, NotificationServiceMetrics metrics)
+        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, INotificationServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));    
             _auditEventFactory = auditEventFactory ?? throw new ArgumentNullException(nameof(auditEventFactory));
@@ -100,12 +100,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     {
                         currentActivity?.AddTag("facility.id", entity.FacilityId);
                     }
-                        
+
 
                     //update notification creation metric counter                    
-                    _metrics.NotificationCreatedCounter.Add(1, 
+                    _metrics.IncrementNotificationCreatedCounter([ 
                         new KeyValuePair<string, object?>("facility", entity.FacilityId), 
-                        new KeyValuePair<string, object?>("type", entity.NotificationType));
+                        new KeyValuePair<string, object?>("type", entity.NotificationType)
+                    ]);
 
                     //Log creation of new notification configuration
                     _logger.LogNotificationCreation(entity.Id.Value.ToString(), model);                    

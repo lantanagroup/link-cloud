@@ -15,9 +15,9 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IOptions<Channels> _channels;
         private readonly IEmailService _emailService;
-        private readonly NotificationServiceMetrics _metrics;
+        private readonly INotificationServiceMetrics _metrics;
 
-        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, NotificationServiceMetrics metrics, IServiceScopeFactory scopeFactory)
+        public SendNotificationCommand(ILogger<SendNotificationCommand> logger, IOptions<Channels> channels, IEmailService emailService, INotificationServiceMetrics metrics, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
@@ -71,9 +71,10 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             currentActivity?.AddTag("facility.id", model.FacilityConfig?.FacilityId);
 
                             //update notification creation metric counter                            
-                            _metrics.NotificationSentCounter.Add(1, 
+                            _metrics.IncrementNotificationSentCounter([
                                 new KeyValuePair<string, object?>("facility", model.FacilityConfig?.FacilityId),
-                                new KeyValuePair<string, object?>("channel", "Email"));
+                                new KeyValuePair<string, object?>("channel", "Email")
+                            ]);
                         }
                         
                     }
