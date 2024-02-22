@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
 
             try
             {                
-                var notification = await _datastore.Get(id);
+                var notification = await _datastore.Get(id, true);
 
                 if (notification is null)
                 {
