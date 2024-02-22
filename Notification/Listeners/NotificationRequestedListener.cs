@@ -54,8 +54,8 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     var currentActivity = Activity.Current;
                                     if (currentActivity != null)
                                     {
-                                        currentActivity.AddTag("link-service", ServiceActivitySource.Instance.Name);
-                                        currentActivity.AddTag("link-service-version", ServiceActivitySource.Instance.Version);
+                                        currentActivity.AddTag("link.service", ServiceActivitySource.Instance.Name);
+                                        currentActivity.AddTag("link.service.version", ServiceActivitySource.Instance.Version);
                                     }
 
                                     NotificationMessage messageValue = result.Message.Value;

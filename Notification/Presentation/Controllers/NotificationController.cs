@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="sentOnEnd"></param>
         /// <param name="sortBy"></param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
+        /// <param name="cancellationToken"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -59,7 +60,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
@@ -93,6 +94,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification event with the provided Id.
         /// </summary>
         /// <param name="id"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -106,7 +108,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationModel>> GetNotification(Guid id)
+        public async Task<ActionResult<NotificationModel>> GetNotification(Guid id, CancellationToken cancellationToken)
         {                 
             if (id == Guid.Empty) { return BadRequest("No notification id provided."); }           
 
@@ -137,6 +139,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="facilityId"></param>
         /// <param name="sortBy"></param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
+        /// <param name="cancellationToken"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -152,13 +155,13 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationModel>> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationModel>> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
         {          
             if (string.IsNullOrWhiteSpace(facilityId)) { return BadRequest("No facility id provided."); }
 
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("facility-id", facilityId);
+            activity?.AddTag("facility.id", facilityId);
 
             try
             {

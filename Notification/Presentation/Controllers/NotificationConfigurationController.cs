@@ -57,9 +57,10 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="searchText"></param>
         /// <param name="filterFacilityBy"></param>
         /// <param name="sortBy"></param>
-        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>        
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200     
         ///     Unautorized: 401
@@ -71,7 +72,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
         {
             //TODO check for authorization
 
@@ -107,6 +108,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Creates a notification configuration.
         /// </summary>
         /// <param name="model"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -120,7 +122,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityCreatedResponse>> CreateNotificationConfigurationAsync(NotificationConfigurationModel model)
+        public async Task<ActionResult<EntityCreatedResponse>> CreateNotificationConfigurationAsync(NotificationConfigurationModel model, CancellationToken cancellationToken)
         {
             //validate config values
             if (model is null) { return BadRequest("No notification configuration provided."); }
@@ -178,6 +180,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Updates a notification configuration.
         /// </summary>
         /// <param name="model"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -191,7 +194,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityCreatedResponse>> UpdateNotificationConfigurationAsync(NotificationConfigurationModel model)
+        public async Task<ActionResult<EntityCreatedResponse>> UpdateNotificationConfigurationAsync(NotificationConfigurationModel model, CancellationToken cancellationToken)
         {
 
             //validate config values
@@ -258,6 +261,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification configuration with the provided facility Id.
         /// </summary>
         /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -271,7 +275,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationConfigurationModel>> GetFacilityConfiguration(string facilityId)
+        public async Task<ActionResult<NotificationConfigurationModel>> GetFacilityConfiguration(string facilityId, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(facilityId))
             {
@@ -282,7 +286,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("facility-id", facilityId);
+            activity?.AddTag("facility.id", facilityId);
             _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
 
             try
@@ -305,6 +309,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification configuration with the provided configuration Id.
         /// </summary>
         /// <param name="id"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -318,7 +323,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(Guid id)
+        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(Guid id, CancellationToken cancellationToken)
         {
             if (id == Guid.Empty)
             {
@@ -352,6 +357,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Deletes a notification configuration with the provided configuration Id.
         /// </summary>
         /// <param name="id"></param>
+        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -365,7 +371,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(Guid id)
+        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(Guid id, CancellationToken cancellationToken)
         {
             if (id == Guid.Empty)
             {
@@ -376,7 +382,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("notification id", id);
+            activity?.AddTag("notification.id", id);
 
             try
             {
