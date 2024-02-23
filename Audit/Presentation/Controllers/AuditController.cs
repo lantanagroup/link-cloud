@@ -20,9 +20,9 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         private readonly IGetAuditEventListQuery _getAuditEventListQuery;
         private readonly IGetAuditEventQuery _getAuditEventQuery;
         private int maxAuditEventsPageSize = 20;
-        private readonly AuditServiceMetrics _auditServiceMetrics;
+        private readonly IAuditServiceMetrics _auditServiceMetrics;
 
-        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, ICreateAuditEventCommand createAuditEventCommand, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, AuditServiceMetrics auditServiceMetrics)
+        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, ICreateAuditEventCommand createAuditEventCommand, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));           
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
@@ -40,7 +40,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="filterServiceBy"></param>
         /// <param name="filterActionBy"></param>
         /// <param name="filterUserBy"></param>
-        /// <param name="sortBy"></param>
+        /// <param name="sortBy">Ascending = 0, Descending = 1, defaults to Ascending</param>
+        /// <param name="sortOrder"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -55,7 +56,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
         public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? 
-            filterActionBy, string? filterUserBy, string? sortBy, int pageSize = 10, int pageNumber = 1)
+            filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {           
             using var _ = _auditServiceMetrics.MeasureAuditSearchDuration();
 
@@ -66,21 +67,20 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 if (pageNumber < 1) { pageNumber = 1; }
 
-                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(auditEventList.Metadata));
                                 
                 return Ok(auditEventList);
-
             }
             catch (Exception ex)
             {
-                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
             }

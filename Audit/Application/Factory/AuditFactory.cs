@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         /// <param name="serviceName"></param>
         /// <param name="correlationId"></param>
         /// <param name="eventDate"></param>
+        /// <param name="userId"></param>
         /// <param name="user"></param>
         /// <param name="action"></param>
         /// <param name="resource"></param>
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
             audit.EventDate = eventDate;
             audit.UserId = userId;
             audit.User = user;
-            audit.Action = nameof(action);
+            audit.Action = action.ToString();
             audit.Resource = resource;
 
 
@@ -60,6 +61,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         /// <param name="serviceName"></param>
         /// <param name="correlationId"></param>
         /// <param name="eventDate"></param>
+        /// <param name="userId"></param>
         /// <param name="user"></param>
         /// <param name="action"></param>
         /// <param name="resource"></param>
@@ -100,7 +102,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
 
         public AuditSearchFilterRecord CreateAuditSearchFilterRecord(string? searchText, string? filterFacilityBy,
             string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy,
-            string? sortBy, int pageSize, int pageNumber)
+            string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         { 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Search Filter Record");
 
@@ -113,6 +115,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
                 FilterActionBy = filterActionBy,
                 FilterUserBy = filterUserBy,
                 SortBy = sortBy,
+                SortOrder = sortOrder ?? SortOrder.Ascending,
                 PageSize = pageSize,
                 PageNumber = pageNumber
             };
