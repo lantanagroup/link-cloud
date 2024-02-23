@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.QueryDispatch.Application.Services;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -12,7 +13,6 @@ namespace LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration
         private readonly ILogger<CreateQueryDispatchConfigurationCommand> _logger;
         private readonly IQueryDispatchConfigurationRepository _dataStore;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
-
 
         public CreateQueryDispatchConfigurationCommand(ILogger<CreateQueryDispatchConfigurationCommand> logger, IQueryDispatchConfigurationRepository dataStore, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory)
         {
