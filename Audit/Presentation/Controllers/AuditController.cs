@@ -57,6 +57,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         public async Task<ActionResult<PagedAuditModel>> ListAuditEvents(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? 
             filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {           
+            //capture audit search duration metric
             using var _ = _auditServiceMetrics.MeasureAuditSearchDuration();
 
             try
@@ -107,7 +108,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         {
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("audit-id", id);
+            activity?.AddTag("audit-log.id", id);
 
             if (id == Guid.Empty) { return BadRequest("No audit event id provided."); }
             _logger.LogGetAuditEventById(id.ToString());
@@ -122,7 +123,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                ex.Data.Add("audit-event-id", id);
+                ex.Data.Add("audit-log.id", id);
                 _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
                 throw;
             }

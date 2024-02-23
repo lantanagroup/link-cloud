@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             _query = _mocker.CreateInstance<GetAuditEventQuery>();
 
             _mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.Get(AuditId.FromString(_auditId))).Returns(Task.FromResult<AuditLog?>(_auditEvent));
+                .Setup(p => p.Get(AuditId.FromString(_auditId), true)).Returns(Task.FromResult<AuditLog?>(_auditEvent));
    
         }
 
@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         {
             Task<AuditModel> _foundAuditEvent = _query.Execute(AuditId.FromString(_auditId));
 
-            _mocker.GetMock<IAuditRepository>().Verify(p => p.Get(AuditId.FromString(_auditId)), Times.Once());
+            _mocker.GetMock<IAuditRepository>().Verify(p => p.Get(AuditId.FromString(_auditId), true), Times.Once());
                
         }
     
