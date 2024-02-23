@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         private AutoMocker _mocker;
         private GetAuditEventListQuery _query;
         private AuditLog _auditEvent;
+        private AuditSearchFilterRecord _auditSearchFilterRecord;
         private List<AuditLog> _auditEvents;
         private PaginationMetadata _pagedMetaData;
 
@@ -52,6 +53,20 @@ namespace LantanaGroup.Link.AuditUnitTests
         {
 
             #region Set Up Models
+
+            _auditSearchFilterRecord = new AuditSearchFilterRecord()
+            {
+                SearchText = searchText,
+                FilterFacilityBy = filterFacilityBy,
+                FilterCorrelationBy = filterCorrelationBy,
+                FilterServiceBy = filterServiceBy,
+                FilterActionBy = filterActionBy,
+                FilterUserBy = filterUserBy,
+                SortBy = sortBy,
+                SortOrder = SortOrder.Ascending,
+                PageSize = pageSize,
+                PageNumber = pageNumber
+            };
 
             //set up audit entity
             _auditEvent = new AuditLog();
@@ -93,17 +108,21 @@ namespace LantanaGroup.Link.AuditUnitTests
 
             var output = (auditEvents: _auditEvents, metaData: _pagedMetaData);
 
+            _mocker.GetMock<IAuditFactory>()
+                .Setup(p => p.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber))
+                .Returns(_auditSearchFilterRecord);
+
             _mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber))
+                .Setup(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber))
                 .ReturnsAsync(output);                
         }               
 
         [Test]
         public void TestExecuteShouldReturnAnAuditEventFromTheDatabase()
         {
-            Task<PagedAuditModel> _foundAuditEvents = _query.Execute(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber);
+            Task<PagedAuditModel> _foundAuditEvents = _query.Execute(_auditSearchFilterRecord);
 
-            _mocker.GetMock<IAuditRepository>().Verify(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, pageSize, pageNumber), Times.Once());
+            _mocker.GetMock<IAuditRepository>().Verify(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
 
         }
 
