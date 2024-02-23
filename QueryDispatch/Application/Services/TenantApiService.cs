@@ -1,8 +1,8 @@
 ﻿
-using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.QueryDispatch.Application.Settings;
 using System.Net;
 
-namespace LantanaGroup.Link.Normalization.Application.Services;
+namespace LantanaGroup.Link.QueryDispatch.Application.Services;
 
 public class TenantApiService : ITenantApiService
 {
