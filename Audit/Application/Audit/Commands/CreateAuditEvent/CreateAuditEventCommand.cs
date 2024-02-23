@@ -51,7 +51,10 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex, new TagList { 
-                    { "service.name", model.ServiceName } 
+                    { "service.name", model.ServiceName },
+                    { "facility", model.FacilityId },
+                    { "action", model.Action },
+                    { "resource", model.Resource }
                 });
                 _logger.LogDebug(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), ex, "New audit event creation failed for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Action, auditLog.Resource, auditLog.ServiceName);
                 throw;

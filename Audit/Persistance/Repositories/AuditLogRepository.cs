@@ -22,10 +22,13 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             _dbContext.AuditLogs.Add(entity);            
             return Task.FromResult(_dbContext.SaveChanges() > 0);
         }
-
-        public Task<AuditLog?> Get(AuditId id)
+        
+        public Task<AuditLog?> Get(AuditId id, bool noTracking = false)
         {
-            var log = _dbContext.AuditLogs.Find(id);
+            var log = noTracking ?
+                _dbContext.AuditLogs.AsNoTracking().FirstOrDefault(x => x.Id == id) :
+                _dbContext.AuditLogs.Find(id);
+            
             return Task.FromResult(log);
         }
 
