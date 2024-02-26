@@ -21,6 +21,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using LantanaGroup.Link.Tenant.Models;
 using Confluent.Kafka.Extensions.OpenTelemetry;
+using System.Diagnostics;
 
 namespace Tenant
 {
@@ -83,6 +84,29 @@ namespace Tenant
             builder.Services.AddHttpClient();
 
             builder.Services.AddControllers();
+
+            //Add problem details
+            builder.Services.AddProblemDetails(options => {
+                options.CustomizeProblemDetails = ctx =>
+                {
+                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+                    {
+                        string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+                        ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+                    }
+
+                    if (builder.Environment.IsDevelopment())
+                    {
+                        ctx.ProblemDetails.Extensions.Add("service", "Demo API Gateway");
+                    }
+                    else
+                    {
+                        ctx.ProblemDetails.Extensions.Remove("exception");
+                    }
+
+                };
+            });
 
             //Add repositories
             //builder.Services.AddSingleton<IPersistenceRepository<FacilityConfigModel>>();

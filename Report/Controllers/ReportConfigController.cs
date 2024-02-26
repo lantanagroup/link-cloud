@@ -1,3 +1,4 @@
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.Models;
@@ -6,6 +7,7 @@ using LantanaGroup.Link.Report.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using static Google.Rpc.Context.AttributeContext.Types;
+using static Hl7.Fhir.Model.Bundle;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -28,11 +30,18 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpGet("Get")]
-        public async Task<MeasureReportConfigModel> GetReportConfig(string Id)
+        public async Task<ActionResult<MeasureReportConfig>> GetReportConfig(string Id)
         {
-            var res = await _mediator.Send(new GetMeasureReportConfigQuery { Id = Id });
-
-            return res;
+            var response = await _mediator.Send(new GetMeasureReportConfigQuery { Id = Id });
+            if (response == null) return NoContent();
+            var model = new MeasureReportConfig()
+            {
+                Id = response.Id,
+                FacilityId = response.FacilityId,
+                ReportType = response.ReportType,
+                BundlingType = response.BundlingType.ToString()
+            };
+            return Ok(model);
         }
 
         /// <summary>
@@ -41,11 +50,18 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpGet("facility/{facilityId}")]
-        public async Task<IEnumerable<MeasureReportConfigModel>> GetReportConfigForFacilityId(string facilityId)
+        public async Task<ActionResult<IEnumerable<MeasureReportConfig>>> GetReportConfigForFacilityId(string facilityId)
         {
-            var res = (await _mediator.Send(new GetFacilityMeasureReportConfigsQuery { FacilityId = facilityId })).ToList();
-
-            return res;
+            var  res = (await _mediator.Send(new GetFacilityMeasureReportConfigsQuery { FacilityId = facilityId })).ToList();
+            if (res == null) return NoContent();
+            var  list = res.Select(model => new MeasureReportConfig()
+            {
+                Id = model.Id,
+                FacilityId = model.FacilityId,
+                ReportType = model.ReportType,
+                BundlingType = model.BundlingType.ToString()
+            });
+            return Ok(list);
         }
 
         /// <summary>

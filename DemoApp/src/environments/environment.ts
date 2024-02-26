@@ -5,13 +5,13 @@
 export const environment = {
   production: false,
   baseApiUrl: "http://localhost:7777",
-  idpIssuer: "",
+  idpIssuer : "",
   idpClientId: '',
   idpClientSecret: '',
   idpScope: 'openid profile email botwdemogatewayapi.read botwdemogatewayapi.write botwdemogatewayapi.delete',
   redirectUri: window.location.origin + '/',
   loginUrl: window.location.origin + '/',
-  
+
 };
 
 /*
