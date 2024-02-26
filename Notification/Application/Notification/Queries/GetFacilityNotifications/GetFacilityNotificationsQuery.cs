@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationModel> Execute(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<PagedNotificationModel> Execute(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Notifications Query");
 
             try
             {
-                var (result, metadata) = await _datastore.GetFacilityNotifications(facilityId, sortBy, sortOrder, pageSize, pageNumber);
+                var (result, metadata) = await _datastore.GetFacilityNotificationsAsync(facilityId, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
 
                 //convert AuditEntity to AuditModel
                 using (ServiceActivitySource.Instance.StartActivity("Map List Results"))

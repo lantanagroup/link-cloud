@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationModel>> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogNotificationListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedNotificationModel notificationList = await _getNotificationListQuery.Execute(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, sortOrder, pageSize, pageNumber);
+                PagedNotificationModel notificationList = await _getNotificationListQuery.Execute(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
@@ -94,7 +94,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification event with the provided Id.
         /// </summary>
         /// <param name="id"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -108,7 +107,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationModel>> GetNotification(Guid id, CancellationToken cancellationToken)
+        public async Task<ActionResult<NotificationModel>> GetNotification(Guid id)
         {                 
             if (id == Guid.Empty) { return BadRequest("No notification id provided."); }           
 
@@ -120,7 +119,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             try
             {
-                NotificationModel notification = await _getNotificationQuery.Execute(new NotificationId(id));
+                NotificationModel notification = await _getNotificationQuery.Execute(new NotificationId(id), HttpContext.RequestAborted);
                 if (notification is null) { return NotFound(); }
                 
                 return Ok(notification);
@@ -155,7 +154,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationModel>> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationModel>> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {          
             if (string.IsNullOrWhiteSpace(facilityId)) { return BadRequest("No facility id provided."); }
 
@@ -172,7 +171,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogGetNotificationByFacilityId(facilityId);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, sortOrder, pageSize, pageNumber);
+                PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));

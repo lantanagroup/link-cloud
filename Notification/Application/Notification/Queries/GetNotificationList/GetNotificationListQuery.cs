@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationModel> Execute(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<PagedNotificationModel> Execute(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Find Notifications Query");
 
             try
             {
-                var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, sortOrder, pageSize, pageNumber);
+                var (result, metadata) = await _datastore.SearchAsync(searchText, filterFacilityBy, filterNotificationTypeBy, createdOnStart, createdOnEnd, sentOnStart, sentOnEnd, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
 
                 List<NotificationModel> notifications = new List<NotificationModel>();
                 if (result != null)

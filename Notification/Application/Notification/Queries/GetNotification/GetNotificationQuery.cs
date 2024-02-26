@@ -19,13 +19,13 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
         }
 
-        public async Task<NotificationModel> Execute(NotificationId id)
+        public async Task<NotificationModel> Execute(NotificationId id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Notification By Id Query");           
 
             try
             {                
-                var notification = await _datastore.Get(id, true);
+                var notification = await _datastore.GetAsync(id, true, cancellationToken);
 
                 if (notification is null)
                 {

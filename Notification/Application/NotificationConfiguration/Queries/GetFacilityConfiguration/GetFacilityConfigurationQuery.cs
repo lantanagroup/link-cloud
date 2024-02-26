@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<NotificationConfigurationModel> Execute(string facilityId)
+        public async Task<NotificationConfigurationModel> Execute(string facilityId, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Configuration By Facility Id Query");
 
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 
             try 
             {             
-                var config = await _datastore.GetFacilityNotificationConfig(facilityId, true);
+                var config = await _datastore.GetFacilityNotificationConfigAsync(facilityId, true, cancellationToken);
                 if (config is null)
                 {
                     return null;

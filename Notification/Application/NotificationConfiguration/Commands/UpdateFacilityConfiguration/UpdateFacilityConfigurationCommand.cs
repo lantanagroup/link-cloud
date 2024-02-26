@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<bool> Execute(UpdateFacilityConfigurationModel model)
+        public async Task<bool> Execute(UpdateFacilityConfigurationModel model, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Update Facility Configuration");
 
@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
             try
             {               
                 NotificationConfig entity = _notificationConfigurationFactory.NotificationConfigEntityCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                bool outcome = await _datastore.Update(entity);              
+                bool outcome = await _datastore.UpdateAsync(entity, cancellationToken);              
 
                 _logger.LogNotificationConfigurationUpdate(model.Id, model);
                 return outcome;

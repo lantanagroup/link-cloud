@@ -18,11 +18,11 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<NotificationConfigurationModel> Execute(NotificationConfigId id)
+        public async Task<NotificationConfigurationModel> Execute(NotificationConfigId id, CancellationToken cancellationToken)
         {     
             try
             {
-                var config = await _datastore.Get(id, true);
+                var config = await _datastore.GetAsync(id, true, cancellationToken);
 
                 if (config is null)
                 {

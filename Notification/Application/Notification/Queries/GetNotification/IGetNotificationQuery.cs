@@ -5,6 +5,6 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
 {
     public interface IGetNotificationQuery
     {
-        Task<NotificationModel> Execute(NotificationId id);
+        Task<NotificationModel> Execute(NotificationId id, CancellationToken cancellationToken);
     }
 }

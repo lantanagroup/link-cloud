@@ -25,13 +25,13 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
         }
        
 
-        public async Task<bool> Execute(NotificationConfigId id)
+        public async Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete Notification Configuration Command");
 
             try 
             {                
-                var config = await _datastore.Get(id);
+                var config = await _datastore.GetAsync(id, true, cancellationToken);
 
                 using (ServiceActivitySource.Instance.StartActivity("Check if notification configuration exists"))
                 {                    
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
                 using (ServiceActivitySource.Instance.StartActivity("Delete the facility configuration"))
                 {                   
 
-                    bool result = await _datastore.Delete(config.Id);                    
+                    bool result = await _datastore.DeleteAsync(config.Id, cancellationToken);                    
 
                     if (result)
                     {

@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Notification.Domain.Entities
+﻿using System;
+
+namespace LantanaGroup.Link.Notification.Domain.Entities
 {
     public readonly record struct NotificationConfigId(Guid Value)
     {
@@ -16,5 +18,12 @@
         public List<EnabledNotification>? EnabledNotifications { get; set; }
         public List<FacilityChannel> Channels { get; set; } = new List<FacilityChannel>();
 
+        public bool EmailAddressesEquals(List<string> originalEmailAddresses, List<string> currentEmailAddresses)
+        {
+            bool intersectsWith = originalEmailAddresses.Intersect(currentEmailAddresses, StringComparer.OrdinalIgnoreCase).Any();
+            return intersectsWith;
+        }        
+
     }
+
 }

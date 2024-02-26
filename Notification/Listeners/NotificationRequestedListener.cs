@@ -120,17 +120,17 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         //create notification
                                         CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, result.Message.Key, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
                                                                           
-                                        string notificationId = await _createNotificationCommand.Execute(notificationModel);
+                                        string notificationId = await _createNotificationCommand.Execute(notificationModel, cancellationToken);
                                         _logger.LogNotificationCreation(notificationId, notificationModel);
 
                                         //send notification
-                                        NotificationModel notification = await _getNotificationQuery.Execute(NotificationId.FromString(notificationId));
+                                        NotificationModel notification = await _getNotificationQuery.Execute(NotificationId.FromString(notificationId), cancellationToken);
                                         SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(notification.Id, notification.Recipients, notification.Bcc, notification.Subject, notification.Body);
 
                                         //if a facility based notification, get their configuration and add it to the send model
                                         if (!string.IsNullOrEmpty(result.Message.Key))
                                         {
-                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key);
+                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key, cancellationToken);
                                             sendModel.FacilityConfig = config;
                                         }
 

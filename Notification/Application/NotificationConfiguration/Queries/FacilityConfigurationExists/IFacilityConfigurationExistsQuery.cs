@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 {
     public interface IFacilityConfigurationExistsQuery
     {
-        Task<bool> Execute(NotificationConfigId id);
+        Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken);
     }
 }

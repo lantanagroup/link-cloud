@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<bool> Execute(NotificationConfigId id)
+        public async Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Check if Facility Configuration Exists Query");           
 
             try 
             {
-                bool exists = await _datastore.Exists(id);
+                bool exists = await _datastore.ExistsAsync(id, cancellationToken);
                 return exists;
             }
             catch(ArgumentNullException)

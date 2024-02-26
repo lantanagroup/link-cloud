@@ -3,7 +3,6 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
-using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
@@ -63,7 +62,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             using (var scope = _scopeFactory.CreateScope())
                             {
                                 var _datastore = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
-                                await _datastore.SetNotificationSentOn(NotificationId.FromString(model.Id));
+                                await _datastore.SetNotificationSentOnAsync(NotificationId.FromString(model.Id));
                             }                                
 
                             //add id to current activity                            
