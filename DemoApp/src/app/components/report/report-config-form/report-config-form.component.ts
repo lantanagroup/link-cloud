@@ -1,8 +1,8 @@
-import { Component, EventEmitter, Input, Output, SimpleChanges } from '@angular/core';
+import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReportService } from 'src/app/services/gateway/report/report.service';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, NonNullableFormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import { FormMode } from '../../../models/FormMode.enum';
 import { IReportConfigModel } from '../../../interfaces/report/report-config-model.interface';
 import { IEntityCreatedResponse } from '../../../interfaces/entity-created-response.model';
@@ -17,9 +17,15 @@ import { MatDialog } from '@angular/material/dialog';
 import { ReportConfigDialogComponent } from '../report-config-dialog/report-config-dialog.component';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { IEntityDeletedResponse } from '../../../interfaces/entity-deleted-response.interface';
+import {MatTooltipModule} from "@angular/material/tooltip";
+import { ReportTypeValidator } from '../../validators/ReportTypeValidator';
+import { map } from 'rxjs';
 
 @Component({
   selector: 'app-report-config-form',
+  providers: [
+    ReportTypeValidator
+  ],
   standalone: true,
   imports: [
     CommonModule,
@@ -32,14 +38,14 @@ import { IEntityDeletedResponse } from '../../../interfaces/entity-deleted-respo
     ReactiveFormsModule,
     MatSnackBarModule,
     MatToolbarModule,
-    MatExpansionModule
+    MatExpansionModule,
+    MatTooltipModule
   ],
   templateUrl: './report-config-form.component.html',
   styleUrls: ['./report-config-form.component.scss']
 })
-export class ReportConfigFormComponent {
+export class ReportConfigFormComponent implements OnInit, OnChanges {
 
-  configForm !: FormGroup;
   @Input() item!: IReportConfigModel;
   @Input() formMode!: FormMode;
 
@@ -51,44 +57,59 @@ export class ReportConfigFormComponent {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse | IEntityDeletedResponse>();
-  constructor(private snackBar: MatSnackBar, private reportService: ReportService, private dialog: MatDialog) {
-    this.configForm = new FormGroup({
-      facilityId: new FormControl('', Validators.required),
-      reportType: new FormControl('', Validators.required),
-      bundlingType: new FormControl('', Validators.required)
-    });
+
+  configForm!: any;
+
+  constructor(private snackBar: MatSnackBar, private reportService: ReportService, private dialog: MatDialog, private fb: FormBuilder, private reportTypeValidator: ReportTypeValidator) {
+    this.configForm = this.fb.group({
+      facilityId: ["", Validators.required],
+      reportType: ["", {
+                        validators: [Validators.required],
+                        asyncValidators: [this.existsReportType.bind(this)],
+                        updateOn: 'blur'
+                        }],
+      bundlingType: ["", Validators.required]
+    })
   }
 
-  get facilityIdControl(): FormControl {
-    return this.configForm.get('facilityId') as FormControl;
+  existsReportType(control: AbstractControl) {
+    return this.reportTypeValidator.checkIfReportTypeExists(control.value, this.item).pipe(map((response: boolean) => response ? { reportTypeExists: true } : null));
   }
 
-  get reportTypeControl(): FormControl {
-    return this.configForm.get('reportType') as FormControl;
+  get reportTypeExists() { 
+    return this.configForm.get('reportType').hasError('reportTypeExists') && this.configForm.get('reportType').touched;
   }
 
-  get bundlingTypeControl(): FormControl {
-    return this.configForm.get('bundlingType') as FormControl;
+  get facilityId() {
+    return this.configForm.controls['facilityId'];
+  }
+
+  get reportType(){
+    return this.configForm.controls['reportType'];
+  }
+
+  get bundlingType() {
+    return this.configForm.controls['bundlingType'];
   }
 
   clearReportType(): void {
-    this.reportTypeControl.setValue('');
-    this.reportTypeControl.updateValueAndValidity();
+    this.reportType.setValue('');
+    this.reportType.updateValueAndValidity();
   }
 
   clearBundlingType(): void {
-    this.bundlingTypeControl.setValue('');
-    this.bundlingTypeControl.updateValueAndValidity();
+    this.bundlingType.setValue('');
+    this.bundlingType.updateValueAndValidity();
   }
 
   ngOnChanges(changes: SimpleChanges) {
 
     if (changes['item'] && changes['item'].currentValue) {
-      this.reportTypeControl.setValue(this.item.reportType);
-      this.reportTypeControl.updateValueAndValidity();
+      this.reportType.setValue(this.item.reportType);
+      this.reportType.updateValueAndValidity();
 
-      this.bundlingTypeControl.setValue(this.item.bundlingType);
-      this.bundlingTypeControl.updateValueAndValidity();
+      this.bundlingType.setValue(this.item.bundlingType);
+      this.bundlingType.updateValueAndValidity();
     }
   }
 
@@ -97,30 +118,30 @@ export class ReportConfigFormComponent {
 
     if (this.item) {
       //set form values
-      this.facilityIdControl.setValue(this.item.facilityId);
-      this.facilityIdControl.updateValueAndValidity();
+      this.facilityId.setValue(this.item.facilityId);
+      this.facilityId.updateValueAndValidity();
 
-      this.reportTypeControl.setValue(this.item.reportType);
-      this.reportTypeControl.updateValueAndValidity();
+      this.reportType.setValue(this.item.reportType);
+      this.reportType.updateValueAndValidity();
 
-      this.bundlingTypeControl.setValue(this.item.bundlingType);
-      this.bundlingTypeControl.updateValueAndValidity();
+      this.bundlingType.setValue(this.item.bundlingType);
+      this.bundlingType.updateValueAndValidity();
     }
 
     this.configForm.valueChanges.subscribe(() => {
-      this.formValueChanged.emit(this.configForm.invalid);
+      this.formValueChanged.emit(this.configForm.invalid); 
     });
   }
 
   submitConfiguration(): void {
-    if (this.configForm.valid) {
+    if (this.configForm.status == 'VALID') {
       if (this.formMode == FormMode.Create) {
-        this.reportService.createConfiguration(this.item.facilityId, this.reportTypeControl.value, this.bundlingTypeControl.value).subscribe((response: IEntityCreatedResponse) => {
+        this.reportService.createReportConfiguration(this.item.facilityId, this.reportType.value, this.bundlingType.value).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit(response);
         });
       }
       else if (this.formMode == FormMode.Edit) {
-        this.reportService.updateConfiguration(this.item.id, this.item.facilityId, this.reportTypeControl.value, this.bundlingTypeControl.value).subscribe((response: IEntityCreatedResponse) => {
+        this.reportService.updateReportConfiguration(this.item.id, this.item.facilityId, this.reportType.value, this.bundlingType.value).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit(response);
         });
       }
@@ -137,7 +158,7 @@ export class ReportConfigFormComponent {
 
   //delete report configurations
   deleteReportConfiguration(): void {
-    this.reportService.deleteConfiguration(this.item.id).subscribe(() => {
+    this.reportService.deleteReportConfiguration(this.item.id).subscribe(() => {
       let reportDeletedResponse: IEntityDeletedResponse = { id: this.item.id, message: "Report Configuration Deleted" };
       this.submittedConfiguration.emit(reportDeletedResponse);
     });
@@ -150,7 +171,7 @@ export class ReportConfigFormComponent {
         width: '75%',
         data: { dialogTitle: 'Edit report', formMode: FormMode.Edit, viewOnly: false, reportConfig: this.item }
       }).afterClosed().subscribe(res => {
-        console.log('Dialog result: ${res}');
+       // console.log('Dialog result: ${res}');
         if (res) {
           this.submittedConfiguration.emit(res);
           this.snackBar.open(`${res}`, '', {

@@ -70,5 +70,9 @@ export class ReportConfigDialogComponent implements OnInit {
     this.reportConfigForm.submitConfiguration();
   }
 
+  canSave() {
+    return (this.reportConfigForm?.configForm.status == 'VALID') ? true : false;
+  }
+
 }
 
