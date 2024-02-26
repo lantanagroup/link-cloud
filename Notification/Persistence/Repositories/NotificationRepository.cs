@@ -16,25 +16,25 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public Task<bool> Add(NotificationEntity entity)
+        public async Task<bool> AddAsync(NotificationEntity entity, CancellationToken cancellationToken = default)
         {
-            _dbContext.Notifications.Add(entity);  
-            return Task.FromResult(_dbContext.SaveChanges() > 0);
+            await _dbContext.Notifications.AddAsync(entity, cancellationToken);  
+            return _dbContext.SaveChanges() > 0;
         }
 
-        public Task<NotificationEntity?> Get(NotificationId id, bool noTracking = false)
+        public async Task<NotificationEntity?> GetAsync(NotificationId id, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var notification = noTracking ? 
-                _dbContext.Notifications.AsNoTracking().FirstOrDefault(x => x.Id == id) :
-                _dbContext.Notifications.Find(id);
-            return Task.FromResult(notification);
+                await _dbContext.Notifications.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken) :
+                await _dbContext.Notifications.FindAsync(id, cancellationToken);
+            return notification;
         }
 
-        public Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> GetFacilityNotifications(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> GetFacilityNotificationsAsync(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<NotificationEntity> notifications;
             var query = _dbContext.Notifications.AsNoTracking().Where(x => x.FacilityId == facilityId).AsQueryable();
-            var count = query.Count();
+            var count = await query.CountAsync(cancellationToken);
 
             query = sortOrder switch
             {
@@ -43,17 +43,19 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
-            notifications = query
+            notifications = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
-            return Task.FromResult<(IEnumerable<NotificationEntity>, PaginationMetadata)>((notifications, metadata));
+            var result = (notifications, metadata);
+
+            return result;
         }
 
-        public Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<(IEnumerable<NotificationEntity>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<NotificationEntity> notifications;
             var query = _dbContext.Notifications.AsNoTracking().AsQueryable();
@@ -101,7 +103,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             #endregion
 
-            var count = query.Count();
+            var count = await query.CountAsync(cancellationToken);
 
             query = sortOrder switch
             {
@@ -110,38 +112,39 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
-            notifications = query                
+            notifications = await query                
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
-            return Task.FromResult<(IEnumerable<NotificationEntity>, PaginationMetadata)>((notifications, metadata));
+            var result = (notifications, metadata);
+            return result;
         }        
 
-        public Task<bool> SetNotificationSentOn(NotificationId id)
+        public async Task<bool> SetNotificationSentOnAsync(NotificationId id, CancellationToken cancellationToken = default)
         {
-            var notification = _dbContext.Notifications.Find(id);
+            var notification = await _dbContext.Notifications.FindAsync(id, cancellationToken);
             if(notification is null)
             {
-                return Task.FromResult(false);
+                return false;
             }
 
             notification.SentOn.Add(DateTime.UtcNow);
-            return Task.FromResult(_dbContext.SaveChanges() > 0);
+            return _dbContext.SaveChanges() > 0;
         }
 
-        public Task<bool> Update(NotificationEntity entity)
+        public async Task<bool> UpdateAsync(NotificationEntity entity, CancellationToken cancellationToken = default)
         {
-            var originalEntity = Get(entity.Id).Result;
+            var originalEntity = await GetAsync(entity.Id, false, cancellationToken);
             if (originalEntity == null)
             {
-                return null;
+                return false;
             }
 
             _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);
-            return Task.FromResult(_dbContext.SaveChanges() > 0);
+            return _dbContext.SaveChanges() > 0;
         }        
     }
 }

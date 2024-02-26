@@ -20,7 +20,6 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -149,7 +148,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         switch (builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseProvider))
         {
             case "SqlServer":
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DatabaseConnection"));
+                options.UseSqlServer(builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString));
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");

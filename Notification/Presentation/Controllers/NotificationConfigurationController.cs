@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, CancellationToken cancellationToken, int pageSize = 10, int pageNumber = 1)
+        public async Task<ActionResult<PagedNotificationConfigurationModel>> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {
             //TODO check for authorization
 
@@ -87,7 +87,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogNotificationConfigurationsListQuery(searchRecord);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber);
+                PagedNotificationConfigurationModel configList = await _getFacilityConfigurationListQuery.Execute(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(configList.Metadata));
@@ -108,7 +108,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Creates a notification configuration.
         /// </summary>
         /// <param name="model"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -122,7 +121,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityCreatedResponse>> CreateNotificationConfigurationAsync(NotificationConfigurationModel model, CancellationToken cancellationToken)
+        public async Task<ActionResult<EntityCreatedResponse>> CreateNotificationConfigurationAsync(NotificationConfigurationModel model)
         {
             //validate config values
             if (model is null) { return BadRequest("No notification configuration provided."); }
@@ -151,7 +150,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
 
             //check if the facility already has an existing configuration
-            NotificationConfigurationModel existingConfig = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+            NotificationConfigurationModel existingConfig = await _getFacilityConfigurationQuery.Execute(model.FacilityId, HttpContext.RequestAborted);
             if (existingConfig is not null)
             {
                 var message = $"A configuration for facility {model.FacilityId} already exists.";
@@ -163,7 +162,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             {
                 //Create notification configuration
                 CreateFacilityConfigurationModel createConfigModel = _configurationFactory.CreateFacilityConfigurationModelCreate(model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                var config = await _createFacilityConfigurationCommand.Execute(createConfigModel);                
+                var config = await _createFacilityConfigurationCommand.Execute(createConfigModel, HttpContext.RequestAborted);                
 
                 return Ok(config);
             }
@@ -180,7 +179,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Updates a notification configuration.
         /// </summary>
         /// <param name="model"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -194,7 +192,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityCreatedResponse>> UpdateNotificationConfigurationAsync(NotificationConfigurationModel model, CancellationToken cancellationToken)
+        public async Task<ActionResult<EntityCreatedResponse>> UpdateNotificationConfigurationAsync(NotificationConfigurationModel model)
         {
 
             //validate config values
@@ -233,7 +231,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             try
             {
                 //check if the configuration exists
-                bool exists = await _facilityConfigurationExistsQuery.Execute(NotificationConfigId.FromString(model.Id));
+                bool exists = await _facilityConfigurationExistsQuery.Execute(NotificationConfigId.FromString(model.Id), HttpContext.RequestAborted);
                 if (!exists)
                 {
                     var notFoundMessage = $"No configuration with the id of {model.Id} was found.";
@@ -243,7 +241,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
                 //Update notification configuration
                 UpdateFacilityConfigurationModel config = _configurationFactory.UpdateFacilityConfigurationModelCreate(model.Id, model.FacilityId, model.EmailAddresses, model.EnabledNotifications, model.Channels);
-                bool result = await _updateFacilityConfigurationCommand.Execute(config);
+                bool result = await _updateFacilityConfigurationCommand.Execute(config, HttpContext.RequestAborted);
                 var msg = result ? "The notification configuration was updated succcessfully." : "Failed to update the notification configuration, check log for details.";
                 EntityUpdateddResponse response = new EntityUpdateddResponse(msg, model.Id);
 
@@ -261,7 +259,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification configuration with the provided facility Id.
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -275,7 +272,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationConfigurationModel>> GetFacilityConfiguration(string facilityId, CancellationToken cancellationToken)
+        public async Task<ActionResult<NotificationConfigurationModel>> GetFacilityConfiguration(string facilityId)
         {
             if (string.IsNullOrEmpty(facilityId))
             {
@@ -291,7 +288,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             try
             {
-                NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId);
+                NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, HttpContext.RequestAborted);
 
                 if (config == null) { return NotFound(); }
 
@@ -309,7 +306,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a notification configuration with the provided configuration Id.
         /// </summary>
         /// <param name="id"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -323,7 +319,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(Guid id, CancellationToken cancellationToken)
+        public async Task<ActionResult<NotificationConfigurationModel>> GetNotificationConfiguration(Guid id)
         {
             if (id == Guid.Empty)
             {
@@ -338,7 +334,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             try
             {
-                NotificationConfigurationModel config = await _getNotificationConfigurationQuery.Execute(new NotificationConfigId(id));
+                NotificationConfigurationModel config = await _getNotificationConfigurationQuery.Execute(new NotificationConfigId(id), HttpContext.RequestAborted);
 
                 if (config == null) { return NotFound(); }
                 _logger.LogGetNotificationConfigurationById(config.Id);
@@ -357,7 +353,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Deletes a notification configuration with the provided configuration Id.
         /// </summary>
         /// <param name="id"></param>
-        /// <param name="cancellationToken"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -371,7 +366,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(Guid id, CancellationToken cancellationToken)
+        public async Task<ActionResult<EntityDeletedResponse>> DeleteNotificationConfiguration(Guid id)
         {
             if (id == Guid.Empty)
             {
@@ -386,7 +381,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
             try
             {
-                bool result = await _deleteFacilityConfigurationCommand.Execute(new NotificationConfigId(id));
+                bool result = await _deleteFacilityConfigurationCommand.Execute(new NotificationConfigId(id), HttpContext.RequestAborted);
 
                 EntityDeletedResponse entityDeletedResponse = new EntityDeletedResponse();
                 entityDeletedResponse.Id = id.ToString();

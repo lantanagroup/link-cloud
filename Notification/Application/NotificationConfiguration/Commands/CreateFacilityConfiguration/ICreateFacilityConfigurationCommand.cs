@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 { 
     public interface ICreateFacilityConfigurationCommand
     {
-        Task<NotificationConfigurationModel> Execute(CreateFacilityConfigurationModel model);
+        Task<NotificationConfigurationModel> Execute(CreateFacilityConfigurationModel model, CancellationToken cancellationToken);
     }
 }

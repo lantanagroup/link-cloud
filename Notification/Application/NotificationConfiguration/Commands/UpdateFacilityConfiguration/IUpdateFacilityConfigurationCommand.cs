@@ -3,6 +3,6 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 {
     public interface IUpdateFacilityConfigurationCommand
     {
-        Task<bool> Execute(UpdateFacilityConfigurationModel model);
+        Task<bool> Execute(UpdateFacilityConfigurationModel model, CancellationToken cancellationToken);
     }
 }

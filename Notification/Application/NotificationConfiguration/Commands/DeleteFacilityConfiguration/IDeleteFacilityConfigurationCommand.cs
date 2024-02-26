@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 {
     public interface IDeleteFacilityConfigurationCommand
     {
-        Task<bool> Execute(NotificationConfigId id);
+        Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken);
     }
 }

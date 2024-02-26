@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
-using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
@@ -31,7 +30,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
-        public async Task<string> Execute(CreateNotificationModel model)
+        public async Task<string> Execute(CreateNotificationModel model, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Notification Command");
 
@@ -49,7 +48,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 using (ServiceActivitySource.Instance.StartActivity("Get facility configuration for notifications"))
                 {
                     //get facility configuration to determine recipients
-                    NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+                    NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId, cancellationToken);
 
                     if (config is null || config.EmailAddresses is null || config.EmailAddresses.Count == 0)
                     {
@@ -85,7 +84,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 using (ServiceActivitySource.Instance.StartActivity("Create the notification"))
                 {
                     NotificationEntity entity = _notificationFactory.NotificationEntityCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
-                    _ = await _datastore.Add(entity);       
+                    _ = await _datastore.AddAsync(entity);       
 
                     //TODO: Get user info
                     //Create audit event

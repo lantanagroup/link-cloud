@@ -16,13 +16,13 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Find Notification Configurations Query");
 
             try
             {
-                var (result, metadata) = await _datastore.Search(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber);
+                var (result, metadata) = await _datastore.SearchAsync(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
                
                 List<NotificationConfigurationModel> configs = result.Select(x => new NotificationConfigurationModel
                 {

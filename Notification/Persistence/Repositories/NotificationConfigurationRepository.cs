@@ -16,41 +16,41 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public Task<bool> Add(NotificationConfig entity)
+        public async Task<bool> AddAsync(NotificationConfig entity, CancellationToken cancellationToken = default)
         {
-            _dbContext.NotificationConfigs.Add(entity);            
-            return Task.FromResult(_dbContext.SaveChanges() > 0);            
+            await _dbContext.NotificationConfigs.AddAsync(entity, cancellationToken);            
+            return _dbContext.SaveChanges() > 0;            
         }
 
-        public Task<bool> Delete(NotificationConfigId id)
+        public async Task<bool> DeleteAsync(NotificationConfigId id, CancellationToken cancellationToken = default)
         {
-            var config = _dbContext.NotificationConfigs.Find(id);
+            var config = await _dbContext.NotificationConfigs.FindAsync(id, cancellationToken);
             if(config is null)
             {
-                return Task.FromResult(false);
+                return false;
             }
 
             _dbContext.NotificationConfigs.Remove(config);
-            return Task.FromResult(_dbContext.SaveChanges() > 0);            
+            return _dbContext.SaveChanges() > 0;            
         }
 
-        public Task<NotificationConfig?> Get(NotificationConfigId id, bool noTracking = false)
+        public async Task<NotificationConfig?> GetAsync(NotificationConfigId id, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var config = noTracking ? 
-                _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(x => x.Id == id) : 
-                _dbContext.NotificationConfigs.Find(id);
-            return Task.FromResult(config);
+                await _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken) : 
+                await _dbContext.NotificationConfigs.FindAsync(id, cancellationToken);
+            return config;
         }
 
-        public Task<NotificationConfig?> GetFacilityNotificationConfig(string facilityId, bool noTracking = false)
+        public async Task<NotificationConfig?> GetFacilityNotificationConfigAsync(string facilityId, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var config = noTracking ? 
-                _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(x => x.FacilityId == facilityId) :
-                _dbContext.NotificationConfigs.FirstOrDefault(x => x.FacilityId == facilityId);
-            return Task.FromResult(config);
+                await _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken) :
+                await _dbContext.NotificationConfigs.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
+            return config;
         }
 
-        public Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<NotificationConfig> configs;
             var query = _dbContext.NotificationConfigs.AsNoTracking().AsQueryable();
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             }
             #endregion
 
-            var count = query.Count();        
+            var count = await query.CountAsync(cancellationToken);        
             query = sortOrder switch
             {
                 SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationConfig>(sortBy)),
@@ -79,22 +79,24 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 _ => query.OrderBy(x => x.CreatedOn)
             };
             
-            configs = query
+            configs = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
-            return Task.FromResult<(IEnumerable<NotificationConfig>, PaginationMetadata)>((configs, metadata));
+            var result = (configs, metadata);
+
+            return result;
         }
 
-        public Task<bool> Update(NotificationConfig entity)
+        public async Task<bool> UpdateAsync(NotificationConfig entity, CancellationToken cancellationToken = default)
         {
-            var originalEntity = Get(entity.Id).Result;
+            var originalEntity = await GetAsync(entity.Id, false, cancellationToken);
             if (originalEntity == null)
             {
-                return null;
+                return false;
             }
 
             //check if channels were updated
@@ -104,14 +106,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             //}
 
             _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);          
-            return Task.FromResult(_dbContext.SaveChanges() > 0);
+            return _dbContext.SaveChanges() > 0;
         }
-        public Task<bool> Exists(NotificationConfigId id)
+        public async Task<bool> ExistsAsync(NotificationConfigId id, CancellationToken cancellationToken = default)
         {
-            var res = _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefault(a => a.Id == id);
+            var res = await _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
             if (res != null)
-                return Task.FromResult<bool>(true);
-            return Task.FromResult<bool>(false);
+                return true;
+            return false;
         }
     }
 }

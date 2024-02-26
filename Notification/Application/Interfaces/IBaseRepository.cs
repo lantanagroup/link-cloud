@@ -2,7 +2,7 @@
 {
     public interface IBaseRepository<T> where T : class
     {
-        Task<bool> Add(T entity);
-        Task<bool> Update(T entity);            
+        Task<bool> AddAsync(T entity, CancellationToken cancellationToken = default);
+        Task<bool> UpdateAsync(T entity, CancellationToken cancellationToken = default);            
     }
 }
