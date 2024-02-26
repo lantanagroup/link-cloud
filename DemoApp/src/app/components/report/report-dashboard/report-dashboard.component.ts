@@ -73,7 +73,7 @@ export class ReportDashboardComponent implements OnInit {
   }
 
   getReports() {
-    this.reportService.getReports(this.facilityId).subscribe((reports: IReportConfigModel[]) => {
+    this.reportService.getReportConfigurations(this.facilityId).subscribe((reports: IReportConfigModel[]) => {
       this.reports = reports;
       if (this.reports.length > 0) {
         this.showNoReportConfigAlert = false;

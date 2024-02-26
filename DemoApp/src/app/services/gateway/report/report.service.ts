@@ -15,7 +15,7 @@ export class ReportService {
 
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService) { }
 
-  createConfiguration(facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
+  createReportConfiguration(facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
     let report: IReportConfigModel = {
       id: "",
       facilityId: facilityId,
@@ -33,7 +33,7 @@ export class ReportService {
       )
   }
 
-  updateConfiguration(reportConfigId: string, facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
+  updateReportConfiguration(reportConfigId: string, facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
     let report: IReportConfigModel = {
       id: reportConfigId,
       facilityId: facilityId,
@@ -51,7 +51,7 @@ export class ReportService {
       )
   }
 
-  getConfiguration(reportConfigId: string): Observable<IReportConfigModel> {
+  getReportConfiguration(reportConfigId: string): Observable<IReportConfigModel> {
     return this.http.get<IReportConfigModel>(`${this.baseApiUrl}/report/config/${reportConfigId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
@@ -59,7 +59,7 @@ export class ReportService {
       )
   }
 
-  deleteConfiguration(reportConfigId: string): Observable<IEntityDeletedResponse> {
+  deleteReportConfiguration(reportConfigId: string): Observable<IEntityDeletedResponse> {
     return this.http.delete<IEntityDeletedResponse>(`${this.baseApiUrl}/report/config/${reportConfigId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
@@ -67,10 +67,13 @@ export class ReportService {
       )
   }
 
-  getReports(facilityId: string): Observable<IReportConfigModel[]> {
+  getReportConfigurations(facilityId: string): Observable<IReportConfigModel[]> {
     return this.http.get<IReportConfigModel[]>(`${this.baseApiUrl}/report/config/reports/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched reports.`)),
+        map((response: IReportConfigModel[]) => {
+          return response;
+        }),
         catchError((error) => this.errorHandler.handleError(error))
       )
   }

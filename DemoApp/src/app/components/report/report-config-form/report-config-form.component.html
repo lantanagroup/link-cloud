@@ -4,10 +4,10 @@
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Facility Id</mat-label>
         <input matInput formControlName="facilityId" [readonly]="true">
-        <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+        <button *ngIf="facilityId.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="facilityIdControl.hasError('required')">
+        <mat-error *ngIf="facilityId.hasError('required')">
           A facility id is <strong>required</strong>
         </mat-error>
       </mat-form-field>
@@ -16,11 +16,14 @@
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Report Type</mat-label>
         <input matInput formControlName="reportType" [readonly]="viewOnly">
-        <button *ngIf="reportTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearReportType()">
+        <button *ngIf="reportType.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearReportType()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="reportTypeControl.hasError('required')">
+        <mat-error *ngIf="reportType.hasError('required')  && !viewOnly">
           A Report type is <strong>required</strong>
+        </mat-error>
+        <mat-error *ngIf="reportTypeExists && !viewOnly">
+          This Report type is <strong>already used</strong>
         </mat-error>
       </mat-form-field>
     </div>
@@ -28,10 +31,10 @@
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Bundling Type</mat-label>
         <input matInput formControlName="bundlingType" [readonly]="viewOnly">
-        <button *ngIf="bundlingTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundlingType()">
+        <button *ngIf="bundlingType.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundlingType()">
           <mat-icon>close</mat-icon>
         </button>
-        <mat-error *ngIf="bundlingTypeControl.hasError('required')">
+        <mat-error *ngIf="bundlingType.hasError('required')">
           A bundling type is <strong>required</strong>
         </mat-error>
       </mat-form-field>
