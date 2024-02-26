@@ -70,6 +70,7 @@ public class CensusListener : BackgroundService
                 catch(ConsumeException ex)
                 {
                     _nonTransientExceptionHandler.HandleException(ex);
+                    kafkaConsumer.Commit(rawmessage);
                     _logger.LogError($"Error consuming message: {ex.Error.Reason}");
                     continue;
                 }
@@ -87,6 +88,7 @@ public class CensusListener : BackgroundService
                     catch (Exception ex)
                     {
                         _nonTransientExceptionHandler.HandleException(rawmessage,ex);
+                        kafkaConsumer.Commit(rawmessage);
                         var errorMessage = $"Unable to deserialize message: {rawmessage?.Message?.Value}";
                         _logger.LogError(errorMessage);
                         continue;
@@ -106,6 +108,7 @@ public class CensusListener : BackgroundService
                     catch (MissingFacilityIdException ex)
                     {
                         _nonTransientExceptionHandler.HandleException(rawmessage, ex);
+                        kafkaConsumer.Commit(rawmessage);
                         var errorMessage = $"No Facility ID provided. Unable to process message: {message}";
                         _logger.LogWarning(errorMessage);
                         continue;
