@@ -19,6 +19,6 @@ RUN dotnet publish "Normalization.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore8.0-runtime
+# RUN apk add --no-cache aspnetcore8.0-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Normalization.dll"]
