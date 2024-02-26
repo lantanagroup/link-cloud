@@ -46,31 +46,31 @@
     </mat-toolbar>
   </p>-->
 
-  <div formArrayName="eHRPatientLists">
-    <div *ngFor="let list of eHRPatientListControl.controls; let i=index">
-      <div class="input-container list-item-container" [formGroupName]="i">
-        <div style="display: flex;">
-          <div style="flex: auto;">
-            <mat-form-field appearance="outline" class="data-acq-list-task-input">
-              <mat-label>Measure ID</mat-label>
-              <input matInput formControlName="measureId" [readonly]="viewOnly">
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="data-acq-list-task-input">
-              <mat-label>List ID</mat-label>
-              <input matInput formControlName="listId" [readonly]="viewOnly">
-            </mat-form-field>
-          </div>
-          <div style="flex-shrink: 2;">
-            <button mat-stroked-button (click)="addEHRPatientList(i)" *ngIf="!viewOnly">
-              Add EHR Patient List
-            </button>
-            <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeEHRPatientList(i)" *ngIf="!viewOnly">
-              Delete EHR Patient List
-            </button>
+  <div formArrayName="eHRPatientLists"  *ngIf="eHRPatientListControl && eHRPatientListControl.controls.length > 0">
+      <div *ngFor="let list of eHRPatientListControl.controls; let i=index">
+        <div class="input-container list-item-container" [formGroupName]="i">
+          <div style="display: flex;">
+            <div style="flex: auto;">
+              <mat-form-field appearance="outline" class="data-acq-list-task-input">
+                <mat-label>Measure ID</mat-label>
+                <input matInput formControlName="measureId" [readonly]="viewOnly">
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="data-acq-list-task-input">
+                <mat-label>List ID</mat-label>
+                <input matInput formControlName="listId" [readonly]="viewOnly">
+              </mat-form-field>
+            </div>
+            <div style="flex-shrink: 2;">
+              <button mat-stroked-button (click)="addEHRPatientList(i)" *ngIf="!viewOnly">
+                Add EHR Patient List
+              </button>
+              <button mat-stroked-button color="warn" style="margin-left: .5em;" (click)="removeEHRPatientList(i)" *ngIf="!viewOnly">
+                Delete EHR Patient List
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </div>
 </form>
 
