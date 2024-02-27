@@ -1,7 +1,13 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Unicode;
 
 namespace LantanaGroup.Link.Notification.Persistence.Repositories
 {
@@ -9,11 +15,15 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
     {
         private readonly ILogger<NotificationConfigurationRepository> _logger;
         private readonly NotificationDbContext _dbContext;
+        private readonly IAuditEventFactory _auditEventFactory;
+        private readonly ICreateAuditEventCommand _createAuditEventCommand;
 
-        public NotificationConfigurationRepository(ILogger<NotificationConfigurationRepository> logger, NotificationDbContext dbContext)
+        public NotificationConfigurationRepository(ILogger<NotificationConfigurationRepository> logger, NotificationDbContext dbContext, ICreateAuditEventCommand createAuditEventCommand, IAuditEventFactory auditEventFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _createAuditEventCommand = createAuditEventCommand ?? throw new ArgumentNullException(nameof(createAuditEventCommand));
+            _auditEventFactory = auditEventFactory ?? throw new ArgumentNullException(nameof(auditEventFactory));
         }
 
         public async Task<bool> AddAsync(NotificationConfig entity, CancellationToken cancellationToken = default)
@@ -99,15 +109,97 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 return false;
             }
 
-            //check if channels were updated
-            //if (originalEntity.Channels.Count != entity.Channels.Count || !originalEntity.Channels.SequenceEqual(entity.Channels))
-            //{
+            var message = _auditEventFactory.CreateAuditEvent(null, "TODOUSER", "TODOUSER", AuditEventType.Update, nameof(NotificationConfig), string.Empty);
+            message.PropertyChanges = [];
 
-            //}
+            var serializerOptions = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),                
+                WriteIndented = false
+            };
 
-            _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);          
-            return _dbContext.SaveChanges() > 0;
+            originalEntity.FacilityId = entity.FacilityId;
+            originalEntity.EmailAddresses = entity.EmailAddresses;
+            originalEntity.EnabledNotifications = entity.EnabledNotifications;
+
+            foreach (var changed in _dbContext.ChangeTracker.Entries())
+            {
+                if(changed.State == EntityState.Modified)
+                {                                 
+                    foreach (var prop in changed.Properties)
+                    {
+                        if (prop.Metadata.Name == "LastModifiedOn")
+                            break;
+
+                        var oldVal = JsonSerializer.Serialize(prop.OriginalValue, serializerOptions);
+                        var newVal = JsonSerializer.Serialize(prop.CurrentValue, serializerOptions);
+                        if (oldVal == newVal)
+                            continue;                    
+                      
+                        message.PropertyChanges.Add(new PropertyChangeModel {
+                            PropertyName = prop.Metadata.Name,
+                            InitialPropertyValue = oldVal,
+                            NewPropertyValue = newVal                                    
+                        });
+                        
+                    }
+                }
+            }
+
+            if (!originalEntity.Channels.SequenceEqual(entity.Channels))
+            {
+                //update originalEntity.Channels with entity.Channels
+                foreach (var channel in entity.Channels)
+                {
+                    if (!originalEntity.Channels.Any(x => x.Name == channel.Name))
+                    {
+                        originalEntity.Channels.Add(channel);
+                        message.PropertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = "Channels",
+                            InitialPropertyValue = string.Empty,
+                            NewPropertyValue = JsonSerializer.Serialize(channel, serializerOptions)
+                        });
+                    }
+                    else if (originalEntity.Channels.Any(x => x.Name == channel.Name))
+                    {
+                        var originalChannel = originalEntity.Channels.First(x => x.Name == channel.Name);   
+                        if(originalChannel.Enabled != channel.Enabled)
+                        {
+                            message.PropertyChanges.Add(new PropertyChangeModel
+                            {
+                                PropertyName = "Channels",
+                                InitialPropertyValue = JsonSerializer.Serialize(originalChannel, serializerOptions),
+                                NewPropertyValue = JsonSerializer.Serialize(channel, serializerOptions)
+                            });
+                            originalChannel.Enabled = channel.Enabled;
+                        }                              
+                    }
+                    else
+                    {
+                        message.PropertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = "Channels",
+                            InitialPropertyValue = JsonSerializer.Serialize(originalEntity.Channels.First(x => x.Name == channel.Name), serializerOptions),
+                            NewPropertyValue = "Deleted"
+                        });
+
+                        originalEntity.Channels.Remove(originalEntity.Channels.First(x => x.Name == channel.Name));
+                    }                    
+                }                     
+            }            
+                     
+            var result = _dbContext.SaveChanges() > 0;
+
+            if (result)
+            {          
+                message.Notes = $"Notification configuration ({entity.Id}) updated for facility '{entity.FacilityId}'.";
+                _ = Task.Run(() => _createAuditEventCommand.Execute(entity.FacilityId, message));                
+            }
+
+            return result;
         }
+
         public async Task<bool> ExistsAsync(NotificationConfigId id, CancellationToken cancellationToken = default)
         {
             var res = await _dbContext.NotificationConfigs.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
