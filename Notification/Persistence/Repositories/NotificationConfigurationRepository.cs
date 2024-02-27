@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -193,7 +192,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             if (result)
             {          
-                message.Notes = $"Notification configuration ({entity.Id}) updated for facility '{entity.FacilityId}'.";
+                message.Notes = $"Notification configuration ({entity.Id.Value}) updated for facility '{entity.FacilityId}'.";
                 _ = Task.Run(() => _createAuditEventCommand.Execute(entity.FacilityId, message));                
             }
 

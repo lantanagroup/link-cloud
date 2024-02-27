@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.C
 
                     //TODO: Get user info
                     //Create audit event
-                    string notes = $"New notification configuration ({entity.Id}) created for '{entity.FacilityId}'.";
+                    string notes = $"New notification configuration ({entity.Id.Value}) created for '{entity.FacilityId}'.";
                     AuditEventMessage auditEventMessage = _auditEventFactory.CreateAuditEvent(null, null, "SystemUser", AuditEventType.Create, typeof(NotificationConfig).Name, notes);
                     _ = Task.Run(() => _createAuditEventCommand.Execute(entity.FacilityId, auditEventMessage));
 
