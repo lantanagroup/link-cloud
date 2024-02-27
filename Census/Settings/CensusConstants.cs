@@ -29,6 +29,7 @@ namespace Census.Settings
         public static class MessageNames
         {
             public const string PatientIDsAcquired = "PatientIDsAcquired";
+            public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
         }
 
         public static class MongoDb
