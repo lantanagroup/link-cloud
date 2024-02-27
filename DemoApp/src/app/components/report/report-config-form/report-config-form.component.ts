@@ -2,11 +2,12 @@ import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges
 import { CommonModule } from '@angular/common';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReportService } from 'src/app/services/gateway/report/report.service';
-import { AbstractControl, FormBuilder, NonNullableFormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import { FormMode } from '../../../models/FormMode.enum';
 import { IReportConfigModel } from '../../../interfaces/report/report-config-model.interface';
 import { IEntityCreatedResponse } from '../../../interfaces/entity-created-response.model';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -39,7 +40,8 @@ import { map } from 'rxjs';
     MatSnackBarModule,
     MatToolbarModule,
     MatExpansionModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatSelectModule
   ],
   templateUrl: './report-config-form.component.html',
   styleUrls: ['./report-config-form.component.scss']
@@ -68,7 +70,7 @@ export class ReportConfigFormComponent implements OnInit, OnChanges {
                         asyncValidators: [this.existsReportType.bind(this)],
                         updateOn: 'blur'
                         }],
-      bundlingType: ["", Validators.required]
+      bundlingType: ['Default', Validators.required]
     })
   }
 
@@ -76,7 +78,10 @@ export class ReportConfigFormComponent implements OnInit, OnChanges {
     return this.reportTypeValidator.checkIfReportTypeExists(control.value, this.item).pipe(map((response: boolean) => response ? { reportTypeExists: true } : null));
   }
 
-  get reportTypeExists() { 
+  get bundlingTypes() {
+    return ['Default', 'SharedPatientLineLevel'];
+  }
+  get reportTypeExists() {
     return this.configForm.get('reportType').hasError('reportTypeExists') && this.configForm.get('reportType').touched;
   }
 
@@ -129,7 +134,7 @@ export class ReportConfigFormComponent implements OnInit, OnChanges {
     }
 
     this.configForm.valueChanges.subscribe(() => {
-      this.formValueChanged.emit(this.configForm.invalid); 
+      this.formValueChanged.emit(this.configForm.invalid);
     });
   }
 
