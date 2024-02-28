@@ -5,6 +5,7 @@ using Census.Settings;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Census.Application.Errors;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.HealthChecks;
 using LantanaGroup.Link.Census.Listeners;
@@ -14,6 +15,7 @@ using LantanaGroup.Link.Census.Services;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -55,16 +57,16 @@ static void RegisterServices(WebApplicationBuilder builder)
    
     
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
-    //builder.Services.AddSingleton<IKafkaWrapper<Ignore, Ignore, string, Null>, KafkaWrapper<Ignore, Ignore, string, Null>>();
-    //builder.Services.AddSingleton<IKafkaWrapper<string, string, string, object>, KafkaWrapper<string, string, string, object>>();
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddSingleton<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
     builder.Services.AddSingleton<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddScoped<ICensusConfigMongoRepository, CensusConfigMongoRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
-    //builder.Services.AddScoped<CensusConfigService>();
+    builder.Services.AddTransient<INonTransientExceptionHandler<string, string>, NonTransientPatientIDsAcquiredExceptionHandler<string, string>>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
