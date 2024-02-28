@@ -19,6 +19,6 @@ RUN dotnet publish "DataAcquisition.csproj" -c Release -o /app/publish /p:UseApp
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore7-runtime
+#RUN apk add --no-cache aspnetcore7-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "DataAcquisition.dll"]
