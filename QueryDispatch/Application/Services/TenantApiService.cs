@@ -19,7 +19,7 @@ public class TenantApiService : ITenantApiService
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
-        if (!_settings.CheckIfFacilityExists)
+        if (!_settings.CheckIfTenantExists)
             return true;
 
         var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}/{facilityId}";
