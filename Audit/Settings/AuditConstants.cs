@@ -7,7 +7,8 @@
             public const string ExternalConfigurationSource = "Link:Audit:ExternalConfigurationSource";
             public const string ServiceInformation = "Link:Audit:ServiceInformation";
             public const string Kafka = "Link:Audit:KafkaConnection";
-            public const string DatabaseProvider = "Link:Audit:DatabaseProvider";
+            public const string DatabaseConnectionString = "Link:Audit:ConnectionStrings:DatabaseConnection";
+            public const string DatabaseProvider = "Link:Audit:DatabaseProvider";            
             public const string IdentityProvider = "Link:Audit:IdentityProviderConfig";
             public const string Telemetry = "Link:Audit:TelemetryConfig";
             public const string Serilog = "Link:Audit:Logging:Serilog";

@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         private List<AuditLog> auditEntityList;
         private Mock<IAsyncCursor<AuditLog>> auditEntityCursor;
 
-        private static readonly string _auditId = new Guid("aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856").ToString();
+        private static readonly string _auditId ="aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856";
         private const string FacilityId = "TestFacility_001";
         private const string ServiceName = "Account Service";
         private const string CorrelationId = "MockCorrelationId_001";
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             //create audit entities
             AuditLog _auditEvent = new AuditLog();
             #region Setup for _auditEvent
-            _auditEvent.Id = _auditId;
+            _auditEvent.Id = AuditId.FromString(_auditId);
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;
             _auditEvent.CorrelationId = CorrelationId;
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         [Test]
         public void TestAddAuditEntity() {
             var auditEntity = new AuditLog();
-            auditEntity.Id = Guid.NewGuid().ToString();
+            auditEntity.Id = AuditId.NewId();
 
             InitializeMongoAuditEventCollection();
             //TODO How to make mongo repo more testable

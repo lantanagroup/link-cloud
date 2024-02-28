@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Audit Event By Id Query");            
             
-            var result = await _datastore.Get(id);
+            var result = await _datastore.Get(id, true);
             AuditModel? auditEvent = null;
             if (result != null)
             {

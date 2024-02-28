@@ -14,9 +14,9 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         private readonly ILogger<CreateAuditEventCommand> _logger;
         private readonly IAuditRepository _datastore;
         private readonly IAuditFactory _factory;
-        private readonly AuditServiceMetrics _metrics;
+        private readonly IAuditServiceMetrics _metrics;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, AuditServiceMetrics metrics, IAuditHelper auditHelper) {
+        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, IAuditServiceMetrics metrics, IAuditHelper auditHelper) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));        
@@ -51,24 +51,25 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex, new TagList { 
-                    { "service.name", model.ServiceName } 
+                    { "service.name", model.ServiceName },
+                    { "facility", model.FacilityId },
+                    { "action", model.Action },
+                    { "resource", model.Resource }
                 });
                 _logger.LogDebug(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), ex, "New audit event creation failed for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Action, auditLog.Resource, auditLog.ServiceName);
                 throw;
             }
 
-            //Log creation of new audit event                        
-            //_logger.LogInformation(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), "New audit event ({auditLogId}) created for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Id, auditLog.Action, auditLog.Resource, auditLog.ServiceName);
+            //Log creation of new audit event                                 
             _logger.LogAuditEventCreation(auditLog);
-            _metrics.AuditableEventCounter.Add(1, 
+            _metrics.IncrementAuditableEventCounter([
                 new KeyValuePair<string, object?>("service", auditLog.ServiceName),
                 new KeyValuePair<string, object?>("facility", auditLog.FacilityId),
                 new KeyValuePair<string, object?>("action", auditLog.Action),
-                new KeyValuePair<string, object?>("resource", auditLog.Resource)                
-            );
-            return auditLog;
-
-            
+                new KeyValuePair<string, object?>("resource", auditLog.Resource)
+            ]);                
+          
+            return auditLog;           
          
         }
     }

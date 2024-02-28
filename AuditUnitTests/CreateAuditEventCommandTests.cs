@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.AuditUnitTests
 
             //set up audit entity
             _auditEvent = new AuditLog();
-            _auditEvent.Id = Guid.NewGuid().ToString();
+            _auditEvent.Id = AuditId.NewId();
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;
             _auditEvent.CorrelationId = CorrelationId;
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             _command = _mocker.CreateInstance<CreateAuditEventCommand>();
 
             _mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.AddAsync(_auditEvent)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.Add(_auditEvent)).Returns(Task.FromResult<bool>(true));
 
         }
 
@@ -125,12 +125,11 @@ namespace LantanaGroup.Link.AuditUnitTests
         [Test]
         public void TestExecuteShouldAddAuditEventToTheDatabase()
         {
-            Task<string> _createdAuditEventId = _command.Execute(_model);            
+            Task<AuditLog> _createdAuditEventId = _command.Execute(_model);            
 
-            _mocker.GetMock<IAuditRepository>().Verify(p => p.AddAsync(_auditEvent), Times.Once());
+            _mocker.GetMock<IAuditRepository>().Verify(p => p.Add(_auditEvent), Times.Once());
 
-            Assert.That(_createdAuditEventId.Result, Is.Not.Empty);
-            Assert.That(_createdAuditEventId.Result, Is.Not.EqualTo(string.Empty));
+            Assert.That(_createdAuditEventId.Result, Is.Not.Null);
 
         }
     }
