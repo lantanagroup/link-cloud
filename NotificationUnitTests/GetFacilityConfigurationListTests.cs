@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
             var output = (configs: _configs, metaData: _pagedMetaData);
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.Search(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber))
+                .Setup(p => p.SearchAsync(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber, CancellationToken.None))
                 .ReturnsAsync(output);
         }
 
@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
         {
             Task<PagedNotificationConfigurationModel> _config = _query.Execute(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Search(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.SearchAsync(searchText, filterFacilityBy, sortBy, SortOrder.Ascending, pageSize, pageNumber, CancellationToken.None), Times.Once());
 
         }
     }

@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             var output = (records: _entities, metaData: _pagedMetaData);
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.GetFacilityNotifications(facilityId, sortBy, SortOrder.Ascending, pageSize, pageNumber))
+                .Setup(p => p.GetFacilityNotificationsAsync(facilityId, sortBy, SortOrder.Ascending, pageSize, pageNumber, CancellationToken.None))
                 .ReturnsAsync(output);
         }
 

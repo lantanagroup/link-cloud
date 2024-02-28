@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 .Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.SetNotificationSentOn(NotificationId.FromString(_model.Id))).Returns(Task.FromResult<bool>(true));           
+                .Setup(p => p.SetNotificationSentOnAsync(NotificationId.FromString(_model.Id), CancellationToken.None)).Returns(Task.FromResult<bool>(true));           
 
         }
 
