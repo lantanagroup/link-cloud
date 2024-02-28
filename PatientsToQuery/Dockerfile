@@ -19,7 +19,7 @@ RUN dotnet publish "PatientsToQuery.csproj" -c Release -o /app/publish /p:UseApp
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache rocksdb libstdc++ aspnetcore6-runtime
+#RUN apk add --no-cache rocksdb libstdc++ aspnetcore6-runtime
 RUN ln -s /usr/lib/librocksdb.so.7 /usr/lib/librocksdb.so
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "PatientsToQuery.dll"]
