@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
         public async Task<bool> AddAsync(NotificationConfig entity, CancellationToken cancellationToken = default)
         {
             await _dbContext.NotificationConfigs.AddAsync(entity, cancellationToken);            
-            return _dbContext.SaveChanges() > 0;            
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;            
         }
 
         public async Task<bool> DeleteAsync(NotificationConfigId id, CancellationToken cancellationToken = default)
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             }
 
             _dbContext.NotificationConfigs.Remove(config);
-            return _dbContext.SaveChanges() > 0;            
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;            
         }
 
         public async Task<NotificationConfig?> GetAsync(NotificationConfigId id, bool noTracking = false, CancellationToken cancellationToken = default)
@@ -184,11 +184,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                         });
 
                         originalEntity.Channels.Remove(originalEntity.Channels.First(x => x.Name == channel.Name));
-                    }                    
+                    } 
+                    
+                    //set the state of the originalEntity to modified
+                    _dbContext.Entry(originalEntity).State = EntityState.Modified;
                 }                     
             }            
                      
-            var result = _dbContext.SaveChanges() > 0;
+            var result = await _dbContext.SaveChangesAsync(cancellationToken) > 0;
 
             if (result)
             {          

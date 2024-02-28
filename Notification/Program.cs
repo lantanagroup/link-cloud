@@ -15,6 +15,7 @@ using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
+using LantanaGroup.Link.Notification.Persistence.Interceptors;
 using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
@@ -143,12 +144,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
     //Add database context
-    builder.Services.AddDbContext<NotificationDbContext>(options => {
+    builder.Services.AddDbContext<NotificationDbContext>((sp, options) => {
+        
+        var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+        
         switch (builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseProvider))
         {
             case "SqlServer":
-                options.UseSqlServer(builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString));
+                options.UseSqlServer(
+                    builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                .AddInterceptors(updateBaseEntityInterceptor);                    
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");

@@ -1,7 +1,5 @@
-﻿using LantanaGroup.Link.Notification.Application.Interfaces;
-using LantanaGroup.Link.Notification.Domain.Entities;
+﻿using LantanaGroup.Link.Notification.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Notification.Persistence
@@ -21,12 +19,12 @@ namespace LantanaGroup.Link.Notification.Persistence
             base.OnModelCreating(modelBuilder);
         }
 
-        public override int SaveChanges()
-        {
-            PreSaveData();       
-            return base.SaveChanges();
-        }
-
+        /// <summary>
+        /// Creates a sort expression for the given sortBy parameter
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="sortBy"></param>
+        /// <returns></returns>
         public Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var sortKey = sortBy switch
@@ -42,33 +40,6 @@ namespace LantanaGroup.Link.Notification.Persistence
             var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
 
             return sortExpression;
-        }
-
-        /// <summary>
-        /// Handles any final entity changes before save is executed.
-        /// Ensures auditing fields are correctly populated regardless of any supplied values.
-        /// </summary>
-        protected void PreSaveData()
-        {
-            foreach (var changed in ChangeTracker.Entries())
-            {
-
-                if (changed.Entity is IBaseEntity entity)
-                {
-                    switch (changed.State)
-                    {
-                        // Entity modified -- set LastModifiedOn and ensure original CreatedOn is retained
-                        case EntityState.Modified:
-                            entity.CreatedOn = changed.OriginalValues.GetValue<DateTime>(nameof(entity.CreatedOn));
-                            entity.LastModifiedOn = DateTime.UtcNow;
-                            break;
-                        // Entity created -- set CreatedOn
-                        case EntityState.Added:
-                            entity.CreatedOn = DateTime.UtcNow;
-                            break;
-                    }
-                }
-            }
         }
     }
 }

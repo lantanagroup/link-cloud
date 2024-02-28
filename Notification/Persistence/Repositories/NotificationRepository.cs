@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
         public async Task<bool> AddAsync(NotificationEntity entity, CancellationToken cancellationToken = default)
         {
             await _dbContext.Notifications.AddAsync(entity, cancellationToken);  
-            return _dbContext.SaveChanges() > 0;
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
         public async Task<NotificationEntity?> GetAsync(NotificationId id, bool noTracking = false, CancellationToken cancellationToken = default)
@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             }
 
             notification.SentOn.Add(DateTime.UtcNow);
-            return _dbContext.SaveChanges() > 0;
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
         public async Task<bool> UpdateAsync(NotificationEntity entity, CancellationToken cancellationToken = default)
@@ -144,7 +144,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             }
 
             _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);
-            return _dbContext.SaveChanges() > 0;
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }        
     }
 }
