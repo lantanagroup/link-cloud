@@ -80,6 +80,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient<ICensusService, CensusService>().AddHeaderPropagation();
     builder.Services.AddHttpClient<IDataAcquisitionService, DataAcquisitionService>().AddHeaderPropagation();
     builder.Services.AddHttpClient<INormalizationService, NormalizationService>().AddHeaderPropagation();
+    builder.Services.AddHttpClient<IReportService, ReportService>().AddHeaderPropagation();
 
     //Commands
     builder.Services.AddTransient<ICreateReportScheduledCommand, CreateReportScheduledCommand>();
