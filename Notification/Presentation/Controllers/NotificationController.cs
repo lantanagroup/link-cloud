@@ -46,7 +46,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="sentOnEnd"></param>
         /// <param name="sortBy"></param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
-        /// <param name="cancellationToken"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -138,7 +137,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="facilityId"></param>
         /// <param name="sortBy"></param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
-        /// <param name="cancellationToken"></param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
