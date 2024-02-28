@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Notification.Persistence.Repositories
 {
@@ -38,8 +39,8 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             query = sortOrder switch
             {
-                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Ascending => query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
@@ -107,8 +108,8 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             query = sortOrder switch
             {
-                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Ascending => query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
@@ -145,6 +146,30 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             _dbContext.Entry(originalEntity).CurrentValues.SetValues(entity);
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
-        }        
+        }
+
+        /// <summary>
+        /// Creates a sort expression for the given sortBy parameter
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="sortBy"></param>
+        /// <returns></returns>
+        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+        {
+            var sortKey = sortBy switch
+            {
+                "FacilityId" => "FacilityId",
+                "NotificationType" => "NotificationType",
+                "CreatedOn" => "CreatedOn",
+                "LastModifiedOn" => "LastModifiedOn",
+                "SentOn" => "SentOn",
+                _ => "CreatedOn"
+            };
+
+            var parameter = Expression.Parameter(typeof(T), "p");
+            var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+            return sortExpression;
+        }
     }
 }

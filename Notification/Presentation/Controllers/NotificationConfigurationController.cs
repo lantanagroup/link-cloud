@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// </summary>
         /// <param name="searchText"></param>
         /// <param name="filterFacilityBy"></param>
-        /// <param name="sortBy"></param>
+        /// <param name="sortBy">Options: FacilityId, CreatedOn, LastModifiedOn</param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>        
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>>
