@@ -17,29 +17,6 @@ namespace LantanaGroup.Link.Notification.Persistence
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationDbContext).Assembly);
             base.OnModelCreating(modelBuilder);
-        }
-
-        /// <summary>
-        /// Creates a sort expression for the given sortBy parameter
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="sortBy"></param>
-        /// <returns></returns>
-        public Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
-        {
-            var sortKey = sortBy switch
-            {
-                "FacilityId" => "FacilityId",
-                "NotificationType" => "NotificationType",
-                "CreatedOn" => "CreatedOn",
-                "SentOn" => "SentOn",
-                _ => "CreatedOn"
-            };
-
-            var parameter = Expression.Parameter(typeof(T), "p");
-            var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
-
-            return sortExpression;
-        }
+        }        
     }
 }

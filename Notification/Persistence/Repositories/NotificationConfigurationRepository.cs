@@ -4,6 +4,7 @@ using LantanaGroup.Link.Notification.Application.Notification.Commands;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -83,8 +84,8 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             var count = await query.CountAsync(cancellationToken);        
             query = sortOrder switch
             {
-                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<NotificationConfig>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<NotificationConfig>(sortBy)),
+                SortOrder.Ascending => query.OrderBy(SetSortBy<NotificationConfig>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<NotificationConfig>(sortBy)),
                 _ => query.OrderBy(x => x.CreatedOn)
             };
             
@@ -208,6 +209,28 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             if (res != null)
                 return true;
             return false;
+        }
+
+        /// <summary>
+        /// Creates a sort expression for the given sortBy parameter
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="sortBy"></param>
+        /// <returns></returns>
+        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+        {
+            var sortKey = sortBy switch
+            {
+                "FacilityId" => "FacilityId",
+                "CreatedOn" => "CreatedOn",
+                "LastModifiedOn" => "LastModifiedOn",
+                _ => "CreatedOn"
+            };
+
+            var parameter = Expression.Parameter(typeof(T), "p");
+            var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+            return sortExpression;
         }
     }
 }

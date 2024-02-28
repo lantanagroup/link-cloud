@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="createdOnEnd"></param>
         /// <param name="sentOnStart"></param>
         /// <param name="sentOnEnd"></param>
-        /// <param name="sortBy"></param>
+        /// <param name="sortBy">Options: FacilityId, NotificationType, CreatedOn, LastModifiedOn, SentOn, defaults to CreatedOn</param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
@@ -90,7 +90,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         }
 
         /// <summary>
-        /// Returns a notification event with the provided Id.
+        /// Returns a notification with the provided Id.
         /// </summary>
         /// <param name="id"></param>
         /// <returns>
@@ -135,7 +135,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// Returns a list of notifications based on the facility Id and provided filters.
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <param name="sortBy"></param>
+        /// <param name="sortBy">Options: FacilityId, NotificationType, CreatedOn, LastModifiedOn, SentOn, defaults to CreatedOn</param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
