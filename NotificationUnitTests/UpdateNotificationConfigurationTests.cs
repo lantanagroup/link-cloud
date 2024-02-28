@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _command = _mocker.CreateInstance<UpdateFacilityConfigurationCommand>();
 
             _mocker.GetMock<INotificationConfigurationRepository>()
-                .Setup(p => p.Update(_config)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_config, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory>()
                 .Setup(p => p.CreateAuditEventProducer(false))
@@ -86,9 +86,9 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldUpdateExistingNotificationConfigurationInTheDatabase()
         {
-            Task<bool> _createdConfigId = _command.Execute(_model);
+            Task<bool> _createdConfigId = _command.Execute(_model, CancellationToken.None);
 
-            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.Update(_config), Times.Once());                        
+            _mocker.GetMock<INotificationConfigurationRepository>().Verify(p => p.UpdateAsync(_config, CancellationToken.None), Times.Once());                        
 
         }
 

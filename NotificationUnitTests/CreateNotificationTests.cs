@@ -116,11 +116,11 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _command = _mocker.CreateInstance<CreateNotificationCommand>();            
 
             _mocker.GetMock<IGetFacilityConfigurationQuery>()
-                .Setup(p => p.Execute(facilityId))
+                .Setup(p => p.Execute(facilityId, CancellationToken.None))
                 .Returns(Task.FromResult< NotificationConfigurationModel>(_config));
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.Add(_entity)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_entity, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory>()
                 .Setup(p => p.CreateAuditEventProducer(false))
@@ -131,9 +131,9 @@ namespace LantanaGroup.Link.NotificationUnitTests
         [Test]
         public void TestExecuteShouldAddNotificationToTheDatabase()
         {
-            Task<string> _createdNotificationId = _command.Execute(_model);
+            Task<string> _createdNotificationId = _command.Execute(_model, CancellationToken.None);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.Add(_entity), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.AddAsync(_entity, CancellationToken.None), Times.Once());
 
             Assert.That(_createdNotificationId.Result, Is.Not.Empty);
         }

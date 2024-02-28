@@ -80,16 +80,16 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _query = _mocker.CreateInstance<GetNotificationQuery>();            
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.Get(NotificationId.FromString(id), true))
+                .Setup(p => p.GetAsync(NotificationId.FromString(id), true, CancellationToken.None))
                 .ReturnsAsync(_entity);
         }
 
         [Test]
         public void TestExecuteShouldReturnANotificationWithIdFromTheDatabase()
         {
-            Task<NotificationModel> results = _query.Execute(NotificationId.FromString(id));
+            Task<NotificationModel> results = _query.Execute(NotificationId.FromString(id), CancellationToken.None);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.Get(NotificationId.FromString(id), true), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.GetAsync(NotificationId.FromString(id), true, CancellationToken.None), Times.Once());
 
         }
     }
