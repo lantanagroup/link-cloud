@@ -19,7 +19,7 @@ RUN dotnet publish "Census.csproj" -c Release -o /app/publish /p:UseAppHost=fals
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore7-runtime
+#RUN apk add --no-cache aspnetcore7-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Census.dll"]
 #
