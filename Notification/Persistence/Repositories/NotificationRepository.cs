@@ -37,10 +37,11 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
             var query = _dbContext.Notifications.AsNoTracking().Where(x => x.FacilityId == facilityId).AsQueryable();
             var count = await query.CountAsync(cancellationToken);
 
+            sortBy ??= "CreatedOn";
             query = sortOrder switch
             {
-                SortOrder.Ascending => query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Ascending => sortBy.Equals("SentOn") ? query.OrderBy(x => x.SentOn.Max()) : query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => sortBy.Equals("SentOn") ? query.OrderByDescending(x => x.SentOn.Max()) : query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
@@ -106,10 +107,12 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
 
             var count = await query.CountAsync(cancellationToken);
 
+            sortBy ??= "CreatedOn";
+            
             query = sortOrder switch
             {
-                SortOrder.Ascending => query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
-                SortOrder.Descending => query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Ascending => sortBy.Equals("SentOn") ? query.OrderBy(x => x.SentOn.Max()) : query.OrderBy(SetSortBy<NotificationEntity>(sortBy)),
+                SortOrder.Descending => sortBy.Equals("SentOn") ? query.OrderByDescending(x => x.SentOn.Max()) :  query.OrderByDescending(SetSortBy<NotificationEntity>(sortBy)),
                 _ => query.OrderBy(x => x.CreatedOn)
             };
 
@@ -162,7 +165,6 @@ namespace LantanaGroup.Link.Notification.Persistence.Repositories
                 "NotificationType" => "NotificationType",
                 "CreatedOn" => "CreatedOn",
                 "LastModifiedOn" => "LastModifiedOn",
-                "SentOn" => "SentOn",
                 _ => "CreatedOn"
             };
 
