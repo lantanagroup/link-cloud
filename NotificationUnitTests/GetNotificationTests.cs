@@ -37,8 +37,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 CorrelationId = correlationId,
                 Subject = subject,
                 Body = body,
-                CreatedOn = DateTime.UtcNow,
-                SentOn = null
+                CreatedOn = DateTime.UtcNow
             };
             if (recipients is not null)
             {
@@ -59,8 +58,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 CorrelationId = correlationId,
                 Subject = subject,
                 Body = body,
-                CreatedOn = DateTime.UtcNow,
-                SentOn = null
+                CreatedOn = DateTime.UtcNow
             };
             if (recipients is not null)
             {

@@ -59,8 +59,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         /// <param name="sortBy"></param>
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>        
         /// <param name="pageSize"></param>
-        /// <param name="pageNumber"></param>
-        /// <param name="cancellationToken"></param>
+        /// <param name="pageNumber"></param>>
         /// <returns>
         ///     Success: 200     
         ///     Unautorized: 401
