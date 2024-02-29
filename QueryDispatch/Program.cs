@@ -30,6 +30,7 @@ using Quartz.Impl;
 using Quartz.Spi;
 using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Services;
+using QueryDispatch.Application.Settings;
 using QueryDispatch.Presentation.Services;
 using Serilog;
 using System.Reflection;
