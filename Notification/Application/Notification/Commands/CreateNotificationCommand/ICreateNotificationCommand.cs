@@ -2,6 +2,6 @@
 {
     public interface ICreateNotificationCommand
     {
-        Task<string> Execute(CreateNotificationModel model);
+        Task<string> Execute(CreateNotificationModel model, CancellationToken cancellationToken);
     }
 }

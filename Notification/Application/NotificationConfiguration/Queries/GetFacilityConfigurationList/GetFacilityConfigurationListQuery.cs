@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries
 {
@@ -17,18 +16,17 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber)
+        public async Task<PagedNotificationConfigurationModel> Execute(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Find Notification Configurations Query");
 
             try
             {
-                var (result, metadata) = await _datastore.FindAsync(searchText, filterFacilityBy, sortBy, pageSize, pageNumber);
-
-                //convert AuditEntity to AuditModel
+                var (result, metadata) = await _datastore.SearchAsync(searchText, filterFacilityBy, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+               
                 List<NotificationConfigurationModel> configs = result.Select(x => new NotificationConfigurationModel
                 {
-                    Id = x.Id,
+                    Id = x.Id.Value.ToString(),
                     FacilityId = x.FacilityId,
                     EmailAddresses = x.EmailAddresses,
                     EnabledNotifications = x.EnabledNotifications,
@@ -39,11 +37,10 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
 
                 return pagedNotificationConfigurations;
             }
-            catch (NullReferenceException ex)
+            catch (NullReferenceException)
             {                
-                _logger.LogDebug(new EventId(NotificationLoggingIds.SearchPerformed, "Notification Service - List notification configurations"), ex, "Failed to find notification configurations.");
-                var queryEx = new ApplicationException("Failed to execute the request to find notification configurations.", ex);
-                throw queryEx;                
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                throw;             
             }
         }
     }
