@@ -30,15 +30,14 @@ public class TenantApiService : ITenantApiService
         {
             return true;
         }
-        else if (response.StatusCode == HttpStatusCode.NotFound)
+        
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return false;
         }
-        else
-        {
-            var message = $"Error checking if facility ({facilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
-            _logger.LogError(message);
-            throw new Exception(message);
-        }
+
+        var message = $"Error checking if facility ({facilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
+        _logger.LogError(message);
+        throw new Exception(message);
     }
 }
