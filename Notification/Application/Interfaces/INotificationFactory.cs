@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
 
         public NotificationEntity NotificationEntityCreate(string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc);
 
-        public NotificationModel NotificationModelCreate(string id, string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc, DateTime createdOn, DateTime? sentOn);
+        public NotificationModel NotificationModelCreate(NotificationId id, string notificationType, string? facilityId, string? correlationId, string subject, string body, List<string> recipients, List<string>? bcc, DateTime createdOn, List<DateTime> sentOn);
 
         public SendNotificationModel CreateSendNotificationModel(string id, List<string> recipients, List<string>? bcc, string subject, string message);
 

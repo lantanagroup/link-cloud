@@ -1,7 +1,9 @@
-﻿namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands
+﻿using LantanaGroup.Link.Notification.Domain.Entities;
+
+namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Commands
 {
     public interface IDeleteFacilityConfigurationCommand
     {
-        Task<bool> Execute(string id);
+        Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken);
     }
 }

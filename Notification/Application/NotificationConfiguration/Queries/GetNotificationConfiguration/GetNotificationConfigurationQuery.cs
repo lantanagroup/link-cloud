@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 using System.Diagnostics;
+using LantanaGroup.Link.Notification.Domain.Entities;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries
 {
@@ -18,30 +18,23 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<NotificationConfigurationModel> Execute(string id)
-        {
-            if (string.IsNullOrEmpty(id)) { throw new ArgumentNullException(nameof(id)); }
-
+        public async Task<NotificationConfigurationModel> Execute(NotificationConfigId id, CancellationToken cancellationToken)
+        {     
             try
             {
-                NotificationConfigurationModel? config = null;
+                var config = await _datastore.GetAsync(id, true, cancellationToken);
 
-                var result = await _datastore.GetAsync(id);
-
-                if (result != null)
+                if (config is null)
                 {
-                    config = new NotificationConfigurationModel();
-                    config = _notificationConfigurationFactory.NotificationConfigurationModelCreate(result.Id, result.FacilityId, result.EmailAddresses, result.EnabledNotifications, result.Channels);
+                    return null;                    
                 }
 
-
-                return config;
+                var configModel = _notificationConfigurationFactory.NotificationConfigurationModelCreate(config.Id, config.FacilityId, config.EmailAddresses, config.EnabledNotifications, config.Channels);
+                return configModel;
             }
-            catch (ArgumentNullException ex)
-            {
-                _logger.LogError(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by id"), ex, "Failed to get notification configuration, no id provided.");
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error, $"Failed to get notification configuration, no id provided.");
+            catch (ArgumentNullException)
+            {                
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);               
                 throw;
             }
         }

@@ -15,13 +15,14 @@ using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
-using LantanaGroup.Link.Notification.Persistence.Notification;
+using LantanaGroup.Link.Notification.Persistence.Interceptors;
+using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -105,7 +106,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceRegistry));
@@ -144,9 +144,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
+    //Add database context
+    builder.Services.AddDbContext<NotificationDbContext>((sp, options) => {
+        
+        var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+        
+        switch (builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseProvider))
+        {
+            case "SqlServer":
+                options.UseSqlServer(
+                    builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                .AddInterceptors(updateBaseEntityInterceptor);                    
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });
+
     //Add repositories
-    builder.Services.AddSingleton<INotificationConfigurationRepository, NotificationConfigMongoRepo>();
-    builder.Services.AddSingleton<INotificationRepository, NotificationMongoRepo>();
+    builder.Services.AddScoped<INotificationConfigurationRepository, NotificationConfigurationRepository>();
+    builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -162,7 +182,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddCorsService(builder.Environment);
 
     //configure servive api security   
-    var idpConfig = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
+    var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
     if (idpConfig != null)
     {
         builder.Services.AddAuthenticationService(idpConfig, builder.Environment);
@@ -249,11 +269,18 @@ static void SetupMiddleware(WebApplication app)
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
     }
 
+    // Ensure database created
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
+        context.Database.EnsureCreated();
+    }
+
     app.UseRouting();
     app.UseCors("CorsPolicy");
     app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
-    app.UseAuthorization();
+    app.UseAuthorization();    
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
