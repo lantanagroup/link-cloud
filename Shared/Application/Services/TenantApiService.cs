@@ -7,13 +7,13 @@ namespace LantanaGroup.Link.Shared.Application.Services;
 public class TenantApiService : ITenantApiService
 {
     private readonly ILogger<TenantApiService> _logger;
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly TenantApiSettings _settings;
 
-    public TenantApiService(ILogger<TenantApiService> logger, HttpClient httpClient, TenantApiSettings settings)
+    public TenantApiService(ILogger<TenantApiService> logger, IHttpClientFactory httpClientFactory, TenantApiSettings settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
@@ -22,8 +22,9 @@ public class TenantApiService : ITenantApiService
         if (!_settings.CheckIfTenantExists)
             return true;
 
+        var httpClient = _httpClientFactory.CreateClient();
         var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}/{facilityId}";
-        var response = await _httpClient.GetAsync(endpoint, cancellationToken);
+        var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)
         {
