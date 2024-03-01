@@ -5,6 +5,8 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
 using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Shared.Application.Converters;
+using LantanaGroup.Link.Shared.Application.Services;
+using System.Text;
 
 namespace LantanaGroup.Link.Account.Services
 {
@@ -16,11 +18,12 @@ namespace LantanaGroup.Link.Account.Services
 
         private readonly IMapper _mapperModelToMessage;
         private readonly IMapper _mapperMessageToModel;
-
-        public GroupService(ILogger<GroupService> logger, GroupRepository GroupRepository)
+        private readonly ITenantApiService _tenantApiService;
+        public GroupService(ILogger<GroupService> logger, GroupRepository GroupRepository, ITenantApiService tenantApiService)
         {
             _logger = logger;
             _groupRepository = GroupRepository;
+            _tenantApiService = tenantApiService;
 
             _mapperModelToMessage = new ProtoMessageMapper<GroupModel, GroupMessage>(new AccountProfile()).CreateMapper();
             _mapperMessageToModel = new ProtoMessageMapper<GroupMessage, GroupModel>(new AccountProfile()).CreateMapper();
@@ -55,6 +58,20 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<GroupMessage> CreateGroup(GroupMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!(await _tenantApiService.CheckFacilityExists(id)))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var newGroup = _mapperMessageToModel.Map<GroupMessage, GroupModel>(request);
 
             try
@@ -72,6 +89,20 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<GroupMessage> UpdateGroup(GroupMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!(await _tenantApiService.CheckFacilityExists(id)))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var updatedGroup = _mapperMessageToModel.Map<GroupMessage, GroupModel>(request);
 
             if (updatedGroup.Id == Guid.Empty)
