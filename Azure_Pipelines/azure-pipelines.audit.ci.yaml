@@ -21,6 +21,7 @@ steps:
       projects: '$(project)'
       nugetConfigPath: '$(nugetPath)'
       feedsToUse: config
+      verbosityRestore: Diagnostic
   
   - task: DotNetCoreCLI@2
     displayName: Build
