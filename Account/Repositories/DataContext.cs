@@ -3,13 +3,13 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Domain.Interfaces;
 using LantanaGroup.Link.Account.Domain.Messages;
 using LantanaGroup.Link.Account.Settings;
-using LantanaGroup.Link.Shared.Configs;
-using LantanaGroup.Link.Shared.Models;
-using LantanaGroup.Link.Shared.SerDes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.SerDes;
 
 namespace LantanaGroup.Link.Account.Repositories
 {
