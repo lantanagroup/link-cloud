@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - Account
+    - Account/*
 
 pool:
   vmImage: 'ubuntu-latest'
