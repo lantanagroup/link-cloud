@@ -26,6 +26,8 @@ variables:
   value: 'link-census'
 - name: dockerPath
   value: '**/Census/Dockerfile'
+- name: serviceName
+  value: 'Census'
   
 steps:
   - template: ../azure-nuget-package-source.yml
