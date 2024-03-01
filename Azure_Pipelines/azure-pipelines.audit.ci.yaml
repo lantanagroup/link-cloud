@@ -10,6 +10,7 @@ variables:
   project: 'Audit/Audit.csproj'
   testProject: 'AuditUnitTests/AuditUnitTests.csproj'
   nugetPath: 'Audit/nuget.config'
+  serviceName: 'Audit'
 
 steps:
   - template: ../azure-nuget-package-source.yml
