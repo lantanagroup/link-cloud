@@ -1,10 +1,10 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Application.Services;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands
 {

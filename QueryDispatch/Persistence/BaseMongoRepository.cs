@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using static LantanaGroup.Link.QueryDispatch.QueryDispatchConstants;
+using static QueryDispatch.Application.Settings.QueryDispatchConstants;
 
 namespace LantanaGroup.Link.QueryDispatch.Persistence
 {

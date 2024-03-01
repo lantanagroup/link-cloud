@@ -9,6 +9,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
