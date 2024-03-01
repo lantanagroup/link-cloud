@@ -7,21 +7,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'Audit/Audit.csproj'
-- name: testProject
-  value: 'AuditUnitTests/AuditUnitTests.csproj'
-- name: nugetPath
-  value: 'Audit/nuget.config'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
-- name: registry-repo-Name
-  value: 'link-audit'
-- name: dockerPath
-  value: '**/Audit/Dockerfile'
+  project: 'Audit/Audit.csproj'
+  testProject: 'AuditUnitTests/AuditUnitTests.csproj'
+  nugetPath: 'Audit/nuget.config'
 
 steps:
   - template: ../azure-nuget-package-source.yml
