@@ -10,6 +10,7 @@ variables:
   project: 'Account/Account.csproj'
   testProject: 'AccountUnitTests/AccountUnitTests.csproj'
   nugetPath: 'Account/nuget.config'
+  serviceName: 'Account'
 
 steps:
   - task: PowerShell@2
