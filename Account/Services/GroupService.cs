@@ -4,7 +4,7 @@ using LantanaGroup.Link.Account.Converters;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
 using LantanaGroup.Link.Account.Repositories;
-using LantanaGroup.Link.Shared.Converters;
+using LantanaGroup.Link.Shared.Application.Converters;
 
 namespace LantanaGroup.Link.Account.Services
 {

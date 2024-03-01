@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Account.Domain.Messages
 {
