@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using static Google.Rpc.Context.AttributeContext.Types;
@@ -17,11 +18,12 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportConfigController> _logger;
         private readonly IMediator _mediator;
-
-        public ReportConfigController(ILogger<ReportConfigController> logger, IMediator mediator)
+        private readonly ITenantApiService _tenantApiService;
+        public ReportConfigController(ILogger<ReportConfigController> logger, IMediator mediator, ITenantApiService tenantApiService)
         {
             _logger = logger;
             _mediator = mediator;
+            _tenantApiService = tenantApiService;
         }
 
         /// <summary>
@@ -72,6 +74,11 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpPost("Create")]
         public async Task<IActionResult> CreateReportConfig([FromBody] MeasureReportConfig config)
         {
+            if (!await _tenantApiService.CheckFacilityExists(config.FacilityId))
+            {
+                return BadRequest($"Tenant {config.FacilityId} does not exist.");
+            }
+
             BundlingType bundleType = BundlingType.Default;
             var entity = new MeasureReportConfigModel()
             {
@@ -108,8 +115,13 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpPut("Update")]
-        public async Task<MeasureReportConfigModel> UpdateReportConfig([FromBody] MeasureReportConfig config)
+        public async Task<ActionResult<MeasureReportConfigModel>> UpdateReportConfig([FromBody] MeasureReportConfig config)
         {
+            if (!await _tenantApiService.CheckFacilityExists(config.FacilityId))
+            {
+                return BadRequest($"Tenant {config.FacilityId} does not exist.");
+            }
+
             BundlingType bundleType = BundlingType.Default;
             var entity = new MeasureReportConfigModel()
             {

@@ -52,6 +52,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka).Get<KafkaConnection>());
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.AddSingleton(builder.Configuration
+        .GetRequiredSection(ReportConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
 
     // Add services to the container.
     builder.Services.AddHttpClient();

@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
     <PackageReference Include="AutoMapper" Version="13.0.1" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="1.0.0" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.1.2" />
     <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />

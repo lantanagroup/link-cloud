@@ -72,7 +72,7 @@ namespace TenantTests
         }
 
         [Fact]
-        public void TestErrorCreateDuplicateFacility()
+        public async Task TestErrorCreateDuplicateFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
 
@@ -116,7 +116,7 @@ namespace TenantTests
 
             Task<string> _createdFacilityId = _service.CreateFacility(_model, CancellationToken.None);
 
-            _ = Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(_model, CancellationToken.None));
+            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(_model, CancellationToken.None));
 
         }
 
