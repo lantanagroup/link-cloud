@@ -19,9 +19,9 @@ variables:
 - name: tags2
   value: '$(Build.BuildId)'
 - name: registry-repo-Name
-  value: 'link-account'
+  value: 'link-audit'
 - name: dockerPath
-  value: '**/Account/Dockerfile'
+  value: '**/Audit/Dockerfile'
 
 steps:
   - template: ../azure-nuget-package-source.yml
