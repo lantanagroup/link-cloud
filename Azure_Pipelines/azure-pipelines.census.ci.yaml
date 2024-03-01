@@ -10,6 +10,7 @@ variables:
   project: 'Census/Census.csproj'
   testProject: 'CensusUnitTests/CensusUnitTests.csproj'
   nugetPath: 'Census/nuget.config'
+  serviceName: 'Census'
 
 steps:
   - template: ../azure-nuget-package-source.yml
