@@ -5,6 +5,8 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
 using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Shared.Application.Converters;
+using LantanaGroup.Link.Shared.Application.Services;
+using System.Text;
 
 namespace LantanaGroup.Link.Account.Services
 {
@@ -12,15 +14,17 @@ namespace LantanaGroup.Link.Account.Services
     public class RoleService : Protos.RoleService.RoleServiceBase
     {
         private readonly ILogger<RoleService> _logger;
-        private readonly RoleRepository _RoleRepository;
+        private readonly RoleRepository _roleRepository;
 
         private readonly IMapper _mapperModelToMessage;
         private readonly IMapper _mapperMessageToModel;
+        private readonly ITenantApiService _tenantApiService;
 
-        public RoleService(ILogger<RoleService> logger, RoleRepository RoleRepository)
+        public RoleService(ILogger<RoleService> logger, RoleRepository roleRepository, ITenantApiService tenantApiService)
         {
             _logger = logger;
-            _RoleRepository = RoleRepository;
+            _roleRepository = roleRepository;
+            _tenantApiService = tenantApiService;
 
             _mapperModelToMessage = new ProtoMessageMapper<RoleModel, RoleMessage>(new AccountProfile()).CreateMapper();
             _mapperMessageToModel = new ProtoMessageMapper<RoleMessage, RoleModel>(new AccountProfile()).CreateMapper();
@@ -29,7 +33,7 @@ namespace LantanaGroup.Link.Account.Services
         
         public override async Task GetAllRoles(GetAllRolesMessage request, IServerStreamWriter<RoleMessage> responseStream, ServerCallContext context)
         {
-            var res = await _RoleRepository.GetAllAsync();
+            var res = await _roleRepository.GetAllAsync();
 
             foreach (var Role in res)
             {
@@ -41,7 +45,7 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<RoleMessage> GetRole(GetRoleMessage request, ServerCallContext context)
         {
-            var res = await _RoleRepository.GetAsync(Guid.Parse(request.Id));
+            var res = await _roleRepository.GetAsync(Guid.Parse(request.Id));
             if (res == null)
             {
                 throw new RpcException(new Status(StatusCode.NotFound, $"No Role found for {request.Id}"));
@@ -55,11 +59,25 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<RoleMessage> CreateRole(RoleMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!(await _tenantApiService.CheckFacilityExists(id)))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var newRole = _mapperMessageToModel.Map<RoleMessage, RoleModel>(request);
 
             try
             {
-                await _RoleRepository.AddAsync(newRole);
+                await _roleRepository.AddAsync(newRole);
             }
             catch (Exception ex)
             {
@@ -72,6 +90,20 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<RoleMessage> UpdateRole(RoleMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!await _tenantApiService.CheckFacilityExists(id))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var updatedRole = _mapperMessageToModel.Map<RoleMessage, RoleModel>(request);
 
             if (updatedRole.Id == Guid.Empty)
@@ -82,7 +114,7 @@ namespace LantanaGroup.Link.Account.Services
             RoleModel returnedModel;
             try
             {
-                returnedModel = await _RoleRepository.UpdateAsync(updatedRole);
+                returnedModel = await _roleRepository.UpdateAsync(updatedRole);
                 if (returnedModel == null)
                 {
                     throw new RpcException(new Status(StatusCode.NotFound, $"No Role found for {updatedRole.Id}"));
@@ -103,7 +135,7 @@ namespace LantanaGroup.Link.Account.Services
             
             try
             {
-                await _RoleRepository.DeleteAsync(Guid.Parse(request.Id));
+                await _roleRepository.DeleteAsync(Guid.Parse(request.Id));
             }
             catch (Exception ex)
             {
@@ -121,7 +153,7 @@ namespace LantanaGroup.Link.Account.Services
             RoleModel restoredRole;
             try
             {
-                restoredRole = await _RoleRepository.RestoreAsync(Guid.Parse(request.Id));
+                restoredRole = await _roleRepository.RestoreAsync(Guid.Parse(request.Id));
             }
             catch (Exception ex)
             {
