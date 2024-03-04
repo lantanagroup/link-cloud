@@ -5,7 +5,6 @@ using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using OpenTelemetry.Metrics;
@@ -14,6 +13,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 var builder = WebApplication.CreateBuilder(args);
 
