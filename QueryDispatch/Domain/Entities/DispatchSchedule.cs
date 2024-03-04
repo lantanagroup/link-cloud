@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.QueryDispatch;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
 {
