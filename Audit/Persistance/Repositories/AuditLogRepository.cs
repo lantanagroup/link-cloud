@@ -33,9 +33,19 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             return log;
         }
 
-        public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacilityAsync(string facilityId, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacilityAsync(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
-            var logs = await _dbContext.AuditLogs.AsNoTracking().Where(x => x.FacilityId == facilityId)
+            IEnumerable<AuditLog> logs;
+            var query = _dbContext.AuditLogs.AsNoTracking().AsQueryable().Where(x => x.FacilityId == facilityId);
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(SetSortBy<AuditLog>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<AuditLog>(sortBy)),
+                _ => query.OrderBy(x => x.CreatedOn)
+            };
+
+            logs = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
@@ -50,7 +60,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
 
         public async Task<(IEnumerable<AuditLog>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {            
-            IEnumerable<AuditLog?> logs;
+            IEnumerable<AuditLog> logs;
             var query = _dbContext.AuditLogs.AsNoTracking().AsQueryable();
 
             #region Build Query
@@ -88,20 +98,6 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             if (filterUserBy is not null && filterUserBy.Length > 0)
             {
                 query = query.Where(x => x.User == filterUserBy);
-            }
-
-            if (sortBy is not null && sortBy.Length > 0)
-            {
-                query = sortBy switch
-                {
-                    "Facility" => query.OrderBy(x => x.FacilityId),
-                    "Correlation" => query.OrderBy(x => x.CorrelationId),
-                    "Service" => query.OrderBy(x => x.ServiceName),
-                    "Action" => query.OrderBy(x => x.Action),
-                    "User" => query.OrderBy(x => x.User),
-                    "Date" => query.OrderBy(x => x.CreatedOn),
-                    _ => query.OrderBy(x => x.CreatedOn)
-                };
             }
 
             #endregion

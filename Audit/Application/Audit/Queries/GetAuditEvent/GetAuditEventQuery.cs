@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
             {
                 auditEvent = new AuditModel
                 {
-                    Id = result.Id,
+                    Id = result.Id.Value.ToString(),
                     FacilityId = result.FacilityId,
                     ServiceName = result.ServiceName,
                     EventDate = result.EventDate,
