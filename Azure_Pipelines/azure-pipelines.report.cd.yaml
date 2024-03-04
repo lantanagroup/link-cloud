@@ -26,6 +26,8 @@ variables:
   value: 'link-report'
 - name: dockerPath
   value: '**/Report/Dockerfile'
+- name: serviceName
+  value: 'Report'
 steps:
   - task: PowerShell@2
     displayName: 'Transform nuget.config'
