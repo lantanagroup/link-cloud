@@ -6,9 +6,7 @@ using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.AutoMock;
 
@@ -23,14 +21,12 @@ namespace QueryDispatchUnitTests
         {
             _mocker = new AutoMocker();
 
-            var logger = _mocker.CreateInstance<Logger<TenantApiService>>();
-            var httpClientFactory = new Mock<IHttpContextFactory>();
             var settings = _mocker.CreateInstance<TenantApiSettings>();
             settings.CheckIfTenantExists = false;
-
-            var tenantService = new Mock<TenantApiService>(logger, httpClientFactory.Object, settings);
             _mocker.Use(settings);
-            _mocker.Use(tenantService.Object);
+
+            var service = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
+            _mocker.Use(service);
 
             var _controller = _mocker.CreateInstance<QueryDispatchController>();
 
