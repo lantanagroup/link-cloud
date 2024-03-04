@@ -73,10 +73,6 @@ stages:
             $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Audit/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool"
 
-            # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Census/" -AllMatches).Matches.Count -gt 0)
-            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool"
-
             # DataAcquisition - Return $true if path has changed files
             $dataBool = ((Select-String -InputObject $changedFiles -Pattern "DataAcquisition/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool"
@@ -184,35 +180,6 @@ stages:
         arguments: 'image -n dev-scale deployment audit-deploy audit=nhsnlink.azurecr.io/$(Audit-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  ###
-  # Census
-  #- job: Census
-  #  displayName: "Build Census"
-  #  dependsOn: getChangedFiles
-  #  variables: 
-  #    changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-  #  condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #  steps:
-  #  - task: Docker@2
-  #    displayName: "Build & Push Census"
-  #    condition: always()
-  #    inputs:
-  #      containerRegistry: 'Link ACR'
-  #      repository: $(Census-Name)
-  #      command: 'buildAndPush'
-  #      Dockerfile: '**/Census/Dockerfile'
-  #      tags: '$(tags)'
-  #      buildContext: '$(Build.Repository.LocalPath)'
-  #  - task: Kubernetes@1
-  #    displayName: "Deploy Census"
-  #    inputs:
-  #      connectionType: 'Kubernetes Service Connection'
-  #      kubernetesServiceEndpoint: 'Link BOTW'
-  #      namespace: 'dev-scale'
-  #      command: 'set'
-  #      arguments: 'image -n dev-scale deployment census-deploy census=nhsnlink.azurecr.io/$(Census-Name):$(Build.BuildId)'
-  #      secretType: 'dockerRegistry'
-  #      containerRegistryType: 'Azure Container Registry'
 
   ###
   # DataAcquisition
@@ -338,35 +305,7 @@ stages:
         arguments: 'image -n dev-scale deployment notification-deploy notification=nhsnlink.azurecr.io/$(Notification-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  # ###
-  # # PatientList
-  # - job: Patient
-  #   displayName: "Build PatientList"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientChanged'] ]
-  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #   steps: 
-  #   - task: Docker@2
-  #     displayName: "Build & Push Patient List"
-  #     condition: always()
-  #     inputs:
-  #       containerRegistry: 'Link ACR'
-  #       repository: $(PatientList-Name)
-  #       command: 'buildAndPush'
-  #       Dockerfile: '**/PatientList/Dockerfile'
-  #       tags: '$(tags)'
-  #       buildContext: '$(Build.Repository.LocalPath)'
-  #   - task: Kubernetes@1
-  #     displayName: "Deploy Patient List"
-  #     inputs:
-  #       connectionType: 'Kubernetes Service Connection'
-  #       kubernetesServiceEndpoint: 'Link BOTW'
-  #       namespace: 'dev-scale'
-  #       command: 'set'
-  #       arguments: 'image -n dev-scale deployment patient-deploy patient=nhsnlink.azurecr.io/$(PatientList-Name):$(Build.BuildId)'
-  #       secretType: 'dockerRegistry'
-  #       containerRegistryType: 'Azure Container Registry'
+ 
   ###
   # PatientQuery
   - job: PatientQuery
