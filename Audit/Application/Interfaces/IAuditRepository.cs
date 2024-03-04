@@ -7,6 +7,6 @@ namespace LantanaGroup.Link.Audit.Application.Interfaces
     {
         Task<bool> AddAsync(AuditLog entity, CancellationToken cancellationToken = default);
         Task<AuditLog?> GetAsync(AuditId id, bool noTracking = false, CancellationToken cancellationToken = default);
-        Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacilityAsync(string facilityId, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+        Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacilityAsync(string facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     }
 }

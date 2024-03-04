@@ -21,6 +21,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// Returns a list of audit events based on one or more filtering optoins.
         /// </summary>
         /// <param name="searchFilter">Search filter parameters</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>A paged list of audit events</returns>
         /// <exception cref="ApplicationException"></exception>
         public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter, CancellationToken cancellationToken = default)
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 
                 List<AuditModel> auditEvents = result.Select(x => new AuditModel
                 {
-                    Id = x.Id,
+                    Id = x.Id.Value.ToString(),
                     FacilityId = x.FacilityId,
                     CorrelationId = x.CorrelationId,
                     ServiceName = x.ServiceName,

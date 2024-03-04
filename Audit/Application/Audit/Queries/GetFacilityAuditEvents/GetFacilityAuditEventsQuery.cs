@@ -21,15 +21,15 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// </summary>
         /// <returns>A list of Audit events</returns>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<PagedAuditModel> Execute(string facilityId, int pageNumber, int PageSize, CancellationToken cancellationToken = default)
+        public async Task<PagedAuditModel> Execute(string facilityId, string? sortBy, SortOrder? sortOrder, int pageNumber, int PageSize, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Audit Events Query");
 
-            var (result, metadata) = await _datastore.GetByFacilityAsync(facilityId, PageSize, pageNumber, cancellationToken);
+            var (result, metadata) = await _datastore.GetByFacilityAsync(facilityId, sortBy, sortOrder, PageSize, pageNumber, cancellationToken);
 
             List<AuditModel> auditEvents = result.Select(x => new AuditModel
             {
-                Id = x.Id,
+                Id = x.Id.Value.ToString(),
                 FacilityId = x.FacilityId,
                 ServiceName = x.ServiceName,
                 EventDate = x.EventDate,
