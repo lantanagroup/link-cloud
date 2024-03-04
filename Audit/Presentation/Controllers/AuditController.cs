@@ -39,8 +39,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="filterServiceBy"></param>
         /// <param name="filterActionBy"></param>
         /// <param name="filterUserBy"></param>
-        /// <param name="sortBy">Ascending = 0, Descending = 1, defaults to Ascending</param>
-        /// <param name="sortOrder"></param>
+        /// <param name="sortBy">Options: FacilityId, Action, ServiceName, Resource, CreatedOn</param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
@@ -71,10 +71,10 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 _logger.LogAuditEventListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter);
+                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter, HttpContext.RequestAborted);
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(auditEventList.Metadata));
+                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
                                 
                 return Ok(auditEventList);
             }
@@ -115,7 +115,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
             try
             {
-                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id));                
+                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id), HttpContext.RequestAborted);                
 
                 if (auditEvent == null) { return NotFound(); }
                 

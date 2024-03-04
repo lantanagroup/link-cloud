@@ -23,13 +23,13 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// <param name="searchFilter">Search filter parameters</param>
         /// <returns>A paged list of audit events</returns>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter)
+        public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
 
-            var (result, metadata) = await _datastore.Search(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy, 
+            var (result, metadata) = await _datastore.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy, 
                 searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder, 
-                searchFilter.PageSize, searchFilter.PageNumber);
+                searchFilter.PageSize, searchFilter.PageNumber, cancellationToken);
 
             //convert AuditEntity to AuditModel
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))

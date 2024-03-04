@@ -5,8 +5,8 @@ namespace LantanaGroup.Link.Audit.Application.Interfaces
 {
     public interface IAuditRepository : ISearchRepository
     {
-        Task<bool> Add(AuditLog entity);
-        Task<AuditLog?> Get(AuditId id, bool noTracking = false);
-        Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacility(string facilityId, int pageSize, int pageNumber);
+        Task<bool> AddAsync(AuditLog entity, CancellationToken cancellationToken = default);
+        Task<AuditLog?> GetAsync(AuditId id, bool noTracking = false, CancellationToken cancellationToken = default);
+        Task<(IEnumerable<AuditLog>, PaginationMetadata)> GetByFacilityAsync(string facilityId, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     }
 }
