@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.AuditUnitTests
                 .Returns(_auditSearchFilterRecord);
 
             _mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber))
+                .Setup(p => p.SearchAsync(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber, CancellationToken.None))
                 .ReturnsAsync(output);                
         }               
 
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         {
             Task<PagedAuditModel> _foundAuditEvents = _query.Execute(_auditSearchFilterRecord);
 
-            _mocker.GetMock<IAuditRepository>().Verify(p => p.Search(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber), Times.Once());
+            _mocker.GetMock<IAuditRepository>().Verify(p => p.SearchAsync(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, SortOrder.Ascending, pageSize, pageNumber, CancellationToken.None), Times.Once());
 
         }
 
