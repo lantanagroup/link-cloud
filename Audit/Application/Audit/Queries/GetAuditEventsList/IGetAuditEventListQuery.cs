@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 {
     public interface IGetAuditEventListQuery
     {
-        Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter);
+        Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter, CancellationToken cancellationToken = default);
     }
 }

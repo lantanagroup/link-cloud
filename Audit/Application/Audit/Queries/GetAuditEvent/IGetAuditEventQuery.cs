@@ -5,6 +5,6 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 {
     public interface IGetAuditEventQuery
     {
-        Task<AuditModel> Execute(AuditId id);
+        Task<AuditModel> Execute(AuditId id, CancellationToken cancellationToken = default);
     }
 }

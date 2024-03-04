@@ -22,15 +22,16 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));        
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
-        
+
         /// <summary>
         /// A command to create a new audit event
         /// </summary>
         /// <param name="model">A model that represents to optoinal fields that can be used when creating an audit event (facilityId, serviceName, correlationId, eventDate, userId, user, action, resource, propertyChanges, and notes).</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>The id of the new autid event created</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<AuditLog> Execute(CreateAuditEventModel model)
+        public async Task<AuditLog> Execute(CreateAuditEventModel model, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Audit Event Command");
 
@@ -45,7 +46,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
                        
             try
             {
-                await _datastore.Add(auditLog);
+                await _datastore.AddAsync(auditLog, cancellationToken);
             }
             catch (Exception ex)
             {
