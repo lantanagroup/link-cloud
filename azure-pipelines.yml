@@ -183,35 +183,35 @@ stages:
 
   ###
   # DataAcquisition
-  - job: DataAcquisition
-    displayName: "Build Census"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-      serviceName: 'Census'
-    condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps:
-    - template: azure-nuget-package-source.yml 
-    - task: Docker@2
-      displayName: "Build & Push Data Acquisition"
-      condition: always()
-      inputs:
-        containerRegistry: 'Link ACR'
-        repository: $(DataAcquisition-Name)
-        command: 'buildAndPush'
-        Dockerfile: '**/DataAcquisition/Dockerfile'
-        tags: '$(tags)'
-        buildContext: '$(Build.Repository.LocalPath)'
-    - task: Kubernetes@1
-      displayName: "Deploy DataAcquisition"
-      inputs:
-        connectionType: 'Kubernetes Service Connection'
-        kubernetesServiceEndpoint: 'Link BOTW'
-        namespace: 'dev-scale'
-        command: 'set'
-        arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
-        secretType: 'dockerRegistry'
-        containerRegistryType: 'Azure Container Registry'
+  # - job: DataAcquisition
+  #   displayName: "Build Data A"
+  #   dependsOn: getChangedFiles
+  #   variables: 
+  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
+  #     serviceName: 'Census'
+  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
+  #   steps:
+  #   - template: azure-nuget-package-source.yml 
+  #   - task: Docker@2
+  #     displayName: "Build & Push Data Acquisition"
+  #     condition: always()
+  #     inputs:
+  #       containerRegistry: 'Link ACR'
+  #       repository: $(DataAcquisition-Name)
+  #       command: 'buildAndPush'
+  #       Dockerfile: '**/DataAcquisition/Dockerfile'
+  #       tags: '$(tags)'
+  #       buildContext: '$(Build.Repository.LocalPath)'
+  #   - task: Kubernetes@1
+  #     displayName: "Deploy DataAcquisition"
+  #     inputs:
+  #       connectionType: 'Kubernetes Service Connection'
+  #       kubernetesServiceEndpoint: 'Link BOTW'
+  #       namespace: 'dev-scale'
+  #       command: 'set'
+  #       arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
+  #       secretType: 'dockerRegistry'
+  #       containerRegistryType: 'Azure Container Registry'
   ###
   # MeasureEval
   - job: MeasureEval
