@@ -125,7 +125,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
-      ServiceName: 'Account'
+      serviceName: 'Account'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -156,7 +156,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
-      ServiceName: 'Audit'
+      serviceName: 'Audit'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -188,7 +188,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-      ServiceName: 'Census'
+      serviceName: 'Census'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml 
@@ -219,7 +219,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.measureChanged'] ]
-      ServiceName: 'MeasureEval'
+      serviceName: 'MeasureEval'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -250,7 +250,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
-      ServiceName: 'Normalization'
+      serviceName: 'Normalization'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -281,7 +281,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-      ServiceName: 'Notification'
+      serviceName: 'Notification'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -313,7 +313,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientqueryChanged'] ]
-      ServiceName: 'PatientsToQuery'
+      serviceName: 'PatientsToQuery'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -344,7 +344,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
-      ServiceName: 'QueryDispatch'
+      serviceName: 'QueryDispatch'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -375,7 +375,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.reportChanged'] ]
-      ServiceName: 'Report'
+      serviceName: 'Report'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml   
@@ -407,7 +407,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-      ServiceName: 'Submission'
+      serviceName: 'Submission'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -439,7 +439,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-      ServiceName: 'Tenant'
+      serviceName: 'Tenant'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
