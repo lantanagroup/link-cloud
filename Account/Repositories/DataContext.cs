@@ -3,13 +3,13 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Domain.Interfaces;
 using LantanaGroup.Link.Account.Domain.Messages;
 using LantanaGroup.Link.Account.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.SerDes;
 
 namespace LantanaGroup.Link.Account.Repositories
 {
@@ -18,13 +18,20 @@ namespace LantanaGroup.Link.Account.Repositories
         private readonly ILogger<DataContext> _logger;
         protected IOptions<KafkaConnection> _kafkaConnection;
         protected IOptions<PostgresConnection> _pgSettings;
-        protected string[] _bridgeTypes = new string[] { "AccountModelGroupModel", "AccountModelRoleModel", "GroupModelRoleModel" };
+        protected string[] BridgeTypes = new string[] { "AccountModelGroupModel", "AccountModelRoleModel", "GroupModelRoleModel" };
 
         public virtual DbSet<AccountModel> Accounts { get; set; }
         public virtual DbSet<GroupModel> Groups { get; set; }
         public virtual DbSet<RoleModel> Roles { get; set; }
 
-        public DataContext(ILogger<DataContext> logger, IOptions<KafkaConnection> kafkaConnection, IOptions<PostgresConnection> pgSettings) : base()
+        public DataContext(ILogger<DataContext> logger, IOptions<KafkaConnection> kafkaConnection, IOptions<PostgresConnection> pgSettings, DbContextOptions options) : base(options)
+        {
+            _logger = logger;
+            _kafkaConnection = kafkaConnection;
+            _pgSettings = pgSettings;
+        }
+
+        public DataContext(ILogger<DataContext> logger, IOptions<KafkaConnection> kafkaConnection, IOptions<PostgresConnection> pgSettings)
         {
             _logger = logger;
             _kafkaConnection = kafkaConnection;
@@ -222,7 +229,7 @@ namespace LantanaGroup.Link.Account.Repositories
                 }
 
                 // bridge types that EF automatically creates (group and role membership)
-                else if (_bridgeTypes.Contains(changed.Metadata.Name))
+                else if (BridgeTypes.Contains(changed.Metadata.Name))
                 {
 
                     string type1, type2, id1, id2;
@@ -312,7 +319,7 @@ namespace LantanaGroup.Link.Account.Repositories
             }
 
             // bridge types that EF creates automatically
-            if (_bridgeTypes.Contains(entityEntry.Metadata.Name))
+            if (BridgeTypes.Contains(entityEntry.Metadata.Name))
             {
                 switch (entityEntry.Metadata.Name)
                 {
