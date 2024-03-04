@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Notification.Domain.Entities
+﻿namespace LantanaGroup.Link.Notification.Domain
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class BsonCollectionAttribute : Attribute

@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
@@ -59,7 +60,7 @@ namespace LantanaGroup.Link.Notification.Application.Extensions
                 //        .AddConsoleExporter());                
             }
 
-            services.AddSingleton<NotificationServiceMetrics>();
+            services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();
 
             return services;
         }

@@ -31,14 +31,13 @@ namespace LantanaGroup.Link.NotificationUnitTests
 
             _entity = new NotificationEntity
             {
-                Id = id,
+                Id = NotificationId.FromString(id),
                 NotificationType = notificaitonType,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
                 Subject = subject,
                 Body = body,
-                CreatedOn = DateTime.UtcNow,
-                SentOn = null
+                CreatedOn = DateTime.UtcNow
             };
             if (recipients is not null)
             {
@@ -59,8 +58,7 @@ namespace LantanaGroup.Link.NotificationUnitTests
                 CorrelationId = correlationId,
                 Subject = subject,
                 Body = body,
-                CreatedOn = DateTime.UtcNow,
-                SentOn = null
+                CreatedOn = DateTime.UtcNow
             };
             if (recipients is not null)
             {
@@ -80,16 +78,16 @@ namespace LantanaGroup.Link.NotificationUnitTests
             _query = _mocker.CreateInstance<GetNotificationQuery>();            
 
             _mocker.GetMock<INotificationRepository>()
-                .Setup(p => p.GetAsync(id))
+                .Setup(p => p.GetAsync(NotificationId.FromString(id), true, CancellationToken.None))
                 .ReturnsAsync(_entity);
         }
 
         [Test]
         public void TestExecuteShouldReturnANotificationWithIdFromTheDatabase()
         {
-            Task<NotificationModel> results = _query.Execute(id);
+            Task<NotificationModel> results = _query.Execute(NotificationId.FromString(id), CancellationToken.None);
 
-            _mocker.GetMock<INotificationRepository>().Verify(p => p.GetAsync(id), Times.Once());
+            _mocker.GetMock<INotificationRepository>().Verify(p => p.GetAsync(NotificationId.FromString(id), true, CancellationToken.None), Times.Once());
 
         }
     }

@@ -19,6 +19,6 @@ RUN dotnet publish "MeasureEval.csproj" -c Release -o /app/publish /p:UseAppHost
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore6-runtime
+#RUN apk add --no-cache aspnetcore6-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "MeasureEval.dll"]

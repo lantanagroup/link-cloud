@@ -4,7 +4,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
-using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
@@ -18,9 +17,9 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
         private readonly INotificationRepository _datastore;
         private readonly INotificationFactory _notificationFactory;
         private readonly IGetFacilityConfigurationQuery _getFacilityConfigurationQuery;
-        private readonly NotificationServiceMetrics _metrics;
+        private readonly INotificationServiceMetrics _metrics;
 
-        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, NotificationServiceMetrics metrics)
+        public CreateNotificationCommand(ILogger<CreateNotificationCommand> logger, IAuditEventFactory auditEventFactory, ICreateAuditEventCommand createAuditEventCommand, INotificationRepository datastore, INotificationFactory notificationFactory, IGetFacilityConfigurationQuery getFacilityConfigurationQuery, INotificationServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));    
             _auditEventFactory = auditEventFactory ?? throw new ArgumentNullException(nameof(auditEventFactory));
@@ -31,7 +30,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
-        public async Task<string> Execute(CreateNotificationModel model)
+        public async Task<string> Execute(CreateNotificationModel model, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Notification Command");
 
@@ -49,7 +48,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 using (ServiceActivitySource.Instance.StartActivity("Get facility configuration for notifications"))
                 {
                     //get facility configuration to determine recipients
-                    NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+                    NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId, cancellationToken);
 
                     if (config is null || config.EmailAddresses is null || config.EmailAddresses.Count == 0)
                     {
@@ -85,9 +84,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 using (ServiceActivitySource.Instance.StartActivity("Create the notification"))
                 {
                     NotificationEntity entity = _notificationFactory.NotificationEntityCreate(model.NotificationType, model.FacilityId, model.CorrelationId, model.Subject, model.Body, model.Recipients, model.Bcc);
-                    if (string.IsNullOrEmpty(entity.Id)) { entity.Id = Guid.NewGuid().ToString(); } //create new GUID for audit event
-                                                                                                    //entity.CreatedBy =
-                    _ = await _datastore.AddAsync(entity);                    
+                    _ = await _datastore.AddAsync(entity);       
 
                     //TODO: Get user info
                     //Create audit event
@@ -97,21 +94,22 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 
                     //add id to current activity
                     var currentActivity = Activity.Current;
-                    currentActivity?.AddTag("notification id", entity.Id);
+                    currentActivity?.AddTag("notification.id", entity.Id);
                     if (entity.FacilityId != null)
                     {
-                        currentActivity?.AddTag("facility id", entity.FacilityId);
+                        currentActivity?.AddTag("facility.id", entity.FacilityId);
                     }
-                        
+
 
                     //update notification creation metric counter                    
-                    _metrics.NotificationCreatedCounter.Add(1, 
+                    _metrics.IncrementNotificationCreatedCounter([ 
                         new KeyValuePair<string, object?>("facility", entity.FacilityId), 
-                        new KeyValuePair<string, object?>("type", entity.NotificationType));
+                        new KeyValuePair<string, object?>("type", entity.NotificationType)
+                    ]);
 
                     //Log creation of new notification configuration
-                    _logger.LogNotificationCreation(entity.Id, model);                    
-                    return entity.Id;
+                    _logger.LogNotificationCreation(entity.Id.Value.ToString(), model);                    
+                    return entity.Id.Value.ToString();
                 }              
             }
             catch (Exception ex)

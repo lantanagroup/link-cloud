@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -59,7 +60,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                 //        .AddConsoleExporter());                
             }
 
-            services.AddSingleton<AuditServiceMetrics>();
+            services.AddSingleton<IAuditServiceMetrics, AuditServiceMetrics>();
 
             return services;
         }

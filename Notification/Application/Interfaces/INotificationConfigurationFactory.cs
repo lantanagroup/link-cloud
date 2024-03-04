@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
 {
     public interface INotificationConfigurationFactory
     {
-        public NotificationConfigurationModel NotificationConfigurationModelCreate(string id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
+        public NotificationConfigurationModel NotificationConfigurationModelCreate(NotificationConfigId id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
 
         public CreateFacilityConfigurationModel CreateFacilityConfigurationModelCreate(string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
 
@@ -16,6 +16,6 @@ namespace LantanaGroup.Link.Notification.Application.Interfaces
 
         public NotificationConfig NotificationConfigEntityCreate(string id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels);
 
-        NotificationConfigurationSearchRecord CreateNotificationConfigurationSearchRecord(string searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
+        NotificationConfigurationSearchRecord CreateNotificationConfigurationSearchRecord(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
     }
 }
