@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries
 {
@@ -19,30 +18,29 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _notificationConfigurationFactory = notificationConfigurationFactory ?? throw new ArgumentNullException(nameof(notificationConfigurationFactory));
         }
 
-        public async Task<NotificationConfigurationModel> Execute(string facilityId)
+        public async Task<NotificationConfigurationModel> Execute(string facilityId, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Configuration By Facility Id Query");
 
-            if (string.IsNullOrEmpty(facilityId)) { throw new ArgumentNullException("Failed to get a notification configuration by facility id, no facility id was provided."); }
+            if (string.IsNullOrEmpty(facilityId)) 
+            { 
+                throw new ArgumentNullException("Failed to get a notification configuration by facility id, no facility id was provided."); 
+            }
 
             try 
-            {
-                NotificationConfigurationModel? config = null;
-
-                var result = await _datastore.GetNotificationConfigByFacilityAsync(facilityId);
-
-                if(result != null)
+            {             
+                var config = await _datastore.GetFacilityNotificationConfigAsync(facilityId, true, cancellationToken);
+                if (config is null)
                 {
-                    config = new NotificationConfigurationModel();
-                    config = _notificationConfigurationFactory.NotificationConfigurationModelCreate(result.Id, result.FacilityId, result.EmailAddresses, result.EnabledNotifications, result.Channels);
+                    return null;
                 }
-                
 
-                return config;
+                var configModel = _notificationConfigurationFactory.NotificationConfigurationModelCreate(config.Id, config.FacilityId, config.EmailAddresses, config.EnabledNotifications, config.Channels);
+                return configModel;
             }
-            catch(ArgumentNullException ex)
+            catch(ArgumentNullException)
             {
-                _logger.LogWarning(new EventId(NotificationLoggingIds.GetItem, "Notification Service - Get notification configuration by facility id"), ex, ex.Message);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }            
         }

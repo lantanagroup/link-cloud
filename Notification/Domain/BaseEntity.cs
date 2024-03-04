@@ -1,13 +1,11 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
-using MongoDB.Bson.Serialization.Attributes;
 
-namespace LantanaGroup.Link.Notification.Domain.Entities
+namespace LantanaGroup.Link.Notification.Domain
 {
     public class BaseEntity : IBaseEntity
-    {
-        [BsonId]
-        public string Id { get; set; }
+    {        
         public DateTime CreatedOn { get; set; }
+        public DateTime? LastModifiedOn { get; set; }
         public Guid? CreatedBy { get; set; }
     }
 }

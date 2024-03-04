@@ -22,10 +22,13 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             _dbContext.AuditLogs.Add(entity);            
             return Task.FromResult(_dbContext.SaveChanges() > 0);
         }
-
-        public Task<AuditLog?> Get(AuditId id)
+        
+        public Task<AuditLog?> Get(AuditId id, bool noTracking = false)
         {
-            var log = _dbContext.AuditLogs.Find(id);
+            var log = noTracking ?
+                _dbContext.AuditLogs.AsNoTracking().FirstOrDefault(x => x.Id == id) :
+                _dbContext.AuditLogs.Find(id);
+            
             return Task.FromResult(log);
         }
 
@@ -42,7 +45,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             return Task.FromResult<(IEnumerable<AuditLog>, PaginationMetadata)>((logs, metadata));
         }
 
-        public Task<(IEnumerable<AuditLog>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, int pageSize, int pageNumber)
+        public Task<(IEnumerable<AuditLog>, PaginationMetadata)> Search(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {            
             IEnumerable<AuditLog?> logs;
             var query = _dbContext.AuditLogs.AsNoTracking().AsQueryable();
@@ -52,6 +55,7 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             {
                 query = query.Where(x =>
                     (x.CorrelationId != null && x.CorrelationId.Contains(searchText)) ||
+                    (x.Resource != null && x.Resource.Contains(searchText)) ||
                     (x.User != null && x.User.Contains(searchText)) ||
                     (x.Notes != null && x.Notes.Contains(searchText)) ||
                     (x.PropertyChanges != null && x.PropertyChanges.Any(y => y.NewPropertyValue.Contains(searchText)))
@@ -98,6 +102,13 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
             }
 
             #endregion
+
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(_dbContext.SetSortBy<AuditLog>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(_dbContext.SetSortBy<AuditLog>(sortBy)),
+                _ => query.OrderBy(x => x.CreatedOn)
+            };
 
             using (ServiceActivitySource.Instance.StartActivity("Get filtered search result"))
             {

@@ -9,13 +9,13 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 {
     public class NotificationConfigurationFactory : INotificationConfigurationFactory
     {      
-        public NotificationConfigurationModel NotificationConfigurationModelCreate(string id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels)
+        public NotificationConfigurationModel NotificationConfigurationModelCreate(NotificationConfigId id, string facilityId, List<string>? emailAddresses, List<EnabledNotification>? enabledNotifications, List<FacilityChannel>? channels)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Factory - Create NotificationConfigurationModel");
 
             NotificationConfigurationModel config = new()
             {
-                Id = id,
+                Id = id.Value.ToString(),
                 FacilityId = facilityId
             };
 
@@ -143,7 +143,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             NotificationConfig config = new()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = NotificationConfigId.NewId(),
                 FacilityId = facilityId,
                 CreatedOn= DateTime.UtcNow
             };
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
 
             NotificationConfig config = new()
             {
-                Id = id,
+                Id = NotificationConfigId.FromString(id),
                 FacilityId = facilityId,
                 CreatedOn = DateTime.UtcNow
             };
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
             return config;
         }
 
-        public NotificationConfigurationSearchRecord CreateNotificationConfigurationSearchRecord(string searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber)
+        public NotificationConfigurationSearchRecord CreateNotificationConfigurationSearchRecord(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Factory - Create NotificationConfigurationSearchRecord");
 

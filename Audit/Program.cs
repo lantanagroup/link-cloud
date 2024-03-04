@@ -120,7 +120,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
         {
             case "SqlServer":
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DatabaseConnection"));
+                options.UseSqlServer(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString));
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
