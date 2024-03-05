@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Audit.Application.Audit.Queries;
-using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
@@ -48,12 +47,14 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="pageNumber"></param>
         /// <returns>
         ///     Success: 200
+        ///     NoContent: 204
         ///     Unautorized: 401
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
@@ -75,6 +76,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 //Get list of audit events using supplied filters and pagination
                 PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter, HttpContext.RequestAborted);
+
+                if(auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
@@ -141,9 +144,16 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageNumber"></param>
         /// <param name="pageSize"></param>
-        /// <returns></returns>
+        /// <returns>
+        ///     Success: 200
+        ///     NoContent: 204
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
         [HttpGet("facility/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -160,6 +170,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 //Get list of audit events using supplied filters and pagination
                 PagedAuditModel auditEventList = await _getFacilityAuditEventsQuery.Execute(facilityId, sortBy, sortOrder, pageNumber, pageSize, HttpContext.RequestAborted);
+
+                if (auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
