@@ -89,7 +89,7 @@ namespace TenantTests
 
 
         [Fact]
-        public async void TestErrorUpdateNonExistingFacility()
+        public async Task TestErrorUpdateNonExistingFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
             scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
@@ -127,7 +127,7 @@ namespace TenantTests
         }
 
         [Fact]
-        public async void TestErrorDuplicateFacility()
+        public async Task TestErrorDuplicateFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
 

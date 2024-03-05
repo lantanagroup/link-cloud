@@ -19,7 +19,7 @@
 
   <ItemGroup>
 	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
-	<PackageReference Include="com.lantanagroup.link.Shared" Version="2023.9.29.1" />
+	<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.1.2" />
     <PackageReference Include="CompareNETObjects" Version="4.83.0" />
     <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
@@ -38,6 +38,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
   </ItemGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
 
   <ItemGroup>
     <Content Update="nuget.config">

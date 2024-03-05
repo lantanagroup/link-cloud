@@ -5,7 +5,6 @@ using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
-using LantanaGroup.Link.Shared.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using OpenTelemetry.Metrics;
@@ -14,6 +13,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +47,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
+    builder.Services.AddSingleton(builder.Configuration
+        .GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
