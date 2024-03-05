@@ -17,11 +17,7 @@ namespace LantanaGroup.Link.PatientsToQuery.Serializers
 
         public object DeserializeObject(byte[] data, SerializationContext context)
         {
-            string jsonContent = System.Text.Encoding.Default.GetString(data.ToArray());
-            var options = new JsonSerializerOptions().ForFhir(typeof(List).Assembly);
-
-            //TODO: Disable Validation - https://github.com/FirelyTeam/firely-net-sdk/blob/release/5.1.0/src/Hl7.Fhir.Base/Serialization/FhirJsonPocoDeserializerSettings.cs
-            
+            string jsonContent = Encoding.Default.GetString(data.ToArray());            
             var patientIdsAcquiredMessage = new PatientIdsAcquiredValue();
 
             jsonContent = jsonContent.Replace("\t", string.Empty);
@@ -29,13 +25,13 @@ namespace LantanaGroup.Link.PatientsToQuery.Serializers
 
             byte[] byteArray = Encoding.UTF8.GetBytes(jsonContent);
             MemoryStream stream = new MemoryStream(byteArray);
-            var doc = System.Text.Json.JsonDocument.Parse(stream);
+            var doc = JsonDocument.Parse(stream);
 
             //TODO: See if there are other ways to validate without having to pull out the patientid's property
             doc.RootElement.TryGetProperty("PatientIds", out var patientids);
             var patientidsStr = patientids.ToString();
 
-            patientIdsAcquiredMessage.PatientIds = JsonSerializer.Deserialize<List>(patientidsStr, options);
+            patientIdsAcquiredMessage.PatientIds = new FhirJsonParser().Parse<List>(patientidsStr);
 
             return patientIdsAcquiredMessage.PatientIds;
 
