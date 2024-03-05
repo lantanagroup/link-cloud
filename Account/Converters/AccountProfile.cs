@@ -4,7 +4,7 @@ using Google.Protobuf.Collections;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Domain.Interfaces;
 using LantanaGroup.Link.Account.Protos;
-using LantanaGroup.Link.Shared.Converters;
+using LantanaGroup.Link.Shared.Application.Converters;
 
 namespace LantanaGroup.Link.Account.Converters
 {

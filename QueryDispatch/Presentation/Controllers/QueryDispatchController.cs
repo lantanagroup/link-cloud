@@ -2,7 +2,7 @@
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers

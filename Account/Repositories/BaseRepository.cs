@@ -1,8 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Domain.Entities;
-using LantanaGroup.Link.Shared.Configs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Account.Repositories
 {

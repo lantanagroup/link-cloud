@@ -3,6 +3,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands.Config;
