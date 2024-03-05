@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
+using QueryDispatch.Application.Settings;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
