@@ -89,7 +89,7 @@ namespace TenantTests
 
 
         [Fact]
-        public void TestErrorUpdateNonExistingFacility()
+        public async void TestErrorUpdateNonExistingFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
             scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
@@ -123,11 +123,11 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
+            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
         }
 
         [Fact]
-        public void TestErrorDuplicateFacility()
+        public async void TestErrorDuplicateFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
 
@@ -174,7 +174,7 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
+            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
         }
     }
 }

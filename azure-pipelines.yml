@@ -73,10 +73,6 @@ stages:
             $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Audit/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool"
 
-            # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Census/" -AllMatches).Matches.Count -gt 0)
-            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool"
-
             # DataAcquisition - Return $true if path has changed files
             $dataBool = ((Select-String -InputObject $changedFiles -Pattern "DataAcquisition/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool"
@@ -129,7 +125,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
-      ServiceName: 'Account'
+      serviceName: 'Account'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -160,7 +156,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
-      ServiceName: 'Audit'
+      serviceName: 'Audit'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -184,67 +180,38 @@ stages:
         arguments: 'image -n dev-scale deployment audit-deploy audit=nhsnlink.azurecr.io/$(Audit-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  ###
-  # Census
-  #- job: Census
-  #  displayName: "Build Census"
-  #  dependsOn: getChangedFiles
-  #  variables: 
-  #    changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-  #  condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #  steps:
-  #  - task: Docker@2
-  #    displayName: "Build & Push Census"
-  #    condition: always()
-  #    inputs:
-  #      containerRegistry: 'Link ACR'
-  #      repository: $(Census-Name)
-  #      command: 'buildAndPush'
-  #      Dockerfile: '**/Census/Dockerfile'
-  #      tags: '$(tags)'
-  #      buildContext: '$(Build.Repository.LocalPath)'
-  #  - task: Kubernetes@1
-  #    displayName: "Deploy Census"
-  #    inputs:
-  #      connectionType: 'Kubernetes Service Connection'
-  #      kubernetesServiceEndpoint: 'Link BOTW'
-  #      namespace: 'dev-scale'
-  #      command: 'set'
-  #      arguments: 'image -n dev-scale deployment census-deploy census=nhsnlink.azurecr.io/$(Census-Name):$(Build.BuildId)'
-  #      secretType: 'dockerRegistry'
-  #      containerRegistryType: 'Azure Container Registry'
 
   ###
   # DataAcquisition
-  - job: DataAcquisition
-    displayName: "Build Census"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-      ServiceName: 'Census'
-    condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps:
-    - template: azure-nuget-package-source.yml 
-    - task: Docker@2
-      displayName: "Build & Push Data Acquisition"
-      condition: always()
-      inputs:
-        containerRegistry: 'Link ACR'
-        repository: $(DataAcquisition-Name)
-        command: 'buildAndPush'
-        Dockerfile: '**/DataAcquisition/Dockerfile'
-        tags: '$(tags)'
-        buildContext: '$(Build.Repository.LocalPath)'
-    - task: Kubernetes@1
-      displayName: "Deploy DataAcquisition"
-      inputs:
-        connectionType: 'Kubernetes Service Connection'
-        kubernetesServiceEndpoint: 'Link BOTW'
-        namespace: 'dev-scale'
-        command: 'set'
-        arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
-        secretType: 'dockerRegistry'
-        containerRegistryType: 'Azure Container Registry'
+  # - job: DataAcquisition
+  #   displayName: "Build Data A"
+  #   dependsOn: getChangedFiles
+  #   variables: 
+  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
+  #     serviceName: 'Census'
+  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
+  #   steps:
+  #   - template: azure-nuget-package-source.yml 
+  #   - task: Docker@2
+  #     displayName: "Build & Push Data Acquisition"
+  #     condition: always()
+  #     inputs:
+  #       containerRegistry: 'Link ACR'
+  #       repository: $(DataAcquisition-Name)
+  #       command: 'buildAndPush'
+  #       Dockerfile: '**/DataAcquisition/Dockerfile'
+  #       tags: '$(tags)'
+  #       buildContext: '$(Build.Repository.LocalPath)'
+  #   - task: Kubernetes@1
+  #     displayName: "Deploy DataAcquisition"
+  #     inputs:
+  #       connectionType: 'Kubernetes Service Connection'
+  #       kubernetesServiceEndpoint: 'Link BOTW'
+  #       namespace: 'dev-scale'
+  #       command: 'set'
+  #       arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
+  #       secretType: 'dockerRegistry'
+  #       containerRegistryType: 'Azure Container Registry'
   ###
   # MeasureEval
   - job: MeasureEval
@@ -252,7 +219,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.measureChanged'] ]
-      ServiceName: 'MeasureEval'
+      serviceName: 'MeasureEval'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -283,7 +250,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
-      ServiceName: 'Normalization'
+      serviceName: 'Normalization'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -314,7 +281,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-      ServiceName: 'Notification'
+      serviceName: 'Notification'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -338,35 +305,7 @@ stages:
         arguments: 'image -n dev-scale deployment notification-deploy notification=nhsnlink.azurecr.io/$(Notification-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  # ###
-  # # PatientList
-  # - job: Patient
-  #   displayName: "Build PatientList"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientChanged'] ]
-  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #   steps: 
-  #   - task: Docker@2
-  #     displayName: "Build & Push Patient List"
-  #     condition: always()
-  #     inputs:
-  #       containerRegistry: 'Link ACR'
-  #       repository: $(PatientList-Name)
-  #       command: 'buildAndPush'
-  #       Dockerfile: '**/PatientList/Dockerfile'
-  #       tags: '$(tags)'
-  #       buildContext: '$(Build.Repository.LocalPath)'
-  #   - task: Kubernetes@1
-  #     displayName: "Deploy Patient List"
-  #     inputs:
-  #       connectionType: 'Kubernetes Service Connection'
-  #       kubernetesServiceEndpoint: 'Link BOTW'
-  #       namespace: 'dev-scale'
-  #       command: 'set'
-  #       arguments: 'image -n dev-scale deployment patient-deploy patient=nhsnlink.azurecr.io/$(PatientList-Name):$(Build.BuildId)'
-  #       secretType: 'dockerRegistry'
-  #       containerRegistryType: 'Azure Container Registry'
+ 
   ###
   # PatientQuery
   - job: PatientQuery
@@ -374,7 +313,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientqueryChanged'] ]
-      ServiceName: 'PatientsToQuery'
+      serviceName: 'PatientsToQuery'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -405,7 +344,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
-      ServiceName: 'QueryDispatch'
+      serviceName: 'QueryDispatch'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -436,7 +375,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.reportChanged'] ]
-      ServiceName: 'Report'
+      serviceName: 'Report'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml   
@@ -468,7 +407,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-      ServiceName: 'Submission'
+      serviceName: 'Submission'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
@@ -500,7 +439,7 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-      ServiceName: 'Tenant'
+      serviceName: 'Tenant'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
     - template: azure-nuget-package-source.yml
