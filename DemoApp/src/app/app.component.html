@@ -43,6 +43,12 @@
         <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Tenants</div>
       </a>
 
+      <!-- Measure Definitions Menu -->
+      <a mat-list-item routerLink="measure-def" routerLinkActive="active">
+        <mat-icon matListItemIcon [ngClass]="{'close-menu-icon' : !showMenuText}">attach_file</mat-icon>
+        <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Measure Definitions</div>
+      </a>
+
       <!-- Notification Service Menu -->
       <mat-accordion>
         <mat-expansion-panel style="box-shadow: none">
@@ -81,7 +87,7 @@
           <a mat-list-item routerLink="integration-test" routerLinkActive="active">
             <mat-icon matListItemIcon>integration_instructions</mat-icon>
             <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Integration Test</div>
-          </a>         
+          </a>
         </mat-expansion-panel>
       </mat-accordion>
 

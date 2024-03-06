@@ -81,6 +81,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient<IDataAcquisitionService, DataAcquisitionService>().AddHeaderPropagation();
     builder.Services.AddHttpClient<INormalizationService, NormalizationService>().AddHeaderPropagation();
     builder.Services.AddHttpClient<IReportService, ReportService>().AddHeaderPropagation();
+    builder.Services.AddHttpClient<IMeasureDefinitionService, MeasureDefinitionService>().AddHeaderPropagation();
 
     //Commands
     builder.Services.AddTransient<ICreateReportScheduledCommand, CreateReportScheduledCommand>();
