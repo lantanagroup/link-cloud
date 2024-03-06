@@ -12,6 +12,7 @@ using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Census.Repositories;
 using LantanaGroup.Link.Census.Repositories.Scheduling;
 using LantanaGroup.Link.Census.Services;
+using LantanaGroup.Link.Census.Settings;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -48,14 +49,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    //var kafkaConnection = builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka).Get<KafkaConnection>();
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Kafka));
-    //if (kafkaConnection != null)
-    //    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
-    //else
-    //    throw new NullReferenceException(nameof(kafkaConnection));
-   
-    
+    builder.Services.Configure<TenantConfig>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantConfig));
+
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();

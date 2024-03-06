@@ -53,12 +53,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
+
     builder.Services.AddHttpClient("FhirHttpClient")
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
             {
                 // FhirClient configures its internal HttpClient this way
                 AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
             });
+
+    builder.Services.Configure<TenantConfig>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.TenantConfig));
+
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
