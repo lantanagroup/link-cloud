@@ -10,6 +10,8 @@ using LantanaGroup.Link.MeasureEval.Auditing;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
 using LantanaGroup.Link.MeasureEval.Settings;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -54,30 +56,30 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> StoreMeasureDefinition(ReportDefinition reportDefinition, CancellationToken token)
         {
-            if (reportDefinition.Bundle == null && reportDefinition.Url == null)
+            if (reportDefinition.bundle == null && reportDefinition.url == null)
             {
                 return BadRequest("Either a Bundle or an Url must be specified in a JSON body of the request");
             }
 
             MeasureDefinition measureDefinition = new MeasureDefinition
             {
-                measureDefinitionId = reportDefinition.BundleId,
-                measureDefinitionName = reportDefinition.BundleName,
-                url = reportDefinition.Url
+                measureDefinitionId = reportDefinition.bundleId,
+                measureDefinitionName = reportDefinition.bundleName,
+                url = reportDefinition.url
             };
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             var bundleAsString = "";
 
-            if (reportDefinition.Bundle == null)
+            if (reportDefinition.bundle == null)
             {
-                measureDefinition.bundle = await _measureDefService.getBundleFromUrl(reportDefinition.Url!);
+                measureDefinition.bundle = await _measureDefService.getBundleFromUrl(reportDefinition.url!);
                 bundleAsString = JsonSerializer.Serialize(measureDefinition.bundle, options);
             }
             else
-            {         
+            {
                 try
                 {
-                    bundleAsString = JsonSerializer.Serialize(reportDefinition.Bundle);
+                    bundleAsString = JsonSerializer.Serialize(reportDefinition.bundle);
                     measureDefinition.bundle = JsonSerializer.Deserialize<Bundle>(bundleAsString, options);
                     //_logger.LogDebug(bundleAsString);
                 }
@@ -143,11 +145,11 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> UpdateMeasureDefinition(String measureDefId, [FromBody] ReportDefinition reportDefinition, CancellationToken token)
-         {
+        {
 
-            if (measureDefId != reportDefinition.BundleId)
+            if (measureDefId != reportDefinition.bundleId)
             {
-                return BadRequest($"The Measure Definition Id passed in url {measureDefId} does not the measure Definition Id passed in the request body {reportDefinition.BundleId}");
+                return BadRequest($"The Measure Definition Id passed in url {measureDefId} does not the measure Definition Id passed in the request body {reportDefinition.bundleId}");
             }
             MeasureDefinition measureDefinition = await _measureDefService.GetMeasureDefinition(measureDefId, token);
             if (measureDefinition == null)
@@ -157,13 +159,13 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             var bundleAsString = "";
 
-            if (reportDefinition.BundleName != null)
+            if (reportDefinition.bundleName != null)
             {
-                measureDefinition.measureDefinitionName = reportDefinition.BundleName;
+                measureDefinition.measureDefinitionName = reportDefinition.bundleName;
             }
-            if (reportDefinition.Bundle == null)
+            if (reportDefinition.bundle == null)
             {
-                string? url = reportDefinition.Url ?? measureDefinition.url;
+                string? url = reportDefinition.url ?? measureDefinition.url;
                 if (url == null)
                 {
                     return BadRequest("Either a Bundle or an Url must be specified in a JSON body of the request");
@@ -174,12 +176,12 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
             }
             else
             {
-                measureDefinition.url = reportDefinition.Url;
+                measureDefinition.url = reportDefinition.url;
                 try
                 {
-                    bundleAsString = JsonSerializer.Serialize(reportDefinition.Bundle);
+                    bundleAsString = JsonSerializer.Serialize(reportDefinition.bundle);
                     measureDefinition.bundle = JsonSerializer.Deserialize<Bundle>(bundleAsString, options);
-                   //  _logger.LogDebug(bundleAsString);
+                    //  _logger.LogDebug(bundleAsString);
                 }
                 catch (DeserializationFailedException ex)
                 {
@@ -240,75 +242,110 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<MeasureDefinition>> GetMeasureDefinition(String measureDefId, CancellationToken token)
+        public async Task<ActionResult<ReportDefinition>> GetMeasureDefinition(String measureDefId, CancellationToken token)
         {
             MeasureDefinition measureDefinition = await _measureDefService.GetMeasureDefinition(measureDefId, token);
-            if (measureDefinition == null)
-                return NotFound();
-            return this.Ok(measureDefinition);
+            if (measureDefinition == null) return NotFound();
+            var options = new JsonSerializerOptions().ForFhir(typeof(Bundle).Assembly);
+            string jsonString = JsonSerializer.Serialize(measureDefinition.bundle, options);
+
+            ReportDefinition reportDefinition = new ReportDefinition()
+            {
+                bundleId = measureDefinition.measureDefinitionId,
+                bundleName = measureDefinition.measureDefinitionName,
+                url = measureDefinition.url,
+                bundle = JsonSerializer.Deserialize<JsonDocument>(jsonString, options)
+            };
+            return this.Ok(reportDefinition);
+        }
+
+
+    /// <summary>
+    /// Gets MeasureDefinitions
+    /// </summary>
+    /// <param name="token"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [HttpGet("measureDefinitions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<ReportDefinition>>> GetMeasureDefinitions(CancellationToken token)
+        {
+            List<MeasureDefinition> measureDefinitions = await _measureDefService.GetMeasureDefinitions(token);
+            var list = measureDefinitions.Select(model => new ReportDefinition()
+            {
+                bundleId = model.measureDefinitionId,
+                bundleName = model.measureDefinitionName,
+                url = model.url
+            });
+            return Ok(list);
         }
 
 
 
-        [HttpDelete("{measureDefId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string measureDefId, CancellationToken token)
 
+    [HttpDelete("{measureDefId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Delete(string measureDefId, CancellationToken token)
+
+    {
+        try
         {
-            try
-            {
-                await _measureDefService.DeleteMeasureDefinition(measureDefId, token);
+            await _measureDefService.DeleteMeasureDefinition(measureDefId, token);
 
-                await CreateAuditEvent(measureDefId, AuditEventType.Delete,  $"Successfully deleted measure definition ({measureDefId}).");
+            await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Successfully deleted measure definition ({measureDefId}).");
 
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex.Message);
 
-                await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Error encountered:{ex.Message}");
+            await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Error encountered:{ex.Message}");
 
-                return StatusCode(500, ex.Message);
-            }
-
+            return StatusCode(500, ex.Message);
         }
 
+    }
 
-        private async Task<string> CreateAuditEvent(String measureDefId, AuditEventType type, String notes, MeasureDefinition? measureDefinition = null) 
+
+    private async Task<string> CreateAuditEvent(String measureDefId, AuditEventType type, String notes, MeasureDefinition? measureDefinition = null)
+    {
+
+        try
         {
+            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.ServiceName = MeasureEvalConstants.AppSettingsSectionNames.ServiceName;
+            auditEvent.Id = measureDefId;
+            auditEvent.EventDate = DateTime.UtcNow;
+            auditEvent.User = "SystemUser";
+            auditEvent.Action = type;
+            auditEvent.Resource = typeof(MeasureDefinition).Name;
+            auditEvent.url = measureDefinition?.url;
+            auditEvent.Notes = notes;
 
-            try
+            var headers = new Headers();
+            headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()));
+
+            //write to auditable event occurred topic
+            await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
             {
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-                AuditEventMessage auditEvent = new AuditEventMessage();
-                auditEvent.ServiceName = MeasureEvalConstants.AppSettingsSectionNames.ServiceName;
-                auditEvent.Id = measureDefId;
-                auditEvent.EventDate = DateTime.UtcNow;
-                auditEvent.User = "SystemUser";
-                auditEvent.Action = type;
-                auditEvent.Resource = typeof(MeasureDefinition).Name;
-                auditEvent.url = measureDefinition?.url;
-                auditEvent.Notes = notes;
+                Key = measureDefId,
+                Value = auditEvent,
+                Headers = headers
+            });
 
-                var headers = new Headers();
-                headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()));
-
-                //write to auditable event occurred topic
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
-                {
-                    Key = measureDefId,
-                    Value = auditEvent,
-                    Headers = headers
-                });
-
-                return measureDefId;
-            }
-            catch (Exception ex)
-            {
-                throw new ApplicationException($"Failed to create audit event for {type} of measure definition {measureDefId}.", ex);
-            }
+            return measureDefId;
+        }
+        catch (Exception ex)
+        {
+            throw new ApplicationException($"Failed to create audit event for {type} of measure definition {measureDefId}.", ex);
         }
     }
+}
 }

@@ -12,6 +12,8 @@ namespace LantanaGroup.Link.MeasureEval.Repository
 
         public Task<MeasureDefinition> GetAsync(string measureDefinitionId, CancellationToken cancellationToken);
 
+        public Task<List<MeasureDefinition>> GetAsync(CancellationToken cancellationToken);
+
         public Task<bool> HealthCheck();
     }
 }

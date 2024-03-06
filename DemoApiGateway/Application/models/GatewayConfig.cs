@@ -9,6 +9,7 @@
         public string DataAcquisitionServiceApiUrl { get; set; }
         public string NormalizationServiceApiUrl { get; set; }
         public string ReportServiceApiUrl { get; set; }
+        public string MeasureServiceApiUrl { get; set; }
         public List<string> KafkaBootstrapServers { get; set; }
     }
 }

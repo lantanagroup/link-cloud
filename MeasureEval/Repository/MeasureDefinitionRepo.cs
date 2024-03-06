@@ -55,6 +55,13 @@ public class MeasureDefinitionRepo : MongoDbRepository<MeasureDefinition>, IMeas
         return result;
     }
 
+
+    public async Task<List<MeasureDefinition>> GetAsync(CancellationToken cancellationToken)
+    {
+        return await _collection.Find(_ => true).ToListAsync();
+    }
+
+
     public async Task<bool> ExistsAsync(string measureDefinitionId, CancellationToken cancellationToken)
     {
         return await _collection.CountDocumentsAsync(x => x.measureDefinitionId == measureDefinitionId, cancellationToken: cancellationToken) > 0;
