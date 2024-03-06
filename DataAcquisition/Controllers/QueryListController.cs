@@ -1,5 +1,6 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -83,6 +84,10 @@ public class QueryListController : Controller
             });
 
             return Ok();
+        }
+        catch (MissingTenantConfigurationException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
