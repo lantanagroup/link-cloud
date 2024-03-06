@@ -2,6 +2,8 @@
 using Census.Models;
 using Census.Repositories;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Commands.TenantCheck;
+using LantanaGroup.Link.Census.Models.Exceptions;
 using MediatR;
 using Quartz;
 
@@ -18,17 +20,24 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
     private readonly ICensusConfigMongoRepository _censusConfigService;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly ICensusSchedulingRepository _censusSchedulingRepo;
+    private readonly IMediator _mediator;
 
-    public CreateCensusConfigCommandHandler(ILogger<CreateCensusConfigCommandHandler> logger, ICensusConfigMongoRepository censusConfigService, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo)
+    public CreateCensusConfigCommandHandler(ILogger<CreateCensusConfigCommandHandler> logger, ICensusConfigMongoRepository censusConfigService, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IMediator mediator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _censusConfigService = censusConfigService ?? throw new ArgumentNullException(nameof(censusConfigService));
         _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         _censusSchedulingRepo = censusSchedulingRepo ?? throw new ArgumentNullException(nameof(censusSchedulingRepo));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
 
     public async Task Handle(CreateCensusConfigCommand request, CancellationToken cancellationToken)
     {
+        if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.CensusConfigEntity.FacilityId }, cancellationToken) == false)
+        {
+            throw new MissingTenantConfigurationException($"Facility {request.CensusConfigEntity.FacilityId} not found.");
+        }
+
         var existingEntity = _censusConfigService.Get(request.CensusConfigEntity.FacilityId);
         
         if (existingEntity != null)

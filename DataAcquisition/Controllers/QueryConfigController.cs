@@ -1,6 +1,7 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -128,8 +129,24 @@ public class QueryConfigController : Controller
 
             return Accepted();
         }
+        catch (MissingTenantConfigurationException ex)
+        {
+            await SendAudit(
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                fhirQueryConfiguration.FacilityId,
+                AuditEventType.Create,
+                null);
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
+            await SendAudit(
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                fhirQueryConfiguration.FacilityId,
+                AuditEventType.Create,
+                null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
     }
@@ -189,8 +206,24 @@ public class QueryConfigController : Controller
            
             return Accepted();
         }
+        catch (MissingTenantConfigurationException ex)
+        {
+            await SendAudit(
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                fhirQueryConfiguration.FacilityId,
+                AuditEventType.Update,
+                null);
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
+            await SendAudit(
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                fhirQueryConfiguration.FacilityId,
+                AuditEventType.Update,
+                null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
     }

@@ -11,6 +11,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 
@@ -60,6 +62,11 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
 
     public async Task<Unit> Handle(SaveQueryPlanCommand request, CancellationToken cancellationToken)
     {
+        if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
+        {
+            throw new MissingTenantConfigurationException($"Facility {request.FacilityId} not found.");
+        }
+
         var jsonSettings = new JsonSerializerSettings
         {
             TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
