@@ -156,10 +156,17 @@ public class AuthenticationConfigController : Controller
         }
         catch(MissingFacilityConfigurationException ex)
         {
+            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
+            return BadRequest(ex.Message);
+        }
+        catch(MissingTenantConfigurationException ex)
+        {
+            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
             return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
+            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
     }
@@ -207,8 +214,6 @@ public class AuthenticationConfigController : Controller
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
             });
 
-
-
             var result = await _mediator.Send(new SaveAuthConfigCommand
             {
                 FacilityId = facilityId,
@@ -236,8 +241,24 @@ public class AuthenticationConfigController : Controller
 
             return Accepted(result);
         }
+        catch (MissingTenantConfigurationException ex)
+        {
+            await SendAudit(
+                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                facilityId,
+                AuditEventType.Query,
+                null);
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
+            await SendAudit(
+                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                facilityId,
+                AuditEventType.Query,
+                null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
     }

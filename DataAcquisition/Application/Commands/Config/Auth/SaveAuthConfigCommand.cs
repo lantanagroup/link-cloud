@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
+using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
@@ -19,29 +20,37 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
     private readonly ILogger<UpdateAuthConfigCommandHandler> _logger;
     private readonly IFhirQueryConfigurationRepository _fhirQueryConfigurationRepository;
     private readonly IFhirQueryListConfigurationRepository _fhirQueryListConfigurationRepository;
+    private readonly IMediator _mediator;
 
     public UpdateAuthConfigCommandHandler(
-        ILogger<UpdateAuthConfigCommandHandler> logger, 
-        IFhirQueryConfigurationRepository fhirQueryConfigurationRepository, 
-        IFhirQueryListConfigurationRepository fhirQueryListConfigurationRepository)
+        ILogger<UpdateAuthConfigCommandHandler> logger,
+        IFhirQueryConfigurationRepository fhirQueryConfigurationRepository,
+        IFhirQueryListConfigurationRepository fhirQueryListConfigurationRepository,
+        IMediator mediator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryConfigurationRepository = fhirQueryConfigurationRepository ?? throw new ArgumentNullException(nameof(fhirQueryConfigurationRepository));
         _fhirQueryListConfigurationRepository = fhirQueryListConfigurationRepository ?? throw new ArgumentNullException(nameof(fhirQueryListConfigurationRepository));
+        _mediator = mediator;
     }
 
     public async Task<Unit> Handle(SaveAuthConfigCommand request, CancellationToken cancellationToken = default)
     {
         if (request.QueryConfigurationTypePathParameter == null)
         {
-            _logger.LogWarning($"{nameof(request.QueryConfigurationTypePathParameter)} is null.");
+            _logger.LogWarning("{QueryConfigTypeParam} is null.", nameof(request.QueryConfigurationTypePathParameter));
             return new Unit();
         }
 
         if (request.FacilityId == null)
         {
-            _logger.LogWarning($"{nameof(request.FacilityId)} is null.");
+            _logger.LogWarning("{FacilityId} is null.", nameof(request.FacilityId));
             return new Unit();
+        }
+
+        if(await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
+        {
+            throw new MissingTenantConfigurationException($"Facility {request.FacilityId} not found.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
