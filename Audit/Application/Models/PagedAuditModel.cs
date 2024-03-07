@@ -4,8 +4,8 @@ namespace LantanaGroup.Link.Audit.Application.Models
 {
     public class PagedAuditModel : IPagedModel<AuditModel>
     {
-        public List<AuditModel> Records { get; set; }
-        public PaginationMetadata Metadata { get; set; }
+        public List<AuditModel> Records { get; set; } = new List<AuditModel>();
+        public PaginationMetadata Metadata { get; set; } = null!;
 
         public PagedAuditModel() { }
 

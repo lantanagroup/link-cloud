@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     using (var scope = _scopeFactory.CreateScope())
                                     {
                                         var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
-                                        _ = await _createAuditEventCommand.Execute(eventModel);
+                                        _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
                                     }                                                                      
 
                                     //consume the result and offset
