@@ -16,12 +16,16 @@ namespace LantanaGroup.Link.Audit.Persistance.Configurations
             builder.ToTable("AuditLogs");
 
             //configure strongly typed ID
-            builder.HasKey(b => b.Id);
+            builder.HasKey(b => b.Id).IsClustered(false);
             builder.Property(b => b.Id)
                 .ValueGeneratedNever()
                 .HasConversion(
                     id => id.Value,
                     value => new AuditId(value));
+
+            builder.HasIndex(b => b.FacilityId);
+
+            builder.HasIndex(b => b.UserId);
 
             builder.Property(b => b.ServiceName)
                 .HasMaxLength(100);
