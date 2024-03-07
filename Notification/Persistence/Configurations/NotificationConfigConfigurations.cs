@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Notification.Persistence.Configurations
             builder.ToTable("NotificationConfigs");
 
             //configure strongly typed ID
-            builder.HasKey(b => b.Id);
+            builder.HasKey(b => b.Id).IsClustered(false);
             builder.Property(b => b.Id)
                 .ValueGeneratedNever()
                 .HasConversion(
