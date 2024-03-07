@@ -2,6 +2,7 @@
 
 public class TenantConfig
 {
-    public string TenantServiceBaseUrl { get; set; }
-    public string TenantService_GetTenantRelativeUrl { get; set; }
+    public string TenantServiceBaseEndpoint { get; set; }
+    public string GetTenantRelativeEndpoint { get; set; }
+    public bool CheckIfTenantExists { get; set; }
 }

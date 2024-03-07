@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Census.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Census.Models.Exceptions;
 
 namespace Census.Controllers;
 
@@ -47,6 +48,12 @@ public class CensusConfigController : Controller
                 CensusConfigEntity = censusConfig
             });
             SendAudit("", censusConfig.FacilityId, AuditEventType.Create);
+        }
+        catch(MissingTenantConfigurationException ex)
+        {
+            _logger.LogError(ex.Message);
+            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
+            return BadRequest(ex.Message);
         }
         catch(Exception ex)
         {
@@ -104,6 +111,12 @@ public class CensusConfigController : Controller
                 Config = censusConfig,
             });
             SendAudit("", facilityId, AuditEventType.Update);
+        }
+        catch (MissingTenantConfigurationException ex)
+        {
+            _logger.LogError(ex.Message);
+            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
+            return BadRequest(ex.Message);
         }
         catch (Exception ex) 
         {
