@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Audit.Application.Audit.Queries;
-using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
@@ -17,17 +16,20 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
         private readonly IGetAuditEventListQuery _getAuditEventListQuery;
-        private readonly IGetAuditEventQuery _getAuditEventQuery;
-        private int maxAuditEventsPageSize = 20;
+        private readonly IGetFacilityAuditEventsQuery _getFacilityAuditEventsQuery;
+        private readonly IGetAuditEventQuery _getAuditEventQuery;        
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
-        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, ICreateAuditEventCommand createAuditEventCommand, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics)
+        private int maxAuditEventsPageSize = 20;
+
+        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));           
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
             _getAuditEventListQuery = getAuditEventListQuery ?? throw new ArgumentNullException(nameof(getAuditEventListQuery));
             _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
+            _getFacilityAuditEventsQuery = getFacilityAuditEventsQuery ?? throw new ArgumentNullException(nameof(getFacilityAuditEventsQuery));
         }
 
         /// <summary>
@@ -39,18 +41,20 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         /// <param name="filterServiceBy"></param>
         /// <param name="filterActionBy"></param>
         /// <param name="filterUserBy"></param>
-        /// <param name="sortBy">Ascending = 0, Descending = 1, defaults to Ascending</param>
-        /// <param name="sortOrder"></param>
+        /// <param name="sortBy">Options: FacilityId, Action, ServiceName, Resource, CreatedOn</param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns>
         ///     Success: 200
+        ///     NoContent: 204
         ///     Unautorized: 401
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]        
@@ -71,10 +75,12 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 _logger.LogAuditEventListQuery(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter);
+                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter, HttpContext.RequestAborted);
+
+                if(auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(auditEventList.Metadata));
+                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
                                 
                 return Ok(auditEventList);
             }
@@ -85,7 +91,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 throw;
             }
                     
-        }
+        }        
 
         /// <summary>
         /// Returns an audit event with the provided Id.
@@ -115,7 +121,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
             try
             {
-                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id));                
+                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id), HttpContext.RequestAborted);                
 
                 if (auditEvent == null) { return NotFound(); }
                 
@@ -128,6 +134,55 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 throw;
             }
 
-        }        
+        }
+
+        /// <summary>
+        /// Returns a list of audit events for a specific facility.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="sortBy">Options: FacilityId, Action, ServiceName, Resource, CreatedOn</param>
+        /// <param name="sortOrder">Ascending = 0, Descending = 1, defaults to Ascending</param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     NoContent: 204
+        ///     Unautorized: 401
+        ///     Forbidden: 403
+        ///     Server Error: 500
+        /// </returns>
+        [HttpGet("facility/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedAuditModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedAuditModel>> GetFacilityAuditEvents(string facilityId, string? sortBy, SortOrder? sortOrder, int pageNumber = 1, int pageSize = 10)
+        {
+            try
+            {
+                //make sure page size does not exceed the max page size allowed
+                if (pageSize > maxAuditEventsPageSize) { pageSize = maxAuditEventsPageSize; }
+
+                if (pageNumber < 1) { pageNumber = 1; }
+
+                _logger.LogGetFacilityAuditEventsQuery(facilityId);
+
+                //Get list of audit events using supplied filters and pagination
+                PagedAuditModel auditEventList = await _getFacilityAuditEventsQuery.Execute(facilityId, sortBy, sortOrder, pageNumber, pageSize, HttpContext.RequestAborted);
+
+                if (auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
+
+                //add X-Pagination header for machine-readable pagination metadata
+                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
+
+                return Ok(auditEventList);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogGetFacilityAuditEventsQueryException(facilityId, ex.Message);
+                throw;
+            }
+        }
     }
 }

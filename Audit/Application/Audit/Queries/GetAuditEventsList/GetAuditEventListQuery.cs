@@ -21,15 +21,16 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// Returns a list of audit events based on one or more filtering optoins.
         /// </summary>
         /// <param name="searchFilter">Search filter parameters</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>A paged list of audit events</returns>
         /// <exception cref="ApplicationException"></exception>
-        public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter)
+        public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
 
-            var (result, metadata) = await _datastore.Search(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy, 
+            var (result, metadata) = await _datastore.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy, 
                 searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder, 
-                searchFilter.PageSize, searchFilter.PageNumber);
+                searchFilter.PageSize, searchFilter.PageNumber, cancellationToken);
 
             //convert AuditEntity to AuditModel
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 
                 List<AuditModel> auditEvents = result.Select(x => new AuditModel
                 {
-                    Id = x.Id,
+                    Id = x.Id.Value.ToString(),
                     FacilityId = x.FacilityId,
                     CorrelationId = x.CorrelationId,
                     ServiceName = x.ServiceName,

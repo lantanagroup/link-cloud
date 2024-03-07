@@ -4,7 +4,7 @@ namespace LantanaGroup.Link.Audit.Application.Models
 {
     public class AuditModel
     {
-        public AuditId Id { get; set; }
+        public string Id { get; set; } = null!;
         public string? FacilityId { get; set; }
         public string? CorrelationId { get; set; }
         public string? ServiceName { get; set; }
