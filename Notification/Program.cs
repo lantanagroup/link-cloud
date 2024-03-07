@@ -266,14 +266,7 @@ static void SetupMiddleware(WebApplication app)
     {
         var serviceInformation = app.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
-    }
-
-    // Ensure database created
-    using (var scope = app.Services.CreateScope())
-    {
-        var context = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-        context.Database.EnsureCreated();
+        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Notification Service"));
     }
 
     app.UseRouting();

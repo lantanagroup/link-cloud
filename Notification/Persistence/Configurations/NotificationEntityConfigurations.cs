@@ -16,12 +16,14 @@ namespace LantanaGroup.Link.Notification.Persistence.Configurations
             builder.ToTable("Notifications");
 
             //configure strongly typed ID
-            builder.HasKey(b => b.Id);
+            builder.HasKey(b => b.Id).IsClustered(false); ;
             builder.Property(b => b.Id)
                 .ValueGeneratedNever()
                 .HasConversion(
                     id => id.Value,
                     value => new NotificationId(value));
+
+            builder.HasIndex(b => b.FacilityId);
 
             builder.Property(b => b.NotificationType)
                 .HasMaxLength(250);
