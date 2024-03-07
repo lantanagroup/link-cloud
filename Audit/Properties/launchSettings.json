@@ -12,7 +12,20 @@
     },
     "Docker": {
       "commandName": "Docker",
-      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "DockerfileRunArguments": "--name=Link-Audit --network=local-link -p 7334:8080 -p 7335:8081",
+      "launchUrl": "http://localhost:7334/swagger",      
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Link__Audit__KafkaConnection__BootstrapServers__0": "kafka:29092/",
+        "Link__Audit__Logging__Serilog__WriteTo__1__Args__uri": "http://loki:3100",
+        "Link__Audit__TelemetryConfig__TelemetryCollectorEndpoint": "http://collector:55690",
+        "ASPNETCORE_URLS": "http://+:8080;https://+:8081",
+        "ASPNETCORE_HTTP_PORTS": "8080",
+        "ASPNETCORE_HTTPS_PORTS": "8081",
+        "Kestrel__Endpoints__Http__Url": "http://*:8080",
+        "Kestrel__Endpoints__Https__Url": "http://*:8081"
+      },
       "publishAllPorts": true,
       "useSSL": true
     },

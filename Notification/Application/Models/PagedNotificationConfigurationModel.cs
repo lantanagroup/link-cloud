@@ -4,8 +4,8 @@ namespace LantanaGroup.Link.Notification.Application.Models
 {
     public class PagedNotificationConfigurationModel : IPagedModel<NotificationConfigurationModel>
     {
-        public List<NotificationConfigurationModel> Records { get; set; }
-        public PaginationMetadata Metadata { get; set; }
+        public List<NotificationConfigurationModel> Records { get; set; } = new List<NotificationConfigurationModel>();
+        public PaginationMetadata Metadata { get; set; } = new PaginationMetadata();
 
         public PagedNotificationConfigurationModel() { }
 

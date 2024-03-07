@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
 
@@ -18,27 +19,24 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Queries
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
         }
 
-        public async Task<NotificationModel> Execute(string id)
+        public async Task<NotificationModel> Execute(NotificationId id, CancellationToken cancellationToken)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Notification By Id Query");
-
-            if (string.IsNullOrEmpty(id)) { throw new ArgumentNullException(nameof(id)); }
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Notification By Id Query");           
 
             try
-            {
-                NotificationModel? notification = null;
+            {                
+                var notification = await _datastore.GetAsync(id, true, cancellationToken);
 
-                var result = await _datastore.GetAsync(id);
-
-                if (result != null)
+                if (notification is null)
                 {
-                    notification = new NotificationModel();
-                    notification = _notificationFactory.NotificationModelCreate(result.Id, result.NotificationType, result.FacilityId, result.CorrelationId, result.Subject, result.Body, result.Recipients, result.Bcc, result.CreatedOn, result.SentOn);
+                    return null;
                 }
+                
+                var model = _notificationFactory.NotificationModelCreate(notification.Id, notification.NotificationType, notification.FacilityId, notification.CorrelationId, notification.Subject, notification.Body, notification.Recipients, notification.Bcc, notification.CreatedOn, notification.SentOn);
 
-                return notification;
+                return model;
             }
-            catch (ArgumentNullException ex)
+            catch (ArgumentNullException)
             {                
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, $"Failed to get notification, no id provided.");
                 throw;

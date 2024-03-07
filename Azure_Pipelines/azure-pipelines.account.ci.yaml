@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - Account
+    - Account/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -10,6 +10,7 @@ variables:
   project: 'Account/Account.csproj'
   testProject: 'AccountUnitTests/AccountUnitTests.csproj'
   nugetPath: 'Account/nuget.config'
+  serviceName: 'Account'
 
 steps:
   - task: PowerShell@2
@@ -20,33 +21,33 @@ steps:
         $path = '$(System.DefaultWorkingDirectory)/Account/nuget.config'
         $nugetUrl = '$(nuget)'
         $sharedUrl = '$(Shared_BOTW_Feed)'
-        $token = '$(ClearTextPassword)'
+        $token = '$(System.AccessToken)'
         $basePath = '$(System.DefaultWorkingDirectory)'
-        
+      
         $xml = [xml](Get-Content -Path $path)
-        
+      
         $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
+              where { $_.key -eq 'nuget' }
         $node.value = $nugetUrl
-        
+      
         Write-Host "updated nuget url:"
         Write-Host $node.value
-        
+      
         $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
+              where { $_.key -eq 'Shared_BOTW_Feed' }
         $node.value = $sharedUrl
-        
+      
         Write-Host "Shared botw url:"
         Write-Host $node.value
-        
+      
         $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
                 where { $_.key -eq 'ClearTextPassword' }
         $node.value = $token
-        
+      
         Write-Host "updated token:"
         Write-Host $node.value
-        
-        $xml.Save($path)
+      
+        $xml.Save($path)    
 
   - task: DotNetCoreCLI@2
     displayName: Restore

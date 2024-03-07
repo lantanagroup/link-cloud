@@ -33,9 +33,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Services
 
                 //add id to current activity
                 var activity = Activity.Current;
-                activity?.AddTag("facility id", model.FacilityId);
+                activity?.AddTag("facility.id", model.FacilityId);
 
-                NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId);
+                NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(model.FacilityId, context.CancellationToken);
 
                 FacilityConfigurationReply reply = new FacilityConfigurationReply
                 {

@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
                 .Returns(auditEntity);
 
             mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.Add(auditEntity)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.AddAsync(auditEntity, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
         }
 
@@ -142,8 +142,8 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
         [Then(@"the Id property should be a valid unique identifier")]
         public void ThenTheIdPropertyShouldBe()
         {
-            Assert.That(createdAuditEventId, Is.Not.Empty);
-            Assert.That(createdAuditEventId, Is.Not.EqualTo(_emptyId));
+            Assert.That(createdAuditEventId.Value, Is.Not.Empty);
+            Assert.That(createdAuditEventId.Value, Is.Not.EqualTo(_emptyId));
         }
 
         [Then(@"the other properties of the AuditEvent should match those of the received AuditEventMessage")]
@@ -151,7 +151,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
         {
             Assert.That(auditMessage.ServiceName, Is.Not.Null);
             Assert.That(auditEntity.ServiceName, Is.Not.Null);
-            Assert.Equals(auditMessage.ServiceName, auditEntity.ServiceName);
+            Assert.That(auditMessage.ServiceName!.Equals(auditEntity.ServiceName));
         }
 
     }

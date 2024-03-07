@@ -59,11 +59,11 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.FindAsync(filter, cancellationToken);
         }
 
-        public async Task<string> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
+        public async Task<bool> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
         {
             this.ValidateFacility(newFacility);
 
-            FacilityConfigModel facility = _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken).Result;
+            var facility = await _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken);
 
             // validates facility does not exist
             if (facility is not null)
@@ -75,7 +75,16 @@ namespace LantanaGroup.Link.Tenant.Services
 
             this.ValidateSchedules(newFacility);
 
-            _ =  _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
+            bool created = false;
+
+            try
+            {
+                created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
+            }
 
             using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
 
@@ -101,8 +110,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 _logger.LogError($"Failed to generate an audit event for create of facility configuration {newFacility.Id}.", ex);
             }
 
-            return newFacility.FacilityId;
-
+            return created;
         }
 
         public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)

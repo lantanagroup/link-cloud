@@ -1,7 +1,6 @@
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LanatanGroup.Link.QueryDispatch.Jobs;
-using LantanaGroup.Link.QueryDispatch;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
@@ -10,8 +9,6 @@ using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.QueryDispatch.Application.Services;
-using LantanaGroup.Link.QueryDispatch.Application.Settings;
 using LantanaGroup.Link.QueryDispatch.Listeners;
 using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
 using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
@@ -21,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -30,6 +28,7 @@ using Quartz.Impl;
 using Quartz.Spi;
 using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Services;
+using QueryDispatch.Application.Settings;
 using QueryDispatch.Presentation.Services;
 using Serilog;
 using System.Reflection;
@@ -54,10 +53,8 @@ else
 
 builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
-
-var tenantApiSettings = builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>();
-if (tenantApiSettings != null)
-    builder.Services.AddSingleton(tenantApiSettings);
+builder.Services.AddSingleton(builder.Configuration
+    .GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
 
 // Add services to the container.
 builder.Services.AddGrpc();

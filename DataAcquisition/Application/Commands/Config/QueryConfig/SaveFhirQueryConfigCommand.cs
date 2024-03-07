@@ -1,5 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
+using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
@@ -26,7 +28,12 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
 
     public async Task<Unit> Handle(SaveFhirQueryConfigCommand request, CancellationToken cancellationToken)
     {
-        if(request.queryConfiguration.ModifyDate == null)
+        if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.queryConfiguration.FacilityId }, cancellationToken) == false)
+        {
+            throw new MissingTenantConfigurationException($"Facility {request.queryConfiguration.FacilityId} not found.");
+        }
+
+        if (request.queryConfiguration.ModifyDate == null)
         {
             request.queryConfiguration.ModifyDate = DateTime.UtcNow;
         }

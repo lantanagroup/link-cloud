@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Audit.Persistance
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
             base.OnModelCreating(modelBuilder);
-        }
+        }       
+        
     }
 }

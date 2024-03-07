@@ -1,0 +1,37 @@
+trigger:
+  paths:
+    include:
+    - Submission/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'Submission/Submission.csproj'
+  #testProject: 'SubmissionUnitTests/SubmissionUnitTests.csproj'
+  nugetPath: 'Submission/nuget.config'
+  serviceName: 'Submission'
+
+steps:
+  - template: ../azure-nuget-package-source.yml 
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      nugetConfigPath: '$(nugetPath)'
+      feedsToUse: config
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  # - task: DotNetCoreCLI@2
+  #   inputs:
+  #     command: 'test'
+  #     projects: $(testProject)
+  #   displayName: 'Run Tests'
+
