@@ -1,9 +1,10 @@
-﻿using System;
+﻿using LantanaGroup.Link.Audit.Application.Interfaces;
+using System;
 using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
 {
-    public class AuditServiceMetrics
+    public class AuditServiceMetrics : IAuditServiceMetrics
     {
         public const string MeterName = "LinkAuditService";
 
@@ -20,6 +21,11 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
         }
 
         public Counter<long> AuditableEventCounter { get; private set; }
+
+        public void IncrementAuditableEventCounter(List<KeyValuePair<string, object?>> tags)
+        {
+            AuditableEventCounter.Add(1, tags.ToArray());
+        }
 
         public TrackedRequestDuration MeasureAuditSearchDuration()
         {            

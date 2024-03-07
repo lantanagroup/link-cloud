@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Commands;
 using LantanaGroup.Link.Census.Models;
 using LantanaGroup.Link.Census.Models.Messages;
@@ -20,14 +21,15 @@ public class CensusListener : BackgroundService
     private readonly IKafkaProducerFactory<string,object> _kafkaProducerFactory;
     private readonly ILogger<CensusListener> _logger;
     private readonly IMediator _mediator;
-    private bool _cancelled = false;
+    private readonly INonTransientExceptionHandler<string, string> _nonTransientExceptionHandler;
 
-    public CensusListener(ILogger<CensusListener> logger, IMediator mediator, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IKafkaProducerFactory<string, object> kafkaProducerFactory)
+    public CensusListener(ILogger<CensusListener> logger, IMediator mediator, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IKafkaProducerFactory<string, object> kafkaProducerFactory, INonTransientExceptionHandler<string, string> nonTransientExceptionHandler)
     {
         _logger = logger;
         _mediator = mediator;
         _kafkaConsumerFactory = kafkaConsumerFactory;
         _kafkaProducerFactory = kafkaProducerFactory;
+        _nonTransientExceptionHandler = nonTransientExceptionHandler;
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
@@ -35,7 +37,7 @@ public class CensusListener : BackgroundService
         await base.StartAsync(cancellationToken);
     }
 
-    //
+
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
     {
         await System.Threading.Tasks.Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
@@ -57,66 +59,98 @@ public class CensusListener : BackgroundService
         kafkaConsumer.Subscribe(KafkaTopic.PatientIDsAcquired.ToString());
         ConsumeResult<string, string> rawmessage = null;
 
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            rawmessage = kafkaConsumer.Consume();
-            IBaseMessage deserializedMessage = null;
-            (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
-
-            if (rawmessage != null)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                IBaseMessage message = null;
                 try
                 {
-                    message = DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                    rawmessage = kafkaConsumer.Consume(cancellationToken);
                 }
-                catch (Exception ex)
+                catch(ConsumeException ex)
                 {
-                    var errorMessage = $"Unable to deserialize message: {rawmessage?.Message?.Value}";
-                    _logger.LogError(errorMessage);
+                    _nonTransientExceptionHandler.HandleException(ex);
+                    kafkaConsumer.Commit(rawmessage);
+                    _logger.LogError($"Error consuming message: {ex.Error.Reason}");
                     continue;
                 }
 
-                deserializedMessage = message;
-                messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+                IBaseMessage deserializedMessage = null;
+                (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
 
-                if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
+                if (rawmessage != null)
                 {
-                    var errorMessage = $"No Facility ID provided. Unable to process message: {message}";
-                    _logger.LogWarning(errorMessage);
-                    continue;
-                }
-
-                try
-                {
-                    responseMessages = message switch
+                    IBaseMessage message = null;
+                    try
                     {
-                        PatientIDsAcquired => await _mediator.Send(new ConsumePatientIdsAcquiredEventCommand
+                        message = DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                    }
+                    catch (Exception ex)
+                    {
+                        _nonTransientExceptionHandler.HandleException(rawmessage,ex);
+                        kafkaConsumer.Commit(rawmessage);
+                        var errorMessage = $"Unable to deserialize message: {rawmessage?.Message?.Value}";
+                        _logger.LogError(errorMessage);
+                        continue;
+                    }
+
+                    deserializedMessage = message;
+                    messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+
+
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                         {
-                            FacilityId = messageMetaData.facilityId,
-                            Message = (PatientIDsAcquired)message
-                        }, cancellationToken),
-                        _ => null
-                    };
-
-                    await ProduceEvents(responseMessages, kafkaProducer, cancellationToken);
-                }
-                catch (Exception ex)
-                { 
-
-                    await ProduceAuditMessage(null, messageMetaData.facilityId, new AuditEventMessage
+                            throw new MissingFacilityIdException("No Facility ID provided. Unable to process message.");
+                        }
+                    }
+                    catch (MissingFacilityIdException ex)
                     {
-                        Action = Shared.Application.Models.AuditEventType.Query,
-                        //Resource = string.Join(',', deserializedMessage.Type),
-                        ServiceName = CensusConstants.ServiceName,
-                        Notes = $"Failed to get {rawmessage.Topic}\nException Message: {ex}\nRaw Message: {JsonConvert.SerializeObject(rawmessage)}",
-                    });
-                    _logger.LogError($"Failed to produce {KafkaTopic.DataAcquired.ToString()} message: {responseMessages}");
-                    responseMessages = null;
-                }
+                        _nonTransientExceptionHandler.HandleException(rawmessage, ex);
+                        kafkaConsumer.Commit(rawmessage);
+                        var errorMessage = $"No Facility ID provided. Unable to process message: {message}";
+                        _logger.LogWarning(errorMessage);
+                        continue;
+                    }
 
-                kafkaConsumer.Commit(rawmessage);
+                    try
+                    {
+                        responseMessages = message switch
+                        {
+                            PatientIDsAcquired => await _mediator.Send(new ConsumePatientIdsAcquiredEventCommand
+                            {
+                                FacilityId = messageMetaData.facilityId,
+                                Message = (PatientIDsAcquired)message
+                            }, cancellationToken),
+                            _ => null
+                        };
+
+                        await ProduceEvents(responseMessages, kafkaProducer, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+
+                        await ProduceAuditMessage(null, messageMetaData.facilityId, new AuditEventMessage
+                        {
+                            Action = Shared.Application.Models.AuditEventType.Query,
+                            //Resource = string.Join(',', deserializedMessage.Type),
+                            ServiceName = CensusConstants.ServiceName,
+                            Notes = $"Failed to get {rawmessage.Topic}\nException Message: {ex}\nRaw Message: {JsonConvert.SerializeObject(rawmessage)}",
+                        });
+                        _logger.LogError($"Failed to produce {KafkaTopic.DataAcquired.ToString()} message: {responseMessages}");
+                        responseMessages = null;
+                    }
+
+                    kafkaConsumer.Commit(rawmessage);
+                }
             }
+        }
+        catch(OperationCanceledException ex) 
+        {
+            _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
+            kafkaConsumer.Close();
+            kafkaConsumer.Dispose();
         }
     }
 
@@ -153,13 +187,6 @@ public class CensusListener : BackgroundService
         using var auditProducer = _kafkaProducerFactory.CreateAuditEventProducer();
 
         Headers? headers = null;
-        if(string.IsNullOrWhiteSpace(correlationId))
-        {
-            //headers = new Headers
-            //        {
-            //            new Header(CensusConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-            //        };
-        }
         
         try
         {
@@ -204,7 +231,6 @@ public class CensusListener : BackgroundService
     private IBaseMessage DeserializeMessage(string topic, string rawMessage) =>
         topic switch
         {
-            //CensusConstants.MessageNames.PatientIDsAcquired => JsonConvert.DeserializeObject<PatientIDsAcquired>(rawMessage),
             CensusConstants.MessageNames.PatientIDsAcquired => DeserializePatientIdsAcquired(rawMessage),
             _ => throw new Exception($"{topic} not a valid topic. Unable to deserialize message.")
         };

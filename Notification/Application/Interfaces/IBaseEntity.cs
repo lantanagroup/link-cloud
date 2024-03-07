@@ -2,8 +2,8 @@
 {
     public interface IBaseEntity
     {
-        string Id { get; set; }
         DateTime CreatedOn { get; set; }
+        DateTime? LastModifiedOn { get; set; }
         Guid? CreatedBy { get; set; }
     }
 }

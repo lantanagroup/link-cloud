@@ -1,11 +1,11 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
 WORKDIR /src
 COPY ["Validation/Validation.csproj", "Validation/"]
 COPY ["Validation/nuget.config", "Validation/"]
@@ -19,6 +19,6 @@ RUN dotnet publish "Validation.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache aspnetcore6-runtime
+#RUN apk add --no-cache aspnetcore6-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Validation.dll"]

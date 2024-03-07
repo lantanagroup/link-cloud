@@ -1,0 +1,37 @@
+trigger:
+  paths:
+    include:
+    - PatientsToQuery/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'PatientsToQuery/PatientsToQuery.csproj'
+  testProject: 'PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
+  nugetPath: 'PatientsToQuery/nuget.config'
+  serviceName: 'PatientsToQuery'
+
+steps:
+  - template: ../azure-nuget-package-source.yml
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      nugetConfigPath: '$(nugetPath)'
+      feedsToUse: config
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+    displayName: 'Run Tests'
+

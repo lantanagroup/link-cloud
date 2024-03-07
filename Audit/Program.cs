@@ -27,6 +27,7 @@ using System.Text;
 using LantanaGroup.Link.Audit.Persistance.Repositories;
 using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Audit.Persistance.Interceptors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,12 +116,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
 
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
     //Add database context
-    builder.Services.AddDbContext<AuditDbContext>(options => {
+    builder.Services.AddDbContext<AuditDbContext>((sp, options) => {
+
+        var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+
         switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
-        {
+        {          
             case "SqlServer":
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DatabaseConnection"));
+                options.UseSqlServer(
+                    builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -231,14 +240,6 @@ static void SetupMiddleware(WebApplication app)
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
-    }
-
-    //TODO: Discuss migrations rather than ensure created
-    // Ensure database created
-    using (var scope = app.Services.CreateScope())
-    {
-        var context = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        context.Database.EnsureCreated();
     }
 
     app.UseRouting();

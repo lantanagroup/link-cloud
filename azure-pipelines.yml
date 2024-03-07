@@ -73,10 +73,6 @@ stages:
             $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Audit/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool"
 
-            # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Census/" -AllMatches).Matches.Count -gt 0)
-            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool"
-
             # DataAcquisition - Return $true if path has changed files
             $dataBool = ((Select-String -InputObject $changedFiles -Pattern "DataAcquisition/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool"
@@ -129,43 +125,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
+      serviceName: 'Account'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Account/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Account"
       condition: always()
@@ -187,113 +150,16 @@ stages:
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
   ###
-  # API
-  - job: API
-    displayName: "Build API"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.apiChanged'] ]
-    condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Api/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)   
-    - task: Docker@2
-      displayName: "Build & Push API"
-      condition: always()
-      inputs:
-        containerRegistry: 'Link ACR'
-        repository: $(API-Name)
-        command: 'buildAndPush'
-        Dockerfile: '**/Api/Dockerfile'
-        tags: '$(tags)'
-        buildContext: '$(Build.Repository.LocalPath)'
-    - task: Kubernetes@1
-      displayName: "Deploy API"
-      inputs:
-        connectionType: 'Kubernetes Service Connection'
-        kubernetesServiceEndpoint: 'Link BOTW'
-        namespace: 'dev-scale'
-        command: 'set'
-        arguments: 'image -n dev-scale deployment api-deploy api=nhsnlink.azurecr.io/$(API-Name):$(Build.BuildId)'
-        secretType: 'dockerRegistry'
-        containerRegistryType: 'Azure Container Registry'
-  ###
   # Audit
   - job: Audit
     displayName: "Build Audit"
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
+      serviceName: 'Audit'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Audit/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)   
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Audit"
       condition: always()
@@ -314,100 +180,38 @@ stages:
         arguments: 'image -n dev-scale deployment audit-deploy audit=nhsnlink.azurecr.io/$(Audit-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  ###
-  # Census
-  #- job: Census
-  #  displayName: "Build Census"
-  #  dependsOn: getChangedFiles
-  #  variables: 
-  #    changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-  #  condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #  steps:
-  #  - task: Docker@2
-  #    displayName: "Build & Push Census"
-  #    condition: always()
-  #    inputs:
-  #      containerRegistry: 'Link ACR'
-  #      repository: $(Census-Name)
-  #      command: 'buildAndPush'
-  #      Dockerfile: '**/Census/Dockerfile'
-  #      tags: '$(tags)'
-  #      buildContext: '$(Build.Repository.LocalPath)'
-  #  - task: Kubernetes@1
-  #    displayName: "Deploy Census"
-  #    inputs:
-  #      connectionType: 'Kubernetes Service Connection'
-  #      kubernetesServiceEndpoint: 'Link BOTW'
-  #      namespace: 'dev-scale'
-  #      command: 'set'
-  #      arguments: 'image -n dev-scale deployment census-deploy census=nhsnlink.azurecr.io/$(Census-Name):$(Build.BuildId)'
-  #      secretType: 'dockerRegistry'
-  #      containerRegistryType: 'Azure Container Registry'
 
   ###
   # DataAcquisition
-  - job: DataAcquisition
-    displayName: "Build Census"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-    condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-    steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/DataAcquisition/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
-    - task: Docker@2
-      displayName: "Build & Push Data Acquisition"
-      condition: always()
-      inputs:
-        containerRegistry: 'Link ACR'
-        repository: $(DataAcquisition-Name)
-        command: 'buildAndPush'
-        Dockerfile: '**/DataAcquisition/Dockerfile'
-        tags: '$(tags)'
-        buildContext: '$(Build.Repository.LocalPath)'
-    - task: Kubernetes@1
-      displayName: "Deploy DataAcquisition"
-      inputs:
-        connectionType: 'Kubernetes Service Connection'
-        kubernetesServiceEndpoint: 'Link BOTW'
-        namespace: 'dev-scale'
-        command: 'set'
-        arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
-        secretType: 'dockerRegistry'
-        containerRegistryType: 'Azure Container Registry'
+  # - job: DataAcquisition
+  #   displayName: "Build Data A"
+  #   dependsOn: getChangedFiles
+  #   variables: 
+  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
+  #     serviceName: 'Census'
+  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
+  #   steps:
+  #   - template: azure-nuget-package-source.yml 
+  #   - task: Docker@2
+  #     displayName: "Build & Push Data Acquisition"
+  #     condition: always()
+  #     inputs:
+  #       containerRegistry: 'Link ACR'
+  #       repository: $(DataAcquisition-Name)
+  #       command: 'buildAndPush'
+  #       Dockerfile: '**/DataAcquisition/Dockerfile'
+  #       tags: '$(tags)'
+  #       buildContext: '$(Build.Repository.LocalPath)'
+  #   - task: Kubernetes@1
+  #     displayName: "Deploy DataAcquisition"
+  #     inputs:
+  #       connectionType: 'Kubernetes Service Connection'
+  #       kubernetesServiceEndpoint: 'Link BOTW'
+  #       namespace: 'dev-scale'
+  #       command: 'set'
+  #       arguments: 'image -n dev-scale deployment data-deploy data=nhsnlink.azurecr.io/$(DataAcquisition-Name):$(Build.BuildId)'
+  #       secretType: 'dockerRegistry'
+  #       containerRegistryType: 'Azure Container Registry'
   ###
   # MeasureEval
   - job: MeasureEval
@@ -415,43 +219,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.measureChanged'] ]
+      serviceName: 'MeasureEval'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/MeasureEval/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Measure Eval"
       condition: always()
@@ -479,43 +250,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
+      serviceName: 'Normalization'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Normalization/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Normalization"
       condition: always()
@@ -543,43 +281,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
+      serviceName: 'Notification'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Notification/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Notification"
       condition: always()
@@ -600,35 +305,7 @@ stages:
         arguments: 'image -n dev-scale deployment notification-deploy notification=nhsnlink.azurecr.io/$(Notification-Name):$(Build.BuildId)'
         secretType: 'dockerRegistry'
         containerRegistryType: 'Azure Container Registry'
-  # ###
-  # # PatientList
-  # - job: Patient
-  #   displayName: "Build PatientList"
-  #   dependsOn: getChangedFiles
-  #   variables: 
-  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientChanged'] ]
-  #   condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
-  #   steps: 
-  #   - task: Docker@2
-  #     displayName: "Build & Push Patient List"
-  #     condition: always()
-  #     inputs:
-  #       containerRegistry: 'Link ACR'
-  #       repository: $(PatientList-Name)
-  #       command: 'buildAndPush'
-  #       Dockerfile: '**/PatientList/Dockerfile'
-  #       tags: '$(tags)'
-  #       buildContext: '$(Build.Repository.LocalPath)'
-  #   - task: Kubernetes@1
-  #     displayName: "Deploy Patient List"
-  #     inputs:
-  #       connectionType: 'Kubernetes Service Connection'
-  #       kubernetesServiceEndpoint: 'Link BOTW'
-  #       namespace: 'dev-scale'
-  #       command: 'set'
-  #       arguments: 'image -n dev-scale deployment patient-deploy patient=nhsnlink.azurecr.io/$(PatientList-Name):$(Build.BuildId)'
-  #       secretType: 'dockerRegistry'
-  #       containerRegistryType: 'Azure Container Registry'
+ 
   ###
   # PatientQuery
   - job: PatientQuery
@@ -636,43 +313,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.patientqueryChanged'] ]
+      serviceName: 'PatientsToQuery'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/PatientsToQuery/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push PatientQuery"
       condition: always()
@@ -700,43 +344,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
+      serviceName: 'QueryDispatch'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/QueryDispatch/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push QueryDispatch"
       condition: always()
@@ -764,43 +375,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.reportChanged'] ]
+      serviceName: 'Report'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Report/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml   
     - task: Docker@2
       displayName: "Build & Push Report"
       condition: always()
@@ -829,43 +407,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
+      serviceName: 'Submission'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Submission/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Submission"
       condition: always()
@@ -894,43 +439,10 @@ stages:
     dependsOn: getChangedFiles
     variables: 
       changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
+      serviceName: 'Tenant'
     condition: or(eq(variables.changed, 'True'), eq('${{parameters.buildAll}}', 'True'))
     steps:
-    - task: PowerShell@2
-      displayName: 'Transform nuget.config'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $path = '$(System.DefaultWorkingDirectory)/Tenant/nuget.config'
-          $nugetUrl = '$(nuget)'
-          $sharedUrl = '$(Shared_BOTW_Feed)'
-          $token = '$(System.AccessToken)'
-          $basePath = '$(System.DefaultWorkingDirectory)'
-        
-          $xml = [xml](Get-Content -Path $path)
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-          $node.value = $nugetUrl
-        
-          Write-Host "updated nuget url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-          $node.value = $sharedUrl
-        
-          Write-Host "Shared botw url:"
-          Write-Host $node.value
-        
-          $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                  where { $_.key -eq 'ClearTextPassword' }
-          $node.value = $token
-        
-          Write-Host "updated token:"
-          Write-Host $node.value
-        
-          $xml.Save($path)    
+    - template: azure-nuget-package-source.yml
     - task: Docker@2
       displayName: "Build & Push Tenant"
       condition: always()

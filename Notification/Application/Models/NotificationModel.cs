@@ -2,7 +2,7 @@
 {
     public class NotificationModel
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Id { get; set; } = null!;
         public string NotificationType { get; set; } = string.Empty;
         public string? FacilityId { get; set; }
         public string? CorrelationId { get; set; }
@@ -11,6 +11,6 @@
         public List<string> Recipients { get; set; } = new List<string>();
         public List<string>? Bcc { get; set; }
         public DateTime CreatedOn { get; set; }
-        public DateTime? SentOn { get; set; }
+        public List<DateTime> SentOn { get; set; } = new List<DateTime>();
     }
 }

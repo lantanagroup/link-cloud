@@ -12,6 +12,7 @@ namespace Census.Settings
             public const string Kafka = "KafkaConnection";
             public const string Mongo = "MongoDB";
             public const string Telemetry = "TelemetryConfig";
+            public const string TenantConfig = "TenantConfig";
         }
 
         public static class Scheduler
@@ -29,6 +30,7 @@ namespace Census.Settings
         public static class MessageNames
         {
             public const string PatientIDsAcquired = "PatientIDsAcquired";
+            public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
         }
 
         public static class MongoDb

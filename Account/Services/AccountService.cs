@@ -1,10 +1,12 @@
+using System.Text;
 using AutoMapper;
 using Grpc.Core;
 using LantanaGroup.Link.Account.Converters;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
 using LantanaGroup.Link.Account.Repositories;
-using LantanaGroup.Link.Shared.Converters;
+using LantanaGroup.Link.Shared.Application.Converters;
+using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.Account.Services
 {
@@ -16,16 +18,38 @@ namespace LantanaGroup.Link.Account.Services
 
         private readonly IMapper _mapperModelToMessage;
         private readonly IMapper _mapperMessageToModel;
+        private readonly ITenantApiService _tenantApiService;
 
-        public AccountService(ILogger<AccountService> logger, AccountRepository accountRepository)
+        public AccountService(ILogger<AccountService> logger, AccountRepository accountRepository, ITenantApiService tenantApiService)
         {
             _logger = logger;
             _accountRepository = accountRepository;
+            _tenantApiService = tenantApiService;
 
             _mapperModelToMessage = new ProtoMessageMapper<AccountModel, AccountMessage>(new AccountProfile()).CreateMapper();
             _mapperMessageToModel = new ProtoMessageMapper<AccountMessage, AccountModel>(new AccountProfile()).CreateMapper();
         }
 
+        /*
+         *
+         * AccountService:
+
+            CreateAccount
+
+            UpdateAccount (If the body of the request contains a facility Id)
+
+            GroupService:
+
+            CreateGroup
+
+            UpdateGroup  (If the body of the request contains a facility Id)
+
+            RoleService
+
+            CreateRole
+
+            UpdateRole  (If the body of the request contains a facility Id)
+         */
 
         #region Basic CRUD
 
@@ -55,9 +79,23 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<AccountMessage> CreateAccount(AccountMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!(await _tenantApiService.CheckFacilityExists(id)))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var newAccount = _mapperMessageToModel.Map<AccountMessage, AccountModel>(request);
 
-            //TODO: find better condtion to use to see if newAccount already exists
+            //TODO: find better condition to use to see if newAccount already exists
             var res = await _accountRepository.GetAccountByEmailAsync(newAccount.EmailAddress);
             if (res == null)
             {
@@ -81,6 +119,20 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<AccountMessage> UpdateAccount(AccountMessage request, ServerCallContext context)
         {
+            var sb = new StringBuilder();
+            foreach (var id in request.FacilityIds)
+            {
+                if (!(await _tenantApiService.CheckFacilityExists(id)))
+                {
+                    sb.AppendLine($"Facility {id} does not exist");
+                }
+            }
+
+            if (sb.Length > 0)
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
+            }
+
             var updatedAccount = _mapperMessageToModel.Map<AccountMessage, AccountModel>(request);
 
             if (updatedAccount.Id == Guid.Empty)

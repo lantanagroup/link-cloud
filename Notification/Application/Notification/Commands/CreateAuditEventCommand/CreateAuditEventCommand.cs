@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     //write to auditable event occurred topic
                     await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
                     {
-                        Key = facilityId,
+                        Key = facilityId ?? string.Empty,
                         Value = auditEvent,
                         Headers = headers
                     });

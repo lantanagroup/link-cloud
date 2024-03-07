@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson.IO;
 using Newtonsoft.Json;
 using System.Text.Json;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -28,32 +29,6 @@ public class QueryPlanConfigController : Controller
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
-
-    /*
-GET /api/<facilityId>/queryPlans/?systemPlans=true
-
-POST /api/<facilityId>/queryPlans/
-
-PUT /api/<facilityId>/queryPlans/
-
-DELETE /api/<facilityId>/queryPlans/
-
-Initial Query requests
-
-GET /api/<facilityId>/initialQueries/
-
-POST /api/<facilityId>/initialQueries/
-
-DELETE /api/<facilityId>/initialQueries/
-
-Supplemental Query requests
-
-GET /api/<facilityId>/supplementalQueries/
-
-POST /api/<facilityId>/supplementalQueries/
-
-DELETE /api/<facilityId>/supplementalQueries/
-     */
 
     /// <summary>
     /// Gets a QueryPlanConfig record for a given facilityId, queryPlanType, and systemPlans.
@@ -162,13 +137,23 @@ DELETE /api/<facilityId>/supplementalQueries/
 
             return Accepted();
         }
+        catch (MissingTenantConfigurationException ex)
+        {
+            await SendAudit(
+                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                facilityId,
+                AuditEventType.Create,
+                null);
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             await SendAudit(
                 $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}", 
                 "", 
                 facilityId, 
-                AuditEventType.Query, 
+                AuditEventType.Create, 
                 null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
@@ -231,13 +216,23 @@ DELETE /api/<facilityId>/supplementalQueries/
 
             return Accepted();
         }
+        catch (MissingTenantConfigurationException ex)
+        {
+            await SendAudit(
+                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                "",
+                facilityId,
+                AuditEventType.Update,
+                null);
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             await SendAudit(
                 $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
                 "",
                 facilityId,
-                AuditEventType.Query,
+                AuditEventType.Update,
                 null);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }

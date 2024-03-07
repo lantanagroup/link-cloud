@@ -4,13 +4,12 @@ using LantanaGroup.Link.Notification.Domain.Entities;
 namespace LantanaGroup.Link.Notification.Application.Interfaces
 {
     public interface INotificationConfigurationRepository : IBaseRepository<NotificationConfig>
-    {
-        public bool Update(NotificationConfig config);
-        public Task<bool> UpdateAsync(NotificationConfig config);
-        public Task<NotificationConfig> GetNotificationConfigByFacilityAsync(string facilityId);
-        public (IEnumerable<NotificationConfig>, PaginationMetadata) Find(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
-        public Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> FindAsync(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize, int pageNumber);
-        public Task<bool> DeleteAsync(string id);
+    {   
+        public Task<NotificationConfig?> GetAsync(NotificationConfigId id, bool noTracking = false, CancellationToken cancellationToken = default);
+        public Task<NotificationConfig?> GetFacilityNotificationConfigAsync(string facilityId, bool noTracking = false, CancellationToken cancellationToken = default);
+        public Task<(IEnumerable<NotificationConfig>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
+        public Task<bool> DeleteAsync(NotificationConfigId id, CancellationToken cancellationToken = default);
+        Task<bool> ExistsAsync(NotificationConfigId id, CancellationToken cancellationToken = default);
 
     }
 }

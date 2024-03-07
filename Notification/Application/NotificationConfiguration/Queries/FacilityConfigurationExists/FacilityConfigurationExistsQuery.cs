@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using System.Diagnostics;
-using static LantanaGroup.Link.Notification.Settings.NotificationConstants;
 
 namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries
 {
@@ -16,21 +16,18 @@ namespace LantanaGroup.Link.Notification.Application.NotificationConfiguration.Q
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
-        public async Task<bool> Execute(string id)
+        public async Task<bool> Execute(NotificationConfigId id, CancellationToken cancellationToken)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Check if Facility Configuration Exists Query");
-
-            if (string.IsNullOrEmpty(id)) throw new ArgumentNullException("Failed to determine if a notification configuration exists, no id was provided.");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Check if Facility Configuration Exists Query");           
 
             try 
             {
-                bool exists = await _datastore.ExistsAsync(id);
-
+                bool exists = await _datastore.ExistsAsync(id, cancellationToken);
                 return exists;
             }
-            catch(ArgumentNullException ex)
+            catch(ArgumentNullException)
             {
-                _logger.LogWarning(new EventId(NotificationLoggingIds.UpdateItemNotFound, "Notification Service - Notification configuration exists"), ex, ex.Message);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
             }
             

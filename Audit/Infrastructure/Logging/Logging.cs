@@ -52,6 +52,18 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
         public static partial void LogAuditEventListQueryException(this ILogger logger, string exceptionMessage, [LogProperties]AuditSearchFilterRecord filter);
 
         [LoggerMessage(
+            AuditLoggingIds.GetFacilityAuditEventsQuery,
+            LogLevel.Information,
+            "A request was made for a list of audit events for facility {facility}.")]
+        public static partial void LogGetFacilityAuditEventsQuery(this ILogger logger, string facility);
+
+        [LoggerMessage(
+            AuditLoggingIds.GetFacilityAuditEventsQueryException,
+            LogLevel.Error,
+            "An exception occurred while attempting to retrieve a list of audit events for facility {facility}: {exceptionMessage}")]
+        public static partial void LogGetFacilityAuditEventsQueryException(this ILogger logger, string facility, string exceptionMessage);
+
+        [LoggerMessage(
             AuditLoggingIds.GetItem,
             LogLevel.Information,
             "A request was made for an audit event with an id of {id}.")]
