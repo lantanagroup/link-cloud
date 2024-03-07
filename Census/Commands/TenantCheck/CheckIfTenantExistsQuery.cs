@@ -22,7 +22,10 @@ public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExis
 
     public async Task<bool> Handle(CheckIfTenantExistsQuery request, CancellationToken cancellationToken)
     {
-        var url = $"{_tenantConfig.TenantServiceBaseUrl.TrimEnd('/')}/{_tenantConfig.TenantService_GetTenantRelativeUrl.TrimEnd('/')}/{request.TenantId}";
+        if (!_tenantConfig.CheckIfTenantExists)
+            return true;
+
+        var url = $"{_tenantConfig.TenantServiceBaseEndpoint.TrimEnd('/')}/{_tenantConfig.GetTenantRelativeEndpoint.TrimEnd('/')}/{request.TenantId}";
         var response = await _httpClient.GetAsync(url, cancellationToken);
         return response.IsSuccessStatusCode;
     }
