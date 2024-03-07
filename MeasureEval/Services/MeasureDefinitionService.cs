@@ -103,6 +103,13 @@ namespace LantanaGroup.Link.MeasureEval.Services
             return await _measureDefRepo.GetAsync(measureDefinitionId, cancellationToken);
         }
 
+
+        public async Task<List<MeasureDefinition>> GetMeasureDefinitions(CancellationToken cancellationToken)
+        {
+            return await _measureDefRepo.GetAsync(cancellationToken);
+        }
+
+
         public async System.Threading.Tasks.Task DeleteMeasureDefinition(string measureDefinitionId, CancellationToken cancellationToken)
         {
             await _measureDefRepo.DeleteAsync(measureDefinitionId, cancellationToken);
