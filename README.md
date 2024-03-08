@@ -56,6 +56,104 @@ The Account Service is responsible for the following:
  - Add/Remove Groups associated with Accounts
  - Add/Remove permission Roles associated with Accounts and Groups
 
+#### AppSettings
+**NOTE** You may need to create an appsettings.Local.json file in your cloned copy or update appsettings.development.json with updated kafka settings or postgres connection information.
+```
+"KafkaConnection": {
+  "BootstrapServers": [ "localhost:9092/" ],
+  "ClientId": "",
+  "GroupId": "default"
+},
+"Postgres": {
+  "ConnectionString": "Host=localhost;Database=link;Username=user;Password=admin"
+},
+```
+
+#### Endpoints
+
+##### Account Operations
+Provided via the AccountService class.  Currently supports basic CRUD and adding/removing accounts from groups and roles.  Generally an AccountMessage maps to AccountModel. Additionally, the Account Service will contain functionality for determining user authorization.
+
+###### Account Service gRPC and REST Operations
+- Get all accounts
+  - gRPC: GetAllAccounts(GetAllAccountsMessage) returns (stream AccountMessage)
+  - REST: GET /api/account
+- Get one account
+  - gRPC: GetAccount(GetAccountMessage) returns (AccountMessage)
+  - REST: GET /api/account/{id}
+- Create account
+  - gRPC: CreateAccount(AccountMessage) returns (AccountMessage)
+  - REST: POST /api/account
+- Update account
+  - gRPC: UpdateAccount(AccountMessage) returns (AccountMessage)
+  - REST: PUT /api/account/{id}
+- Delete account
+  - gRPC: DeleteAccount(DeleteAccountMessage) returns (AccountDeletedMessage)
+  - REST: DELETE /api/account/{id}
+- Restore a deleted account
+  - gRPC: RestoreAccount(RestoreAccountMessage) returns (AccountMessage)
+  - REST: POST /api/account/restore/{id}
+- Add an account to a group
+  - gRPC: AddAccountToGroup(AddAccountToGroupMessage) returns (AccountMessage)
+  - REST: POST /api/account/{accountId}/group/{groupId}
+- Remove an account from a group
+  - gRPC: RemoveAccountFromGroup(RemoveAccountFromGroupMessage) returns (AccountRemovedFromGroupMessage)
+  - REST: DELETE /api/account/{accountId}/group/{groupId}
+- Assign a role to an account
+  - gRPC: AddRoleToAccount(AddRoleToAccountMessage) returns (AccountMessage)
+  - REST: POST /api/account/{accountId}/role/{roleId}
+- Remove a role from an account
+  - gRPC: RemoveRoleFromAccount(RemoveRoleFromAccountMessage) returns (RoleRemovedFromAccountMessage)
+  - REST: DELETE /api/account/{accountId}/role/{roleId}
+- User Has Access
+  - gRPC: UserHasAccess(string email, string facilityId string role, string group) returns bool  
+
+##### Group Operations
+Provided via the GroupService class.  Currently supports basic CRUD.  Generally a GroupMessage maps to GroupModel.
+
+###### Group Service gRPC and REST Operations
+- Get all groups
+  - gRPC: GetAllGroups(GetAllGroupsMessage) returns (stream GroupMessage)
+  - REST: GET /api/group
+- Get one group
+  - gRPC: GetGroup(GetGroupMessage) returns (GroupMessage)
+  - REST: GET /api/group/{id}
+- Create group
+  - gRPC: CreateGroup(GroupMessage) returns (GroupMessage)
+  - REST: POST /api/group
+- Update group
+  - gRPC: UpdateGroup(GroupMessage) returns (GroupMessage)
+  - REST: PUT /api/group/{id}
+- Delete group
+  - gRPC: DeleteGroup(DeleteGroupMessage) returns (GroupDeletedMessage)
+  - REST: DELETE /api/group/{id}
+- Restore a deleted group
+  - gRPC: RestoreGroup(RestoreGroupMessage) returns (GroupMessage)
+  - REST: POST /api/group/restore/{id}
+
+##### Role Operations
+Provided via the RoleService class.  Currently supports basic CRUD.  Generally a RoleMessage maps to RoleModel.
+
+###### Role Service gRPC and REST Operations
+- Get all roles
+  - gRPC: GetAllRoles(GetAllRolesMessage) returns (stream RoleMessage)
+  - REST: GET /api/role
+- Get one role
+  - gRPC: GetRole(GetRoleMessage) returns (RoleMessage)
+  - REST: GET /api/role/{id}
+- Create role
+  - gRPC: CreateRole(RoleMessage) returns (RoleMessage)
+  - REST: POST /api/role
+- Update role
+  - gRPC: UpdateRole(RoleMessage) returns (RoleMessage)
+  - REST: PUT /api/role/{id}
+- Delete role
+  - gRPC: DeleteRole(DeleteRoleMessage) returns (RoleDeletedMessage)
+  - REST: DELETE /api/role/{id}
+- Restore a deleted role
+  - gRPC: RestoreRole(RestoreRoleMessage) returns (RoleMessage)
+  - REST: POST /api/role/restore/{id}
+
 ### Audit Service
 
 The Audit service creates and persists audit events triggered from actions that take place throughout Link. As well as:
@@ -66,12 +164,30 @@ Capture and store audit events that take place in Link
  - List all audit events on record for a specified facility
  - Provide a single audit event based on Id
 
+#### Rest Operations
+
+- Get All Audit Events - **GET api/audit**
+  - searchText: text to use in full text search
+  - filterFacilityBy: return only events where facility id equals
+  - filterServiceBy: return only events where service name equals
+  - filterActionBy: return only events where action equals
+  - filterUserBy: return only events where user id equals
+  - sortBy: property to sort by, Options: FacilityId, Action, ServiceName, Resource, CreatedOn, defaults to CreatedOn
+  - sortOrder: Ascending = 0, Descending = 1, defaults to Ascending
+  - pageSize: results returned per page, max is 20
+  - pageNumber: the page number to return
+- Get one Audit Event - **GET api/audit/{*auditId*}**
+- Get audit events for a facility - **GET api/audit/facility/*{facilityId}***
+
 ### Census Service
 
+#### Responsibilities:
 - The census service will be responsible for maintaining and internal schedule in which it will produce events requesting a list of patients that are currently admitted.
 - The census service will persist this list of patients.
   - Retention of census to be configuration option 
 - The census service (for Epic STU3 facilities) will determine if a patient has been discharged and is ready for additional queries.
+
+####
 
 ### Data Acquisition Service
 
