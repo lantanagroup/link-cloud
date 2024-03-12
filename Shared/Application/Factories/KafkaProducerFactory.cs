@@ -33,7 +33,7 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
         }
     }
 
-    public IProducer<TProducerKey, TProducerValue> CreateProducer(ProducerConfig config, ISerializer<TProducerKey>? keySerializer = null, ISerializer<TProducerValue>? valueSerializer = null, bool useOpenTelemetry = false)
+    public IProducer<TProducerKey, TProducerValue> CreateProducer(ProducerConfig config, ISerializer<TProducerKey>? keySerializer = null, ISerializer<TProducerValue>? valueSerializer = null, bool useOpenTelemetry = true)
     {
         try
         {
