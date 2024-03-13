@@ -50,7 +50,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    var tenantApiSettings = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantConfig).Get<TenantApiSettings>();
     builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetSection(CensusConstants.AppSettings.TenantConfig));
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Kafka));
