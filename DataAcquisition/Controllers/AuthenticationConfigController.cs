@@ -154,11 +154,6 @@ public class AuthenticationConfigController : Controller
             
             return Accepted(result);
         }
-        catch(MissingFacilityConfigurationException ex)
-        {
-            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
-            return BadRequest(ex.Message);
-        }
         catch(MissingTenantConfigurationException ex)
         {
             await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
