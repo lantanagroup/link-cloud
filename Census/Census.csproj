@@ -49,7 +49,6 @@
 
   <ItemGroup>
     <Folder Include="Listeners\" />
-    <Folder Include="Models\Exceptions\" />
   </ItemGroup>
 
   <ItemGroup>

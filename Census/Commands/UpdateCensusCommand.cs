@@ -1,5 +1,6 @@
 ﻿using Census.Models;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Quartz;
@@ -33,7 +34,7 @@ public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusCommand, C
     {
         if(await _tenantApiService.CheckFacilityExists(request.Config.FacilityId, cancellationToken) == false)
         {
-            throw new ArgumentException($"Facility {request.Config.FacilityId} not found.");
+            throw new MissingTenantConfigurationException($"Facility {request.Config.FacilityId} not found.");
         }
 
         _logger.LogInformation($"Updating config for facility {request.Config}.");
