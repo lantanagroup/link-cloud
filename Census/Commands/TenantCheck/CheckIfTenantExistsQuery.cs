@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Settings;
+﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -12,9 +12,9 @@ public class CheckIfTenantExistsQuery : IRequest<bool>
 public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExistsQuery, bool>
 {
     private readonly HttpClient _httpClient;
-    private readonly TenantConfig _tenantConfig;
+    private readonly TenantApiSettings _tenantConfig;
 
-    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<TenantConfig> tenantConfig)
+    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<TenantApiSettings> tenantConfig)
     {
         _httpClient = httpClient;
         _tenantConfig = tenantConfig.Value;
@@ -25,7 +25,7 @@ public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExis
         if (!_tenantConfig.CheckIfTenantExists)
             return true;
 
-        var url = $"{_tenantConfig.TenantServiceBaseEndpoint.TrimEnd('/')}/{_tenantConfig.GetTenantRelativeEndpoint.TrimEnd('/')}/{request.TenantId}";
+        var url = $"{_tenantConfig.TenantServiceBaseEndpoint?.TrimEnd('/')}/{_tenantConfig.GetTenantRelativeEndpoint?.TrimEnd('/')}/{request.TenantId}";
         var response = await _httpClient.GetAsync(url, cancellationToken);
         return response.IsSuccessStatusCode;
     }
