@@ -12,7 +12,7 @@ namespace Census.Settings
             public const string Kafka = "KafkaConnection";
             public const string Mongo = "MongoDB";
             public const string Telemetry = "TelemetryConfig";
-            public const string TenantConfig = "TenantConfig";
+            public const string TenantConfig = "TenantApiSettings";
         }
 
         public static class Scheduler
