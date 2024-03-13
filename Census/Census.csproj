@@ -24,7 +24,7 @@
 
 	<ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2023.10.13.1" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.12.1" />
     <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />
@@ -52,6 +52,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="appsettings.Local.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="nuget.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
