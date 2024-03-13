@@ -132,7 +132,7 @@ public class QueryConfigController : Controller
         catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
-                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Create,
@@ -142,7 +142,7 @@ public class QueryConfigController : Controller
         catch (Exception ex)
         {
             await SendAudit(
-                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Create,

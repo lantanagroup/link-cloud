@@ -52,6 +52,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="appsettings.Local.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="nuget.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
