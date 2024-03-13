@@ -50,19 +50,19 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
 
         if(await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
         {
-            throw new MissingTenantConfigurationException($"Facility {request.FacilityId} not found.");
+            throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
         {
             if(!(await checkIfFacilityConfigExists(request.FacilityId, request.QueryConfigurationTypePathParameter.Value, cancellationToken)))
-                throw new MissingTenantConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
+                throw new MissingFacilityConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
             await _fhirQueryConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
         }
         else
         {
             if (!(await checkIfFacilityConfigExists(request.FacilityId, request.QueryConfigurationTypePathParameter.Value, cancellationToken)))
-                throw new MissingTenantConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
+                throw new MissingFacilityConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
             await _fhirQueryListConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
         }
         return new Unit();

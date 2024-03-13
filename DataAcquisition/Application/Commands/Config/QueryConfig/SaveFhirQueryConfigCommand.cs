@@ -30,7 +30,7 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
     {
         if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.queryConfiguration.FacilityId }, cancellationToken) == false)
         {
-            throw new MissingTenantConfigurationException($"Facility {request.queryConfiguration.FacilityId} not found.");
+            throw new MissingFacilityConfigurationException($"Facility {request.queryConfiguration.FacilityId} not found.");
         }
 
         if (request.queryConfiguration.ModifyDate == null)

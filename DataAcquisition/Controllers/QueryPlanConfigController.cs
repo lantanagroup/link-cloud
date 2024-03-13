@@ -137,7 +137,7 @@ public class QueryPlanConfigController : Controller
 
             return Accepted();
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
                 $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
@@ -216,7 +216,7 @@ public class QueryPlanConfigController : Controller
 
             return Accepted();
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
                 $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
