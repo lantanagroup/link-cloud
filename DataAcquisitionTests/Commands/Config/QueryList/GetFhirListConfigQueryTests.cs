@@ -65,7 +65,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryList
                 .Setup(r => r.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((FhirListConfiguration)null);
 
-            await Assert.ThrowsAsync<MissingFacilityConfigurationException>(() => handler.Handle(query, CancellationToken.None));
+            await Assert.ThrowsAsync<MissingTenantConfigurationException>(() => handler.Handle(query, CancellationToken.None));
 
             _mocker.GetMock<IFhirQueryListConfigurationRepository>()
                 .Verify(r => r.GetByFacilityIdAsync(query.FacilityId, It.IsAny<CancellationToken>()),

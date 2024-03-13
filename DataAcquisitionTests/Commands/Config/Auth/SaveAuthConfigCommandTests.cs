@@ -70,7 +70,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
                 .Verify(r => r.SaveAuthenticationConfiguration(command.FacilityId, command.Configuration, It.IsAny<CancellationToken>()),
                 Times.Never);
 
-            await Assert.ThrowsAsync<MissingFacilityConfigurationException>(() => handler.Handle(command, CancellationToken.None));
+            await Assert.ThrowsAsync<MissingTenantConfigurationException>(() => handler.Handle(command, CancellationToken.None));
         }
     }
 }

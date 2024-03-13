@@ -33,7 +33,7 @@ public class GetFhirListConfigQueryHandler : IRequestHandler<GetFhirListConfigQu
 
         if (config == null)
         {
-            throw new MissingFacilityConfigurationException("No facility configuration found.");
+            throw new MissingTenantConfigurationException("No facility configuration found.");
         }
 
         return config;
