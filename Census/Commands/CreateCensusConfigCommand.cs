@@ -1,6 +1,7 @@
 ﻿using Census.Domain.Entities;
 using Census.Models;
 using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Quartz;
@@ -35,7 +36,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
     {
         if (await _tenantApiService.CheckFacilityExists(request.CensusConfigEntity.FacilityId, cancellationToken) == false)
         {
-            throw new ArgumentException($"Facility {request.CensusConfigEntity.FacilityId} not found.");
+            throw new MissingTenantConfigurationException($"Facility {request.CensusConfigEntity.FacilityId} not found.");
         }
 
         var existingEntity = _censusConfigService.Get(request.CensusConfigEntity.FacilityId);
