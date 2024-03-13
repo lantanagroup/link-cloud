@@ -1,12 +1,11 @@
 ﻿using Census.Commands;
 using Census.Models;
-using LantanaGroup.Link.Census.Commands;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
 using Census.Settings;
+using LantanaGroup.Link.Census.Commands;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Census.Models.Exceptions;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Census.Controllers;
 
@@ -49,7 +48,7 @@ public class CensusConfigController : Controller
             });
             SendAudit("", censusConfig.FacilityId, AuditEventType.Create);
         }
-        catch(MissingTenantConfigurationException ex)
+        catch(ArgumentException ex)
         {
             _logger.LogError(ex.Message);
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
@@ -112,7 +111,7 @@ public class CensusConfigController : Controller
             });
             SendAudit("", facilityId, AuditEventType.Update);
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (ArgumentException ex)
         {
             _logger.LogError(ex.Message);
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);

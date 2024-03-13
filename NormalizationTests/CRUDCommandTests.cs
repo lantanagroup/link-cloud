@@ -3,9 +3,11 @@ using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Moq.AutoMock;
 
 namespace NormalizationTests;
 
@@ -182,7 +184,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new NormalizationConfigEntity());
         configRepo.Setup(x => x.UpdateAsync(It.IsAny<NormalizationConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
@@ -201,7 +209,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -219,7 +227,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
         configRepo.Setup(x => x.AddAsync(It.IsAny<NormalizationConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -237,7 +251,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Create
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -255,7 +269,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -270,7 +290,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -292,7 +312,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -300,7 +326,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -322,7 +348,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -337,7 +369,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -359,7 +391,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -371,7 +409,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -393,7 +431,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         var command = new SaveConfigEntityCommand
         {
@@ -405,7 +449,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
@@ -427,7 +471,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var service = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new NormalizationConfigEntity { FacilityId = "test" });
 
@@ -444,7 +494,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Create
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, service);
 
         try
         {
@@ -466,7 +516,13 @@ public class CRUDCommandTests
     {
         var logger = new Mock<ILogger<SaveConfigEntityCommandHandler>>();
         var configRepo = new Mock<IConfigRepository>();
-        var apiService = new Mock<ITenantApiService>();
+
+        var _mocker = new AutoMocker();
+        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        settings.CheckIfTenantExists = false;
+        _mocker.Use(settings);
+
+        var apiService = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
 
         configRepo.Setup(x => x.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((NormalizationConfigEntity)null);
 
@@ -484,7 +540,7 @@ public class CRUDCommandTests
             Source = SaveTypeSource.Update
         };
 
-        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService.Object);
+        var handler = new SaveConfigEntityCommandHandler(logger.Object, configRepo.Object, apiService);
 
         try
         {
