@@ -1,18 +1,12 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
 using Moq;
-using Moq.Language.Flow;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace DataAcquisitionUnitTests.Commands.Config.Auth
 {
@@ -70,7 +64,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
                 .Verify(r => r.SaveAuthenticationConfiguration(command.FacilityId, command.Configuration, It.IsAny<CancellationToken>()),
                 Times.Never);
 
-            await Assert.ThrowsAsync<MissingTenantConfigurationException>(() => handler.Handle(command, CancellationToken.None));
+            await Assert.ThrowsAsync<MissingFacilityConfigurationException>(() => handler.Handle(command, CancellationToken.None));
         }
     }
 }
