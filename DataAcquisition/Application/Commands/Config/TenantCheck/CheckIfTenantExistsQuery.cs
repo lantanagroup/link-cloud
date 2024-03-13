@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using MediatR;
 using Microsoft.Extensions.Options;
 
@@ -12,9 +13,9 @@ public class CheckIfTenantExistsQuery : IRequest<bool>
 public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExistsQuery, bool>
 {
     private readonly HttpClient _httpClient;
-    private readonly TenantConfig _tenantConfig;
+    private readonly TenantApiSettings _tenantConfig;
 
-    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<TenantConfig> tenantConfig)
+    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<TenantApiSettings> tenantConfig)
     {
         _httpClient = httpClient;
         _tenantConfig = tenantConfig.Value;
