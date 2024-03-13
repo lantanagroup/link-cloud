@@ -12,7 +12,6 @@ using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Census.Repositories;
 using LantanaGroup.Link.Census.Repositories.Scheduling;
 using LantanaGroup.Link.Census.Services;
-using LantanaGroup.Link.Census.Settings;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -50,7 +49,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Kafka));
-    builder.Services.Configure<TenantConfig>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantConfig));
+    builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings));
 
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();

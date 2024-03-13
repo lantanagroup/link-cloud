@@ -1,20 +1,12 @@
-﻿using JWT.Algorithms;
-using JWT.Builder;
-using LantanaGroup.Link.DataAcquisition.Application.Services.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Utilities.IO.Pem;
-using System.IO;
 using System.Net.Http.Headers;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
