@@ -9,6 +9,10 @@
     <Configurations>Debug;Release;Debug IIS</Configurations>
   </PropertyGroup>
 
+	<PropertyGroup>
+		<Version>1.1.1</Version>
+	</PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
