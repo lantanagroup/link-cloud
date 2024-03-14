@@ -14,15 +14,15 @@ variables:
 
 steps:
 
-  - task: PowerShell@2
-    displayName: Get Version Information
-    inputs:
-      targetType: 'inline'
-      script: |
-         $xml = [Xml] (Get-Content .\Shared\Shared.csproj)
-         $sharedVersion = $xml.Project.PropertyGroup.Version
-         echo $sharedVersion
-         echo "##vso[task.setvariable variable=sharedVersion]$sharedVersion"
+  # - task: PowerShell@2
+  #   displayName: Get Version Information
+  #   inputs:
+  #     targetType: 'inline'
+  #     script: |
+  #        $xml = [Xml] (Get-Content .\Shared\Shared.csproj)
+  #        $sharedVersion = $xml.Project.PropertyGroup.Version
+  #        echo $sharedVersion
+  #        echo "##vso[task.setvariable variable=sharedVersion]$sharedVersion"
 
   - task: DotNetCoreCLI@2
     displayName: 'Restore'
