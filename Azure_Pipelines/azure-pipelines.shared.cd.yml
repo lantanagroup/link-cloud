@@ -30,8 +30,9 @@ steps:
       command: 'pack'
       packagesToPack: 'Shared/Shared.csproj'
       configuration: $(buildConfiguration)
-      versioningScheme: 'byBuildNumber'
+      #versioningScheme: 
       packDirectory: '$(build.artifactstagingdirectory)/publish'
+      includesymbols: true
       #arguments: '--output $(build.artifactstagingdirectory)/publish'
       modifyOutputPath: false
 
