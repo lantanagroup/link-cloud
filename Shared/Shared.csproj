@@ -4,13 +4,17 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>com.lantanagroup.link.Shared</PackageId>
     <RootNamespace>LantanaGroup.Link.Shared</RootNamespace>
     <Configurations>Debug;Release;Debug IIS</Configurations>
   </PropertyGroup>
 
 	<PropertyGroup>
+		<Authors>Lantana Consulting Group</Authors>
+		<Company>Lantana Consulting Group</Company>
+		<Description>Shared library for Lantana Link</Description>
+		<Product>NHSN Link Shared Library</Product>
 		<Version>1.1.1</Version>
+		<PackageId>com.lantanagroup.link.Shared</PackageId>
 	</PropertyGroup>
 
   <ItemGroup>
