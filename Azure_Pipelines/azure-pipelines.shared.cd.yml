@@ -36,31 +36,31 @@ steps:
       command: 'build'
       projects: 'Shared/Shared.csproj'
       
-#  - task: DotNetCoreCLI@2
-#    displayName: 'Pack'
-#    inputs:
-#      command: 'pack'
-#      packagesToPack: 'Shared/Shared.csproj'
-#      #configuration: $(buildConfiguration)
-#      configuration: 'Shared/Shared.csproj'
-#      versioningScheme: 'byEnvVar'
-#      versionEnvVar: $sharedVersion
-#      packDirectory: '$(build.artifactstagingdirectory)/publish'
-#      includesymbols: true
-#      #arguments: '--output $(build.artifactstagingdirectory)/publish'
-#      modifyOutputPath: false
-
-  - task: NuGetCommand@2
-    displayName: 'Pack NuGet'
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack'
     inputs:
-      command: pack
-      packagesToPack: 'Shared/Shared.csproj'
-      configuration: 'Shared/Shared.csproj'
-      packDestination: $(build.artifactstagingdirectory)/publish'
-      versioningScheme: byEnvVar
-      versionEnvVar: sharedVersion
-      includeSymbols: true
-      verbosityPack: Detailed
+     command: 'pack'
+     packagesToPack: 'Shared/Shared.csproj'
+     #configuration: $(buildConfiguration)
+     configuration: 'Shared/Shared.csproj'
+     versioningScheme: 'byEnvVar'
+     versionEnvVar: $sharedVersion
+     packDirectory: '$(build.artifactstagingdirectory)/publish'
+     includesymbols: true
+     #arguments: '--output $(build.artifactstagingdirectory)/publish'
+     modifyOutputPath: false
+
+  # - task: NuGetCommand@2
+  #   displayName: 'Pack NuGet'
+  #   inputs:
+  #     command: pack
+  #     packagesToPack: 'Shared/Shared.csproj'
+  #     configuration: 'Shared/Shared.csproj'
+  #     packDestination: $(build.artifactstagingdirectory)/publish'
+  #     versioningScheme: byEnvVar
+  #     versionEnvVar: sharedVersion
+  #     includeSymbols: true
+  #     verbosityPack: Detailed
 
 
   # - task: DotNetCoreCLI@2
