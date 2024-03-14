@@ -29,8 +29,9 @@ steps:
     inputs:
       command: 'pack'
       packagesToPack: 'Shared/Shared.csproj'
-      configuration: $(buildConfiguration)
-      #versioningScheme: 
+      #configuration: $(buildConfiguration)
+      configuration: 'Shared/Shared.csproj'
+      versioningScheme: 'byBuildNumber' 
       packDirectory: '$(build.artifactstagingdirectory)/publish'
       includesymbols: true
       #arguments: '--output $(build.artifactstagingdirectory)/publish'
