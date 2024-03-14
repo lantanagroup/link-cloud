@@ -51,6 +51,7 @@ steps:
 #      modifyOutputPath: false
 
   - task: NuGetCommand@2
+    displayName: 'Pack NuGet'
     inputs:
       command: pack
       packagesToPack: 'Shared/Shared.csproj'
