@@ -43,8 +43,8 @@ steps:
      packagesToPack: 'Shared/Shared.csproj'
      #configuration: $(buildConfiguration)
      configuration: 'Shared/Shared.csproj'
-     versioningScheme: 'byEnvVar'
-     versionEnvVar: $sharedVersion
+     #versioningScheme: 'byEnvVar'
+     #versionEnvVar: $sharedVersion
      packDirectory: '$(build.artifactstagingdirectory)/publish'
      includesymbols: true
      #arguments: '--output $(build.artifactstagingdirectory)/publish'
