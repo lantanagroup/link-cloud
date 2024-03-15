@@ -7,7 +7,7 @@ target/
 .vscode/
 
 # Ignore Docker-related files
-Dockerfile*
+Dockerfile.validation
 docker-compose.yml
 
 # Ignore version control system files
