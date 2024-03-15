@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
 using MediatR;
 using Microsoft.Extensions.Options;
 

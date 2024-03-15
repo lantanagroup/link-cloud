@@ -1,12 +1,12 @@
 ﻿using Census.Commands;
 using Census.Models;
-using LantanaGroup.Link.Census.Commands;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
 using Census.Settings;
+using LantanaGroup.Link.Census.Commands;
+using LantanaGroup.Link.Census.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Census.Models.Exceptions;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Census.Controllers;
 

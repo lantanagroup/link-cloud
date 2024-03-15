@@ -51,7 +51,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.TenantConfig));
+    builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.TenantApiSettings));
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
@@ -62,8 +62,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                 // FhirClient configures its internal HttpClient this way
                 AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
             });
-
-    builder.Services.Configure<TenantConfig>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.TenantConfig));
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
