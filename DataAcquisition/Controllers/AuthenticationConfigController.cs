@@ -239,7 +239,7 @@ public class AuthenticationConfigController : Controller
         catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
-                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 facilityId,
                 AuditEventType.Query,
@@ -249,7 +249,7 @@ public class AuthenticationConfigController : Controller
         catch (Exception ex)
         {
             await SendAudit(
-                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 facilityId,
                 AuditEventType.Query,
