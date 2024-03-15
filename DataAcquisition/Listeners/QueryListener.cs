@@ -111,7 +111,7 @@ public class QueryListener : BackgroundService
                         ServiceName = DataAcquisitionConstants.ServiceName,
                         Notes = $"Failed to get {rawmessage.Topic}\nException Message: {ex}\nRaw Message: {JsonConvert.SerializeObject(rawmessage)}",
                     });
-                    _logger.LogError($"Failed to produce {rawmessage.Topic}");
+                    _logger.LogError(ex,"Error producing message: {1}", ex.Message);
                     responseMessages = null;
                     continue;
                 }

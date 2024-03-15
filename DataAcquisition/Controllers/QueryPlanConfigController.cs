@@ -140,7 +140,7 @@ public class QueryPlanConfigController : Controller
         catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 facilityId,
                 AuditEventType.Create,

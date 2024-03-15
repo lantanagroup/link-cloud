@@ -67,6 +67,7 @@ public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRe
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2}.", listId, facilityConfig.FacilityId);
                     throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
                 }
             }
