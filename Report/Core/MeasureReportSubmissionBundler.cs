@@ -1,8 +1,5 @@
-﻿using Confluent.Kafka;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using Hl7.Fhir.Utility;
-using LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
@@ -11,8 +8,6 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
-using System.Configuration;
-using System.Linq;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -283,7 +278,7 @@ namespace LantanaGroup.Link.Report.Core
 
         #region Common Methods
 
-        protected MeasureReport ReportFormater(MeasureReport measureReport)
+        protected MeasureReport ReportFormatter(MeasureReport measureReport)
         {
             measureReport.EvaluatedResource.ForEach(r => { if (r.Extension.Count > 0) r.Extension = new List<Extension>(); });
             return measureReport;

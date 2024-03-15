@@ -22,36 +22,36 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.10.4" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2023.8.28.1" />
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
-    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.61.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.2" />
-    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.2.0" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.6" />
-    <PackageReference Include="MongoDB.Driver" Version="2.24.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
-    <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
-    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
-    <PackageReference Include="Serilog.Expressions" Version="4.0.0" />
-    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.3.1" />
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.12.1" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
+    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.*" />
+    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.*" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
+    <PackageReference Include="MongoDB.Driver" Version="2.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="*-*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="*-*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+    <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+    <PackageReference Include="Serilog.Exceptions" Version="8.*" />
+    <PackageReference Include="Serilog.Expressions" Version="4.*" />
+    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.*" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.*" />
   </ItemGroup>
 
   <ItemGroup>
