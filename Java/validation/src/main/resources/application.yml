@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: ValidationService
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: validation
+    producer:
+      client-id: validation-service
+    #properties:
+    #  security.protocol: SASL_PLAINTEXT
+    #  sasl.mechanism: PLAIN
+    #  sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="your-username" password="your-password";
