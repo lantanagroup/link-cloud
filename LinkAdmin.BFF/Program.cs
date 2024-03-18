@@ -1,6 +1,9 @@
 using Azure.Identity;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,7 +32,38 @@ if (!string.IsNullOrEmpty(externalConfigurationSource))
     }
 }
 
+var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+if (serviceInformation != null)
+{
+    ServiceActivitySource.Initialize(serviceInformation);
+}
+else
+{
+    throw new NullReferenceException("Service Information was null.");
+}
 
+//Add problem details
+builder.Services.AddProblemDetails(options => {
+    options.CustomizeProblemDetails = ctx =>
+    {
+        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+        if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+        {
+            string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+            ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+        }
+
+        if (builder.Environment.IsDevelopment())
+        {
+            ctx.ProblemDetails.Extensions.Add("API", "Link Administration");
+        }
+        else
+        {
+            ctx.ProblemDetails.Extensions.Remove("exception");
+        }
+
+    };
+});
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
