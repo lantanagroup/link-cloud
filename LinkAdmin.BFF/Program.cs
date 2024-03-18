@@ -1,6 +1,7 @@
 using Azure.Identity;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using System.Diagnostics;
@@ -40,6 +41,16 @@ if (serviceInformation != null)
 else
 {
     throw new NullReferenceException("Service Information was null.");
+}
+
+//configure CORS
+builder.Services.AddCorsService(builder.Environment);
+
+// Add open telemetry
+var telemetryConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
+if (telemetryConfig != null)
+{
+    builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
 }
 
 //Add problem details
