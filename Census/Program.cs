@@ -17,6 +17,8 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -48,7 +50,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka));
+    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings));
 
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
