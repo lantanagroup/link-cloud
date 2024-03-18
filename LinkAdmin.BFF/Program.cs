@@ -4,7 +4,12 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Serilog;
+using Serilog.Enrichers.Span;
+using Serilog.Exceptions;
+using Serilog.Settings.Configuration;
 using System.Diagnostics;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,7 +84,27 @@ builder.Services.AddProblemDetails(options => {
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
+
+// Logging using Serilog
+builder.Logging.AddSerilog();
+var loggerOptions = new ConfigurationReaderOptions { SectionName = LinkAdminConstants.AppSettingsSectionNames.Serilog };
+Log.Logger = new LoggerConfiguration()
+                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/swagger%'")
+                .Enrich.WithExceptionDetails()
+                .Enrich.FromLogContext()
+                .Enrich.WithSpan()
+                .Enrich.With<ActivityEnricher>()
+                .CreateLogger();
+
+//Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
 var app = builder.Build();
 
