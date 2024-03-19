@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Errors.Handlers
             }
             catch (Exception e)
             {
-                _logger.LogError(exception: e, message: "Error in ReportExceptionHandler.HandleException");
+                _logger.LogError(exception: e, message: "Error in ReportExceptionHandler.HandleException: " + e.Message);
             }
         }
 
