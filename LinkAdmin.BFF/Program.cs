@@ -36,9 +36,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                 {
                     options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
                         // Load configuration values with no label
-                        .Select("Link:AdminBFF*", LabelFilter.Null)
+                        .Select("*", LabelFilter.Null)
                         // Override with any configuration values specific to current hosting env
-                        .Select("Link:AdminBFF*", builder.Environment.EnvironmentName);
+                        .Select("*", "Link:AdminBFF:" + builder.Environment.EnvironmentName);
 
                     options.ConfigureKeyVault(kv =>
                     {
