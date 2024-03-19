@@ -27,7 +27,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-		<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.12.1" />
+		<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.14.3" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
 		<PackageReference Include="Flurl" Version="4.*" />

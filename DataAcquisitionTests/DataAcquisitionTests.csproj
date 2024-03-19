@@ -20,7 +20,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-	<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.12.1" />
+	<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.14.3" />
   </ItemGroup>
 
   <ItemGroup>
