@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
@@ -86,14 +87,24 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHealthChecks();
 
     //configure CORS
-    builder.Services.AddCorsService(options => {
-        options.Environment = builder.Environment;
-        options.CorsPolicyName = "";   
-        options.AllowedHeaders = new[] { "Authorization", "Content-Type", "Accept", "Origin", "User-Agent", "X-Requested-With" };
-        options.AllowedExposedHeaders = new[] { "X-Pagination" };
-        options.AllowedMethods = new string[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
-        options.AllowedOrigins = new string[] { "https://localhost:7007", "http://localhost:5005" };       
-    });
+    var corsConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
+    if(corsConfig != null)
+    {
+        builder.Services.AddCorsService(options =>
+        {
+            options.Environment = builder.Environment;
+            options.CorsPolicyName = corsConfig.CorsPolicyName;   
+            options.AllowedHeaders = corsConfig.AllowedHeaders;
+            options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
+            options.AllowedMethods = corsConfig.AllowedMethods;
+            options.AllowedOrigins = corsConfig.AllowedOrigins;       
+        });
+    }
+    else
+    {
+        throw new NullReferenceException("CORS Configuration was null.");
+    }
+
 
     // Add services to the container.
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -158,10 +169,11 @@ static void SetupMiddleware(WebApplication app)
     app.UseHttpsRedirection();
 
     app.UseRouting();
-    app.UseCors("CorsPolicy");
-    app.UseAuthentication();
+    var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
+    app.UseCors(corsConfig?.CorsPolicyName ?? CorsConfig.DefaultCorsPolicyName);
+    //app.UseAuthentication();
     //app.UseMiddleware<UserScopeMiddleware>();
-    app.UseAuthorization();
+    //app.UseAuthorization();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

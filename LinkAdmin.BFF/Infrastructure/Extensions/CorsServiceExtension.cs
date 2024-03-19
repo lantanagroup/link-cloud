@@ -1,4 +1,7 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using Microsoft.AspNetCore.Cors.Infrastructure;
+
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 {
     public static class CorsServiceExtension
     {
@@ -8,47 +11,64 @@
             options?.Invoke(corsServiceOptions);
             
             services.AddCors(options =>
-            {
-                if (corsServiceOptions.Environment.IsDevelopment())
+            {                
+                CorsPolicyBuilder cpb = new();
+
+                if(corsServiceOptions.AllowedOrigins?.Length > 0)
                 {
-                    options.AddPolicy("DevCorsPolicy",
-                        builder => builder
-                            .WithMethods(corsServiceOptions.AllowedMethods)
-                            .SetIsOriginAllowed((host) => true)
-                            .AllowAnyHeader()
-                            .WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders)
-                            .AllowAnyMethod()
-                            .AllowCredentials()
-                            .SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge))
-                    );
+                    cpb.WithOrigins(corsServiceOptions.AllowedOrigins);
+
+                    if(corsServiceOptions.AllowCredentials)
+                    {
+                        cpb.AllowCredentials();
+                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders is not null ? corsServiceOptions.AllowedHeaders : corsServiceOptions.DefaultAllowedHeaders);                           
+                    }
                 }
                 else
-                { 
-                    options.AddPolicy(corsServiceOptions.CorsPolicyName,
-                        builder => builder
-                            .WithMethods(corsServiceOptions.AllowedMethods)
-                            .WithOrigins(corsServiceOptions.AllowedOrigins)
-                            .WithHeaders(corsServiceOptions.AllowedHeaders)
-                            .WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders)
-                            .AllowCredentials()
-                            .SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge))
-                    );                                                                                                               
+                {
+                    cpb.SetIsOriginAllowed((Host) => true);
+
+                    if (corsServiceOptions.AllowedHeaders?.Length > 0)
+                    {
+                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders);
+                    }
+                    else 
+                    { 
+                        cpb.AllowAnyHeader();
+                    }
+
                 }
+
+                cpb.WithMethods(corsServiceOptions.AllowedMethods is not null ? corsServiceOptions.AllowedMethods : corsServiceOptions.DefaultAllowedMethods);
+                cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);                    
+                cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));          
+                    
+                options.AddPolicy(corsServiceOptions?.CorsPolicyName ?? CorsConfig.DefaultCorsPolicyName, cpb.Build());
+
+                //add health check endpoint to cors policy
+                options.AddPolicy("HealthCheckPolicy", policy =>
+                {
+                    policy.AllowAnyHeader();
+                    policy.AllowAnyMethod();
+                    policy.AllowAnyOrigin();
+                });
+
+                //add swagger endpoint to cors policy
+                options.AddPolicy("SwaggerPolicy", policy =>
+                {
+                    policy.AllowAnyHeader();
+                    policy.AllowAnyMethod();
+                    policy.AllowAnyOrigin();
+                });
+                
             });
 
             return services;
         }
     }
 
-    public class CorsServiceOptions
+    public class CorsServiceOptions : CorsConfig
     {
-        public IWebHostEnvironment Environment { get; set; } = null!;
-        public bool AllowCredentials { get; set; } = true;
-        public string CorsPolicyName { get; set; } = "CorsPolicy";
-        public string[] AllowedHeaders { get; set; } = new string[] { "Authorization, Content-Type, Accept, Origin, User-Agent, X-Requested-With" };
-        public string[] AllowedExposedHeaders { get; set; } = new string[] { "X-Pagination" }   ;
-        public string[] AllowedMethods { get; set; } = new string[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
-        public string[] AllowedOrigins { get; set; } = new string[] { "https://localhost:7007", "http://localhost:5005" };
-        public int MaxAge { get; set; } = 600;
+        public IWebHostEnvironment Environment { get; set; } = null!;        
     }
 }
