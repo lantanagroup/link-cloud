@@ -4,17 +4,13 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Diagnostics;
 using System.Reflection;
-using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,6 +64,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;  
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
+
+    //Add YARP (reverse proxy)
+    builder.Services.AddReverseProxy()
+        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
     //Add health checks
     builder.Services.AddHealthChecks();
@@ -169,7 +169,9 @@ static void SetupMiddleware(WebApplication app)
     })
     .WithName("GetUserInfomration")
     .RequireCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName)
-    .WithOpenApi();
+    .WithOpenApi();    
+
+    app.MapReverseProxy();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
