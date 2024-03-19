@@ -33,7 +33,7 @@
         /// <summary>
         /// The name of the CORS policy
         /// </summary>
-        public string? CorsPolicyName { get; set; }
+        public string? PolicyName { get; set; }
 
         /// <summary>
         /// The allowed headers
