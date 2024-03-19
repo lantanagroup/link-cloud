@@ -7,6 +7,7 @@
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string ServiceInformation = "ServiceInformation";
             public const string IdentityProvider = "IdentityProviderConfig";
+            public const string CORS = "CORS";
             public const string Telemetry = "TelemetryConfig";
             public const string Serilog = "Logging:Serilog";
             public const string EnableSwagger = "EnableSwagger";
