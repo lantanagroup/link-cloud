@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Report.Application.Error.Handlers
             }
             catch (Exception e)
             {
-                _logger.LogError(exception: e, message: "Error in ReportTransientExceptionHandler.HandleException");
+                _logger.LogError(exception: e, message: "Error in ReportTransientExceptionHandler.HandleException: " + e.Message);
                 throw;
             }
         }
