@@ -57,10 +57,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     else
     {
         throw new NullReferenceException("Service Information was null.");
-    }
-
-    //configure CORS
-    builder.Services.AddCorsService(builder.Environment);    
+    }      
 
     //Add problem details
     builder.Services.AddProblemDetails(options => {
@@ -87,6 +84,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add health checks
     builder.Services.AddHealthChecks();
+
+    //configure CORS
+    builder.Services.AddCorsService(options => {
+        options.Environment = builder.Environment;
+        options.CorsPolicyName = "";   
+        options.AllowedHeaders = new[] { "Authorization", "Content-Type", "Accept", "Origin", "User-Agent", "X-Requested-With" };
+        options.AllowedExposedHeaders = new[] { "X-Pagination" };
+        options.AllowedMethods = new string[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
+        options.AllowedOrigins = new string[] { "https://localhost:7007", "http://localhost:5005" };       
+    });
 
     // Add services to the container.
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -117,7 +124,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     var telemetryConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
     if (telemetryConfig != null)
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
+        builder.Services.AddOpenTelemetryService(options => {
+            options.Environment = builder.Environment;
+            options.TelemetryCollectorEndpoint = telemetryConfig.TelemetryCollectorEndpoint;
+            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+        });
     }
 }
 
