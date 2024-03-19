@@ -20,18 +20,25 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Errors.Handlers
 
         public void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
         {
-            _logger.LogError(message:"Failed to process Report Scheduled Event.", exception: ex);
-
-            var auditValue = new AuditEventMessage
+            try
             {
-                FacilityId = consumeResult.Message.Key as string,
-                Action = AuditEventType.Query,
-                ServiceName = "Report",
-                EventDate = DateTime.UtcNow,
-                Notes = $"Report Scheduled processing failure \nException Message: {ex.Message}",
-            };
+                _logger.LogError(message: "Failed to process Report Scheduled Event.", exception: ex);
 
-            ProduceAuditEvent(_auditProducerFactory, auditValue, consumeResult.Message.Headers);
+                var auditValue = new AuditEventMessage
+                {
+                    FacilityId = consumeResult.Message.Key as string,
+                    Action = AuditEventType.Query,
+                    ServiceName = "Report",
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"Report Scheduled processing failure \nException Message: {ex.Message}",
+                };
+
+                ProduceAuditEvent(_auditProducerFactory, auditValue, consumeResult.Message.Headers);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(exception: e, message: "Error in ReportExceptionHandler.HandleException");
+            }
         }
 
         private void ProduceAuditEvent(IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, AuditEventMessage auditValue, Headers headers)

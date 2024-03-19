@@ -47,19 +47,28 @@ namespace LantanaGroup.Link.Report.Application.Error.Handlers
 
         public void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
         {
-            _logger.LogError(message: "Failed to process Report Event.", exception: ex);
-
-            var auditValue = new AuditEventMessage
+            try
             {
-                FacilityId = consumeResult.Message.Key as string,
-                Action = AuditEventType.Query,
-                ServiceName = "Report",
-                EventDate = DateTime.UtcNow,
-                Notes = $"Report processing failure \nException Message: {ex.Message}",
-            };
+                _logger.LogError(message: "Failed to process Report Event.", exception: ex);
 
-            ProduceAuditEvent(_auditProducerFactory, auditValue, consumeResult.Message.Headers);
-            ProduceRetryReportScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers);
+                var auditValue = new AuditEventMessage
+                {
+                    FacilityId = consumeResult.Message.Key as string,
+                    Action = AuditEventType.Query,
+                    ServiceName = "Report",
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"Report processing failure \nException Message: {ex.Message}",
+                };
+
+                ProduceAuditEvent(_auditProducerFactory, auditValue, consumeResult.Message.Headers);
+                ProduceRetryReportScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
+                    consumeResult.Message.Headers);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(exception: e, message: "Error in ReportTransientExceptionHandler.HandleException");
+                throw;
+            }
         }
 
         private void ProduceAuditEvent(IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, AuditEventMessage auditValue, Headers headers)
