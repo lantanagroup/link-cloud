@@ -49,6 +49,6 @@
         public string[] AllowedExposedHeaders { get; set; } = new string[] { "X-Pagination" }   ;
         public string[] AllowedMethods { get; set; } = new string[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
         public string[] AllowedOrigins { get; set; } = new string[] { "https://localhost:7007", "http://localhost:5005" };
-        public int MaxAge { get; set; } = 3600;
+        public int MaxAge { get; set; } = 600;
     }
 }
