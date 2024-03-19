@@ -61,26 +61,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     }      
 
     //Add problem details
-    builder.Services.AddProblemDetails(options => {
-        options.CustomizeProblemDetails = ctx =>
-        {
-            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-            {
-                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-            }
-
-            if (builder.Environment.IsDevelopment())
-            {
-                ctx.ProblemDetails.Extensions.Add("API", "Link Administration");
-            }
-            else
-            {
-                ctx.ProblemDetails.Extensions.Remove("exception");
-            }
-
-        };
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;  
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
     //Add health checks
@@ -166,7 +150,7 @@ static void SetupMiddleware(WebApplication app)
         var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API")
+            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API");
         });
     }
 
