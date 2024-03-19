@@ -7,8 +7,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 {
     public static class TelemetryServiceExtension
     {
-        public static IServiceCollection AddOpenTelemetryService(this IServiceCollection services, TelemetryConfig telemetryConfig, IWebHostEnvironment env)
-        {
+        public static IServiceCollection AddOpenTelemetryService(this IServiceCollection services, Action<TelemetryServiceOptions> options)
+        {       
+            var telemetryServiceOptions = new TelemetryServiceOptions();
+            options.Invoke(telemetryServiceOptions);
 
             var otel = services.AddOpenTelemetry();
 
@@ -26,22 +28,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         {
                             options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                         })
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryServiceOptions.TelemetryCollectorEndpoint); }));
 
             otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
                         .AddAspNetCoreInstrumentation()
                         .AddProcessInstrumentation()
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryServiceOptions.TelemetryCollectorEndpoint); }));
 
-            if (telemetryConfig.EnableRuntimeInstrumentation)
+            if (telemetryServiceOptions.EnableRuntimeInstrumentation)
             {
                 otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
                         .AddRuntimeInstrumentation());
             }
 
-            if (env.IsDevelopment())
+            if (telemetryServiceOptions.Environment.IsDevelopment())
             {
                 otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder
@@ -54,7 +56,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             }
 
             return services;
-        }     
-        
+        }        
+    }
+
+    public class TelemetryServiceOptions : TelemetryConfig
+    {
+        public IWebHostEnvironment Environment { get; set; } = null!;
     }
 }
