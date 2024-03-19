@@ -51,16 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                     policy.AllowAnyHeader();
                     policy.AllowAnyMethod();
                     policy.AllowAnyOrigin();
-                });
-
-                //add swagger endpoint to cors policy
-                options.AddPolicy("SwaggerPolicy", policy =>
-                {
-                    policy.AllowAnyHeader();
-                    policy.AllowAnyMethod();
-                    policy.AllowAnyOrigin();
-                });
-                
+                });              
             });
 
             return services;

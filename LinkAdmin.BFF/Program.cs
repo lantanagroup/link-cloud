@@ -156,17 +156,19 @@ static void SetupMiddleware(WebApplication app)
     else
     {
         app.UseExceptionHandler();
-    }
+    }   
+
+    app.UseHttpsRedirection();
 
     //configure swagger
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API"));
+        app.UseSwaggerUI(opts => {
+            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API")
+        });
     }
-
-    app.UseHttpsRedirection();
 
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
@@ -179,7 +181,8 @@ static void SetupMiddleware(WebApplication app)
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    }).RequireCors("HealthCheckPolicy");
+    
 }
 
 #endregion
