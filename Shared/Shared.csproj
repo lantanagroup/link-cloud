@@ -14,7 +14,7 @@
 		<Description>Shared library for Lantana Link</Description>
 		<Product>NHSN Link Shared Library</Product>
 		<!--<Version>1.1.1</Version>-->
-		<VersionPrefix>1.1.2</VersionPrefix>
+		<VersionPrefix>1.2.1</VersionPrefix>
 		<PackageId>com.lantanagroup.link.Shared</PackageId>
 	</PropertyGroup>
 
