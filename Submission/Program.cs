@@ -16,6 +16,8 @@ using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Queries;
 using LantanaGroup.Link.Submission.Application.Repositories;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,16 +79,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add repositories
     // TODO
 
-    //// Setup CORS
-    //builder.Services.AddCors(options =>
-    //{
-    //    options.AddPolicy("CorsPolicy",
-    //        builder => builder
-    //            .AllowAnyMethod()
-    //            .AllowCredentials()
-    //            .SetIsOriginAllowed((host) => true) //lock this down, allows all atm
-    //            .AllowAnyHeader());
-    //});
+    #region Exception Handling
+    //Report Scheduled Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+    #endregion
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();

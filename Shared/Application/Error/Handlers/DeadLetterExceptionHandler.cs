@@ -15,14 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
 
-        /// <summary>
-        /// The Topic to use when publishing Retry Kafka events.
-        /// </summary>
         public string Topic { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The name of the service that is consuming the ExceptionHandler.
-        /// </summary>
         public string ServiceName { get; set; } = string.Empty;
 
         public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
