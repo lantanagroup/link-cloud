@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     Notes = $"{ServiceName} processing failure \nException Message: {ex.Message}",
                 };
 
-                ProduceAuditEvent(AuditProducerFactory, auditValue, consumeResult.Message.Headers);
+                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers);
             }
@@ -59,9 +59,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void ProduceAuditEvent(IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, AuditEventMessage auditValue, Headers headers)
+        public virtual void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
         {
-            using var producer = auditProducerFactory.CreateAuditEventProducer();
+            using var producer = AuditProducerFactory.CreateAuditEventProducer();
             producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
                 Value = auditValue,
