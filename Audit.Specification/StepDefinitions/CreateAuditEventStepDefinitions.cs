@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
 
             //set up audit entity
             auditEntity = new AuditLog();
-            auditEntity.Id = AuditId.NewId();
+            auditEntity.AuditId = AuditId.NewId();
             auditEntity.FacilityId = FacilityId;
             auditEntity.ServiceName = ServiceName;
             auditEntity.CorrelationId = CorrelationId;
@@ -135,7 +135,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
 
             Task<AuditLog> outcome = command.Execute(createAuditEventModel);
 
-            createdAuditEventId = outcome.Result.Id;
+            createdAuditEventId = outcome.Result.AuditId;
 
         }
 
