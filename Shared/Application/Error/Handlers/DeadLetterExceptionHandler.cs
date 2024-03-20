@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
+        public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
