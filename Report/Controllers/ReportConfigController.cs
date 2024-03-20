@@ -1,4 +1,3 @@
-using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.Models;
@@ -7,8 +6,6 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using static Google.Rpc.Context.AttributeContext.Types;
-using static Hl7.Fhir.Model.Bundle;
 
 namespace LantanaGroup.Link.Report.Controllers
 {

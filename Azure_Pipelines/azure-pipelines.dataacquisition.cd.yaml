@@ -15,7 +15,7 @@ variables:
 - name: project
   value: 'DataAcquisition/DataAcquisition.csproj'
 - name: testProject
-  value: 'DataAcquisitionUnitTests/DataAcquisitionUnitTests.csproj'
+  value: 'DataAcquisitionTests/DataAcquisitionTests.csproj'
 - name: nugetPath
   value: 'DataAcquisition/nuget.config'
 - name: tags1

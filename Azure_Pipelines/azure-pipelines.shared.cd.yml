@@ -10,8 +10,20 @@ name: $(BuildDefinitionName)_$(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
 
 variables:
   buildConfiguration: 'Release'
+  sharedVersion: ''
 
 steps:
+
+  # - task: PowerShell@2
+  #   displayName: Get Version Information
+  #   inputs:
+  #     targetType: 'inline'
+  #     script: |
+  #        $xml = [Xml] (Get-Content .\Shared\Shared.csproj)
+  #        $sharedVersion = $xml.Project.PropertyGroup.Version
+  #        echo $sharedVersion
+  #        echo "##vso[task.setvariable variable=sharedVersion]$sharedVersion"
+
   - task: DotNetCoreCLI@2
     displayName: 'Restore'
     inputs:
@@ -27,15 +39,29 @@ steps:
   - task: DotNetCoreCLI@2
     displayName: 'Pack'
     inputs:
-      command: 'pack'
-      packagesToPack: 'Shared/Shared.csproj'
-      #configuration: $(buildConfiguration)
-      configuration: 'Shared/Shared.csproj'
-      versioningScheme: 'byBuildNumber' 
-      packDirectory: '$(build.artifactstagingdirectory)/publish'
-      includesymbols: true
-      #arguments: '--output $(build.artifactstagingdirectory)/publish'
-      modifyOutputPath: false
+     command: 'pack'
+     packagesToPack: 'Shared/Shared.csproj'
+     #configuration: $(buildConfiguration)
+     configuration: 'Shared/Shared.csproj'
+     #versioningScheme: 'byEnvVar'
+     #versionEnvVar: $sharedVersion
+     packDirectory: '$(build.artifactstagingdirectory)/publish'
+     includesymbols: true
+     #arguments: '--output $(build.artifactstagingdirectory)/publish'
+     modifyOutputPath: false
+
+  # - task: NuGetCommand@2
+  #   displayName: 'Pack NuGet'
+  #   inputs:
+  #     command: pack
+  #     packagesToPack: 'Shared/Shared.csproj'
+  #     configuration: 'Shared/Shared.csproj'
+  #     packDestination: $(build.artifactstagingdirectory)/publish'
+  #     versioningScheme: byEnvVar
+  #     versionEnvVar: sharedVersion
+  #     includeSymbols: true
+  #     verbosityPack: Detailed
+
 
   # - task: DotNetCoreCLI@2
   #   displayName: 'Publish'

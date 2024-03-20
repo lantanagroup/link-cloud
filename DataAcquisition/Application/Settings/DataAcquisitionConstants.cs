@@ -13,7 +13,7 @@ public static class DataAcquisitionConstants
         public const string Redis = "Redis";
         public const string ServiceInformation = "ServiceInformation";
         public const string Telemetry = "TelemetryConfig";
-        public const string TenantConfig = "TenantApiSettings";
+        public const string TenantApiSettings = "TenantApiSettings";
     }
 
     public static class ValidationErrorMessages

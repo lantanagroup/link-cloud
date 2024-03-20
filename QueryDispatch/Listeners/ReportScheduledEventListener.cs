@@ -1,13 +1,13 @@
-﻿using LantanaGroup.Link.QueryDispatch.Application.Models;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {

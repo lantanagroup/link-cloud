@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -157,7 +159,16 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
                 .ReturnsAsync(null);
 
+            _mocker.GetMock<IMediator>()
+                .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Unit.Value);
+
+            _mocker.GetMock<IMediator>()
+                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(true));
+
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
+
 
             var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
