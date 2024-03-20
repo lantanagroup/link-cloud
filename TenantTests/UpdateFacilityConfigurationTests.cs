@@ -19,7 +19,7 @@ namespace TenantTests
     public class UpdateFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private TenantConfig? _tenantConfig;
+        private MeasureApiConfig? _measureApiConfig;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private const string id = "64b6dd4efe21820a49c1698a";
@@ -49,9 +49,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _tenantConfig = new TenantConfig()
+            _measureApiConfig = new MeasureApiConfig()
             {
-                MeasureDefUrl = "test"
+                MeasureServiceApiUrl = "test"
             };
 
 
@@ -74,9 +74,9 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<TenantConfig>>()
+            _mocker.GetMock<IOptions<MeasureApiConfig>>()
             .Setup(p => p.Value)
-            .Returns(_tenantConfig);
+            .Returns(_measureApiConfig);
 
             Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
 

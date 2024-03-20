@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             Scheduler.JobFactory = _jobFactory;
 
-            List<FacilityConfigModel> facilities = _facilityConfigurationService.GetFacilities(cancellationToken).Result;
+            List<FacilityConfigModel> facilities = _facilityConfigurationService.GetAllFacilities(cancellationToken).Result;
 
             foreach (FacilityConfigModel facility in facilities)
             {

@@ -18,7 +18,7 @@ namespace TenantTests
     public class CreateFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private TenantConfig? _tenantConfig;
+        private MeasureApiConfig? _measureApiConfig;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -42,9 +42,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _tenantConfig = new TenantConfig()
+            _measureApiConfig = new MeasureApiConfig()
             {
-                MeasureDefUrl = "test" 
+                MeasureServiceApiUrl = "test" 
             };
 
             _model.ScheduledTasks.AddRange(scheduledTaskModels);
@@ -60,9 +60,9 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<TenantConfig>>()
+            _mocker.GetMock<IOptions<MeasureApiConfig>>()
               .Setup(p => p.Value)
-              .Returns(_tenantConfig);
+              .Returns(_measureApiConfig);
 
             var result = await _service.CreateFacility(_model,CancellationToken.None);
 
@@ -92,7 +92,7 @@ namespace TenantTests
 
         //    _tenantConfig = new TenantConfig()
         //    {
-        //        MeasureDefUrl = "test"
+        //        MeasureServiceApiUrl = "test"
         //    };
 
 
