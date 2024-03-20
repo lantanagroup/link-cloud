@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
                 consumeResult.Message.Headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(ex.Message));
-                ProduceDispositionEvent(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers);
+                ProduceEvent(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers);
             }
             catch (Exception e)
             {
@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void ProduceDispositionEvent(K key, V value, Headers headers)
+        public virtual void ProduceEvent(K key, V value, Headers headers)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
