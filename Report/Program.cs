@@ -23,6 +23,10 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.QueryDispatch.Application.Errors.Handlers;
+using LantanaGroup.Link.Report.Application.Error.Handlers;
+using LantanaGroup.Link.Report.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,11 +53,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add configuration settings
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka).Get<KafkaConnection>());
+    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka).Get<KafkaConnection>() ?? new KafkaConnection());
+    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
-    builder.Services.AddSingleton(builder.Configuration
-        .GetRequiredSection(ReportConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
+
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -63,12 +67,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>, KafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientsToQueryValue>, KafkaConsumerFactory<string, PatientsToQueryValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, 
-        KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
 
+    //Producres
     builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>, KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>>();
+
+    //Producers for Retry
+    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientsToQueryValue>, KafkaProducerFactory<string, PatientsToQueryValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>, KafkaProducerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
 
     // Add repositories
     builder.Services.AddSingleton<MeasureReportConfigRepository>();
@@ -112,7 +122,25 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
+    #region Exception Handling
+    //Report Scheduled Listener
+    builder.Services.AddTransient<IReportExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, ReportExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+    builder.Services.AddTransient<IReportTransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, ReportTransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+
+    //Report Submitted Listener
+    builder.Services.AddTransient<IReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, ReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, ReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
+
+    //Patients To Query Listener
+    builder.Services.AddTransient<IReportExceptionHandler<string, PatientsToQueryValue>, ReportExceptionHandler<string, PatientsToQueryValue>>();
+    builder.Services.AddTransient<IReportTransientExceptionHandler<string, PatientsToQueryValue>, ReportTransientExceptionHandler<string, PatientsToQueryValue>>();
+
+    //Measure Evaluated Listener
+    builder.Services.AddTransient<IReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, ReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
+    builder.Services.AddTransient<IReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, ReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
+    #endregion
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
