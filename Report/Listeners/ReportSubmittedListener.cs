@@ -1,16 +1,17 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using System.Text;
-using LantanaGroup.Link.Report.Application.Error.Exceptions;
-using LantanaGroup.Link.Report.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -24,24 +25,32 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IMediator _mediator;
 
-        private readonly IReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _reportTransientExceptionHandler;
-        private readonly IReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _reportExceptionHandler;
+        private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
 
         public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
-            IReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> reportTransientExceptionHandler,
-            IReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> reportExceptionHandler)
+            ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
 
-            _reportTransientExceptionHandler = reportTransientExceptionHandler ??
-                                               throw new ArgumentException(nameof(reportExceptionHandler));
+            _transientExceptionHandler = transientExceptionHandler ??
+                                               throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _reportExceptionHandler = reportExceptionHandler ??
-                                      throw new ArgumentException(nameof(reportExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
+                                      throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            var t = (TransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>)_transientExceptionHandler;
+            t.ServiceName = "Report";
+            t.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Retry";
+
+            var d = (DeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>)_deadLetterExceptionHandler;
+            d.ServiceName = "Report";
+            d.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,7 +83,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             if (consumeResult == null)
                             {
-                                throw new TerminatingException(
+                                consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
+                                throw new DeadLetterException(
                                     "ReportSubmittedListener: Result of ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>.Consume is null");
                             }
 
@@ -127,7 +137,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                throw new TerminatingException("ReportSubmittedListener: " + ex.Message, ex.InnerException);
+                                throw new DeadLetterException("ReportSubmittedListener: " + ex.Message, ex.InnerException);
                             }
                         }
                         catch (ConsumeException e)
@@ -139,20 +149,20 @@ namespace LantanaGroup.Link.Report.Listeners
                                 break;
                             }
                         }
-                        catch (TerminatingException ex)
+                        catch (DeadLetterException ex)
                         {
                             consumer.Commit(consumeResult);
-                            _reportExceptionHandler.HandleException(consumeResult, ex);
+                            _deadLetterExceptionHandler.HandleException(consumeResult, ex);
                         }
                         catch (TransientException ex)
                         {
-                            _reportTransientExceptionHandler.HandleException(consumeResult, ex);
+                            _transientExceptionHandler.HandleException(consumeResult, ex);
                             consumer.Commit(consumeResult);
                         }
                         catch (Exception ex)
                         {
                             consumer.Commit(consumeResult);
-                            _reportExceptionHandler.HandleException(consumeResult, new TerminatingException("ReportSubmittedListener: " + ex.Message, ex.InnerException));
+                            _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("ReportSubmittedListener: " + ex.Message, ex.InnerException));
                         }
                     }
                 }
