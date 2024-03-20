@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
-                    "TransientExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
+                    "DeadLetterExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
             }
 
             headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
