@@ -6,9 +6,9 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IPersistenceRepository<FacilityConfigModel> _datastore;
+        private readonly IFacilityConfigurationRepo _datastore;
 
-        public DatabaseHealthCheck(IPersistenceRepository<FacilityConfigModel> datastore)
+        public DatabaseHealthCheck(IFacilityConfigurationRepo datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
