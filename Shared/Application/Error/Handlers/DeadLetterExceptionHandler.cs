@@ -5,11 +5,10 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
-    public class DeadLetterExceptionHandler<K, V> : IDeadLetterExceptionHandler<K, V>
+    public class DeadLetterExceptionHandler<K, V> : IExceptionhandler<K, V>
     {
         protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
@@ -50,7 +49,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
+
+                consumeResult.Message.Headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(ex.Message));
+                DispositionEvent(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers);
             }
             catch (Exception e)
             {
@@ -69,15 +70,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
+        public virtual void DispositionEvent(K key, V value, Headers headers)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
                     "DeadLetterExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
             }
-
-            headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
             producer.Produce(Topic, new Message<K, V>
