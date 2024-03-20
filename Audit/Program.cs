@@ -138,6 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
+    builder.Services.AddScoped<ISearchRepository, MsSqlAuditLogSearchRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -240,6 +241,14 @@ static void SetupMiddleware(WebApplication app)
         var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
+    }
+
+    //TODO: Discuss migrations rather than ensure created
+    // Ensure database created (temporary), not for production
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        context.Database.EnsureCreated();
     }
 
     app.UseRouting();
