@@ -31,6 +31,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                             {
                                 options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                             })
+                        .AddEntityFrameworkCoreInstrumentation()
                         .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
 

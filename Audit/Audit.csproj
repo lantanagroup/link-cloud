@@ -28,12 +28,12 @@
 	<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
 	<PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />
 	<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.61.0" />
-	<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.2" />
-	<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.2" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.2" />
-	<PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.2.0" />
-	<PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.2.0" />
+	<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+	<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.1.0" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.3" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.3" />
+	<PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.3.0" />
+	<PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.3.0" />
 	<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.6" />
 	<PackageReference Include="MongoDB.Driver" Version="2.24.0" />
 	<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
@@ -41,6 +41,7 @@
 	<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
 	<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
 	<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
+	<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.10" />
 	<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
 	<PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
 	<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
@@ -51,7 +52,7 @@
 	<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.0" />
 	<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
 	<PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.5.0" />
-	<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.3.1" />
+	<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
   </ItemGroup>
 
   <ItemGroup>
