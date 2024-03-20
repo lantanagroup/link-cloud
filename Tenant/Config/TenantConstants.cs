@@ -9,15 +9,18 @@ namespace LantanaGroup.Link.Tenant.Config
     public static class TenantConstants
     {
 
-        public const string ServiceName = "Tenant Service";
+        public const string ServiceName = "Tenant";
 
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string Kafka = "Kafka";
-            public const string Mongo = "MongoDB";
+            public const string KafkaConnection = "KafkaConnection";
+            public const string MongoDB = "MongoDB";
             public const string Telemetry = "TelemetryConfig";
-            public const string TenantConfig = "TenantConfig";
+            public const string MeasureApiConfig = "MeasureServiceRegistry";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string EnableSwagger = "EnableSwagger";
+            public const string Serilog = "Logging:Serilog";
         }
 
         public static class TenantLoggingIds
