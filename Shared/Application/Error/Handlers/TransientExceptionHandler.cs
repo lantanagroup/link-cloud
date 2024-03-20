@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -14,17 +13,11 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
 
-        /// <summary>
-        /// The Topic to use when publishing Retry Kafka events.
-        /// </summary>
         public string Topic { get; set; } = string.Empty;
 
-        /// <summary>
-        /// The name of the service that is consuming the TransientExceptionHandler.
-        /// </summary>
         public string ServiceName { get; set; } = string.Empty;
 
-        protected TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
+        public TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
             IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
             IKafkaProducerFactory<K, V> producerFactory)
         {
@@ -33,19 +26,25 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
+        public virtual void HandleException(ConsumeResult<K, V>? consumeResult, Exception ex, string facilityId)
         {
             try
             {
-                Logger.LogError(message: "Failed to process Report Event.", exception: ex);
+                if (consumeResult == null)
+                {
+                    Logger.LogError(message: $"TransientExceptionHandler|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", exception: ex);
+                    return;
+                }
+
+                Logger.LogError(message: $"TransientExceptionHandler: Failed to process {ServiceName} Event.", exception: ex);
 
                 var auditValue = new AuditEventMessage
                 {
-                    FacilityId = consumeResult.Message.Key as string,
+                    FacilityId = facilityId,
                     Action = AuditEventType.Query,
                     ServiceName = ServiceName,
                     EventDate = DateTime.UtcNow,
-                    Notes = $"{ServiceName} processing failure \nException Message: {ex.Message}",
+                    Notes = $"TransientExceptionHandler: processing failure in {ServiceName} \nException Message: {ex.Message}",
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
@@ -54,7 +53,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
             catch (Exception e)
             {
-                Logger.LogError(exception: e, message: "Error in TransientExceptionHandler.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in TransientExceptionHandler.HandleException: " + e.Message);
                 throw;
             }
         }
@@ -75,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
-                    "TransientExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
+                    $"TransientExceptionHandler.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
