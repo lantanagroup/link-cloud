@@ -11,7 +11,8 @@ namespace LantanaGroup.Link.Audit.Domain.Entities
    
     public class AuditLog : BaseEntity
     {
-        public AuditId Id { get; set; }
+        public long Id { get; set; }
+        public AuditId AuditId { get; set; }
         public string? FacilityId { get; set; } = string.Empty;
         public string? ServiceName { get; set; }
         public string? CorrelationId { get; set; }

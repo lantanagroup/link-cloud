@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.AuditUnitTests
             //create audit entities
             AuditLog _auditEvent = new AuditLog();
             #region Setup for _auditEvent
-            _auditEvent.Id = AuditId.FromString(_auditId);
+            _auditEvent.AuditId = AuditId.FromString(_auditId);
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;
             _auditEvent.CorrelationId = CorrelationId;
@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         [Test]
         public void TestAddAuditEntity() {
             var auditEntity = new AuditLog();
-            auditEntity.Id = AuditId.NewId();
+            auditEntity.AuditId = AuditId.NewId();
 
             InitializeMongoAuditEventCollection();
             //TODO How to make mongo repo more testable

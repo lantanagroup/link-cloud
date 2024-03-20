@@ -14,10 +14,11 @@ namespace LantanaGroup.Link.Audit.Persistance.Configurations
         private void ConfigureAuditLogTable(EntityTypeBuilder<AuditLog> builder)
         {           
             builder.ToTable("AuditLogs");
+            
+            builder.HasKey(b => b.Id).IsClustered();
 
             //configure strongly typed ID
-            builder.HasKey(b => b.Id).IsClustered(false);
-            builder.Property(b => b.Id)
+            builder.Property(b => b.AuditId)
                 .ValueGeneratedNever()
                 .HasConversion(
                     id => id.Value,
@@ -26,6 +27,14 @@ namespace LantanaGroup.Link.Audit.Persistance.Configurations
             builder.HasIndex(b => b.FacilityId);
 
             builder.HasIndex(b => b.UserId);
+
+            builder.HasIndex(b => b.ServiceName);
+
+            builder.HasIndex(b => b.Action);
+
+            builder.HasIndex(b => b.EventDate);
+
+            builder.HasIndex(b => b.CreatedOn);
 
             builder.Property(b => b.ServiceName)
                 .HasMaxLength(100);
