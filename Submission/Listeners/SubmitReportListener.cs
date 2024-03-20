@@ -24,6 +24,8 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
 
+        private string Name => this.GetType().Name;
+
         public SubmitReportListener(ILogger<SubmitReportListener> logger, IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
             IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig, IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
@@ -78,9 +80,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         consumeResult = consumer.Consume(cancellationToken);
                         if (consumeResult == null)
                         {
-                            consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>();
-                            throw new DeadLetterException(
-                                "SubmitReportListener: Result of ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>.Consume is null");
+                            throw new DeadLetterException($"{Name}: consumeResult is null");
                         }
 
                         var key = consumeResult.Message.Key;
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
                         {
                             throw new DeadLetterException(
-                                "SubmitReportListener: One or more required MeasureReportScheduledKey properties are null or empty.");
+                                $"{Name}: One or more required Key/Value properties are null or empty.");
                         }
 
                         string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
@@ -114,31 +114,38 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                         if (!File.Exists(fullFilePath))
                         {
-                            throw new TransientException("SubmitReportListener: Bundle File Not Created");
+                            throw new TransientException($"{Name}: Bundle File Not Created");
                         }
                         #endregion
-
-                        consumer.Commit(consumeResult);
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("ReportScheduledListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
                     }
                     catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
                         _deadLetterExceptionHandler.HandleException(consumeResult, ex);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("ReportScheduledListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }
