@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
-    public class DeadLetterExceptionHandler<K, V> : IExceptionhandler<K, V>
+    public class DeadLetterExceptionHandler<K, V> : IConsumerExceptionHandler<K, V>
     {
         protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
