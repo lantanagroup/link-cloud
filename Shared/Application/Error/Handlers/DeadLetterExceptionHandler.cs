@@ -4,23 +4,33 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
-    public class ExceptionHandler<K, V> : IExceptionHandler<K, V>
+    public class DeadLetterExceptionHandler<K, V> : IDeadLetterExceptionHandler<K, V>
     {
-        protected readonly ILogger<ExceptionHandler<K, V>> Logger;
+        protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
+        protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+
+        /// <summary>
+        /// The Topic to use when publishing Retry Kafka events.
+        /// </summary>
+        public string Topic { get; set; } = string.Empty;
 
         /// <summary>
         /// The name of the service that is consuming the ExceptionHandler.
         /// </summary>
-        public string ServiceName { get; set; }
+        public string ServiceName { get; set; } = string.Empty;
 
-        public ExceptionHandler(ILogger<ExceptionHandler<K, V>> logger, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory)
+        public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
+            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
+            IKafkaProducerFactory<K, V> producerFactory)
         {
             Logger = logger;
             AuditProducerFactory = auditProducerFactory;
+            ProducerFactory = producerFactory;
         }
 
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
@@ -39,6 +49,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 };
 
                 ProduceAuditEvent(AuditProducerFactory, auditValue, consumeResult.Message.Headers);
+                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
             }
             catch (Exception e)
             {
@@ -54,6 +65,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 Value = auditValue,
                 Headers = headers
             });
+            producer.Flush();
+        }
+
+        public void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
+        {
+            headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
+
+            using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
+            producer.Produce(Topic, new Message<K, V>
+            {
+                Key = key,
+                Value = value,
+                Headers = headers
+            });
+
             producer.Flush();
         }
     }
