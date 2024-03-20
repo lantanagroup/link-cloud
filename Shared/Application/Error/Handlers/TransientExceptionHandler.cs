@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
-    public class TransientExceptionHandler<K, V> : IExceptionhandler<K, V>
+    public class TransientExceptionHandler<K, V> : IConsumerExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
