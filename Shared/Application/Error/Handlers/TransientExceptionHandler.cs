@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
-    public class TransientExceptionHandler<K, V> : IExceptionhandler<K, V>
+    public class TransientExceptionHandler<K, V> : ITransientExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
@@ -49,7 +49,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-                DispositionEvent(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers);
+                ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
+                    consumeResult.Message.Headers);
             }
             catch (Exception e)
             {
@@ -69,7 +70,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void DispositionEvent(K key, V value, Headers headers)
+        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
