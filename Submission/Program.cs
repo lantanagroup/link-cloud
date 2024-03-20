@@ -18,6 +18,7 @@ using LantanaGroup.Link.Submission.Application.Repositories;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<TenantSubmissionRepository>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
 
     // Add Controllers
     builder.Services.AddControllers();
