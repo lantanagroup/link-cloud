@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -25,6 +26,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
 
+        private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
             IMediator mediator, ISchedulerFactory schedulerFactory,
@@ -43,11 +45,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
             var t = (TransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>)_transientExceptionHandler;
-            t.ServiceName = "Report";
+            t.ServiceName = ReportConstants.ServiceName;
             t.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
 
             var d = (DeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>)_deadLetterExceptionHandler;
-            d.ServiceName = "Report";
+            d.ServiceName = ReportConstants.ServiceName;
             d.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
         }
 
@@ -73,15 +75,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<MeasureReportScheduledKey, MeasureReportScheduledValue>();
+                    ConsumeResult<MeasureReportScheduledKey, MeasureReportScheduledValue>? consumeResult = null;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
                         if (consumeResult == null)
                         {
-                            consumeResult = new ConsumeResult<MeasureReportScheduledKey, MeasureReportScheduledValue>();
                             throw new DeadLetterException(
-                                "ReportSubmittedListener: Result of ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>.Consume is null");
+                                $"{Name}: consumeResult is null");
                         }
 
                         var key = consumeResult.Message.Key;
@@ -91,7 +92,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             string.IsNullOrWhiteSpace(key.ReportType))
                         {
                             throw new DeadLetterException(
-                                "ReportScheduledListener: One or more required MeasureReportScheduledKey properties are null or empty.");
+                                $"{Name}: One or more required Key/Value properties are null or empty.");
                         }
 
                         DateTimeOffset startDateOffset;
@@ -99,7 +100,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
                                 out startDateOffset))
                         {
-                            throw new DeadLetterException("ReportScheduledListener: Start Date could not be parsed");
+                            throw new DeadLetterException($"{Name}: Start Date could not be parsed");
                         }
 
                         DateTimeOffset endDateOffset;
@@ -107,7 +108,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
                                 out endDateOffset))
                         {
-                            throw new DeadLetterException("ReportScheduledListener: End Date could not be parsed");
+                            throw new DeadLetterException($"{Name}: End Date could not be parsed");
                         }
 
                         var startDate = startDateOffset.UtcDateTime;
@@ -186,31 +187,37 @@ namespace LantanaGroup.Link.Report.Listeners
                             }, cancellationToken);
 
                             await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                await _schedulerFactory.GetScheduler(cancellationToken));
-
-
-                            consumer.Commit(consumeResult);
+                            await _schedulerFactory.GetScheduler(cancellationToken));
                         }
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("ReportScheduledListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
                     }
                     catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
                         _deadLetterExceptionHandler.HandleException(consumeResult, ex);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("ReportScheduledListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }

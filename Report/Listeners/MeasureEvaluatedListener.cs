@@ -16,6 +16,7 @@ using System.Text.Json;
 using System.Transactions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Report.Settings;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -29,6 +30,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _deadLetterExceptionHandler;
+
+        private string Name => this.GetType().Name;
 
         public MeasureEvaluatedListener(ILogger<MeasureEvaluatedListener> logger, IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
@@ -45,11 +48,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             var t = (TransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>)_transientExceptionHandler;
-            t.ServiceName = "Report";
+            t.ServiceName = ReportConstants.ServiceName;
             t.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Retry";
 
             var d = (DeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>)_deadLetterExceptionHandler;
-            d.ServiceName = "Report";
+            d.ServiceName = ReportConstants.ServiceName;
             d.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Error";
         }
 
@@ -80,15 +83,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>();
+                    ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>? consumeResult = null;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
 
                         if (consumeResult == null)
                         {
-                            consumeResult = new ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>();
-                            throw new DeadLetterException("MeasureEvaluatedListener: consumeResult is null");
+                            throw new DeadLetterException($"{Name}: consumeResult is null");
                         }
 
                         var key = consumeResult.Message.Key;
@@ -96,7 +98,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
-                            throw new DeadLetterException($"MeasureEvaluatedListener: Received message without correlation ID: {consumeResult.Topic}");
+                            _logger.LogInformation($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
                         }
 
                         if (string.IsNullOrWhiteSpace(key.FacilityId) ||
@@ -105,12 +107,18 @@ namespace LantanaGroup.Link.Report.Listeners
                             key.EndDate == DateTime.MinValue)
                         {
                             throw new DeadLetterException(
-                                "MeasureEvaluatedListener: One or more required MeasureEvaluatedKey properties are null or empty.");
+                                $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
                         }
 
                         // find existing report scheduled for this facility, report type, and date range
-                        var schedule = await _mediator.Send(new FindMeasureReportScheduleForReportTypeQuery { FacilityId = key.FacilityId, ReportStartDate = key.StartDate, ReportEndDate = key.EndDate, ReportType = key.ReportType }, cancellationToken)
-                                                ?? throw new TransactionException($"No report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
+                        var schedule = await _mediator.Send(
+                                           new FindMeasureReportScheduleForReportTypeQuery
+                                           {
+                                               FacilityId = key.FacilityId, ReportStartDate = key.StartDate,
+                                               ReportEndDate = key.EndDate, ReportType = key.ReportType
+                                           }, cancellationToken)
+                                       ?? throw new TransactionException(
+                                           $"{Name}: report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
                         var measureReport = new MeasureReport();
 
                         try
@@ -121,7 +129,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         catch (Exception ex)
                         {
                             throw new DeadLetterException(
-                                "MeasureEvaluatedListener: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result);
+                                $"{Name}: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result);
                         }
 
                         // ensure measure report has an ID to avoid inserting duplicates during bundling
@@ -145,6 +153,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         }, cancellationToken);
 
                         #region Patients To Query & Submision Report Handling
+
                         if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
                         {
                             if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
@@ -174,7 +183,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         },
                                         Headers = new Headers
                                         {
-                                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                                         }
                                     });
 
@@ -182,28 +191,35 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                         }
                         #endregion
-
-                        consumer.Commit(consumeResult);
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("MeasureEvaluatedListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
                     }
                     catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
                         _deadLetterExceptionHandler.HandleException(consumeResult, ex);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("MeasureEvaluatedListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }

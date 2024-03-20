@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -20,6 +21,8 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientsToQueryValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientsToQueryValue> _deadLetterExceptionHandler;
 
+        private string Name => this.GetType().Name;
+
         public PatientsToQueryListener(ILogger<PatientsToQueryListener> logger, IKafkaConsumerFactory<string, PatientsToQueryValue> kafkaConsumerFactory,
             IMediator mediator,
             ITransientExceptionHandler<string, PatientsToQueryValue> transientExceptionHandler,
@@ -33,11 +36,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
             var t = (TransientExceptionHandler<string, PatientsToQueryValue>)_transientExceptionHandler;
-            t.ServiceName = "Report";
+            t.ServiceName = ReportConstants.ServiceName;
             t.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Retry";
 
             var d = (DeadLetterExceptionHandler<string, PatientsToQueryValue>)_deadLetterExceptionHandler;
-            d.ServiceName = "Report";
+            d.ServiceName = ReportConstants.ServiceName;
             d.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Error";
         }
 
@@ -63,15 +66,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<string, PatientsToQueryValue>();
+                    ConsumeResult<string, PatientsToQueryValue>? consumeResult = null;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
                         if (consumeResult == null)
                         {
-                            consumeResult = new ConsumeResult<string, PatientsToQueryValue>();
                             throw new DeadLetterException(
-                                "ReportSubmittedListener: Result of ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>.Consume is null");
+                                $"{Name}: consumeResult is null");
                         }
 
                         var key = consumeResult.Message.Key;
@@ -79,7 +81,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         if (string.IsNullOrWhiteSpace(key))
                         {
-                            throw new DeadLetterException("PatientsToQueryListener: key value is null or empty");
+                            throw new DeadLetterException($"{Name}: key value is null or empty");
                         }
 
                         var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
@@ -93,28 +95,35 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             }, cancellationToken);
                         }
-
-                        consumer.Commit(consumeResult);
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("PatientsToQueryListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
                     }
                     catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
                         _deadLetterExceptionHandler.HandleException(consumeResult, ex);
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("PatientsToQueryListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }
