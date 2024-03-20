@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
-                    $"TransientExceptionHandler.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
+                    $"TransientExceptionHandler.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
