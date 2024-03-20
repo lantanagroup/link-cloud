@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -70,6 +71,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
         public void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
         {
+            if (string.IsNullOrWhiteSpace(Topic))
+            {
+                throw new Exception(
+                    "TransientExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
+            }
+
             headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
