@@ -46,13 +46,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                       throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            var t = (TransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>)_transientExceptionHandler;
-            t.ServiceName = ReportConstants.ServiceName;
-            t.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Retry";
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Retry";
 
-            var d = (DeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>)_deadLetterExceptionHandler;
-            d.ServiceName = ReportConstants.ServiceName;
-            d.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Error";
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,6 +77,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         var consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
+                        string facilityId = string.Empty;
                         try
                         {
                             consumeResult = consumer.Consume(cancellationToken);
@@ -89,8 +88,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     $"{Name}: consumeResult is null");
                             }
 
-                            ReportSubmittedKey key = consumeResult.Message.Key;
-                            ReportSubmittedValue value = consumeResult.Message.Value;
+                            var key = consumeResult.Message.Key;
+                            var value = consumeResult.Message.Value;
+                            facilityId = key.FacilityId;
 
                             // find existing report schedule
                             MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
@@ -136,20 +136,20 @@ namespace LantanaGroup.Link.Report.Listeners
                         catch (ConsumeException ex)
                         {
                             _deadLetterExceptionHandler.HandleException(consumeResult,
-                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                         }
                         catch (DeadLetterException ex)
                         {
-                            _deadLetterExceptionHandler.HandleException(consumeResult, ex);
+                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                         }
                         catch (TransientException ex)
                         {
-                            _transientExceptionHandler.HandleException(consumeResult, ex);
+                            _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                         }
                         catch (Exception ex)
                         {
                             _deadLetterExceptionHandler.HandleException(consumeResult,
-                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                         }
                         finally
                         {

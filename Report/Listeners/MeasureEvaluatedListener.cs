@@ -47,13 +47,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            var t = (TransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>)_transientExceptionHandler;
-            t.ServiceName = ReportConstants.ServiceName;
-            t.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Retry";
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Retry";
 
-            var d = (DeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>)_deadLetterExceptionHandler;
-            d.ServiceName = ReportConstants.ServiceName;
-            d.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Error";
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -84,6 +82,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>? consumeResult = null;
+                    var facilityId = string.Empty;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
@@ -95,6 +94,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         var key = consumeResult.Message.Key;
                         var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
 
                         if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
@@ -195,20 +195,20 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex);
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(consumeResult, ex);
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     finally
                     {
