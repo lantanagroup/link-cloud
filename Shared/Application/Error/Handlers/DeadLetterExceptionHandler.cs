@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -16,6 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
 
         public string Topic { get; set; } = string.Empty;
+
         public string ServiceName { get; set; } = string.Empty;
 
         public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
@@ -27,19 +27,25 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
             try
             {
-                Logger.LogError(message: $"Failed to process {ServiceName} Event.", exception: ex);
+                if (consumeResult == null)
+                {
+                    Logger.LogError(message: $"DeadLetterExceptionHandler|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events", exception: ex);
+                    return;
+                }
+
+                Logger.LogError(message: $"DeadLetterExceptionHandler: Failed to process {ServiceName} Event.", exception: ex);
 
                 var auditValue = new AuditEventMessage
                 {
-                    FacilityId = consumeResult.Message.Key as string,
+                    FacilityId = facilityId,
                     Action = AuditEventType.Query,
                     ServiceName = ServiceName,
                     EventDate = DateTime.UtcNow,
-                    Notes = $"{ServiceName} processing failure \nException Message: {ex.Message}",
+                    Notes = $"DeadLetterExceptionHandler: processing failure in {ServiceName} \nException Message: {ex.Message}",
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
@@ -47,7 +53,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
             catch (Exception e)
             {
-                Logger.LogError(exception: e, message: "Error in ExceptionHandler.HandleException: " + e.Message);
+                Logger.LogError(e,"Error in DeadLetterExceptionHandler.HandleException: " + e.Message);
+                throw;
             }
         }
 
@@ -67,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
-                    "DeadLetterExceptionHandler.Topic has not been configured. Cannot Produce Scheduled Event");
+                    $"DeadLetterExceptionHandler.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
             headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
