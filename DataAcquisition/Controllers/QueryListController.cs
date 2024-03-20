@@ -85,7 +85,7 @@ public class QueryListController : Controller
 
             return Ok();
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
             return BadRequest(ex.Message);
         }

@@ -37,8 +37,15 @@ public class NonTransientPatientIDsAcquiredExceptionHandler<K, V> : INonTransien
             Notes = $"Kafka {CensusConstants.MessageNames.PatientIDsAcquired} consume failure, potentially schema related \nException Message: {consumeException.Error}",
         };
 
-        ProduceAuditEvent(auditValue, consumeException.ConsumerRecord.Message.Headers);
-        ProduceDeadLetter(keyString, valueString, consumeException.ConsumerRecord.Message.Headers, consumeException.Message);
+        try
+        {
+            ProduceAuditEvent(auditValue, consumeException.ConsumerRecord.Message.Headers);
+            ProduceDeadLetter(keyString, valueString, consumeException.ConsumerRecord.Message.Headers, consumeException.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred producing audit or dead letter event.");
+        }
     }
 
     public void HandleException(ConsumeResult<K, V> consumeResult, Exception ex)
@@ -54,12 +61,38 @@ public class NonTransientPatientIDsAcquiredExceptionHandler<K, V> : INonTransien
             Notes = $"Patient IDs Acquired processing failure \nException Message: {ex}",
         };
 
-        ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
+        try
+        {
+            ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+        }
+        catch (Exception producerException)
+        {
+            _logger.LogError(producerException, "An error occurred producing an audit event.");
+            return;
+        }
+        
         var key = consumeResult.Message.Key as string;
-        var value = JsonSerializer.Serialize<string>(consumeResult.Message.Value as string);
+        string? value = null;
+        try
+        {
+            value = JsonSerializer.Serialize<string>(consumeResult.Message.Value as string);
+        }
+        catch (Exception serializationException)
+        {
+            _logger.LogError(serializationException, "An error occurred serializing the consume result value.");
+            return;
+        }
 
-        ProduceDeadLetter(key, value, consumeResult.Message.Headers, ex.Message);
+
+        try
+        {
+            ProduceDeadLetter(key, value, consumeResult.Message.Headers, ex.Message);
+        }
+        catch (Exception producerException)
+        {
+            _logger.LogError(producerException, "An error occurred serializing the consume result value.");
+            return;
+        }
     }
 
     private void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)

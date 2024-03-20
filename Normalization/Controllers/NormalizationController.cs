@@ -4,11 +4,11 @@ using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
