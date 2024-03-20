@@ -43,13 +43,11 @@ namespace LantanaGroup.Link.Submission.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                           throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            var t = (TransientExceptionHandler<SubmitReportKey, SubmitReportValue>)_transientExceptionHandler;
-            t.ServiceName = "Submission";
-            t.Topic = nameof(KafkaTopic.SubmitReport) + "-Retry";
+            _transientExceptionHandler.ServiceName = "Submission";
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Retry";
 
-            var d = (DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>)_deadLetterExceptionHandler;
-            d.ServiceName = "Submission";
-            d.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
+            _deadLetterExceptionHandler.ServiceName = "Submission";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -75,6 +73,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>();
+                    string facilityId = string.Empty;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
@@ -85,6 +84,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                         var key = consumeResult.Message.Key;
                         var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
 
                         if (string.IsNullOrWhiteSpace(key.FacilityId) ||
                             string.IsNullOrWhiteSpace(key.ReportType) ||
@@ -121,20 +121,20 @@ namespace LantanaGroup.Link.Submission.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex);
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(consumeResult, ex);
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     finally
                     {

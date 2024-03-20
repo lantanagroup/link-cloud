@@ -35,13 +35,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            var t = (TransientExceptionHandler<string, PatientsToQueryValue>)_transientExceptionHandler;
-            t.ServiceName = ReportConstants.ServiceName;
-            t.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Retry";
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Retry";
 
-            var d = (DeadLetterExceptionHandler<string, PatientsToQueryValue>)_deadLetterExceptionHandler;
-            d.ServiceName = ReportConstants.ServiceName;
-            d.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Error";
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -67,6 +65,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     ConsumeResult<string, PatientsToQueryValue>? consumeResult = null;
+                    string facilityId = string.Empty;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
@@ -78,6 +77,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         var key = consumeResult.Message.Key;
                         var value = consumeResult.Message.Value;
+                        facilityId = key;
 
                         if (string.IsNullOrWhiteSpace(key))
                         {
@@ -99,20 +99,20 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex);
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(consumeResult, ex);
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException));
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
                     finally
                     {
