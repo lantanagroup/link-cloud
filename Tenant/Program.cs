@@ -22,6 +22,11 @@ using OpenTelemetry.Trace;
 using LantanaGroup.Link.Tenant.Models;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using System.Diagnostics;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Azure.Identity;
+using Serilog.Settings.Configuration;
+using Serilog.Enrichers.Span;
+using Serilog.Exceptions;
 
 namespace Tenant
 {
@@ -37,6 +42,7 @@ namespace Tenant
             var app = builder.Build();
 
             SetupMiddleware(app);
+
             app.Run();
 
         }
@@ -47,8 +53,33 @@ namespace Tenant
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-            // Additional configuration is required to successfully run gRPC on macOS.
-            // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
+
+            //load external configuration source if specified
+            var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+            if (!string.IsNullOrEmpty(externalConfigurationSource))
+            {
+                switch (externalConfigurationSource)
+                {
+                    case ("AzureAppConfiguration"):
+                        builder.Configuration.AddAzureAppConfiguration(options =>
+                        {
+                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                                 // Load configuration values with no label
+                                 .Select("*", LabelFilter.Null)
+                                 // Load configuration values for service name
+                                 .Select("*", TenantConstants.ServiceName)
+                                 // Load configuration values for service name and environment
+                                 .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                            options.ConfigureKeyVault(kv =>
+                            {
+                                kv.SetCredential(new DefaultAzureCredential());
+                            });
+
+                        });
+                        break;
+                }
+            }
 
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
@@ -64,29 +95,30 @@ namespace Tenant
             // Add services to the container.
             builder.Services.AddGrpc();
             builder.Services.AddGrpcReflection();
-            builder.Services.AddHostedService<ListenerXX>();
-            builder.Services.AddHostedService<ScheduleService>(); 
+           // builder.Services.AddHostedService<ListenerXX>();
+            builder.Services.AddHostedService<ScheduleService>();
 
-            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Kafka));
+            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
 
-            builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Mongo));
+            builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MongoDB));
 
-            builder.Services.Configure<TenantConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.TenantConfig));
+            builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
             builder.Services.AddSingleton<FacilityConfigurationService>();
 
             builder.Services.AddSingleton<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string,object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
+            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
 
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string,object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
+            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
 
             builder.Services.AddHttpClient();
 
             builder.Services.AddControllers();
 
             //Add problem details
-            builder.Services.AddProblemDetails(options => {
+            builder.Services.AddProblemDetails(options =>
+            {
                 options.CustomizeProblemDetails = ctx =>
                 {
                     ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
@@ -98,7 +130,7 @@ namespace Tenant
 
                     if (builder.Environment.IsDevelopment())
                     {
-                        ctx.ProblemDetails.Extensions.Add("service", "Demo API Gateway");
+                        ctx.ProblemDetails.Extensions.Add("service", "Tenant");
                     }
                     else
                     {
@@ -107,6 +139,8 @@ namespace Tenant
 
                 };
             });
+
+
 
             //Add repositories
             //builder.Services.AddSingleton<IPersistenceRepository<FacilityConfigModel>>();
@@ -127,9 +161,19 @@ namespace Tenant
 
             // Logging using Serilog
             builder.Logging.AddSerilog();
+            //  var seri = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Serilog);
+            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
-                            .ReadFrom.Configuration(builder.Configuration)
-                            .CreateLogger();
+                            .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                                        .Filter.ByExcluding("RequestPath like '/health%'")
+                                        .Filter.ByExcluding("RequestPath like '/swagger%'")
+                                        .Enrich.WithExceptionDetails()
+                                        .Enrich.FromLogContext()
+                                        .Enrich.WithSpan()
+                                        .Enrich.With<ActivityEnricher>()
+                                        .Enrich.FromLogContext()
+                                        .CreateLogger();
+
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();
 
@@ -158,12 +202,19 @@ namespace Tenant
                             .AddConfluentKafkaInstrumentation()
                             .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
 
+
                 otel.WithMetrics(metricsProviderBuilder =>
                         metricsProviderBuilder
                             .AddAspNetCoreInstrumentation()
-                            .AddRuntimeInstrumentation()
                             .AddMeter(Counters.meter.Name)
                             .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+
+                if (telemetryConfig.EnableRuntimeInstrumentation)
+                {
+                    otel.WithMetrics(metricsProviderBuilder =>
+                        metricsProviderBuilder
+                            .AddRuntimeInstrumentation());
+                }
 
                 if (builder.Environment.IsDevelopment())
                 {
@@ -186,7 +237,7 @@ namespace Tenant
         static void SetupMiddleware(WebApplication app)
         {
             // Configure the HTTP request pipeline.
-            if (app.Configuration.GetValue<bool>("EnableSwagger"))
+            if (app.Configuration.GetValue<bool>(TenantConstants.AppSettingsSectionNames.EnableSwagger))
             {
                 app.UseSwagger();
                 app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Tenant Service v1"));

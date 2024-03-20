@@ -14,7 +14,7 @@ namespace TenantTests
     public class GetFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private TenantConfig? _tenantConfig;
+        private MeasureApiConfig? _measureApiConfig;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -38,9 +38,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _tenantConfig = new TenantConfig()
+            _measureApiConfig = new MeasureApiConfig()
             {
-                MeasureDefUrl = "test"
+                MeasureServiceApiUrl = "test"
             };
 
             _model.ScheduledTasks.AddRange(scheduledTaskModels);
@@ -52,9 +52,9 @@ namespace TenantTests
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _mocker.GetMock<IOptions<TenantConfig>>()
+            _mocker.GetMock<IOptions<MeasureApiConfig>>()
             .Setup(p => p.Value)
-            .Returns(_tenantConfig);
+            .Returns(_measureApiConfig);
 
             Task<FacilityConfigModel> facility = _service.GetFacilityById(id, CancellationToken.None);
 
@@ -79,9 +79,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _tenantConfig = new TenantConfig()
+            _measureApiConfig = new MeasureApiConfig()
             {
-                MeasureDefUrl = "test"
+                MeasureServiceApiUrl = "test"
             };
 
 
@@ -96,11 +96,11 @@ namespace TenantTests
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.GetAsync(CancellationToken.None)).Returns(Task.FromResult<List<FacilityConfigModel>>(facilities));
 
-            _mocker.GetMock<IOptions<TenantConfig>>()
+            _mocker.GetMock<IOptions<MeasureApiConfig>>()
              .Setup(p => p.Value)
-             .Returns(_tenantConfig);
+             .Returns(_measureApiConfig);
 
-            Task<List<FacilityConfigModel>> facilitiesResponse = _service.GetFacilities(CancellationToken.None);
+            Task<List<FacilityConfigModel>> facilitiesResponse = _service.GetAllFacilities(CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsync(CancellationToken.None), Times.Once);
 
