@@ -8,9 +8,9 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
     public class GetAuditEventListQuery : IGetAuditEventListQuery
     {
         private readonly ILogger<GetAuditEventListQuery> _logger;
-        private readonly IAuditRepository _datastore;
+        private readonly ISearchRepository _datastore;
 
-        public GetAuditEventListQuery(ILogger<GetAuditEventListQuery> logger, IAuditRepository datastore) 
+        public GetAuditEventListQuery(ILogger<GetAuditEventListQuery> logger, ISearchRepository datastore) 
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
 
                 List<AuditModel> auditEvents = result.Select(x => new AuditModel
                 {
-                    Id = x.Id.Value.ToString(),
+                    Id = x.AuditId.Value.ToString(),
                     FacilityId = x.FacilityId,
                     CorrelationId = x.CorrelationId,
                     ServiceName = x.ServiceName,
