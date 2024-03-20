@@ -8,6 +8,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
     {
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex);
         void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers);
-        void ProduceEvent(K key, V value, Headers headers);
+        void ProduceDispositionEvent(K key, V value, Headers headers);
     }
 }
