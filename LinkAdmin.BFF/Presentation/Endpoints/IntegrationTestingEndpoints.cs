@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreatePatientEvent;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreateReportScheduled;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using Microsoft.OpenApi.Models;
@@ -9,11 +10,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
     {
         private readonly ILogger<IntegrationTestingEndpoints> _logger;
         private readonly ICreatePatientEvent _createPatientEvent;
+        private readonly ICreateReportScheduled _createReportScheduled;
 
-        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, ICreatePatientEvent createPatientEvent)
+        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, ICreatePatientEvent createPatientEvent, ICreateReportScheduled createReportScheduled)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _createPatientEvent = createPatientEvent;
+            _createPatientEvent = createPatientEvent ?? throw new ArgumentNullException(nameof(createPatientEvent));
+            _createReportScheduled = createReportScheduled ?? throw new ArgumentNullException(nameof(createReportScheduled));
         }
 
         public void RegisterEndpoints(WebApplication app)
@@ -24,11 +27,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
                 });
 
-            integrationEndpoints.MapPost("/create-patient-event", CreatePatientEvent)
+            integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Patient Event",
                     Description = "Produces a new patient event that will be sent to the broker. Allows for testing processes outside of scheduled events."
+                });
+
+            integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Integration Testing - Produce Report Scheduled Event",
+                    Description = "Produces a new report scheduled event that will be sent to the broker. Allows for testing processes outside of scheduled events."
                 });
 
         }
@@ -39,6 +49,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             return Results.Ok(new { 
                 Id = correlationId,
                 Message = $"The patient event was created succcessfully with a correlation id of '{correlationId}'."
+            });
+        }
+
+        public async Task<IResult> CreateReportScheduled(HttpContext context, ReportScheduled model)
+        {
+            var correlationId = await _createReportScheduled.Execute(model);
+            return Results.Ok(new
+            {
+                Id = correlationId,
+                Message = $"The report scheduled event was created succcessfully with a correlation id of '{correlationId}'."
             });
         }
     }

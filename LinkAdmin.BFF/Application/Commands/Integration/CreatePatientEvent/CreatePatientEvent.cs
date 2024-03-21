@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.Creat
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
         }
 
-        public async Task<string> Execute(PatientEvent model)
+        public async Task<string> Execute(PatientEvent model, string? userId = null)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");
             using var scope = _scopeFactory.CreateScope();
