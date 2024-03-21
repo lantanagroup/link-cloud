@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreateReportScheduled
+namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
     public class CreateReportScheduled : ICreateReportScheduled
     {

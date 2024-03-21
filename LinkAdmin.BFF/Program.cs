@@ -1,7 +1,6 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreatePatientEvent;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreateReportScheduled;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
@@ -86,6 +85,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
+    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
 
     //Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()

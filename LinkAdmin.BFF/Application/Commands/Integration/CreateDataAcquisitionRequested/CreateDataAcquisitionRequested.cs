@@ -5,24 +5,23 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
-using System.Text;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
-    public class CreatePatientEvent : ICreatePatientEvent
+    public class CreateDataAcquisitionRequested : ICreateDataAcquisitionRequested
     {
-        private readonly ILogger<CreatePatientEvent> _logger;
+        private readonly ILogger<CreateDataAcquisitionRequested> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
 
-        public CreatePatientEvent(ILogger<CreatePatientEvent> logger, IServiceScopeFactory scopeFactory)
+        public CreateDataAcquisitionRequested(ILogger<CreateDataAcquisitionRequested> logger, IServiceScopeFactory scopeFactory)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));            
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
         }
 
-        public async Task<string> Execute(PatientEvent model, string? userId = null)
+        public async Task<string> Execute(DataAcquisitionRequested model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
             using var scope = _scopeFactory.CreateScope();
             var _kafkaProducerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, object>>();
 
@@ -30,25 +29,25 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             try
             {
-                var producerConfig = new ProducerConfig();                
+                var producerConfig = new ProducerConfig();
 
                 using (var producer = _kafkaProducerFactory.CreateProducer(producerConfig))
                 {
                     try
                     {
                         var headers = new Headers();
-                        headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(correlationId));
+                        headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
 
                         var message = new Message<string, object>
                         {
                             Key = model.Key,
-                            Value = new PatientEventMessage { PatientId = model.PatientId, EventType = model.EventType },
+                            Value = new DataAcquisitionRequestedMessage { PatientId = model.PatientId, reports = model.Reports },
                             Headers = headers
                         };
 
-                        await producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);                     
-                        _logger.LogKafkaProducerPatientEvent(correlationId);
+                        await producer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), message);
 
+                        _logger.LogKafkaProducerDataAcquisitionRequested(correlationId);
                         return correlationId;
 
                     }
@@ -67,6 +66,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
                 throw;
             }
+
         }
     }
 }

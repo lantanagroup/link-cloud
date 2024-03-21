@@ -2,8 +2,8 @@
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
-    public interface ICreateReportScheduled
+    public interface ICreateDataAcquisitionRequested
     {
-        Task<string> Execute(ReportScheduled model, string? userId = null);
+        Task<string> Execute(DataAcquisitionRequested model, string? userId = null);
     }
 }
