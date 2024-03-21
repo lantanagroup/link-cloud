@@ -1,5 +1,6 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
@@ -16,6 +17,7 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 
 RegisterServices(builder);
+
 var app = builder.Build();
 SetupMiddleware(app);
 
@@ -66,6 +68,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
+    //Add APIs
+    builder.Services.AddTransient<IApi, AuthEndpoints>();
+
     //Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()
         .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -101,6 +106,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+    });
+
+    // Add logging redaction services
+    builder.Services.AddRedactionService(options =>
+    {
+        options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
     });
 
     // Logging using Serilog
@@ -162,9 +173,15 @@ static void SetupMiddleware(WebApplication app)
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
     //app.UseAuthentication();
     //app.UseMiddleware<UserScopeMiddleware>();
-    //app.UseAuthorization();
+    //app.UseAuthorization(); 
 
-    app.RegisterAuthEndpoints();
+    //register endpoints
+    var apis = app.Services.GetServices<IApi>();
+    foreach (var api in apis)
+    {
+        if(api is null) throw new InvalidProgramException("API was not found.");
+        api.RegisterEndpoints(app);        
+    }
 
     app.MapReverseProxy();
 
