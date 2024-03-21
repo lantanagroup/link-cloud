@@ -31,6 +31,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
+                message = message ?? "";
                 if (consumeResult == null)
                 {
                     Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: " + message);
