@@ -13,11 +13,12 @@
             public const string EnableSwagger = "EnableSwagger";
         }
 
-        public static class AuditLoggingIds
+        public static class LinkAdminLoggingIds
         {
             public const int RequestRecieved = 1000;
             public const int RequestRecievedWarning = 1001;
             public const int RequestRecievedException = 1002;
+            public const int ApiRegistered = 1003;
         }
     }
 }

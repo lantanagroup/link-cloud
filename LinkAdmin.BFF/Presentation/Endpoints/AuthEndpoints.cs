@@ -1,11 +1,19 @@
 ﻿
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
-    public static class AuthEndpoints
+    public class AuthEndpoints : IApi
     {
-        public static void RegisterAuthEndpoints(this WebApplication app)
+        private readonly ILogger<AuthEndpoints> _logger;
+
+        public AuthEndpoints(ILogger<AuthEndpoints> logger)
+        {
+            _logger = logger;
+        }
+
+        public void RegisterEndpoints(WebApplication app)
         {
             var authEndpoints = app.MapGroup("/")
                 .WithOpenApi(x => new OpenApiOperation(x)
@@ -30,26 +38,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             authEndpoints.MapGet("/logout", Logout)
-                .RequireAuthorization()
+                .RequireAuthorization()               
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Logout of Link",
                     Description = "Initiates the logout process for link"
                 });
 
+            _logger.LogInformation("Auth Endpoints Registered");
+
         }
 
-        static async Task<IResult> Login()
+        public async Task<IResult> Login()
         {            
             return Results.Ok(new { Message = "Login" });
         }
 
-        static async Task<IResult> GetUser()
+        public async Task<IResult> GetUser()
         {
             return Results.Ok(new { Message = "Get User" });
         }
 
-        static async Task<IResult> Logout()
+        public async Task<IResult> Logout()
         {            
             return Results.Ok(new { Message = "Logout" });
         }
