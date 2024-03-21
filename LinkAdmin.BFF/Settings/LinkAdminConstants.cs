@@ -9,7 +9,7 @@
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string CORS = "CORS";
             public const string Telemetry = "TelemetryConfig";
-            public const string Serilog = "Logging:Serilog";
+            public const string Serilog = "Serilog";
             public const string Kafka = "KafkaConnection";
             public const string EnableSwagger = "EnableSwagger";
         }
