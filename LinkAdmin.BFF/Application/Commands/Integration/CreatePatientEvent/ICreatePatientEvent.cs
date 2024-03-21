@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.Creat
 {
     public interface ICreatePatientEvent
     {
-        Task<string> Execute(PatientEvent model);
+        Task<string> Execute(PatientEvent model, string? userId = null);
     }
 }

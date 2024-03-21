@@ -23,6 +23,7 @@
             public const int KafkaProducerCreated  = 1004;
             public const int KafkaProducerException = 1005;
             public const int KafkaProducerPatientEvent = 1006;
+            public const int KafkaProducerReportScheduled = 1007;
         }
     }
 }
