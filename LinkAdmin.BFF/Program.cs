@@ -1,11 +1,16 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreatePatientEvent;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
@@ -68,8 +73,18 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
-    //Add APIs
+    //Add IOptions
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+
+    //Add Kafka Producer Factories
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+
+    //Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
+    builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
+
+    //Add commands
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
 
     //Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()
@@ -96,7 +111,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         throw new NullReferenceException("CORS Configuration was null.");
     }
-
 
     // Add services to the container.
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
