@@ -3,6 +3,7 @@ using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -163,13 +164,7 @@ static void SetupMiddleware(WebApplication app)
     //app.UseMiddleware<UserScopeMiddleware>();
     //app.UseAuthorization();
 
-    app.MapGet("/api/user", () =>
-    {
-        return Results.Ok(new { Name = "John Doe" });
-    })
-    .WithName("GetUserInfomration")
-    .RequireCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName)
-    .WithOpenApi();    
+    app.RegisterAuthEndpoints();
 
     app.MapReverseProxy();
 
