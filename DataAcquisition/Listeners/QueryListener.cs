@@ -34,8 +34,7 @@ public class QueryListener : BackgroundService
         IMediator mediator,
         IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
         IKafkaProducerFactory<string, object> kafkaProducerFactory,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerHandler,
-        IDeadLetterExceptionHandler<string, object> deadLetterProducerHandler)
+        IDeadLetterExceptionHandler<string, string> deadLetterConsumerHandler)
     {
         _logger = logger;
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
