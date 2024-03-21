@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -27,25 +28,56 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             ProducerFactory = producerFactory;
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
+        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "")
         {
             try
             {
                 if (consumeResult == null)
                 {
-                    Logger.LogError(message: $"DeadLetterExceptionHandler|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events", exception: ex);
+                    Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events: " + message);
                     return;
                 }
 
-                Logger.LogError(message: $"DeadLetterExceptionHandler: Failed to process {ServiceName} Event.", exception: ex);
+                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
 
                 var auditValue = new AuditEventMessage
                 {
                     FacilityId = facilityId,
-                    Action = AuditEventType.Query,
+                    Action = auditEventType,
                     ServiceName = ServiceName,
                     EventDate = DateTime.UtcNow,
-                    Notes = $"DeadLetterExceptionHandler: processing failure in {ServiceName} \nException Message: {ex.Message}",
+                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {message}",
+                };
+
+                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                throw;
+            }
+        }
+
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
+        {
+            try
+            {
+                if (consumeResult == null)
+                {
+                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or DeadLetter events", exception: ex);
+                    return;
+                }
+
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+
+                var auditValue = new AuditEventMessage
+                {
+                    FacilityId = facilityId,
+                    Action = ex.AuditEventType,
+                    ServiceName = ServiceName,
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
@@ -53,7 +85,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
             catch (Exception e)
             {
-                Logger.LogError(e,"Error in DeadLetterExceptionHandler.HandleException: " + e.Message);
+                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
                 throw;
             }
         }
@@ -74,7 +106,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
-                    $"DeadLetterExceptionHandler.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
+                    $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
             headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
