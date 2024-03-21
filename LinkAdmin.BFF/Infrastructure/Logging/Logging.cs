@@ -52,5 +52,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
             "New Report Scheduled event with a correlation id of {correlationId} was created.")]
         public static partial void LogKafkaProducerReportScheduled(this ILogger logger, string correlationId);
 
+        [LoggerMessage(
+            LinkAdminLoggingIds.KafkaProducerDataAcquisitionRequested,
+            LogLevel.Information,
+            "New Data Acquisition Requested event with a correlation id of {correlationId} was created.")]
+        public static partial void LogKafkaProducerDataAcquisitionRequested(this ILogger logger, string correlationId);
+
     }
 }

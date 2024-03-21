@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 using System.Text;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration.CreatePatientEvent
+namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
     public class CreatePatientEvent : ICreatePatientEvent
     {
