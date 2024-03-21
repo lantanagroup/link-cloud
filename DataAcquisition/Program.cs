@@ -12,6 +12,8 @@ using LantanaGroup.Link.DataAcquisition.HealthChecks;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -97,6 +99,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IQueryPlanRepository,QueryPlanRepository>();
     builder.Services.AddSingleton<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
+    builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
