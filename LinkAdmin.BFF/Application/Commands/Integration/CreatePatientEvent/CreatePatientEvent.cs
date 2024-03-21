@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 var producerConfig = new ProducerConfig();                
 
-                using (var producer = _kafkaProducerFactory.CreateProducer(producerConfig))
+                using (var producer = _kafkaProducerFactory.CreateProducer(producerConfig, useOpenTelemetry: true))
                 {
                     try
                     {

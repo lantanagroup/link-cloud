@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+﻿using Confluent.Kafka.Extensions.OpenTelemetry;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -28,6 +29,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         {
                             options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                         })
+                        .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryServiceOptions.TelemetryCollectorEndpoint); }));
 
             otel.WithMetrics(metricsProviderBuilder =>
