@@ -60,6 +60,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId)
+        {
+            var dlEx = new DeadLetterException(ex.Message, auditEventType, ex.InnerException);
+            HandleException(consumeResult, dlEx, facilityId);
+        }
+
         public virtual void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId)
         {
             try

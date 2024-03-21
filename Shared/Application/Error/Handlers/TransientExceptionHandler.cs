@@ -60,6 +60,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId)
+        {
+            var tEx = new TransientException(ex.Message, auditEventType, ex.InnerException);
+            HandleException(consumeResult, tEx, facilityId);
+        }
+
         public virtual void HandleException(ConsumeResult<K, V>? consumeResult, TransientException ex, string facilityId)
         {
             try
