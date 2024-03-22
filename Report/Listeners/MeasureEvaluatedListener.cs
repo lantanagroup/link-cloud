@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
@@ -7,14 +6,17 @@ using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Commands;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
+using System.Text;
 using System.Text.Json;
 using System.Transactions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Report.Application.Error.Interfaces;
-using LantanaGroup.Link.Report.Application.Error.Exceptions;
+using LantanaGroup.Link.Report.Settings;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -26,13 +28,15 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IMediator _mediator;
 
-        private readonly IReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _reportTransientExceptionHandler;
-        private readonly IReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _reportExceptionHandler;
+        private readonly ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _deadLetterExceptionHandler;
+
+        private string Name => this.GetType().Name;
 
         public MeasureEvaluatedListener(ILogger<MeasureEvaluatedListener> logger, IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
-            IReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> reportTransientExceptionHandler,
-            IReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> reportExceptionHandler)
+            ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> deadLetterExceptionHandler)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -40,8 +44,14 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
 
-            _reportTransientExceptionHandler = reportTransientExceptionHandler ?? throw new ArgumentException(nameof(reportTransientExceptionHandler));
-            _reportExceptionHandler = reportExceptionHandler ?? throw new ArgumentException(nameof(reportExceptionHandler));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -71,127 +81,145 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>();
+                    ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>? consumeResult = null;
+                    var facilityId = string.Empty;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
 
-                        if (consumeResult != null)
+                        if (consumeResult == null)
                         {
-                            MeasureEvaluatedKey key = consumeResult.Message.Key;
-                            MeasureEvaluatedValue value = consumeResult.Message.Value;
-
-                            if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                            {
-                                throw new TerminatingException($"MeasureEvaluatedListener: Received message without correlation ID: {consumeResult.Topic}");
-                            }
-
-                            if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                string.IsNullOrWhiteSpace(key.ReportType) ||
-                                key.StartDate == DateTime.MinValue ||
-                                key.EndDate == DateTime.MinValue)
-                            {
-                                throw new TerminatingException(
-                                    "MeasureEvaluatedListener: One or more required MeasureEvaluatedKey properties are null or empty.");
-                            }
-
-                            // find existing report scheduled for this facility, report type, and date range
-                            var schedule = await _mediator.Send(new FindMeasureReportScheduleForReportTypeQuery { FacilityId = key.FacilityId, ReportStartDate = key.StartDate, ReportEndDate = key.EndDate, ReportType = key.ReportType }, cancellationToken)
-                                                    ?? throw new TransactionException($"No report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
-                            var measureReport = new MeasureReport();
-
-                            try
-                            {
-                                measureReport = JsonSerializer.Deserialize<MeasureReport>(value.Result,
-                                    new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
-                            }
-                            catch (Exception ex)
-                            {
-                                throw new TerminatingException(
-                                    "MeasureEvaluatedListener: Unable to deserialize MeasureEvaluatedValue.Result");
-                            }
-
-                            // ensure measure report has an ID to avoid inserting duplicates during bundling
-                            if (string.IsNullOrEmpty(measureReport.Id))
-                            {
-                                measureReport.Id = Guid.NewGuid().ToString();
-                            }
-
-                            // add this measure report to the measure report entry collection
-                            MeasureReportSubmissionEntryModel entry = new MeasureReportSubmissionEntryModel
-                            {
-                                FacilityId = key.FacilityId,
-                                MeasureReportScheduleId = schedule.Id,
-                                PatientId = value.PatientId,
-                                MeasureReport = await new FhirJsonSerializer().SerializeToStringAsync(measureReport)
-                            };
-
-                            await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
-                            {
-                                MeasureReportSubmissionEntry = entry
-                            }, cancellationToken);
-
-                            #region Patients To Query & Submision Report Handling
-                            if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
-                            {
-                                if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
-                                {
-                                    schedule.PatientsToQuery.Remove(value.PatientId);
-
-                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand
-                                    {
-                                        ReportSchedule = schedule
-                                    }, cancellationToken);
-                                }
-
-                                if (schedule.PatientsToQuery?.Count == 0)
-                                {
-                                    using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
-                                    prod.Produce(nameof(KafkaTopic.SubmitReport),
-                                        new Message<SubmissionReportKey, SubmissionReportValue>
-                                        {
-                                            Key = new SubmissionReportKey()
-                                            {
-                                                FacilityId = schedule.FacilityId,
-                                                ReportType = schedule.ReportType
-                                            },
-                                            Value = new SubmissionReportValue()
-                                            {
-                                                MeasureReportScheduleId = schedule.Id
-                                            },
-                                            Headers = new Headers
-                                            {
-                                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                                            }
-                                        });
-
-                                    prod.Flush(cancellationToken);
-                                }
-                            }
-                            #endregion
-
-                            consumer.Commit(consumeResult);
+                            throw new DeadLetterException($"{Name}: consumeResult is null");
                         }
+
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
+
+                        if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                        {
+                            _logger.LogInformation($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
+                        }
+
+                        if (string.IsNullOrWhiteSpace(key.FacilityId) ||
+                            string.IsNullOrWhiteSpace(key.ReportType) ||
+                            key.StartDate == DateTime.MinValue ||
+                            key.EndDate == DateTime.MinValue)
+                        {
+                            throw new DeadLetterException(
+                                $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
+                        }
+
+                        // find existing report scheduled for this facility, report type, and date range
+                        var schedule = await _mediator.Send(
+                                           new FindMeasureReportScheduleForReportTypeQuery
+                                           {
+                                               FacilityId = key.FacilityId, ReportStartDate = key.StartDate,
+                                               ReportEndDate = key.EndDate, ReportType = key.ReportType
+                                           }, cancellationToken)
+                                       ?? throw new TransactionException(
+                                           $"{Name}: report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
+                        var measureReport = new MeasureReport();
+
+                        try
+                        {
+                            measureReport = JsonSerializer.Deserialize<MeasureReport>(value.Result,
+                                new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new DeadLetterException(
+                                $"{Name}: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result);
+                        }
+
+                        // ensure measure report has an ID to avoid inserting duplicates during bundling
+                        if (string.IsNullOrEmpty(measureReport.Id))
+                        {
+                            measureReport.Id = Guid.NewGuid().ToString();
+                        }
+
+                        // add this measure report to the measure report entry collection
+                        MeasureReportSubmissionEntryModel entry = new MeasureReportSubmissionEntryModel
+                        {
+                            FacilityId = key.FacilityId,
+                            MeasureReportScheduleId = schedule.Id,
+                            PatientId = value.PatientId,
+                            MeasureReport = await new FhirJsonSerializer().SerializeToStringAsync(measureReport)
+                        };
+
+                        await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                        {
+                            MeasureReportSubmissionEntry = entry
+                        }, cancellationToken);
+
+                        #region Patients To Query & Submision Report Handling
+
+                        if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
+                        {
+                            if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
+                            {
+                                schedule.PatientsToQuery.Remove(value.PatientId);
+
+                                await _mediator.Send(new UpdateMeasureReportScheduleCommand
+                                {
+                                    ReportSchedule = schedule
+                                }, cancellationToken);
+                            }
+
+                            if (schedule.PatientsToQuery?.Count == 0)
+                            {
+                                using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
+                                prod.Produce(nameof(KafkaTopic.SubmitReport),
+                                    new Message<SubmissionReportKey, SubmissionReportValue>
+                                    {
+                                        Key = new SubmissionReportKey()
+                                        {
+                                            FacilityId = schedule.FacilityId,
+                                            ReportType = schedule.ReportType
+                                        },
+                                        Value = new SubmissionReportValue()
+                                        {
+                                            MeasureReportScheduleId = schedule.Id
+                                        },
+                                        Headers = new Headers
+                                        {
+                                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                        }
+                                    });
+
+                                prod.Flush(cancellationToken);
+                            }
+                        }
+                        #endregion
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, new TerminatingException("MeasureEvaluatedListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
                     }
-                    catch (TerminatingException ex)
+                    catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, ex);
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (TransientException ex)
                     {
-                        _reportTransientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, new TerminatingException("MeasureEvaluatedListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }
