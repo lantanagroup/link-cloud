@@ -68,7 +68,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
-    builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
+    if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
+    {
+        builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
+    }    
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
