@@ -1,6 +1,4 @@
 
-using LantanaGroup.Link.Tenant;
-using LantanaGroup.Link.Tenant.Listeners;
 using LantanaGroup.Link.Tenant.Services;
 using Quartz;
 using Serilog;
@@ -56,28 +54,33 @@ namespace Tenant
 
             //load external configuration source if specified
             var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-            if (!string.IsNullOrEmpty(externalConfigurationSource))
+
+            if ("Development" != builder.Environment.EnvironmentName)
             {
-                switch (externalConfigurationSource)
+
+                if (!string.IsNullOrEmpty(externalConfigurationSource))
                 {
-                    case ("AzureAppConfiguration"):
-                        builder.Configuration.AddAzureAppConfiguration(options =>
-                        {
-                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                 // Load configuration values with no label
-                                 .Select("*", LabelFilter.Null)
-                                 // Load configuration values for service name
-                                 .Select("*", TenantConstants.ServiceName)
-                                 // Load configuration values for service name and environment
-                                 .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                            options.ConfigureKeyVault(kv =>
+                    switch (externalConfigurationSource)
+                    {
+                        case ("AzureAppConfiguration"):
+                            builder.Configuration.AddAzureAppConfiguration(options =>
                             {
-                                kv.SetCredential(new DefaultAzureCredential());
-                            });
+                                options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                                     // Load configuration values with no label
+                                     .Select("*", LabelFilter.Null)
+                                     // Load configuration values for service name
+                                     .Select("*", TenantConstants.ServiceName)
+                                     // Load configuration values for service name and environment
+                                     .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
 
-                        });
-                        break;
+                                options.ConfigureKeyVault(kv =>
+                                {
+                                    kv.SetCredential(new DefaultAzureCredential());
+                                });
+
+                            });
+                            break;
+                    }
                 }
             }
 
