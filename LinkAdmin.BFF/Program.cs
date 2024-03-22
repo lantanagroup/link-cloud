@@ -1,4 +1,3 @@
-using Azure.Identity;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
@@ -11,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using FluentValidation;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -36,25 +34,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
     if (!string.IsNullOrEmpty(externalConfigurationSource))
     {
-        switch (externalConfigurationSource)
+        builder.AddExternalConfiguration(options =>
         {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                        // Load configuration values with no label
-                        .Select("*", LabelFilter.Null)
-                        // Override with any configuration values specific to current hosting env
-                        .Select("*", "Link:AdminBFF:" + builder.Environment.EnvironmentName);
-
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
-
-                });
-                break;
-        }
+            options.ExternalConfigurationSource = externalConfigurationSource;
+            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
+            options.Environment = builder.Environment;
+        });
     }
 
     var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
