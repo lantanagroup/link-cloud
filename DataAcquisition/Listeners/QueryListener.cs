@@ -77,7 +77,7 @@ public class QueryListener : BackgroundService
             }
             catch (Exception ex)
             {
-                _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
+                _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Create, "");
                 continue;
             }
 
@@ -94,7 +94,7 @@ public class QueryListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error deserializing message: {1}", ex.Message);
-                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Create, "");
                     continue;
                 }
 
@@ -107,7 +107,7 @@ public class QueryListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error extracting facility id and correlation id from message");
-                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Create, "");
                     continue;
                 }
                 
@@ -115,7 +115,7 @@ public class QueryListener : BackgroundService
                 {
                     var errorMessage = "No Facility ID provided. Unable to process message: {1}";
                     _logger.LogWarning(errorMessage, message);
-                    _deadLetterConsumerHandler.HandleException(rawmessage, new Exception($"No Facility ID provided. Unable to process message: {message}"), "");
+                    _deadLetterConsumerHandler.HandleException(rawmessage, new Exception($"No Facility ID provided. Unable to process message: {message}"), AuditEventType.Create, "");
                     continue;
                 }
 
@@ -138,7 +138,7 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, messageMetaData.facilityId);
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Create, messageMetaData.facilityId);
                     _logger.LogError(ex,"Error producing message: {1}", ex.Message);
                     responseMessages = null;
                     continue;
@@ -195,7 +195,7 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, messageMetaData.facilityId);
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Create, messageMetaData.facilityId);
                     _logger.LogError(ex, "Failed to produce message");
                     continue;
                 }
@@ -214,7 +214,7 @@ public class QueryListener : BackgroundService
                     Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
                 });
                 _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
-                _deadLetterConsumerHandler.HandleException(rawmessage, new Exception("Message meets no condition for processing"), messageMetaData.facilityId);
+                _deadLetterConsumerHandler.HandleException(rawmessage, new Exception("Message meets no condition for processing"), AuditEventType.Create, messageMetaData.facilityId);
             }
         }
     }
