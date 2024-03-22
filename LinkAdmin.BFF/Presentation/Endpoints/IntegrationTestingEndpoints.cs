@@ -33,6 +33,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
                 .AddEndpointFilter<ValidationFilter<PatientEvent>>()
+                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Patient Event",
@@ -41,6 +45,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
                 .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
+                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Report Scheduled Event",
@@ -49,6 +57,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             integrationEndpoints.MapPost("/data-acquisition-requested", CreateDataAcquisitionRequested)
                 .AddEndpointFilter<ValidationFilter<DataAcquisitionRequested>>()
+                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Data Acquisition Requested Event",
