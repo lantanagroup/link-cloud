@@ -11,7 +11,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -67,112 +66,108 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var consumer = _kafkaConsumerFactory.CreateConsumer(config))
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            try
             {
-                try
+                consumer.Subscribe(nameof(KafkaTopic.ReportSubmitted));
+                _logger.LogInformation($"Started report submitted consumer for topic '{nameof(KafkaTopic.ReportSubmitted)}' at {DateTime.UtcNow}");
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    consumer.Subscribe(nameof(KafkaTopic.ReportSubmitted));
-                    _logger.LogInformation($"Started report submitted consumer for topic '{nameof(KafkaTopic.ReportSubmitted)}' at {DateTime.UtcNow}");
-
-                    while (!cancellationToken.IsCancellationRequested)
+                    var consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
+                    string facilityId = string.Empty;
+                    try
                     {
-                        var consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
-                        string facilityId = string.Empty;
-                        try
+                        consumeResult = consumer.Consume(cancellationToken);
+
+                        if (consumeResult == null)
                         {
-                            consumeResult = consumer.Consume(cancellationToken);
+                            throw new DeadLetterException(
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
+                        }
 
-                            if (consumeResult == null)
-                            {
-                                throw new DeadLetterException(
-                                    $"{Name}: consumeResult is null");
-                            }
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
 
-                            var key = consumeResult.Message.Key;
-                            var value = consumeResult.Message.Value;
-                            facilityId = key.FacilityId;
+                        // find existing report schedule
+                        MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
 
-                            // find existing report schedule
-                            MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
+                        if (schedule is null)
+                        {
+                            throw new TransientException(
+                                $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}", AuditEventType.Query);
+                        }
 
-                            if (schedule is null)
-                            {
-                                throw new TransientException(
-                                    $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}");
-                            }
+                        // update report schedule with submitted date
+                        schedule.SubmittedDate = DateTime.UtcNow;
+                        await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
 
-                            // update report schedule with submitted date
-                            schedule.SubmittedDate = DateTime.UtcNow;
-                            await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
+                        // produce audit message signalling the report service acknowledged the report has been submitted
+                        using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
 
-                            // produce audit message signalling the report service acknowledged the report has been submitted
-                            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-                            string notes =
-                                $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
-                            var val = new AuditEventMessage
-                            {
-                                FacilityId = schedule.FacilityId,
-                                ServiceName = ReportConstants.ServiceName,
-                                Action = AuditEventType.Submit,
-                                EventDate = DateTime.UtcNow,
-                                Resource = typeof(MeasureReportScheduleModel).Name,
-                                Notes = notes
-                            };
-                            var headers = new Headers
+                        string notes =
+                            $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
+                        var val = new AuditEventMessage
+                        {
+                            FacilityId = schedule.FacilityId,
+                            ServiceName = ReportConstants.ServiceName,
+                            Action = AuditEventType.Submit,
+                            EventDate = DateTime.UtcNow,
+                            Resource = typeof(MeasureReportScheduleModel).Name,
+                            Notes = notes
+                        };
+                        var headers = new Headers
                                         {
                                             { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                                         };
 
-                            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                                new Message<string, AuditEventMessage>
-                                {
-                                    Value = val,
-                                    Headers = headers
-                                });
-                            producer.Flush();
-                            _logger.LogInformation(notes);
-                        }
-                        catch (ConsumeException ex)
-                        {
-                            _deadLetterExceptionHandler.HandleException(consumeResult,
-                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
-                        }
-                        catch (DeadLetterException ex)
-                        {
-                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                        }
-                        catch (TransientException ex)
-                        {
-                            _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _deadLetterExceptionHandler.HandleException(consumeResult,
-                                new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
-                        }
-                        finally
-                        {
-                            if (consumeResult != null)
+                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                            new Message<string, AuditEventMessage>
                             {
-                                consumer.Commit(consumeResult);
-                            }
-                            else
-                            {
-                                consumer.Commit();
-                            }
+                                Value = val,
+                                Headers = headers
+                            });
+                        producer.Flush();
+                        _logger.LogInformation(notes);
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                    }
+                    catch (DeadLetterException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (TransientException ex)
+                    {
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
                         }
                     }
                 }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
-                    consumer.Close();
-                    consumer.Dispose();
-                }
             }
-
+            catch (OperationCanceledException oce)
+            {
+                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                consumer.Close();
+                consumer.Dispose();
+            }
         }
-
     }
 }

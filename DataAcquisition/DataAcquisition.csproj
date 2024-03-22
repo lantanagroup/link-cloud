@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>40b6b0d0-fb4c-4650-a7c8-146c74214acb</UserSecretsId>
-    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
-    <RootNamespace>LantanaGroup.Link.DataAcquisition</RootNamespace>
-    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>40b6b0d0-fb4c-4650-a7c8-146c74214acb</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+		<RootNamespace>LantanaGroup.Link.DataAcquisition</RootNamespace>
+		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -17,47 +17,47 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-    <Protobuf Include="Protos\dataacquisition.proto" GrpcServices="Server" />
-	<Protobuf Include="Protos\tenantclient.proto" GrpcServices="Client" />
-  </ItemGroup>
+		<Protobuf Include="Protos\dataacquisition.proto" GrpcServices="Server" />
+		<Protobuf Include="Protos\tenantclient.proto" GrpcServices="Client" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="1.2.1" />
-    <PackageReference Include="CompareNETObjects" Version="4.*" />
-    <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="Grpc.Net.Client" Version="2.*" />
-    <PackageReference Include="jose-jwt" Version="4.*" />
-    <PackageReference Include="JWT" Version="10.*" />
-    <!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
-    <PackageReference Include="MediatR" Version="12.*" />
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="MongoDB.Driver" Version="2.*" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
-    <PackageReference Include="PemUtils" Version="3.*" />
-    <PackageReference Include="Portable.BouncyCastle" Version="1.*" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-    <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-    <PackageReference Include="Serilog.Exceptions" Version="8.*" />
-    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+		<PackageReference Include="com.lantanagroup.link.Shared" Version="1.2.1" />
+		<PackageReference Include="CompareNETObjects" Version="4.*" />
+		<PackageReference Include="Confluent.Kafka" Version="2.*" />
+		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
+		<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
+		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
+		<PackageReference Include="Grpc.Net.Client" Version="2.*" />
+		<PackageReference Include="jose-jwt" Version="4.*" />
+		<PackageReference Include="JWT" Version="10.*" />
+		<!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
+		<PackageReference Include="MediatR" Version="12.*" />
+		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
+		<PackageReference Include="MongoDB.Driver" Version="2.*" />
+		<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
+		<PackageReference Include="PemUtils" Version="3.*" />
+		<PackageReference Include="Portable.BouncyCastle" Version="1.*" />
+		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Update="nuget.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+	<ItemGroup>
+		<Content Update="nuget.config">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
 </Project>
