@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         consumeResult = consumer.Consume(cancellationToken);
                         if (consumeResult == null)
                         {
-                            throw new DeadLetterException($"{Name}: consumeResult is null");
+                            throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
                         }
 
                         var key = consumeResult.Message.Key;
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
                         {
                             throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null or empty.");
+                                $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
                         }
 
                         string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
@@ -114,14 +114,14 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                         if (!File.Exists(fullFilePath))
                         {
-                            throw new TransientException($"{Name}: Bundle File Not Created");
+                            throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
                         }
                         #endregion
                     }
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
                     }
                     finally
                     {
@@ -155,7 +155,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
-
         }
     }
 }

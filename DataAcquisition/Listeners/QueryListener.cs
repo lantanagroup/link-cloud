@@ -25,7 +25,7 @@ public class QueryListener : BackgroundService
     private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
 
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterConsumerHandler;
-    
+
     private readonly ILogger<QueryListener> _logger;
     private readonly IMediator _mediator;
 
@@ -55,7 +55,7 @@ public class QueryListener : BackgroundService
 
     private async System.Threading.Tasks.Task StartConsumerLoop(CancellationToken cancellationToken)
     {
-        var settings = new ConsumerConfig 
+        var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
             GroupId = "DataAcquisition-Query"
@@ -110,7 +110,7 @@ public class QueryListener : BackgroundService
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
                     continue;
                 }
-                
+
                 if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                 {
                     var errorMessage = "No Facility ID provided. Unable to process message: {1}";
@@ -139,7 +139,7 @@ public class QueryListener : BackgroundService
                 catch (Exception ex)
                 {
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, messageMetaData.facilityId);
-                    _logger.LogError(ex,"Error producing message: {1}", ex.Message);
+                    _logger.LogError(ex, "Error producing message: {1}", ex.Message);
                     responseMessages = null;
                     continue;
                 }

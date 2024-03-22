@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         if (consumeResult == null)
                         {
                             throw new DeadLetterException(
-                                $"{Name}: consumeResult is null");
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
                         }
 
                         var key = consumeResult.Message.Key;
@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         if (string.IsNullOrWhiteSpace(key))
                         {
-                            throw new DeadLetterException($"{Name}: key value is null or empty");
+                            throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
                         }
 
                         var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -112,7 +112,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
                     }
                     finally
                     {

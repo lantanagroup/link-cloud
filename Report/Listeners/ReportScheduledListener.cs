@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         if (consumeResult == null)
                         {
                             throw new DeadLetterException(
-                                $"{Name}: consumeResult is null");
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
                         }
 
                         var key = consumeResult.Message.Key;
@@ -92,7 +92,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             string.IsNullOrWhiteSpace(key.ReportType))
                         {
                             throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null or empty.");
+                                $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
                         }
 
                         DateTimeOffset startDateOffset;
@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
                                 out startDateOffset))
                         {
-                            throw new DeadLetterException($"{Name}: Start Date could not be parsed");
+                            throw new DeadLetterException($"{Name}: Start Date could not be parsed", AuditEventType.Create);
                         }
 
                         DateTimeOffset endDateOffset;
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
                                 out endDateOffset))
                         {
-                            throw new DeadLetterException($"{Name}: End Date could not be parsed");
+                            throw new DeadLetterException($"{Name}: End Date could not be parsed", AuditEventType.Create);
                         }
 
                         var startDate = startDateOffset.UtcDateTime;
@@ -133,14 +133,14 @@ namespace LantanaGroup.Link.Report.Listeners
                         catch (Exception ex)
                         {
                             throw new DeadLetterException(
-                                "ReportScheduledListener: Cron Schedule could not be created from provided dates.", ex.InnerException);
+                                "ReportScheduledListener: Cron Schedule could not be created from provided dates.", AuditEventType.Create, ex.InnerException);
                         }
 
 
                         if (string.IsNullOrWhiteSpace(scheduleTrigger))
                         {
                             throw new DeadLetterException(
-                                "ReportScheduledListener: scheduleTrigger is null or empty.");
+                                "ReportScheduledListener: scheduleTrigger is null or empty.", AuditEventType.Create);
                         }
 
                         // create or update the consumed report schedule
@@ -193,7 +193,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -206,7 +206,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
                     }
                     finally
                     {

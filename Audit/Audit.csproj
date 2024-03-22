@@ -23,7 +23,7 @@
 
   <ItemGroup>
 	<PackageReference Include="Azure.Identity" Version="1.10.4" />
-	<PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.14.3" />
+	<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
 	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
 	<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
 	<PackageReference Include="Grpc.AspNetCore" Version="2.61.0" />

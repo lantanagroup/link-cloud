@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         if (consumeResult == null)
                         {
-                            throw new DeadLetterException($"{Name}: consumeResult is null");
+                            throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
                         }
 
                         var key = consumeResult.Message.Key;
@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             key.EndDate == DateTime.MinValue)
                         {
                             throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
+                                $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.", AuditEventType.Create);
                         }
 
                         // find existing report scheduled for this facility, report type, and date range
@@ -129,7 +129,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         catch (Exception ex)
                         {
                             throw new DeadLetterException(
-                                $"{Name}: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result);
+                                $"{Name}: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result, AuditEventType.Create);
                         }
 
                         // ensure measure report has an ID to avoid inserting duplicates during bundling
@@ -195,7 +195,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -208,7 +208,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
                     }
                     finally
                     {
