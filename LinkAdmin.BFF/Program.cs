@@ -12,11 +12,13 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using FluentValidation;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -81,6 +83,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
     builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
+
+    //Add fluent validation
+    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
     //Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
