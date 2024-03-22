@@ -7,16 +7,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// Key for the patient event (FacilityId)
         /// </summary>
+        /// <example>TestFacility01</example>
         public string Key { get; set; } = string.Empty;
 
         /// <summary>
         /// The id of the patient subject to the event
         /// </summary>
+        /// <example>TestPatient01</example>
         public string PatientId { get; set; } = string.Empty;
 
         /// <summary>
         /// The type of event that occurred
         /// </summary>
+        /// <example>Discharge</example>
         public string EventType { get; set; } = string.Empty;
     }
 

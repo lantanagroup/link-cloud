@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses
         /// <summary>
         /// A list of validation errors
         /// </summary>
+        /// <example>"PatientId is required"</example>
         public List<string> Errors { get; init; } = [];
     }
 

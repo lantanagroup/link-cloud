@@ -23,6 +23,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             authEndpoints.MapGet("/login", Login)                
                 .AllowAnonymous()
+                .Produces(StatusCodes.Status200OK)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                  {
                      Summary = "Login to Link",
@@ -31,6 +33,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             authEndpoints.MapGet("/user", GetUser)
                 .RequireAuthorization()
+                .Produces(StatusCodes.Status200OK)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Get user information",
@@ -39,6 +44,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             authEndpoints.MapGet("/logout", Logout)
                 .RequireAuthorization()               
+                .Produces(StatusCodes.Status200OK)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Logout of Link",

@@ -7,11 +7,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// The key for the data acquisition request (facility id)
         /// </summary>
+        /// <example>TestFacility01</example>
         public string Key { get; set; } = string.Empty;
 
         /// <summary>
         /// The patient id for the data acquisition request
         /// </summary>
+        /// <example>TestPatient01</example>
         public string PatientId { get; set; } = string.Empty;
 
         /// <summary>
