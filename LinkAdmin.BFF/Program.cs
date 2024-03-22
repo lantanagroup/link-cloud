@@ -30,7 +30,7 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
+    // load external configuration source if specified
     var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
     if (!string.IsNullOrEmpty(externalConfigurationSource))
     {
@@ -42,6 +42,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         });
     }
 
+    // Add service information
     var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
@@ -52,39 +53,39 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }      
 
-    //Add problem details
+    // Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;  
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
-    //Add IOptions
+    // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
 
-    //Add Kafka Producer Factories
+    // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
-    //Add Endpoints
+    // Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
     builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
 
-    //Add fluent validation
+    // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
-    //Add commands
+    // Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
 
-    //Add YARP (reverse proxy)
+    // Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()
         .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-    //Add health checks
+    // Add health checks
     builder.Services.AddHealthChecks();
 
-    //configure CORS
+    // Configure CORS
     var corsConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     if(corsConfig != null)
     {
@@ -103,8 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("CORS Configuration was null.");
     }
 
-    // Add services to the container.
-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+    // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
@@ -163,7 +163,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseHttpsRedirection();
 
-    //configure swagger
+    // Configure swagger
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
@@ -180,17 +180,17 @@ static void SetupMiddleware(WebApplication app)
     //app.UseMiddleware<UserScopeMiddleware>();
     //app.UseAuthorization(); 
 
-    //register endpoints
+    // Register endpoints
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
-        if(api is null) throw new InvalidProgramException("API was not found.");
+        if(api is null) throw new InvalidProgramException("No Endpoints were not found.");
         api.RegisterEndpoints(app);        
     }
 
     app.MapReverseProxy();
 
-    //map health check middleware
+    // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
