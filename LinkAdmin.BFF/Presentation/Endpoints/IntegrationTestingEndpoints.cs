@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
@@ -30,6 +32,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
+                .AddEndpointFilter<ValidationFilter<PatientEvent>>()
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Patient Event",
@@ -37,6 +40,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
+                .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Report Scheduled Event",
@@ -44,6 +48,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/data-acquisition-requested", CreateDataAcquisitionRequested)
+                .AddEndpointFilter<ValidationFilter<DataAcquisitionRequested>>()
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Summary = "Integration Testing - Produce Data Acquisition Requested Event",
@@ -57,7 +62,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var user = context.User;
 
             var correlationId = await _createPatientEvent.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
-            return Results.Ok(new { 
+            return Results.Ok(new EventProducerResponse
+            { 
                 Id = correlationId,
                 Message = $"The patient event was created succcessfully with a correlation id of '{correlationId}'."
             });
@@ -68,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var user = context.User;
 
             var correlationId = await _createReportScheduled.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
-            return Results.Ok(new
+            return Results.Ok(new EventProducerResponse
             {
                 Id = correlationId,
                 Message = $"The report scheduled event was created succcessfully with a correlation id of '{correlationId}'."
@@ -80,7 +86,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var user = context.User;
 
             var correlationId = await _createDataAcquisitionRequested.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
-            return Results.Ok(new
+            return Results.Ok(new EventProducerResponse
             {
                 Id = correlationId,
                 Message = $"The data acquisition requested event was created succcessfully with a correlation id of '{correlationId}'."
