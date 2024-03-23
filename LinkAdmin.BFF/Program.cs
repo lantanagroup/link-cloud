@@ -6,6 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Validation;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -16,7 +17,10 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Validation;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Identity.Client;
+using Microsoft.Extensions.Azure;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +69,56 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+
+    // Add Authentication
+    List<string> authSchemes = [ LinkAdminConstants.AuthenticationSchemes.Cookie ];
+    var authBuilder = builder.Services.AddAuthentication();
+    authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
+        {
+            options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        });
+
+    if(builder.Configuration.GetValue<bool>("Authentication:Schemes:Jwt:Enabled"))
+    {
+        authSchemes.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
+
+        authBuilder.AddJwTBearerAuthentication(options =>
+        {            
+            options.Environment = builder.Environment;
+            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Authority");
+            options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Audience");
+            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:NameClaimType");
+            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:RoleClaimType");       
+        });
+        //JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+        //authBuilder.Services.AddAuthentication()
+        //    .AddJwtBearer(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken, options =>
+        //    {
+        //        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Authority");
+        //        options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Audience");
+        //        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+
+        //        options.TokenValidationParameters = new()
+        //        {
+        //            NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:NameClaimType"),
+        //            RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:RoleClaimType"),
+        //            //avoid jwt confustion attacks (ie: circumvent token signature checking)
+        //            ValidTypes = builder.Configuration.GetValue<string[]>("Authentication:Schemes:Jwt:ValidTypes")
+        //        };
+        //    });
+    }
+
+    // Add Authorization
+    builder.Services.AddAuthorization(builder =>
+    {
+        builder.AddPolicy("AuthenticatedUser", pb => {
+            pb.RequireAuthenticatedUser()
+                .AddAuthenticationSchemes([.. authSchemes]);         
+        });
+    });
+
 
     // Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
@@ -176,12 +230,14 @@ static void SetupMiddleware(WebApplication app)
         });
     }
 
+
+
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
-    //app.UseAuthentication();
+    app.UseAuthentication();
     //app.UseMiddleware<UserScopeMiddleware>();
-    //app.UseAuthorization(); 
+    app.UseAuthorization(); 
 
     // Register endpoints
     var apis = app.Services.GetServices<IApi>();
