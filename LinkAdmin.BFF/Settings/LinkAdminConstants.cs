@@ -14,6 +14,12 @@
             public const string EnableSwagger = "EnableSwagger";
         }
 
+        public static class AuthenticationSchemes
+        {
+            public const string Cookie = "link_cookie";
+            public const string JwtBearerToken = "link_jwt_bearer";
+        }
+
         public static class LinkAdminLoggingIds
         {
             public const int RequestRecieved = 1000;
