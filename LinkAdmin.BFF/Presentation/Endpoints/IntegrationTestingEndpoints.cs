@@ -32,6 +32,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
+                .RequireAuthorization("AuthenticatedUser")
                 .AddEndpointFilter<ValidationFilter<PatientEvent>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -44,6 +45,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
+                .RequireAuthorization("AuthenticatedUser")
                 .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -56,6 +58,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/data-acquisition-requested", CreateDataAcquisitionRequested)
+                .RequireAuthorization("AuthenticatedUser")
                 .AddEndpointFilter<ValidationFilter<DataAcquisitionRequested>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
