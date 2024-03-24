@@ -18,7 +18,6 @@ using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
 using System.Net.Http.Headers;
-using Newtonsoft.Json.Linq;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 
@@ -72,7 +71,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
     // Add Authentication
-    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie, LinkAdminConstants.AuthenticationSchemes.Oauth2];
+    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
     var authBuilder = builder.Services.AddAuthentication(options => { 
         options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
         options.DefaultChallengeScheme = LinkAdminConstants.AuthenticationSchemes.Oauth2;
@@ -118,9 +117,9 @@ static void RegisterServices(WebApplicationBuilder builder)
             var user = await response.Content.ReadFromJsonAsync<JsonElement>();
 
             //TODO: Store token in bff associated with the user
+            //var db = context.HttpContext.RequestServices.GetRequiredService<IDbContext>();
 
-            //TODO: add application specific claims
-            
+            //TODO: add application specific claims            
 
             context.RunClaimActions(user);
         };
@@ -149,23 +148,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:NameClaimType");
             options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
             
-        });
-        //JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-        //authBuilder.Services.AddAuthentication()
-        //    .AddJwtBearer(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken, options =>
-        //    {
-        //        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Authority");
-        //        options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Audience");
-        //        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-
-        //        options.TokenValidationParameters = new()
-        //        {
-        //            NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:NameClaimType"),
-        //            RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:RoleClaimType"),
-        //            //avoid jwt confustion attacks (ie: circumvent token signature checking)
-        //            ValidTypes = builder.Configuration.GetValue<string[]>("Authentication:Schemes:Jwt:ValidTypes")
-        //        };
-        //    });
+        });        
     }  
     
     // Add Authorization
@@ -298,6 +281,8 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization(); 
 
     // Register endpoints
+    app.MapGet("/", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!"));
+
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
