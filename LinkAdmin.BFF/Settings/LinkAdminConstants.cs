@@ -18,6 +18,8 @@
         {
             public const string Cookie = "link_cookie";
             public const string JwtBearerToken = "link_jwt_bearer";
+            public const string Oauth2 = "link_oauth2";
+            public const string OpenIdConnect = "link_openid_connect";
         }
 
         public static class LinkAdminLoggingIds

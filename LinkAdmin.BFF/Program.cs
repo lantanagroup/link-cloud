@@ -17,10 +17,10 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.Identity.Client;
-using Microsoft.Extensions.Azure;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.CdcSams;
+using System.Net.Http.Headers;
+using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,26 +72,82 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
     // Add Authentication
-    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie ];
-    var authBuilder = builder.Services.AddAuthentication();
+    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie, LinkAdminConstants.AuthenticationSchemes.Oauth2];
+    var authBuilder = builder.Services.AddAuthentication(options => { 
+        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        options.DefaultChallengeScheme = LinkAdminConstants.AuthenticationSchemes.Oauth2;
+    });    
+
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
         {
             options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
             options.Cookie.SameSite = SameSiteMode.Strict;
             options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         });
+    
+    authBuilder.AddOAuth(LinkAdminConstants.AuthenticationSchemes.Oauth2, options =>
+    {
+        options.SignInScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
 
-    if(builder.Configuration.GetValue<bool>("Authentication:Schemes:Jwt:Enabled"))
+        options.AuthorizationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!;
+        options.TokenEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!;
+        options.UserInformationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
+        options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId")!;
+        options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientSecret")!;
+        options.CallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
+        options.SaveTokens = false;
+        options.Scope.Add("email");
+        options.Scope.Add("profile");
+
+        options.ClaimActions.MapJsonKey("sub", "sub");
+        options.ClaimActions.MapJsonKey("email", "email");
+        options.ClaimActions.MapJsonKey("name", "name");
+        options.ClaimActions.MapJsonKey("given_name", "given_name");
+        options.ClaimActions.MapJsonKey("family_name", "family_name");
+        
+        options.Events.OnCreatingTicket = async context =>
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+            var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+            response.EnsureSuccessStatusCode();
+
+            var user = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+            //TODO: Store token in bff associated with the user
+
+            //TODO: add application specific claims
+            
+
+            context.RunClaimActions(user);
+        };
+    });
+
+    //authBuilder.AddOpenIdConnect(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect, options =>
+    //{
+    //    options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority");
+
+    //    options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId");
+    //    options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret");
+    //    options.Scope.Add("email"); // openId and profile scopes are included by default
+    //    options.SaveTokens = false;
+    //    options.ResponseType = "code";
+    //});
+
+    if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
     {
         authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
 
         authBuilder.AddJwTBearerAuthentication(options =>
         {            
             options.Environment = builder.Environment;
-            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Authority");
-            options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:Audience");
-            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:NameClaimType");
-            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemes:Jwt:RoleClaimType");       
+            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority");
+            options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience");
+            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:NameClaimType");
+            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
+            
         });
         //JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
         //authBuilder.Services.AddAuthentication()
@@ -109,10 +165,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         //            ValidTypes = builder.Configuration.GetValue<string[]>("Authentication:Schemes:Jwt:ValidTypes")
         //        };
         //    });
-    }
+    }  
     
-
-
     // Add Authorization
     builder.Services.AddAuthorization(builder =>
     {
