@@ -1,16 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OAuth;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.Options
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.CdcSams
 {
     public class SamsOptions : OAuthOptions
     {
         public SamsOptions()
         {
-            CallbackPath = "/auth/signin-sams";
-            AuthorizationEndpoint = "";
-            TokenEndpoint = "";
-            UserInformationEndpoint = "";
+            CallbackPath = "/signin-sams";
             Scope.Add("openid");
             Scope.Add("profile");
             Scope.Add("email");
@@ -23,9 +20,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.Options
             ClaimActions.MapJsonSubKey("middle_name", "profile", "middle_name");
             ClaimActions.MapJsonSubKey("given_name", "profile", "given_name");
             ClaimActions.MapJsonSubKey("preferred_name", "profile", "preferred_name");
-            ClaimActions.MapJsonSubKey("name_suffix", "profile", "name_suffix");     
-            ClaimActions.MapJsonKey("email", "email");            
-            
+            ClaimActions.MapJsonSubKey("name_suffix", "profile", "name_suffix");
+            ClaimActions.MapJsonKey("email", "email");
         }
+
+        public override void Validate()
+        {
+            ArgumentException.ThrowIfNullOrEmpty(AppId);
+            ArgumentException.ThrowIfNullOrEmpty(AppSecret);
+
+            base.Validate();
+        }
+
+        public string AppId
+        {
+            get { return ClientId; }
+            set { ClientId = value; }
+        }
+
+        public string AppSecret
+        {
+            get { return ClientSecret; }
+            set { ClientSecret = value; }
+        }   
     }
 }
