@@ -71,7 +71,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
     // Add Authentication
-    List<string> authSchemes = [ LinkAdminConstants.AuthenticationSchemes.Cookie ];
+    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie ];
     var authBuilder = builder.Services.AddAuthentication();
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
         {
@@ -82,7 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if(builder.Configuration.GetValue<bool>("Authentication:Schemes:Jwt:Enabled"))
     {
-        authSchemes.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
+        authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
 
         authBuilder.AddJwTBearerAuthentication(options =>
         {            
@@ -115,7 +115,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.AddPolicy("AuthenticatedUser", pb => {
             pb.RequireAuthenticatedUser()
-                .AddAuthenticationSchemes([.. authSchemes]);         
+                .AddAuthenticationSchemes([.. authSchemas]);         
         });
     });
 
