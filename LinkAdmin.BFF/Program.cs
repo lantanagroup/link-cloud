@@ -98,6 +98,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.SaveTokens = false;
         options.Scope.Add("email");
         options.Scope.Add("profile");
+        options.Scope.Add("openid");
 
         options.ClaimActions.MapJsonKey("sub", "sub");
         options.ClaimActions.MapJsonKey("email", "email");
