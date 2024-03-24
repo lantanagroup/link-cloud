@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                  });
 
             authEndpoints.MapGet("/user", GetUser)
-                .RequireAuthorization()
+                .RequireAuthorization("AuthenticatedUser")
                 .Produces(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -57,9 +57,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         }
 
-        public async Task<IResult> Login()
-        {            
-            return Results.Ok(new { Message = "Login" });
+        public IResult Login()
+        {
+            //TODO: DI authentication schema options from settings
+            return Results.Challenge(authenticationSchemes: ["link_oauth2"]);
         }
 
         public async Task<IResult> GetUser()
