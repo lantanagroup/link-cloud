@@ -20,6 +20,7 @@ using System.Reflection;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Azure;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.CdcSams;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -109,6 +110,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         //        };
         //    });
     }
+    
+
 
     // Add Authorization
     builder.Services.AddAuthorization(builder =>
