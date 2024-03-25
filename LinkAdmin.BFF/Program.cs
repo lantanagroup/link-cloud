@@ -17,10 +17,6 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
-using System.Net.Http.Headers;
-using System.Text.Json;
-using Microsoft.AspNetCore.Authentication;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,21 +68,22 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Authentication
     List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
-    var authBuilder = builder.Services.AddAuthentication(options => { 
-        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
-        options.DefaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
-    });
 
     var defaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
     builder.Services.Configure<AuthenticationSchemaConfig>(options =>
     {
         options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
-        
-        if (string.IsNullOrEmpty(defaultChallengeScheme)) 
+
+        if (string.IsNullOrEmpty(defaultChallengeScheme))
             throw new NullReferenceException("DefaultChallengeScheme is required.");
 
         options.DefaultChallengeScheme = defaultChallengeScheme;
     });
+
+    var authBuilder = builder.Services.AddAuthentication(options => { 
+        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        options.DefaultChallengeScheme = defaultChallengeScheme;
+    });    
 
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
         {
@@ -155,7 +152,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                 .AddAuthenticationSchemes([.. authSchemas]);         
         });
     });
-
 
     // Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
@@ -267,8 +263,6 @@ static void SetupMiddleware(WebApplication app)
         });
     }
 
-
-
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
@@ -292,8 +286,7 @@ static void SetupMiddleware(WebApplication app)
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");
-    
+    }).RequireCors("HealthCheckPolicy");    
 }
 
 #endregion
