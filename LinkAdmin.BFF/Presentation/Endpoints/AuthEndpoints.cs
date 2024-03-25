@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             authEndpoints.MapGet("/logout", Logout)
-                .RequireAuthorization()               
+                .RequireAuthorization("AuthenticatedUser")               
                 .Produces<object>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
