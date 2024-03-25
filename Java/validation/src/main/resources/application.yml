@@ -1,3 +1,8 @@
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
 spring:
   application:
     name: ValidationService
@@ -5,9 +10,10 @@ spring:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: validation
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
       client-id: validation-service
-    #properties:
-    #  security.protocol: SASL_PLAINTEXT
-    #  sasl.mechanism: PLAIN
-    #  sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="your-username" password="your-password";
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
