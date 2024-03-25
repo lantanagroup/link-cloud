@@ -3,7 +3,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
