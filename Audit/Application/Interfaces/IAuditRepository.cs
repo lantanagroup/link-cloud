@@ -3,7 +3,7 @@ using LantanaGroup.Link.Audit.Domain.Entities;
 
 namespace LantanaGroup.Link.Audit.Application.Interfaces
 {
-    public interface IAuditRepository : ISearchRepository
+    public interface IAuditRepository
     {
         Task<bool> AddAsync(AuditLog entity, CancellationToken cancellationToken = default);
         Task<AuditLog?> GetAsync(AuditId id, bool noTracking = false, CancellationToken cancellationToken = default);

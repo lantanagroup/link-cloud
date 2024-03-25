@@ -1,10 +1,12 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
@@ -22,14 +24,32 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IMediator _mediator;
 
+        private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
 
-        public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory, 
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator)
+        private string Name => this.GetType().Name;
+
+        public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
+            ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+
+            _transientExceptionHandler = transientExceptionHandler ??
+                                               throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
+                                      throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -46,99 +66,108 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var _reportSubmittedConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            try
             {
-                try
+                consumer.Subscribe(nameof(KafkaTopic.ReportSubmitted));
+                _logger.LogInformation($"Started report submitted consumer for topic '{nameof(KafkaTopic.ReportSubmitted)}' at {DateTime.UtcNow}");
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    _reportSubmittedConsumer.Subscribe(nameof(KafkaTopic.ReportSubmitted));
-                    _logger.LogInformation($"Started report submitted consumer for topic '{nameof(KafkaTopic.ReportSubmitted)}' at {DateTime.UtcNow}");
-
-                    while (!cancellationToken.IsCancellationRequested)
+                    var consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
+                    string facilityId = string.Empty;
+                    try
                     {
-                        try
+                        consumeResult = consumer.Consume(cancellationToken);
+
+                        if (consumeResult == null)
                         {
-                            var consumeResult = _reportSubmittedConsumer.Consume(cancellationToken);
+                            throw new DeadLetterException(
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
+                        }
 
-                            if (consumeResult != null)
-                            {
-                                ReportSubmittedKey key = consumeResult.Message.Key;
-                                ReportSubmittedValue value = consumeResult.Message.Value;
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
 
+                        // find existing report schedule
+                        MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
 
-                                // find existing report schedule
-                                MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
-                                if (schedule is null)
-                                    throw new Exception($"No report schedule found for submission bundle with ID {value.ReportBundleId}");
+                        if (schedule is null)
+                        {
+                            throw new TransientException(
+                                $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}", AuditEventType.Query);
+                        }
 
-                                // update report schedule with submitted date
-                                schedule.SubmittedDate = DateTime.UtcNow;
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
+                        // update report schedule with submitted date
+                        schedule.SubmittedDate = DateTime.UtcNow;
+                        await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
 
-                                _logger.LogInformation($"Report schedule with ID {schedule.Id} updated.");
+                        // produce audit message signalling the report service acknowledged the report has been submitted
+                        using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
 
-                                _reportSubmittedConsumer.Commit(consumeResult);
-
-
-                                // produce audit message signalling the report service acknowledged the report has been submitted
-                                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                                {
-                                    try
-                                    {
-                                        string notes = $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
-                                        var val = new AuditEventMessage
-                                        {
-                                            FacilityId = schedule.FacilityId,
-                                            ServiceName = ReportConstants.ServiceName,
-                                            Action = AuditEventType.Submit,
-                                            EventDate = DateTime.UtcNow,
-                                            Resource = typeof(MeasureReportScheduleModel).Name,
-                                            Notes = notes
-                                        };
-                                        var headers = new Headers
+                        string notes =
+                            $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
+                        var val = new AuditEventMessage
+                        {
+                            FacilityId = schedule.FacilityId,
+                            ServiceName = ReportConstants.ServiceName,
+                            Action = AuditEventType.Submit,
+                            EventDate = DateTime.UtcNow,
+                            Resource = typeof(MeasureReportScheduleModel).Name,
+                            Notes = notes
+                        };
+                        var headers = new Headers
                                         {
                                             { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                                         };
 
-                                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                                        {
-                                            Value = val,
-                                            Headers = headers
-                                        });
-                                        producer.Flush();
-                                        _logger.LogInformation(notes);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        _logger.LogError($"Failed to generate a {KafkaTopic.AuditableEventOccurred} message", ex);
-                                    }
-                                }
-
-                            }
-                        }
-                        catch (ConsumeException e)
-                        {
-                            _logger.LogError($"Consumer error: {e.Error.Reason}");
-                            _logger.LogError(e.InnerException?.Message);
-                            if (e.Error.IsFatal)
+                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                            new Message<string, AuditEventMessage>
                             {
-                                break;
-                            }
-                        }
-                        catch (Exception ex)
+                                Value = val,
+                                Headers = headers
+                            });
+                        producer.Flush();
+                        _logger.LogInformation(notes);
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                    }
+                    catch (DeadLetterException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (TransientException ex)
+                    {
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
                         {
-                            _logger.LogError(ex, $"An exception occurred in the Measure Evaluated Consumer service: {ex.Message}");
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
                         }
                     }
                 }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
-                    _reportSubmittedConsumer.Close();
-                    _reportSubmittedConsumer.Dispose();
-                }
             }
-
+            catch (OperationCanceledException oce)
+            {
+                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                consumer.Close();
+                consumer.Dispose();
+            }
         }
-
     }
 }

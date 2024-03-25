@@ -50,7 +50,7 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
 
         if(await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
         {
-            throw new MissingTenantConfigurationException($"Facility {request.FacilityId} not found.");
+            throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)

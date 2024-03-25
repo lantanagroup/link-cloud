@@ -1,12 +1,14 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-
 using MediatR;
-using Quartz;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -16,12 +18,28 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientsToQueryValue> _kafkaConsumerFactory;
         private readonly IMediator _mediator;
 
+        private readonly ITransientExceptionHandler<string, PatientsToQueryValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientsToQueryValue> _deadLetterExceptionHandler;
+
+        private string Name => this.GetType().Name;
+
         public PatientsToQueryListener(ILogger<PatientsToQueryListener> logger, IKafkaConsumerFactory<string, PatientsToQueryValue> kafkaConsumerFactory,
-            IMediator mediator)
+            IMediator mediator,
+            ITransientExceptionHandler<string, PatientsToQueryValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, PatientsToQueryValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,59 +56,82 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var _reportScheduledConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            try
             {
-                try
+                consumer.Subscribe(nameof(KafkaTopic.PatientsToQuery));
+                _logger.LogInformation($"Started patients to query consumer for topic '{nameof(KafkaTopic.PatientsToQuery)}' at {DateTime.UtcNow}");
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    _reportScheduledConsumer.Subscribe(nameof(KafkaTopic.PatientsToQuery));
-                    _logger.LogInformation($"Started patients to query consumer for topic '{nameof(KafkaTopic.PatientsToQuery)}' at {DateTime.UtcNow}");
-
-                    while (!cancellationToken.IsCancellationRequested)
+                    ConsumeResult<string, PatientsToQueryValue>? consumeResult = null;
+                    string facilityId = string.Empty;
+                    try
                     {
-                        try
+                        consumeResult = consumer.Consume(cancellationToken);
+                        if (consumeResult == null)
                         {
-                            var consumeResult = _reportScheduledConsumer.Consume(cancellationToken);
-
-                            if (consumeResult != null)
-                            {
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
-
-                                var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
-                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
-                                {
-                                    scheduledReport.PatientsToQuery = value.PatientIds;
-
-                                    await _mediator.Send( new UpdateMeasureReportScheduleCommand()
-                                    {
-                                        ReportSchedule = scheduledReport 
-
-                                    }, cancellationToken);
-                                }
-
-                                _reportScheduledConsumer.Commit(consumeResult);
-                            }
+                            throw new DeadLetterException(
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
                         }
-                        catch (ConsumeException e)
+
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key;
+
+                        if (string.IsNullOrWhiteSpace(key))
                         {
-                            _logger.LogError($"Consumer error: {e.Error.Reason}");
-                            if (e.Error.IsFatal)
-                            {
-                                break;
-                            }
+                            throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
                         }
-                        catch (Exception ex)
+
+                        var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
+                        foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
                         {
-                            _logger.LogError(ex, $"An exception occurred in the Patients to Query Consumer service: {ex.Message}");
+                            scheduledReport.PatientsToQuery = value.PatientIds;
+
+                            await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                            {
+                                ReportSchedule = scheduledReport
+
+                            }, cancellationToken);
+                        }
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                    }
+                    catch (DeadLetterException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (TransientException ex)
+                    {
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
                         }
                     }
                 }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
-                    _reportScheduledConsumer.Close();
-                    _reportScheduledConsumer.Dispose();
-                }
+            }
+            catch (OperationCanceledException oce)
+            {
+                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                consumer.Close();
+                consumer.Dispose();
             }
 
         }

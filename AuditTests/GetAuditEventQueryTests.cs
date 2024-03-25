@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.AuditUnitTests
 
             //set up audit entity
             _auditEvent = new AuditLog();
-            _auditEvent.Id = AuditId.FromString(_auditId);
+            _auditEvent.AuditId = AuditId.FromString(_auditId);
             _auditEvent.FacilityId = FacilityId;
             _auditEvent.ServiceName = ServiceName;
             _auditEvent.CorrelationId = CorrelationId;

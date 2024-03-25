@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Entity");
 
             AuditLog audit = new AuditLog();
-            audit.Id = AuditId.NewId();
+            audit.AuditId = AuditId.NewId();
             audit.FacilityId = facilityId;
             audit.ServiceName = serviceName;
             audit.CorrelationId = correlationId;

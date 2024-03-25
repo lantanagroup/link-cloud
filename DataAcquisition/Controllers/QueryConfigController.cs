@@ -129,7 +129,7 @@ public class QueryConfigController : Controller
 
             return Accepted();
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
                 $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
@@ -206,7 +206,7 @@ public class QueryConfigController : Controller
            
             return Accepted();
         }
-        catch (MissingTenantConfigurationException ex)
+        catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
                 $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",

@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands
         public async Task<MeasureReportScheduleModel> Handle(CreateMeasureReportScheduleCommand request, CancellationToken cancellationToken)
         {
             request.ReportSchedule.CreateDate = DateTime.UtcNow;
-            await _repository.AddAsync(request.ReportSchedule);
+            await _repository.AddAsync(request.ReportSchedule, cancellationToken);
             return request.ReportSchedule;
         }
     }
