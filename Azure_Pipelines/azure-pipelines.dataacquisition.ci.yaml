@@ -8,7 +8,7 @@ pool:
 
 variables:
   project: 'DataAcquisition/DataAcquisition.csproj'
-  testProject: 'DataAcquisitionUnitTests/DataAcquisitionUnitTests.csproj'
+  testProject: 'DataAcquisitionTests/DataAcquisitionTests.csproj'
   nugetPath: 'DataAcquisition/nuget.config'
   serviceName: 'DataAcquisition'
 

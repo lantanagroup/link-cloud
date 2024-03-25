@@ -1,4 +1,8 @@
-﻿using Confluent.Kafka;
+﻿using System.Transactions;
+using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Submission.Application.Models;
@@ -15,10 +19,17 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly IMediator _mediator;
         private readonly SubmissionServiceConfig _submissionConfig;
         private readonly FileSystemConfig _fileSystemConfig;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClient;
+
+        private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
+
+        private string Name => this.GetType().Name;
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger, IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
-            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig, IOptions<FileSystemConfig> fileSystemConfig, HttpClient httpClient)
+            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig, IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
+            ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -26,6 +37,17 @@ namespace LantanaGroup.Link.Submission.Listeners
             _submissionConfig = submissionConfig.Value;
             _fileSystemConfig = fileSystemConfig.Value;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
+
+            _transientExceptionHandler = transientExceptionHandler ??
+                                         throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ??
+                                          throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = "Submission";
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = "Submission";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -42,83 +64,97 @@ namespace LantanaGroup.Link.Submission.Listeners
                 EnableAutoCommit = false
             };
 
-            using (var _submitReportConsumer = _kafkaConsumerFactory.CreateConsumer(config))
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
+            try
             {
-                try
+                consumer.Subscribe(nameof(KafkaTopic.SubmitReport));
+                _logger.LogInformation($"Started consumer for topic '{nameof(KafkaTopic.SubmitReport)}' at {DateTime.UtcNow}");
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    _submitReportConsumer.Subscribe(nameof(KafkaTopic.SubmitReport));
-                    _logger.LogInformation($"Started consumer for topic '{nameof(KafkaTopic.SubmitReport)}' at {DateTime.UtcNow}");
-
-                    while (!cancellationToken.IsCancellationRequested)
+                    var consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>();
+                    string facilityId = string.Empty;
+                    try
                     {
-                        try
+                        consumeResult = consumer.Consume(cancellationToken);
+                        if (consumeResult == null)
                         {
-                            var consumeResult = _submitReportConsumer.Consume(cancellationToken);
-
-                            try
-                            {
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
-
-                                if (string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
-                                {
-                                    throw new InvalidOperationException("MeasureReportScheduleId is null or empty");
-                                }
-
-                                string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
-
-                                var response = await _httpClient.GetAsync(requestUrl, cancellationToken);
-                                var measureReportSubmissionBundle =
-                                    JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(await response.Content.ReadAsStringAsync(cancellationToken));
-
-                                #region File IO
-                                string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
-                                if (!Directory.Exists(facilityDirectory))
-                                {
-                                    Directory.CreateDirectory(facilityDirectory);
-                                }
-
-                                var dtu = DateTime.UtcNow;
-                                string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
-
-                                await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
-
-                                if (!File.Exists(fullFilePath))
-                                {
-                                    throw new Exception("SubmitReportListener: Bundle File Not Created");
-                                }
-                                #endregion
-
-                                _submitReportConsumer.Commit(consumeResult);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, $"Error occurred during SubmitReportListener: {ex.Message}");
-                                throw;
-                            }
+                            throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
                         }
-                        catch (ConsumeException e)
+
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key.FacilityId;
+
+                        if (string.IsNullOrWhiteSpace(key.FacilityId) ||
+                            string.IsNullOrWhiteSpace(key.ReportType) ||
+                            string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
                         {
-                            _logger.LogError(e, $"Consumer error: {e.Error.Reason}");
-                            if (e.Error.IsFatal)
-                            {
-                                break;
-                            }
+                            throw new DeadLetterException(
+                                $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
                         }
-                        catch (Exception ex)
+
+                        string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
+
+                        var response = await _httpClient.CreateClient().GetAsync(requestUrl, cancellationToken);
+                        var measureReportSubmissionBundle =
+                            JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(await response.Content.ReadAsStringAsync(cancellationToken));
+
+                        #region File IO
+                        string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
+                        if (!Directory.Exists(facilityDirectory))
                         {
-                            _logger.LogError(ex, $"An exception occurred in the Submit Report Consumer service: {ex.Message}", ex);
+                            Directory.CreateDirectory(facilityDirectory);
+                        }
+
+                        var dtu = DateTime.UtcNow;
+                        string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
+
+                        await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
+
+                        if (!File.Exists(fullFilePath))
+                        {
+                            throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
+                        }
+                        #endregion
+                    }
+                    catch (ConsumeException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                    }
+                    catch (DeadLetterException ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (TransientException ex)
+                    {
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
                         }
                     }
                 }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
-                    _submitReportConsumer.Close();
-                    _submitReportConsumer.Dispose();
-                }
             }
-
+            catch (OperationCanceledException oce)
+            {
+                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                consumer.Close();
+                consumer.Dispose();
+            }
         }
     }
 }

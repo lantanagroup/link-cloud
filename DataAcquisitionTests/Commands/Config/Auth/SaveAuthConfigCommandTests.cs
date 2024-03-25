@@ -1,18 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
 using Moq;
-using Moq.Language.Flow;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace DataAcquisitionUnitTests.Commands.Config.Auth
 {
@@ -40,6 +35,10 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
             _mocker.GetMock<IFhirQueryConfigurationRepository>()
                 .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(new FhirQueryConfiguration()));
+
+            _mocker.GetMock<IMediator>()
+                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(true));
 
             var result = await handler.Handle(command, CancellationToken.None);
 

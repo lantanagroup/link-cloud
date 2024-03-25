@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
@@ -45,6 +46,10 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Unit.Value);
 
+            _mocker.GetMock<IMediator>()
+                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(true));
+
             var result = await handler.Handle(command, CancellationToken.None);
 
             _mocker.GetMock<IQueryPlanRepository>()
@@ -81,6 +86,10 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             _mocker.GetMock<IMediator>()
                 .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Unit.Value);
+
+            _mocker.GetMock<IMediator>()
+                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(true));
 
             var result = await handler.Handle(command, CancellationToken.None);
 

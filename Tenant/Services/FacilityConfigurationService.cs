@@ -10,6 +10,10 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Tenant.Models;
+using System.Diagnostics;
+using OpenTelemetry.Trace;
+using LantanaGroup.Link.Tenant.Config;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
@@ -21,7 +25,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly HttpClient _httpClient;
         private static List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
-        private readonly IOptions<TenantConfig> _tenantConfig;
+        private readonly IOptions<MeasureApiConfig> _measureApiConfig;
 
 
         IFacilityConfigurationRepo _facilityConfigurationRepo;
@@ -33,12 +37,12 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, IOptions<TenantConfig> tenantConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, IOptions<MeasureApiConfig> tenantConfig, HttpClient httpClient)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
-            _tenantConfig = tenantConfig ?? throw new ArgumentNullException(nameof(tenantConfig));
-            _logger = logger;   
+            _measureApiConfig = tenantConfig ?? throw new ArgumentNullException(nameof(tenantConfig));
+            _logger = logger;
             _httpClient = httpClient;
         }
 
@@ -47,174 +51,256 @@ namespace LantanaGroup.Link.Tenant.Services
             return _facilityConfigurationRepo != null ? _facilityConfigurationRepo : null;
         }
 
-        public async Task<List<FacilityConfigModel>> GetFacilities(CancellationToken cancellationToken)
-        {
-           var result =  await _facilityConfigurationRepo.GetAsync(cancellationToken);
-
-           return result;
+        public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken)
+        { 
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Facilities Query");
+        
+            return await _facilityConfigurationRepo.GetAsync(cancellationToken);
         }
 
-        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(CancellationToken cancellationToken, FilterDefinition<FacilityConfigModel> filter)
+        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters( FilterDefinition<FacilityConfigModel> filter, CancellationToken cancellationToken)
         {
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
+
             return await _facilityConfigurationRepo.FindAsync(filter, cancellationToken);
-        }
-
-        public async Task<bool> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
-        {
-            this.ValidateFacility(newFacility);
-
-            var facility = await _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken);
-
-            // validates facility does not exist
-            if (facility is not null)
-            {
-                this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
-
-                throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
-            }
-
-            this.ValidateSchedules(newFacility);
-
-            bool created = false;
-
-            try
-            {
-                created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
-            }
-
-            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-            // audit create facility event
-            try
-            {
-                AuditEventMessage auditEvent;
-                Headers headers;
-                Helper.CreateFacilityAuditEvent(newFacility, out auditEvent, out headers);
-                // send the Audit Event
-
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
-                {
-                    Key = newFacility.FacilityId,
-                    Value = auditEvent,
-                    Headers = headers
-                });
-               
-
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Failed to generate an audit event for create of facility configuration {newFacility.Id}.", ex);
-            }
-
-            return created;
         }
 
         public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)
         {
-            var result = await _facilityConfigurationRepo.GetAsyncById(id, cancellationToken);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Id Query");
 
-            return result;
-
+            return await _facilityConfigurationRepo.GetAsyncById(id, cancellationToken);
         }
 
         public async Task<FacilityConfigModel> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
         {
-            var result = await _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Facility Id Query");
 
-            return result;
-
+            return await _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken);
         }
 
 
-        public async Task<string> UpdateFacility(string id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
+        public async Task<bool> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
         {
-            this.ValidateFacility(newFacility);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Facility Configuration");
 
-            FacilityConfigModel existingFacility = _facilityConfigurationRepo.GetAsyncById(id, cancellationToken).Result;
+            //add id to current activity
+            var currentActivity = Activity.Current;
+            currentActivity?.AddTag("facility.id", newFacility.FacilityId);
 
-            if (existingFacility is null)
+            using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this._logger.LogError($"Facility with Id: {id} Not Found");
+                this.ValidateFacility(newFacility);
 
-                throw new ApplicationException($"Facility with Id: {id} Not Found");
+                var facility = await _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken);
+
+                // validates facility does not exist
+                if (facility is not null)
+                {
+                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+
+                    throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
+                }
+
+                this.ValidateSchedules(newFacility);
             }
 
-            FacilityConfigModel foundFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId,cancellationToken).Result;
-
-            if (foundFacility != null && foundFacility.Id != id)
-            {
-                this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
-
-                throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
-            }
-
-            this.ValidateSchedules(newFacility);
-
-            _ = _facilityConfigurationRepo.UpdateAsync(id, newFacility, cancellationToken);
-
-            // audit update facility event
-            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+            bool created = false;
             try
             {
-                AuditEventMessage auditEvent;
-                Headers headers;
-                Helper.UpdateFacilityAuditEvent(newFacility, existingFacility, out auditEvent, out headers);
 
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
-                    Key = newFacility.FacilityId,
-                    Value = auditEvent,
-                    Headers = headers
-                });
-
+                    created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to generate an audit event for update of facility configuration {newFacility.Id}.", ex);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex, new TagList {
+                    { "service.name",TenantConstants.ServiceName },
+                    { "facility", newFacility.FacilityId },
+                    { "action", AuditEventType.Create },
+                    { "resource", newFacility }
+                });
+                throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
 
+            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Create Event"))
+            {
+                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+
+                // audit create facility event
+                try
+                {
+                    AuditEventMessage auditEvent;
+                    Headers headers;
+                    Helper.CreateFacilityAuditEvent(newFacility, out auditEvent, out headers);
+                    // send the Audit Event
+
+                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                    {
+                        Key = newFacility.FacilityId,
+                        Value = auditEvent,
+                        Headers = headers
+                    });
+
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to generate an audit event for create of facility configuration {newFacility.Id}.", ex);
+                }
+            }
+            return created;
+        }
+
+        public async Task<string> UpdateFacility(string id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
+        {
+            FacilityConfigModel existingFacility;
+
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Update Facility Configuration");
+
+            //add id to current activity
+            var currentActivity = Activity.Current;
+
+            currentActivity?.AddTag("facility.id", newFacility.FacilityId);
+
+            using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
+            {
+                this.ValidateFacility(newFacility);
+
+                existingFacility = _facilityConfigurationRepo.GetAsyncById(id, cancellationToken).Result;
+
+                if (existingFacility is null)
+                {
+                    this._logger.LogError($"Facility with Id: {id} Not Found");
+
+                    throw new ApplicationException($"Facility with Id: {id} Not Found");
+                }
+
+                FacilityConfigModel foundFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken).Result;
+
+                if (foundFacility != null && foundFacility.Id != id)
+                {
+                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+
+                    throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
+                }
+
+                this.ValidateSchedules(newFacility);
+            }
+            try
+            {
+                using (ServiceActivitySource.Instance.StartActivity("Update the Facility Command"))
+                {
+                    _ = await _facilityConfigurationRepo.UpdateAsync(id, newFacility, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex, new TagList {
+                    { "service.name",TenantConstants.ServiceName },
+                    { "facility", newFacility.FacilityId },
+                    { "action", AuditEventType.Update },
+                    { "resource", newFacility }
+                });
+                throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
+            }
+
+            // audit update facility event
+            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Update Event"))
+            {
+                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+                try
+                {
+                    AuditEventMessage auditEvent;
+                    Headers headers;
+                    Helper.UpdateFacilityAuditEvent(newFacility, existingFacility, out auditEvent, out headers);
+
+                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                    {
+                        Key = newFacility.FacilityId,
+                        Value = auditEvent,
+                        Headers = headers
+                    });
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to generate an audit event for update of facility configuration {newFacility.Id}.", ex);
+                }
+            }
             return id;
         }
 
         public async Task<string> RemoveFacility(string facilityId, CancellationToken cancellationToken)
         {
+           FacilityConfigModel existingFacility;
+
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete Facility Configuration");
+
+            var currentActivity = Activity.Current;
+
+            currentActivity?.AddTag("facility.id", facilityId);
+
             // validate facility exists
-            var existingFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken).Result;
-
-            if (existingFacility is null)
+            using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this._logger.LogError($"Facility with Id: {facilityId} Not Found");
-                throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
+                existingFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken).Result;
+
+                if (existingFacility is null)
+                {
+                    this._logger.LogError($"Facility with Id: {facilityId} Not Found");
+                    throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
+                }
             }
-
-            await _facilityConfigurationRepo.RemoveAsync(existingFacility.Id, cancellationToken);
-
-            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-            // audit delete facility event
+      
             try
             {
-                AuditEventMessage auditEvent;
-                Headers headers;
-                Helper.DeleteFacilityAuditEvent(existingFacility, out auditEvent, out headers);
-
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                using (ServiceActivitySource.Instance.StartActivity("Delete the Facility Configuration Command"))
                 {
-                    Key = existingFacility.FacilityId,
-                    Value = auditEvent,
-                    Headers = headers
-                });
-
+                    await _facilityConfigurationRepo.RemoveAsync(existingFacility.Id, cancellationToken);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to generate an audit event for delete of facility configuration {existingFacility.Id}.", ex);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex, new TagList {
+                    { "service.name",TenantConstants.ServiceName },
+                    { "facility", facilityId },
+                    { "action", AuditEventType.Delete },
+                    { "resource", existingFacility }
+                });
+                throw new ApplicationException($"Facility {facilityId} failed to delete. " + ex.Message);
             }
 
+            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Delete Event"))
+            {
+
+                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+
+                // audit delete facility event
+                try
+                {
+                    AuditEventMessage auditEvent;
+                    Headers headers;
+                    Helper.DeleteFacilityAuditEvent(existingFacility, out auditEvent, out headers);
+
+                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                    {
+                        Key = existingFacility.FacilityId,
+                        Value = auditEvent,
+                        Headers = headers
+                    });
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to generate an audit event for delete of facility configuration {existingFacility.Id}.", ex);
+                }
+            }
             return facilityId;
         }
 
@@ -224,7 +310,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             if (string.IsNullOrWhiteSpace(facility.FacilityId))
             {
-                validationErrors.AppendLine("FacilityId must be entered.");              
+                validationErrors.AppendLine("FacilityId must be entered.");
             }
             if (string.IsNullOrWhiteSpace(facility.FacilityName))
             {
@@ -285,7 +371,7 @@ namespace LantanaGroup.Link.Tenant.Services
             string duplicatedTopics = string.Join(" ", duplicates.ToList());
 
             if (!duplicatedTopics.Equals(""))
-            {  
+            {
                 this._logger.LogError($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
                 throw new ApplicationException($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
             }
@@ -293,7 +379,7 @@ namespace LantanaGroup.Link.Tenant.Services
             StringBuilder schedulingErrors = new StringBuilder();
             foreach (ScheduledTaskModel facilityScheduledTask in facility.ScheduledTasks)
             {
-               
+
                 IEnumerable<string> duplicatedReportTypes = facilityScheduledTask.ReportTypeSchedules.GroupBy(i => i.ReportType).Where(g => g.Count() > 1).Select(g => g.Key);
 
                 string duplicatedReportTypesString = string.Join(" ", duplicatedReportTypes.ToList());
@@ -318,7 +404,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     }
                     // check if the report type was set-up in Measure Evaluation Service
 
-                    string requestUrl = _tenantConfig.Value.MeasureDefUrl + $"/{reportTypeSchedule.ReportType}";
+                    string requestUrl = _measureApiConfig.Value.MeasureServiceApiUrl + $"/{reportTypeSchedule.ReportType}";
 
                     var response = _httpClient.GetAsync(requestUrl).Result;
 
@@ -344,8 +430,8 @@ namespace LantanaGroup.Link.Tenant.Services
                         this._logger.LogError($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                         throw new ApplicationException($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                     }
-                  
-                }             
+
+                }
             }
             if (!string.IsNullOrEmpty(schedulingErrors.ToString()))
             {

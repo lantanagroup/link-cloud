@@ -30,22 +30,6 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
 
     public async Task Handle(SaveConfigEntityCommand request, CancellationToken cancellationToken)
     {
-        bool tenantExists;
-        try
-        {
-            tenantExists = await _tenantApiService.CheckFacilityExists(request.NormalizationConfigModel.FacilityId, cancellationToken);
-        }
-        catch(Exception ex)
-        {
-            _logger.LogError(ex, $"Error checking if facility ({request.FacilityId}) exists in Tenant Service.");
-            throw;
-        }
-        
-        if(!tenantExists)
-        {
-            throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
-        }
-
         if(request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
         {
             var message = "FacilityId property is null in request. Unable to proceed with update.";
@@ -59,6 +43,22 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
         {
             var message = "Configuration provided is not valid.";
             throw new ConfigOperationNullException(message);
+        }
+
+        bool tenantExists;
+        try
+        {
+            tenantExists = await _tenantApiService.CheckFacilityExists(request.NormalizationConfigModel.FacilityId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error checking if facility ({request.FacilityId}) exists in Tenant Service.");
+            throw;
+        }
+
+        if (!tenantExists)
+        {
+            throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
         }
 
         var existingEntity = await _configRepo.GetAsync(request.Source == SaveTypeSource.Create ? request.NormalizationConfigModel.FacilityId : request.FacilityId);

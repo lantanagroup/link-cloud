@@ -1,9 +1,7 @@
 ﻿using Census.Models;
-using Census.Repositories;
-using Census.Services;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Commands.TenantCheck;
 using LantanaGroup.Link.Census.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Quartz;
 
@@ -21,19 +19,20 @@ public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusCommand, C
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly ICensusSchedulingRepository _censusSchedulingRepo;
     private readonly IMediator _mediator;
-
-    public UpdateCensusCommandHandler(ILogger<UpdateCensusCommandHandler> logger, ICensusConfigMongoRepository repository, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IMediator mediator)
+    private readonly ITenantApiService _tenantApiService;
+    public UpdateCensusCommandHandler(ILogger<UpdateCensusCommandHandler> logger, ICensusConfigMongoRepository repository, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IMediator mediator, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         _censusSchedulingRepo = censusSchedulingRepo ?? throw new ArgumentNullException(nameof(censusSchedulingRepo));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _tenantApiService = tenantApiService ?? throw new ArgumentNullException();
     }
 
     public async Task<CensusConfigModel> Handle(UpdateCensusCommand request, CancellationToken cancellationToken)
     {
-        if(await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.Config.FacilityId }, cancellationToken) == false)
+        if(await _tenantApiService.CheckFacilityExists(request.Config.FacilityId, cancellationToken) == false)
         {
             throw new MissingTenantConfigurationException($"Facility {request.Config.FacilityId} not found.");
         }

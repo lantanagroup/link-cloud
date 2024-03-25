@@ -16,7 +16,7 @@ namespace TenantTests
     public class RemoveFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private TenantConfig? _tenantConfig;
+        private MeasureApiConfig? _measureApiConfig;
         private AutoMocker? _mocker;
         private FacilityConfigurationService? _service;
 
@@ -43,9 +43,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _tenantConfig = new TenantConfig()
+            _measureApiConfig = new MeasureApiConfig()
             {
-                MeasureDefUrl = "test"
+                MeasureServiceApiUrl = "test"
             };
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
@@ -58,9 +58,9 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<TenantConfig>>()
+            _mocker.GetMock<IOptions<MeasureApiConfig>>()
             .Setup(p => p.Value)
-            .Returns(_tenantConfig);
+            .Returns(_measureApiConfig);
 
             Task<string> facility = _service.RemoveFacility(facilityId, CancellationToken.None);
 
