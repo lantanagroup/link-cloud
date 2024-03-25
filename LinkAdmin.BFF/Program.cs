@@ -280,7 +280,7 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    app.MapReverseProxy();
+    app.MapReverseProxy().RequireAuthorization("AuthenticatedUser");
 
     // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
