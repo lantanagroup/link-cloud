@@ -1,18 +1,23 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+﻿using Hl7.FhirPath.Sprache;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
     public class AuthEndpoints : IApi
     {
-        private readonly ILogger<AuthEndpoints> _logger;   
+        private readonly ILogger<AuthEndpoints> _logger; 
+        private readonly IOptions<AuthenticationSchemaConfig> _authSchemaOptions;
 
-        public AuthEndpoints(ILogger<AuthEndpoints> logger)
+        public AuthEndpoints(ILogger<AuthEndpoints> logger, IOptions<AuthenticationSchemaConfig> oauthOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authSchemaOptions = oauthOptions ?? throw new ArgumentNullException(nameof(oauthOptions));
         }
 
         public void RegisterEndpoints(WebApplication app)
@@ -66,7 +71,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 properties: new AuthenticationProperties { 
                     RedirectUri = "/" 
                 },                
-                authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Oauth2]);
+                authenticationSchemes: [ _authSchemaOptions.Value.DefaultChallengeScheme ]);
         }
 
         public IResult GetUser(HttpContext context)

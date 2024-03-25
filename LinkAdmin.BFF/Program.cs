@@ -74,8 +74,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
     var authBuilder = builder.Services.AddAuthentication(options => { 
         options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
-        options.DefaultChallengeScheme = LinkAdminConstants.AuthenticationSchemes.Oauth2;
-    });    
+        options.DefaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
+    });
+
+    var defaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
+    builder.Services.Configure<AuthenticationSchemaConfig>(options =>
+    {
+        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        
+        if (string.IsNullOrEmpty(defaultChallengeScheme)) 
+            throw new NullReferenceException("DefaultChallengeScheme is required.");
+
+        options.DefaultChallengeScheme = defaultChallengeScheme;
+    });
 
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
         {
@@ -83,62 +94,47 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.Cookie.SameSite = SameSiteMode.Strict;
             options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         });
-    
-    authBuilder.AddOAuth(LinkAdminConstants.AuthenticationSchemes.Oauth2, options =>
+
+    //Add Oauth authorization scheme if enabled
+    if(builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
     {
-        options.SignInScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        if(!LinkAdminConstants.AuthenticationSchemes.Oauth2.Equals(defaultChallengeScheme))
+            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.Oauth2);
 
-        options.AuthorizationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!;
-        options.TokenEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!;
-        options.UserInformationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
-        options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId")!;
-        options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientSecret")!;
-        options.CallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
-        options.SaveTokens = false;
-        options.Scope.Add("email");
-        options.Scope.Add("profile");
-        options.Scope.Add("openid");
-
-        options.ClaimActions.MapJsonKey("sub", "sub");
-        options.ClaimActions.MapJsonKey("email", "email");
-        options.ClaimActions.MapJsonKey("name", "name");
-        options.ClaimActions.MapJsonKey("given_name", "given_name");
-        options.ClaimActions.MapJsonKey("family_name", "family_name");
-        
-        options.Events.OnCreatingTicket = async context =>
+        authBuilder.AddOAuthAuthentication(options =>
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+            options.Environment = builder.Environment;
+            options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId")!;
+            options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientSecret")!;
+            options.AuthorizationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!;
+            options.TokenEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!;
+            options.UserInformationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
+            options.CallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
+        });
+    }  
+   
+    // Add OpenIdConnect authorization scheme if enabled
+    if (builder.Configuration.GetValue<bool>("Authentication:Schemas:OpenIdConnect:Enabled"))
+    {
+        if(!LinkAdminConstants.AuthenticationSchemes.OpenIdConnect.Equals(defaultChallengeScheme))
+            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
 
-            var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-            response.EnsureSuccessStatusCode();
+        authBuilder.AddOpenIdConnectAuthentication(options =>
+        {
+            options.Environment = builder.Environment;
+            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority")!;
+            options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId")!;
+            options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret")!;
+            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:NameClaimType");
+            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:RoleClaimType");
+        });
+    }    
 
-            var user = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-            //TODO: Store token in bff associated with the user
-            //var db = context.HttpContext.RequestServices.GetRequiredService<IDbContext>();
-
-            //TODO: add application specific claims            
-
-            context.RunClaimActions(user);
-        };
-    });
-
-    //authBuilder.AddOpenIdConnect(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect, options =>
-    //{
-    //    options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority");
-
-    //    options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId");
-    //    options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret");
-    //    options.Scope.Add("email"); // openId and profile scopes are included by default
-    //    options.SaveTokens = false;
-    //    options.ResponseType = "code";
-    //});
-
+    // Add JWT authorization scheme if enabled
     if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
     {
-        authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
+        if(!LinkAdminConstants.AuthenticationSchemes.JwtBearerToken.Equals(defaultChallengeScheme))
+            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
 
         authBuilder.AddJwTBearerAuthentication(options =>
         {            
