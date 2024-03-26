@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>8870e68f-fb67-4181-9714-8533f6f8db6b</UserSecretsId>
+	<RootNamespace>LantanaGroup.Link.LinkAdmin.BFF</RootNamespace>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <PropertyGroup>
+	<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	<NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.0" />
+    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="1.2.1" />
+    <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
+    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.3.0" />
+    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="8.0.0-preview" />
+    <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.3.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.6" />
+    <PackageReference Include="OpenTelemetry" Version="1.7.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
+    <PackageReference Include="Serilog" Version="4.0.0-dev-02122" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2-dev-00334" />
+    <PackageReference Include="Serilog.Enrichers.Span" Version="3.1.0" />
+    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
+    <PackageReference Include="Serilog.Expressions" Version="4.0.1-dev-00154" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.1.0-dev-00943" />
+    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Application\Factories\" />
+    <Folder Include="Application\Interfaces\Factories\" />
+  </ItemGroup>
+
+</Project>
