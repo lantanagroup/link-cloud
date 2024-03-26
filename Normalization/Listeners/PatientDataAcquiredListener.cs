@@ -71,7 +71,7 @@ public class PatientDataAcquiredListener : BackgroundService
             ConsumeResult<string, PatientDataAcquiredMessage> message;
             try
             {
-                message = kafkaConsumer.Consume();
+                message = kafkaConsumer.Consume(cancellationToken);
             }
             catch (Exception ex)
             {
