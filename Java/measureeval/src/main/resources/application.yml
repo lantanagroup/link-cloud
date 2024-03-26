@@ -5,25 +5,19 @@ springdoc:
     path: /swagger-ui.html
 spring:
   application:
-    name: ValidationService
-  datasource:
-    url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;databaseName=link-validation;encrypt=true;trustServerCertificate=true
-    username: link-user
-    password: link-password
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      show_sql: true
-      hibernate:
-        dialect: org.hibernate.dialect.SQLServerDialect
+    name: measureeval
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/measureeval
+      username: root
+      password: example
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: validation
+      group-id: measureeval
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
-      client-id: validation
+      client-id: measureeval
     properties:
       security.protocol: SASL_SSL
       sasl.mechanism: PLAIN
