@@ -41,6 +41,7 @@ public class QueryListener : BackgroundService
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
         _deadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
+        _deadLetterConsumerHandler.ServiceName = DataAcquisitionConstants.ServiceName;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -77,6 +78,7 @@ public class QueryListener : BackgroundService
             }
             catch (Exception ex)
             {
+                _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                 _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
                 continue;
             }
@@ -94,6 +96,8 @@ public class QueryListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error deserializing message: {1}", ex.Message);
+
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
                     continue;
                 }
@@ -107,6 +111,7 @@ public class QueryListener : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error extracting facility id and correlation id from message");
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, "");
                     continue;
                 }
@@ -138,6 +143,7 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, messageMetaData.facilityId);
                     _logger.LogError(ex, "Error producing message: {1}", ex.Message);
                     responseMessages = null;
@@ -195,6 +201,7 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                     _deadLetterConsumerHandler.HandleException(rawmessage, ex, messageMetaData.facilityId);
                     _logger.LogError(ex, "Failed to produce message");
                     continue;
@@ -214,6 +221,8 @@ public class QueryListener : BackgroundService
                     Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
                 });
                 _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
+
+                _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
                 _deadLetterConsumerHandler.HandleException(rawmessage, new Exception("Message meets no condition for processing"), messageMetaData.facilityId);
             }
         }
