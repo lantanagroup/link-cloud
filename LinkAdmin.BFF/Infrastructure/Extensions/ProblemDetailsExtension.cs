@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 {
@@ -21,7 +22,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                     if (problemDetailsOptions.Environment.IsDevelopment() || problemDetailsOptions.IncludeExceptionDetails)
                     {
-                        ctx.ProblemDetails.Extensions.Add("API", "Link Administration");
+                        ctx.ProblemDetails.Extensions.Add("API", LinkAdminConstants.ServiceName);
                     }
                     else
                     {

@@ -2,6 +2,8 @@
 {
     public class LinkAdminConstants
     {
+        public const string ServiceName = "LinkAdminBFF";
+
         public static class AppSettingsSectionNames
         {
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";

@@ -1,4 +1,5 @@
 ﻿using Azure.Identity;
+using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
@@ -18,8 +19,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         builder.Configuration.AddAzureAppConfiguration(options =>
                         {
                             options.Connect(externalConfigurationOptions.ExternalConfigurationConnectionString)
+                                // Load configuration values with no label
                                 .Select("*", LabelFilter.Null)
-                                .Select("*", "Link:AdminBFF:" + externalConfigurationOptions.Environment.EnvironmentName);
+                                // Load configuration values for service name
+                                .Select("*", LinkAdminConstants.ServiceName)
+                                // Load configuration values for service name and environment
+                                .Select("*", LinkAdminConstants.ServiceName + ":" + externalConfigurationOptions.Environment.EnvironmentName);
 
                             options.ConfigureKeyVault(kv =>
                             {
