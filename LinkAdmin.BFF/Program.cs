@@ -86,11 +86,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     });    
 
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
-        {
-            options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
-            options.Cookie.SameSite = SameSiteMode.Strict;
-            options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-        });
+    {
+        options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+    });
 
     //Add Oauth authorization scheme if enabled
     if(builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
@@ -276,7 +276,7 @@ static void SetupMiddleware(WebApplication app)
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
     {
-        if(api is null) throw new InvalidProgramException("No Endpoints were not found.");
+        if(api is null) throw new InvalidProgramException("No Endpoints were registered.");
         api.RegisterEndpoints(app);        
     }
 
