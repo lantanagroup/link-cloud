@@ -51,36 +51,31 @@ namespace Tenant
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-
             //load external configuration source if specified
             var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
 
-            if ("Development" != builder.Environment.EnvironmentName)
+            if (!string.IsNullOrEmpty(externalConfigurationSource))
             {
-
-                if (!string.IsNullOrEmpty(externalConfigurationSource))
+                switch (externalConfigurationSource)
                 {
-                    switch (externalConfigurationSource)
-                    {
-                        case ("AzureAppConfiguration"):
-                            builder.Configuration.AddAzureAppConfiguration(options =>
+                    case ("AzureAppConfiguration"):
+                        builder.Configuration.AddAzureAppConfiguration(options =>
+                        {
+                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                                    // Load configuration values with no label
+                                    .Select("*", LabelFilter.Null)
+                                    // Load configuration values for service name
+                                    .Select("*", TenantConstants.ServiceName)
+                                    // Load configuration values for service name and environment
+                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                            options.ConfigureKeyVault(kv =>
                             {
-                                options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                     // Load configuration values with no label
-                                     .Select("*", LabelFilter.Null)
-                                     // Load configuration values for service name
-                                     .Select("*", TenantConstants.ServiceName)
-                                     // Load configuration values for service name and environment
-                                     .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                                options.ConfigureKeyVault(kv =>
-                                {
-                                    kv.SetCredential(new DefaultAzureCredential());
-                                });
-
+                                kv.SetCredential(new DefaultAzureCredential());
                             });
-                            break;
-                    }
+
+                        });
+                        break;
                 }
             }
 

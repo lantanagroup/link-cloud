@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Report.Application.Factory;
@@ -16,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -40,6 +42,34 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(ReportConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                            // Load configuration values with no label
+                            .Select("*", LabelFilter.Null)
+                            // Load configuration values for service name
+                            .Select("*", ReportConstants.ServiceName)
+                            // Load configuration values for service name and environment
+                            .Select("*", ReportConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
