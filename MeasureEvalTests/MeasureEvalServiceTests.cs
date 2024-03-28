@@ -32,8 +32,7 @@ public class MeasureEvalServiceTests
         
         var measureEvalConfig = new MeasureEvalConfig
         {
-            EvaluationServiceUrl = "https://www.testcqfruler.com/fhir",
-            DataStoreServiceUrl = "https://ehr-test.com/fhir"
+            EvaluationServiceUrl = "https://www.testcqfruler.com/fhir"
         };
 
         var httpClient = CreateHttpClient(HttpMethod.Post, measureEvalConfig.EvaluationServiceUrl, HttpStatusCode.OK, cqfrResponse);
