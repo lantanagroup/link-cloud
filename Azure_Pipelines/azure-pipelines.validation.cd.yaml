@@ -1,23 +1,16 @@
 trigger:
   branches:
     include:
-    - master
+    - main
   paths:
     include:
-    - Validation/*
+    - Java/validation/*
 pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'Validation/Validation.csproj'
-- name: testProject
-  value: 'ValidationUnitTests/ValidationUnitTests.csproj'
-- name: nugetPath
-  value: 'Validation/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,33 +18,11 @@ variables:
 - name: registry-repo-Name
   value: 'link-validation'
 - name: dockerPath
-  value: '**/Validation/Dockerfile'
+  value: 'Java/validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
 
-steps:
-  - template: ../azure-nuget-package-source.yml
-
-  - task: DotNetCoreCLI@2
-    displayName: Restore
-    inputs:
-      command: restore
-      projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
-  
+steps: 
 
   - task: Docker@2
     displayName: "Build & Push Validation Docker Image"
@@ -64,9 +35,4 @@ steps:
       tags: |
         $(tags1)
         $(tags2)
-      buildContext: '$(Build.Repository.LocalPath)'
-
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifact: 'manifest'
+      buildContext: 'Java/validation/'
