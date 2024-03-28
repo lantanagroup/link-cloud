@@ -19,11 +19,13 @@
 
   <ItemGroup>
 	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+	<PackageReference Include="Azure.Identity" Version="1.10.4" />
 	<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
     <PackageReference Include="CompareNETObjects" Version="4.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
+    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
 	<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
 	<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />

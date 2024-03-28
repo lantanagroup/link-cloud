@@ -23,6 +23,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+		<PackageReference Include="Azure.Identity" Version="1.10.4" />
 		<PackageReference Include="com.lantanagroup.link.Shared" Version="1.2.1" />
 		<PackageReference Include="CompareNETObjects" Version="4.*" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
@@ -34,6 +35,7 @@
 		<PackageReference Include="JWT" Version="10.*" />
 		<!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
 		<PackageReference Include="MediatR" Version="12.*" />
+		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
 		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
 		<PackageReference Include="MongoDB.Driver" Version="2.*" />
@@ -58,6 +60,10 @@
 		<Content Update="nuget.config">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Settings\" />
 	</ItemGroup>
 
 </Project>
