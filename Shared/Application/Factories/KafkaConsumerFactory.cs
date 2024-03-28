@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ZstdSharp.Unsafe;
 
 namespace LantanaGroup.Link.Shared.Application.Factories;
 public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumerFactory<TConsumerKey, TConsumerValue>
@@ -28,6 +29,18 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
             }
 
             config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
+            config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
+            config.ClientId = _kafkaConnection.Value.ClientId;
+            config.GroupId = _kafkaConnection.Value.GroupId;
+
+            if (_kafkaConnection.Value.SaslProtocolEnabled)
+            {
+                config.SecurityProtocol = SecurityProtocol.SaslSsl;
+                config.SaslMechanism = SaslMechanism.Plain;
+                config.SaslUsername = _kafkaConnection.Value.SaslUsername;
+                config.SaslPassword = _kafkaConnection.Value.SaslPassword;
+                config.ApiVersionRequest = _kafkaConnection.Value.ApiVersionRequest;
+            }
 
             var consumerBuilder = new ConsumerBuilder<TConsumerKey, TConsumerValue>(config);
 

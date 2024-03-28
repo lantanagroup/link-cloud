@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Linq;
 
 namespace LantanaGroup.Link.Shared.Application.Factories;
 public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducerFactory<TProducerKey, TProducerValue>
@@ -38,6 +39,17 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
         try
         {
             config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
+            config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
+            config.ClientId = _kafkaConnection.Value.ClientId;
+
+            if (_kafkaConnection.Value.SaslProtocolEnabled)
+            {
+                config.SecurityProtocol = SecurityProtocol.SaslSsl;
+                config.SaslMechanism = SaslMechanism.Plain;
+                config.SaslUsername = _kafkaConnection.Value.SaslUsername;
+                config.SaslPassword = _kafkaConnection.Value.SaslPassword;
+                config.ApiVersionRequest = _kafkaConnection.Value.ApiVersionRequest;
+            }
 
             var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
 
