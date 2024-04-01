@@ -8,10 +8,10 @@ pool:
 
 steps:
   - task: Maven@2
-    displayName: Restore
+    displayName: Maven Install
     env:
       SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
+      mavenPomFile: 'Validation/pom.xml'
       goals: install
       options: '-s .m2/settings.xml'
-
