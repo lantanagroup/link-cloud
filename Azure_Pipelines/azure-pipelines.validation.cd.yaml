@@ -4,7 +4,7 @@ trigger:
     - master
   paths:
     include:
-    - Validation/*
+    - Java/validation/*
 pr: none
 
 pool:
@@ -25,14 +25,20 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
   - task: Maven@2
-    displayName: Restore
+    displayName: Maven Install
     env:
       SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
+      mavenPomFile: 'Java/validation/pom.xml'
       goals: install
-      options: '-s .m2/settings.xml'
+      options: '-s Java/validation/.m2/settings.xml'
 
   - task: Docker@2
     displayName: "Build Docker Image"
@@ -45,7 +51,7 @@ steps:
       tags: |
         $(tags1)
         $(tags2)
-      buildContext: '$(Build.Repository.LocalPath)'
+      buildContext: 'Java/validation'
 
   - task: Docker@2
     displayName: "Push Docker Image"
