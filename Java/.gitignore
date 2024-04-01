@@ -27,6 +27,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-### Maven Settings ###
-.m2/
