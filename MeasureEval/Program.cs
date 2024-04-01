@@ -16,6 +16,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Confluent.Kafka.Extensions.OpenTelemetry;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +31,34 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(MeasureEvalConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                         // Load configuration values with no label
+                         .Select("*", LabelFilter.Null)
+                         // Load configuration values for service name
+                         .Select("*", MeasureEvalConstants.AppSettingsSectionNames.ServiceName)
+                         // Load configuration values for service name and environment
+                         .Select("*", MeasureEvalConstants.AppSettingsSectionNames.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 

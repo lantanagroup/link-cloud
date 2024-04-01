@@ -16,6 +16,11 @@ using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Queries;
 using LantanaGroup.Link.Submission.Application.Repositories;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Azure.Identity;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +34,34 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(SubmissionConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                         // Load configuration values with no label
+                         .Select("*", LabelFilter.Null)
+                         // Load configuration values for service name
+                         .Select("*", SubmissionConstants.ServiceName)
+                         // Load configuration values for service name and environment
+                         .Select("*", SubmissionConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     //Add problem details
     builder.Services.AddProblemDetails(opts => {
         opts.IncludeExceptionDetails = (ctx, ex) => false;
@@ -73,20 +106,17 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
 
     // Add repositories
     // TODO
 
-    //// Setup CORS
-    //builder.Services.AddCors(options =>
-    //{
-    //    options.AddPolicy("CorsPolicy",
-    //        builder => builder
-    //            .AllowAnyMethod()
-    //            .AllowCredentials()
-    //            .SetIsOriginAllowed((host) => true) //lock this down, allows all atm
-    //            .AllowAnyHeader());
-    //});
+    #region Exception Handling
+    //Report Scheduled Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+    #endregion
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();

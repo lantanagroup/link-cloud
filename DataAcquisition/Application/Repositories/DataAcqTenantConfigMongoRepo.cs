@@ -1,11 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using static LantanaGroup.Link.DataAcquisition.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
@@ -100,7 +99,7 @@ public class DataAcqTenantConfigMongoRepo : MongoDbRepository<TenantDataAcquisit
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.HealthCheck, "Data Acquisition Service - Database Health Check"), ex, "Health check failed for database connection.");
+            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.HealthCheck, "Data Acquisition Service - Database Health Check"), ex, "Health check failed for database connection.");
             return false;
         }
 

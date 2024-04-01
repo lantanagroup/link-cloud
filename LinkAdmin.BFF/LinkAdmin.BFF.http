@@ -1,0 +1,6 @@
+@LinkAdmin.BFF_HostAddress = http://localhost:5218
+
+GET {{LinkAdmin.BFF_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,6 +1,4 @@
 
-using LantanaGroup.Link.Tenant;
-using LantanaGroup.Link.Tenant.Listeners;
 using LantanaGroup.Link.Tenant.Services;
 using Quartz;
 using Serilog;
@@ -53,9 +51,9 @@ namespace Tenant
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-
             //load external configuration source if specified
             var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
             if (!string.IsNullOrEmpty(externalConfigurationSource))
             {
                 switch (externalConfigurationSource)
@@ -64,12 +62,12 @@ namespace Tenant
                         builder.Configuration.AddAzureAppConfiguration(options =>
                         {
                             options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                 // Load configuration values with no label
-                                 .Select("*", LabelFilter.Null)
-                                 // Load configuration values for service name
-                                 .Select("*", TenantConstants.ServiceName)
-                                 // Load configuration values for service name and environment
-                                 .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+                                    // Load configuration values with no label
+                                    .Select("*", LabelFilter.Null)
+                                    // Load configuration values for service name
+                                    .Select("*", TenantConstants.ServiceName)
+                                    // Load configuration values for service name and environment
+                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
 
                             options.ConfigureKeyVault(kv =>
                             {
