@@ -23,7 +23,7 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
         return await _dbContext.Set<T>().ToListAsync(cancellationToken);
     }
 
-    public async Task<T> GetAsyncById(Guid id, CancellationToken cancellationToken)
+    public async Task<T> GetAsyncById(string id, CancellationToken cancellationToken)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
@@ -48,7 +48,7 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
 
     }
 
-    public async virtual Task<bool> RemoveAsync(Guid id, CancellationToken cancellationToken)
+    public async virtual Task<bool> RemoveAsync(string id, CancellationToken cancellationToken)
     {
         var entity = await _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefaultAsync();
 
