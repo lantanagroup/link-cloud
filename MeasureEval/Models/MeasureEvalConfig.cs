@@ -2,7 +2,6 @@
 {
     public class MeasureEvalConfig
     {
-        public string DataStoreServiceUrl { get; set; } = null!;  // TODO: Replace with MongoDB?
         public string TerminologyServiceUrl { get; set; } = null!;
         public string EvaluationServiceUrl { get; set; } = null!;
         public int MaxRetry { get; set; } = 10;

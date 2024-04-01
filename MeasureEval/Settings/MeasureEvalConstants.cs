@@ -7,6 +7,7 @@
             public const string ServiceInformation = "ServiceInformation";
             public const string Telemetry = "TelemetryConfig";
             public const string ServiceName = "MeasureEval";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
 
         public static class MeasureEvalLoggingIds

@@ -18,6 +18,8 @@ variables:
   value: 'AccountUnitTests/AccountUnitTests.csproj'
 - name: nugetPath
   value: 'Account/nuget.config'
+- name: serviceName
+  value: 'Account'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -26,6 +28,9 @@ variables:
   value: 'link-account'
 - name: dockerPath
   value: '**/Account/Dockerfile'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+  
 steps:
   - template: ../azure-nuget-package-source.yml
   - task: DotNetCoreCLI@2
@@ -53,7 +58,7 @@ steps:
     displayName: "Build & Push Account Docker Image"
     condition: always()
     inputs:
-      containerRegistry: 'Link ACR'
+      containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

@@ -2,7 +2,7 @@
 {
     public static class AccountConstants
     {
-        public const string ServiceName = "Account Service";
+        public const string ServiceName = "Account";
 
         public static class AppSettingsSectionNames
         {
@@ -11,6 +11,7 @@
             public const string Postgres = "Postgres";
             public const string Telemetry = "TelemetryConfig";
             public const string TenantApiSettings = "TenantApiSettings";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
     }
 }

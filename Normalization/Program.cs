@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using Hellang.Middleware.ProblemDetails;
@@ -6,11 +7,15 @@ using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Listeners;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -31,6 +36,34 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(NormalizationConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                         // Load configuration values with no label
+                         .Select("*", LabelFilter.Null)
+                         // Load configuration values for service name
+                         .Select("*", NormalizationConstants.AppSettingsSectionNames.ServiceName)
+                         // Load configuration values for service name and environment
+                         .Select("*", NormalizationConstants.AppSettingsSectionNames.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
@@ -56,6 +89,16 @@ static void RegisterServices(WebApplicationBuilder builder)
         KafkaProducerFactory<string, LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage>
         >();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient(serviceProvider =>
+    {
+        IKafkaProducerFactory<string, PatientDataAcquiredMessage> producerFactory =
+            ActivatorUtilities.CreateInstance<KafkaProducerFactory<string, PatientDataAcquiredMessage>>(serviceProvider);
+        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> handler =
+            ActivatorUtilities.CreateInstance<DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>(serviceProvider, producerFactory);
+        handler.ServiceName = serviceInformation.Name;
+        handler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
+        return handler;
+    });
     
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 

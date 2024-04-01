@@ -28,6 +28,8 @@ variables:
   value: '**/Validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
 
 steps:
   - template: ../azure-nuget-package-source.yml
@@ -57,7 +59,7 @@ steps:
     displayName: "Build & Push Validation Docker Image"
     condition: always()
     inputs:
-      containerRegistry: 'Link ACR'
+      containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

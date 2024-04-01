@@ -10,19 +10,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Application\Enums\**" />
     <Compile Remove="Application\Submission\**" />
     <Compile Remove="Infrastructure\**" />
+    <Content Remove="Application\Enums\**" />
     <Content Remove="Application\Submission\**" />
     <Content Remove="Infrastructure\**" />
+    <EmbeddedResource Remove="Application\Enums\**" />
     <EmbeddedResource Remove="Application\Submission\**" />
     <EmbeddedResource Remove="Infrastructure\**" />
+    <None Remove="Application\Enums\**" />
     <None Remove="Application\Submission\**" />
     <None Remove="Infrastructure\**" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2024.3.14.3" />
+    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
@@ -31,6 +36,7 @@
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
+    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.*" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
@@ -45,7 +51,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Application\Enums\" />
     <Folder Include="Domain\Interfaces\" />
   </ItemGroup>
 

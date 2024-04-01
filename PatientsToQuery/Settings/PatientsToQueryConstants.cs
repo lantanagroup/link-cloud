@@ -2,6 +2,13 @@
 {
     public class PatientsToQueryConstants
     {
+        public static string ServiceName = "PatientsToQuery";
+
+        public static class AppSettingsSectionNames
+        {
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+        }
+
         public static class LoggingIds
         {
             public const int GenerateItems = 1000;

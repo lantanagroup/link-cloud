@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Report.Application.Factory;
@@ -8,11 +9,15 @@ using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Repositories;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -23,10 +28,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.QueryDispatch.Application.Errors.Handlers;
-using LantanaGroup.Link.Report.Application.Error.Handlers;
-using LantanaGroup.Link.Report.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +42,34 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(ReportConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                            // Load configuration values with no label
+                            .Select("*", LabelFilter.Null)
+                            // Load configuration values for service name
+                            .Select("*", ReportConstants.ServiceName)
+                            // Load configuration values for service name and environment
+                            .Select("*", ReportConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
@@ -74,7 +103,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>, KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>>();
 
-    //Producers for Retry
+    //Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientsToQueryValue>, KafkaProducerFactory<string, PatientsToQueryValue>>();
@@ -126,20 +155,20 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     #region Exception Handling
     //Report Scheduled Listener
-    builder.Services.AddTransient<IReportExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, ReportExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
-    builder.Services.AddTransient<IReportTransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, ReportTransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, DeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>, TransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
 
     //Report Submitted Listener
-    builder.Services.AddTransient<IReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, ReportExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
-    builder.Services.AddTransient<IReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, ReportTransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, DeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, TransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
 
     //Patients To Query Listener
-    builder.Services.AddTransient<IReportExceptionHandler<string, PatientsToQueryValue>, ReportExceptionHandler<string, PatientsToQueryValue>>();
-    builder.Services.AddTransient<IReportTransientExceptionHandler<string, PatientsToQueryValue>, ReportTransientExceptionHandler<string, PatientsToQueryValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientsToQueryValue>, DeadLetterExceptionHandler<string, PatientsToQueryValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientsToQueryValue>, TransientExceptionHandler<string, PatientsToQueryValue>>();
 
     //Measure Evaluated Listener
-    builder.Services.AddTransient<IReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, ReportExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
-    builder.Services.AddTransient<IReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, ReportTransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, DeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, TransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
     #endregion
 
     // Logging using Serilog

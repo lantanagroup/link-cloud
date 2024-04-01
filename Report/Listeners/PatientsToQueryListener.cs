@@ -1,15 +1,14 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-
 using MediatR;
-using Quartz;
-using LantanaGroup.Link.Report.Application.Error.Interfaces;
-using LantanaGroup.Link.Report.Application.Error.Exceptions;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -19,20 +18,28 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientsToQueryValue> _kafkaConsumerFactory;
         private readonly IMediator _mediator;
 
-        private readonly IReportTransientExceptionHandler<string, PatientsToQueryValue> _reportTransientExceptionHandler;
-        private readonly IReportExceptionHandler<string, PatientsToQueryValue> _reportExceptionHandler;
+        private readonly ITransientExceptionHandler<string, PatientsToQueryValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientsToQueryValue> _deadLetterExceptionHandler;
+
+        private string Name => this.GetType().Name;
 
         public PatientsToQueryListener(ILogger<PatientsToQueryListener> logger, IKafkaConsumerFactory<string, PatientsToQueryValue> kafkaConsumerFactory,
             IMediator mediator,
-            IReportTransientExceptionHandler<string, PatientsToQueryValue> reportScheduledTransientExceptionhandler,
-            IReportExceptionHandler<string, PatientsToQueryValue> reportScheduledExceptionhandler)
+            ITransientExceptionHandler<string, PatientsToQueryValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, PatientsToQueryValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
 
-            _reportTransientExceptionHandler = reportScheduledTransientExceptionhandler ?? throw new ArgumentException(nameof(reportScheduledTransientExceptionhandler));
-            _reportExceptionHandler = reportScheduledExceptionhandler ?? throw new ArgumentException(nameof(reportScheduledExceptionhandler));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientsToQuery) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -57,55 +64,66 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<string, PatientsToQueryValue>();
+                    ConsumeResult<string, PatientsToQueryValue>? consumeResult = null;
+                    string facilityId = string.Empty;
                     try
                     {
                         consumeResult = consumer.Consume(cancellationToken);
-
-                        if (consumeResult != null)
+                        if (consumeResult == null)
                         {
-                            var key = consumeResult.Message.Key;
-                            var value = consumeResult.Message.Value;
+                            throw new DeadLetterException(
+                                $"{Name}: consumeResult is null", AuditEventType.Create);
+                        }
 
-                            if (string.IsNullOrWhiteSpace(key))
+                        var key = consumeResult.Message.Key;
+                        var value = consumeResult.Message.Value;
+                        facilityId = key;
+
+                        if (string.IsNullOrWhiteSpace(key))
+                        {
+                            throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
+                        }
+
+                        var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
+                        foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
+                        {
+                            scheduledReport.PatientsToQuery = value.PatientIds;
+
+                            await _mediator.Send(new UpdateMeasureReportScheduleCommand()
                             {
-                                throw new TerminatingException("PatientsToQueryListener: key value is null or empty");
-                            }
+                                ReportSchedule = scheduledReport
 
-                            var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
-                            foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
-                            {
-                                scheduledReport.PatientsToQuery = value.PatientIds;
-
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand()
-                                {
-                                    ReportSchedule = scheduledReport
-
-                                }, cancellationToken);
-                            }
-
-                            consumer.Commit(consumeResult);
+                            }, cancellationToken);
                         }
                     }
                     catch (ConsumeException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, new TerminatingException("PatientsToQueryListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
-                    catch (TerminatingException ex)
+                    catch (DeadLetterException ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, ex);
+                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (TransientException ex)
                     {
-                        _reportTransientExceptionHandler.HandleException(consumeResult, ex);
-                        consumer.Commit(consumeResult);
+                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
                     catch (Exception ex)
                     {
-                        consumer.Commit(consumeResult);
-                        _reportExceptionHandler.HandleException(consumeResult, new TerminatingException("PatientsToQueryListener: " + ex.Message, ex.InnerException));
+                        _deadLetterExceptionHandler.HandleException(consumeResult,
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                    }
+                    finally
+                    {
+                        if (consumeResult != null)
+                        {
+                            consumer.Commit(consumeResult);
+                        }
+                        else
+                        {
+                            consumer.Commit();
+                        }
                     }
                 }
             }
