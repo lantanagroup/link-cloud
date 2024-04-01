@@ -14,4 +14,4 @@ steps:
     inputs:
       mavenPomFile: 'Java/validation/pom.xml'
       goals: install
-      options: '-s Java/validation/.m2/settings.xml'
+      options: '-s .m2/settings.xml'
