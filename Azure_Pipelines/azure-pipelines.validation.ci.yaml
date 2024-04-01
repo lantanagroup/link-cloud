@@ -5,6 +5,9 @@ trigger:
 
 pool:
   vmImage: 'ubuntu-latest'
+  
+variables:
+- group: Link_BOTW_Build_Package_Variables
 
 steps:
   - task: JavaToolInstaller@0

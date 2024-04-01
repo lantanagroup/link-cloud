@@ -11,6 +11,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
+- group: Link_BOTW_Build_Package_Variables
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -18,7 +19,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-validation'
 - name: dockerPath
-  value: '**/Validation/Dockerfile'
+  value: 'Java/validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
 - name: containerRegistry
