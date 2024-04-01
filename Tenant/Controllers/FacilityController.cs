@@ -71,21 +71,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            var filterBuilder = Builders<FacilityConfigModel>.Filter;
-
-            var filter = filterBuilder.Empty;
-
-            if (!string.IsNullOrEmpty(facilityId))
-            {
-                filter = filterBuilder.Eq(f => f.FacilityId, facilityId);
+            if (facilityId == null && facilityName == null) {
+                facilities = await _facilityConfigurationService.GetAllFacilities(cancellationToken);
             }
-
-            if (!string.IsNullOrEmpty(facilityName))
+            else
             {
-               filter &= filterBuilder.Eq(f => f.FacilityName, facilityName);
+                facilities = await _facilityConfigurationService.GetFacilitiesByFilters(facilityId, facilityName, cancellationToken);
             }
-
-            facilities = filter == filterBuilder.Empty ? await _facilityConfigurationService.GetAllFacilities(cancellationToken) : await _facilityConfigurationService.GetFacilitiesByFilters(filter, cancellationToken);
        
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
@@ -137,7 +129,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <summary>
         /// Find a facility config by Id
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [HttpGet("{facilityId}")]
@@ -191,6 +183,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
         try
         {
+
             await _facilityConfigurationService.UpdateFacility(id, dest, cancellationToken);
         }
         catch (ApplicationException ex)
@@ -241,7 +234,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
         using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
         {
-            await ScheduleService.DeleteJobsForFacility(existingFacility.Id, existingFacility.ScheduledTasks, _scheduler);
+            await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
         }
 
         return NoContent();

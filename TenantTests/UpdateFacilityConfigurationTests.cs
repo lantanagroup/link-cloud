@@ -1,11 +1,10 @@
-
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,8 +21,8 @@ namespace TenantTests
         private MeasureApiConfig? _measureApiConfig;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private const string id = "64b6dd4efe21820a49c1698a";
-        private const string id1 = "64b6dd4efe21820a49c1698b";
+        private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45333";
+        private const string id1 = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
 
 
         private AutoMocker? _mocker;
@@ -41,7 +40,7 @@ namespace TenantTests
 
             _model = new FacilityConfigModel()
             {
-                Id = id,
+                Id = new Guid(id),
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -62,7 +61,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(id, _model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync( _model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
             .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
@@ -80,7 +79,7 @@ namespace TenantTests
 
             Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.UpdateAsync(id, _model, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.UpdateAsync(_model, CancellationToken.None), Times.Once);
 
             Assert.NotEmpty(_updatedFacilityId.Result);
 
@@ -96,7 +95,7 @@ namespace TenantTests
 
             _model = new FacilityConfigModel()
             {
-                Id = id,
+                Id = new Guid(id),
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -111,7 +110,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(id, _model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
            .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
@@ -137,7 +136,7 @@ namespace TenantTests
 
             _model = new FacilityConfigModel()
             {
-                Id = id,
+                Id = new Guid(id),
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -147,7 +146,7 @@ namespace TenantTests
 
             FacilityConfigModel _modelFound = new FacilityConfigModel()
             {
-                Id = id1,
+                Id = new Guid(id1),
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -162,7 +161,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(id, _model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
            .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));

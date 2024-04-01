@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Tenant.Entities;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Tenant.Repository;
 using Confluent.Kafka;
 using System.Text;
 using LantanaGroup.Link.Tenant.Utils;
@@ -13,22 +12,22 @@ using LantanaGroup.Link.Tenant.Models;
 using System.Diagnostics;
 using OpenTelemetry.Trace;
 using LantanaGroup.Link.Tenant.Config;
-using Microsoft.AspNetCore.Http.HttpResults;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+
 
 namespace LantanaGroup.Link.Tenant.Services
 {
-
     public class FacilityConfigurationService
     {
 
         private readonly ILogger<FacilityConfigurationService> _logger;
         private readonly HttpClient _httpClient;
-        private static List<KafkaTopic> _topics = new List<KafkaTopic>();
+        private static   List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
         private readonly IOptions<MeasureApiConfig> _measureApiConfig;
 
 
-        IFacilityConfigurationRepo _facilityConfigurationRepo;
+        private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
 
         static FacilityConfigurationService()
         {
@@ -37,18 +36,13 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, IOptions<MeasureApiConfig> tenantConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, IOptions<MeasureApiConfig> measureApiConfig, HttpClient httpClient)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
-            _measureApiConfig = tenantConfig ?? throw new ArgumentNullException(nameof(tenantConfig));
+            _measureApiConfig = measureApiConfig ?? throw new ArgumentNullException(nameof(_measureApiConfig));
             _logger = logger;
             _httpClient = httpClient;
-        }
-
-        public IFacilityConfigurationRepo getFacilityConfigurationRepo()
-        {
-            return _facilityConfigurationRepo != null ? _facilityConfigurationRepo : null;
         }
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken)
@@ -58,18 +52,17 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.GetAsync(cancellationToken);
         }
 
-        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters( FilterDefinition<FacilityConfigModel> filter, CancellationToken cancellationToken)
+        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string facilityId, string facilityName, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
-            return await _facilityConfigurationRepo.FindAsync(filter, cancellationToken);
+            return await _facilityConfigurationRepo.SearchAsync(facilityId, facilityName, cancellationToken);
         }
 
         public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Id Query");
-
-            return await _facilityConfigurationRepo.GetAsyncById(id, cancellationToken);
+            return await _facilityConfigurationRepo.GetAsyncById(new Guid(id), cancellationToken);
         }
 
         public async Task<FacilityConfigModel> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
@@ -78,7 +71,6 @@ namespace LantanaGroup.Link.Tenant.Services
 
             return await _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken);
         }
-
 
         public async Task<bool> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
         {
@@ -92,7 +84,7 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 this.ValidateFacility(newFacility);
 
-                var facility = await _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken);
+                var facility = await GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken);
 
                 // validates facility does not exist
                 if (facility is not null)
@@ -111,6 +103,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
+                    newFacility.MRPCreatedDate = DateTime.UtcNow;
                     created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
                 }
             }
@@ -170,7 +163,7 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 this.ValidateFacility(newFacility);
 
-                existingFacility = _facilityConfigurationRepo.GetAsyncById(id, cancellationToken).Result;
+                existingFacility = GetFacilityById(id, cancellationToken).Result;
 
                 if (existingFacility is null)
                 {
@@ -179,9 +172,9 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new ApplicationException($"Facility with Id: {id} Not Found");
                 }
 
-                FacilityConfigModel foundFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(newFacility.FacilityId, cancellationToken).Result;
+                FacilityConfigModel foundFacility = GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken).Result;
 
-                if (foundFacility != null && foundFacility.Id != id)
+                if (foundFacility != null && foundFacility.Id.ToString().ToLower() != id.ToLower())
                 {
                     this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
@@ -191,10 +184,16 @@ namespace LantanaGroup.Link.Tenant.Services
                 this.ValidateSchedules(newFacility);
             }
             try
-            {
+            { 
                 using (ServiceActivitySource.Instance.StartActivity("Update the Facility Command"))
                 {
-                    _ = await _facilityConfigurationRepo.UpdateAsync(id, newFacility, cancellationToken);
+                    existingFacility.FacilityId = newFacility.FacilityId;
+                    existingFacility.FacilityName = newFacility.FacilityName;
+                    existingFacility.ScheduledTasks = newFacility.ScheduledTasks;
+                    existingFacility.MonthlyReportingPlans = newFacility.MonthlyReportingPlans;
+
+                    await _facilityConfigurationRepo.UpdateAsync(existingFacility, cancellationToken);
+
                 }
             }
             catch (Exception ex)
@@ -248,7 +247,7 @@ namespace LantanaGroup.Link.Tenant.Services
             // validate facility exists
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                existingFacility = _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken).Result;
+                existingFacility = GetFacilityByFacilityId(facilityId, cancellationToken).Result;
 
                 if (existingFacility is null)
                 {
@@ -406,10 +405,15 @@ namespace LantanaGroup.Link.Tenant.Services
 
                     string requestUrl = _measureApiConfig.Value.MeasureServiceApiUrl + $"/{reportTypeSchedule.ReportType}";
 
+                    if (String.IsNullOrEmpty(_measureApiConfig.Value.MeasureServiceApiUrl))
+                    {
+                        throw new ApplicationException($"MeasureEval service configuration from \"MeasureServiceRegistry.MeasureServiceApiUrl\" is missing");
+                    }   
+
                     var response = _httpClient.GetAsync(requestUrl).Result;
 
                     // check respone status code
-                    if (!response.IsSuccessStatusCode)
+                    if (!response.IsSuccessStatusCode) 
                     {
                         throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
                     }

@@ -3,8 +3,9 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo;
 
-namespace LantanaGroup.Link.Tenant.Repository;
+namespace LantanaGroup.Link.Tenant.Repository.Implementations.Mongo;
 
 
 public class FacilityConfigurationRepo : BaseConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
@@ -23,10 +24,4 @@ public class FacilityConfigurationRepo : BaseConfigurationRepo<FacilityConfigMod
 
     }
 
-    public async Task<List<FacilityConfigModel>> FindAsync(string facilityId, string id, CancellationToken cancellationToken)
-    {
-            FilterDefinition<FacilityConfigModel> filter = Builders<FacilityConfigModel>.Filter.Where(x => x.FacilityId == facilityId && x.Id != id);
-
-            return await _collection.Find(t => t.FacilityId == facilityId).ToListAsync();
-    }
-  }
+}
