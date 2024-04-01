@@ -1,7 +1,6 @@
-﻿using LantanaGroup.Link.Tenant.Entities;
-using MongoDB.Driver;
+﻿using MongoDB.Driver;
 
-namespace LantanaGroup.Link.Tenant.Repository
+namespace LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo
 {
     public interface IPersistenceRepository<T> where T : class
     {

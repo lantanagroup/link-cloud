@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Repository;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Tenant.Services

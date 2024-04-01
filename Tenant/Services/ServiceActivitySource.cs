@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Tenant.Services
     public class ServiceActivitySource
     {
         private static string _version = string.Empty;
-        public static string ServiceName = "Link Tenant Service";
+        public static string ServiceName = "Tenant Service";
         public static ActivitySource Instance { get; private set; } = new ActivitySource(ServiceName, _version);
 
         public static void Initialize(ServiceInformation serviceInfo)

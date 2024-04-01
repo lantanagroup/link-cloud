@@ -13,7 +13,6 @@ using System.Reflection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Tenant.Repository;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -25,6 +24,12 @@ using Azure.Identity;
 using Serilog.Settings.Configuration;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Tenant.Listeners;
+using LantanaGroup.Link.Tenant.Repository.Interceptors;
+using LantanaGroup.Link.Tenant.Repository.Context;
+using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 
 namespace Tenant
 {
@@ -55,34 +60,31 @@ namespace Tenant
             //load external configuration source if specified
             var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
 
-            if ("Development" != builder.Environment.EnvironmentName)
+            if (!string.IsNullOrEmpty(externalConfigurationSource))
             {
-
-                if (!string.IsNullOrEmpty(externalConfigurationSource))
+                switch (externalConfigurationSource)
                 {
-                    switch (externalConfigurationSource)
-                    {
-                        case ("AzureAppConfiguration"):
-                            builder.Configuration.AddAzureAppConfiguration(options =>
+                    case ("AzureAppConfiguration"):
+                        builder.Configuration.AddAzureAppConfiguration(options =>
+                        {
+                            options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                                    // Load configuration values with no label
+                                    .Select("*", LabelFilter.Null)
+                                    // Load configuration values for service name
+                                    .Select("*", TenantConstants.ServiceName)
+                                    // Load configuration values for service name and environment
+                                    .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                            options.ConfigureKeyVault(kv =>
                             {
-                                options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                                     // Load configuration values with no label
-                                     .Select("*", LabelFilter.Null)
-                                     // Load configuration values for service name
-                                     .Select("*", TenantConstants.ServiceName)
-                                     // Load configuration values for service name and environment
-                                     .Select("*", TenantConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
-
-                                options.ConfigureKeyVault(kv =>
-                                {
-                                    kv.SetCredential(new DefaultAzureCredential());
-                                });
-
+                                kv.SetCredential(new DefaultAzureCredential());
                             });
-                            break;
-                    }
+
+                        });
+                        break;
                 }
             }
+
 
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
@@ -98,7 +100,7 @@ namespace Tenant
             // Add services to the container.
             builder.Services.AddGrpc();
             builder.Services.AddGrpcReflection();
-           // builder.Services.AddHostedService<ListenerXX>();
+            builder.Services.AddHostedService<ListenerXX>();
             builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
@@ -107,13 +109,36 @@ namespace Tenant
 
             builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
-            builder.Services.AddSingleton<FacilityConfigurationService>();
+            builder.Services.AddScoped<FacilityConfigurationService>();
 
-            builder.Services.AddSingleton<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
+            builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
+
+            builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
+            //Add database context
+            builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>
+            {
+
+                var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+
+                switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
+                {
+                    case "SqlServer":
+                        options.UseSqlServer(
+                            builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                           .AddInterceptors(updateBaseEntityInterceptor);
+                        break;
+                    default:
+                        throw new InvalidOperationException("Database provider not supported.");
+                }
+            });
+
+
 
             builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
 
             builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
+
 
             builder.Services.AddHttpClient();
 
@@ -144,10 +169,6 @@ namespace Tenant
             });
 
 
-
-            //Add repositories
-            //builder.Services.AddSingleton<IPersistenceRepository<FacilityConfigModel>>();
-
             //Add health checks
             builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck>("Database");
@@ -159,12 +180,11 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
-                //c.IncludeGrpcXmlComments(xmlPath, includeControllerXmlComments: true);
             });
 
             // Logging using Serilog
             builder.Logging.AddSerilog();
-            //  var seri = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Serilog);
+
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                             .ReadFrom.Configuration(builder.Configuration, loggerOptions)
@@ -260,6 +280,13 @@ namespace Tenant
                 app.MapGrpcReflectionService();
             }
 
+            // Ensure database created
+            using (var scope = app.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
+                context.Database.EnsureCreated();
+
+            }
             // Configure the HTTP request pipeline.
             //app.MapGrpcService<TenantService>();
             //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
