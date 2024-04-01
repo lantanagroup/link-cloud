@@ -6,32 +6,12 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  project: 'Validation/Validation.csproj'
-  testProject: 'ValidationUnitTests/ValidationUnitTests.csproj'
-  nugetPath: 'Validation/nuget.config'
-  serviceName: 'Validation'
-
 steps:
-  - template: ../azure-nuget-package-source.yml
-
-  - task: DotNetCoreCLI@2
+  - task: Maven@2
     displayName: Restore
+    env:
+      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      command: restore
-      projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)
-    displayName: 'Run Tests'
+      goals: install
+      options: '-s .m2/settings.xml'
 
