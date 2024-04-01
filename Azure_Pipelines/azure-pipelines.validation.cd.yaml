@@ -4,7 +4,7 @@ trigger:
     - master
   paths:
     include:
-    - Validation/*
+    - Java/validation/*
 pr: none
 
 pool:
@@ -12,12 +12,6 @@ pool:
 
 variables:
 - group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'Validation/Validation.csproj'
-- name: testProject
-  value: 'ValidationUnitTests/ValidationUnitTests.csproj'
-- name: nugetPath
-  value: 'Validation/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,48 +19,50 @@ variables:
 - name: registry-repo-Name
   value: 'link-validation'
 - name: dockerPath
-  value: '**/Validation/Dockerfile'
+  value: 'Java/validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: Maven@2
+    displayName: Maven Install
+    env:
+      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      command: restore
-      projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
-  
+      mavenPomFile: 'Java/validation/pom.xml'
+      goals: install
+      options: '-s Java/validation/.m2/settings.xml'
 
   - task: Docker@2
-    displayName: "Build & Push Validation Docker Image"
-    condition: always()
+    displayName: "Build Docker Image"
     inputs:
       containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
-      command: 'buildAndPush'
+      command: build
       Dockerfile: $(dockerPath)
+      arguments: '--build-arg SHARED_BOTW_FEED_TOKEN_ARG=$(SHARED_BOTW_FEED_TOKEN)'
       tags: |
         $(tags1)
         $(tags2)
-      buildContext: '$(Build.Repository.LocalPath)'
+      buildContext: 'Java/validation'
+
+  - task: Docker@2
+    displayName: "Push Docker Image"
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: push
+      tags: |
+        $(tags1)
+        $(tags2)
 
   - task: PublishPipelineArtifact@1
     inputs:
