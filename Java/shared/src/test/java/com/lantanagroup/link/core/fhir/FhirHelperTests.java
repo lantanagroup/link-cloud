@@ -1,4 +1,4 @@
-package com.lantanagroup.link.core;
+package com.lantanagroup.link.core.fhir;
 
 import org.junit.Test;
 
