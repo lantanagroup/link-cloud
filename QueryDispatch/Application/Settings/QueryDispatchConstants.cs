@@ -28,6 +28,7 @@
             public const string ServiceInformation = "ServiceInformation";
             public const string Telemetry = "TelemetryConfig";
             public const string TenantApiSettings = "TenantApiSettings";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
 
         public static class QueryDispatchLoggingIds

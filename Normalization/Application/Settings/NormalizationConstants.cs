@@ -11,6 +11,8 @@ public static class NormalizationConstants
         public const string Redis = "Redis";
         public const string Telemetry = "TelemetryConfig";
         public const string TenantApiSettings = "TenantApiSettings";
+        public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+        public const string ServiceName = "Normalization";
     }
 
     public static class FixResourceIDCommand

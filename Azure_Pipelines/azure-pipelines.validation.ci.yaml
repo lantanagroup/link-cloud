@@ -5,18 +5,22 @@ trigger:
 
 pool:
   vmImage: 'ubuntu-latest'
-
+  
 variables:
-  project: 'Validation/Validation.csproj'
-  testProject: 'ValidationUnitTests/ValidationUnitTests.csproj'
-  nugetPath: 'Validation/nuget.config'
-  serviceName: 'Validation'
+- group: Link_BOTW_Build_Package_Variables
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
-  # Builds module and runs tests, test results are published by this task by default
-  - task: Maven@3
-    displayName: Install and Test
+  - task: JavaToolInstaller@0
     inputs:
-      goals: package
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - task: Maven@2
+    displayName: Maven Install
+    env:
+      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
+    inputs:
+      mavenPomFile: 'Java/validation/pom.xml'
+      goals: install
+      options: '-s Java/validation/.m2/settings.xml'

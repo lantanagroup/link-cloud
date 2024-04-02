@@ -8,6 +8,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -27,18 +28,21 @@ public class PatientDataAcquiredListener : BackgroundService
     private readonly IMediator _mediator;
     private readonly IKafkaConsumerFactory<string, PatientDataAcquiredMessage> _consumerFactory;
     private readonly IKafkaProducerFactory<string, PatientNormalizedMessage> _producerFactory;
+    private readonly IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> _deadLetterExceptionHandler;
     private bool _cancelled = false;
 
     public PatientDataAcquiredListener(
         ILogger<PatientDataAcquiredListener> logger,
         IMediator mediator,
         IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
-        IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory)
+        IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
+        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
+        _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
     }
 
     ~PatientDataAcquiredListener()
@@ -71,18 +75,35 @@ public class PatientDataAcquiredListener : BackgroundService
             ConsumeResult<string, PatientDataAcquiredMessage> message;
             try
             {
-                message = kafkaConsumer.Consume();
+                message = kafkaConsumer.Consume(cancellationToken);
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                _logger.LogError(ex.Message, ex);
+                continue;
+            }
+            catch (ConsumeException ex)
+            {
+                // TODO: DLEH correctly handles these nulls despite declaring the corresponding parameters as non-nullable
+                // Update the signature of HandleException to reflect the fact that we anticipate (and explicitly check for) potentially null values?
+                // For now, use the null-forgiving operator (here and below) to suppress compiler warnings
+                _deadLetterExceptionHandler.HandleException(null!, ex, AuditEventType.Create, null!);
                 continue;
             }
 
             if (message == null)
                 continue;
 
-            (string facilityId, string correlationId) messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
+            (string facilityId, string correlationId) messageMetaData;
+            try
+            {
+                messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
+            }
+            catch (Exception ex)
+            {
+                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, null!);
+                kafkaConsumer.Commit(message);
+                continue;
+            }
 
             NormalizationConfigEntity? config = null;
             try
@@ -116,14 +137,8 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch(Exception ex)
             {
-                _logger.LogError(ex.Message,ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 

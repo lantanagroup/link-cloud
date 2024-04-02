@@ -6,10 +6,10 @@ springdoc:
 spring:
   application:
     name: ValidationService
-  datasource:
-    url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;databaseName=link-validation;encrypt=true;trustServerCertificate=true
-    username: link-user
-    password: link-password
+  #datasource:
+  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
+  #  username: link-user
+  #  password: link-password
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,8 +23,8 @@ spring:
       group-id: validation
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
-      client-id: validation
-    properties:
-      security.protocol: SASL_SSL
-      sasl.mechanism: PLAIN
+      client-id: validation-service
+    #properties:
+      #security.protocol: SASL_SSL
+      #sasl.mechanism: PLAIN
       #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";

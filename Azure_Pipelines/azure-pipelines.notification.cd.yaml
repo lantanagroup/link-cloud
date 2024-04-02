@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - master
+    - main
   paths:
     include:
     - Notification/*
@@ -28,6 +28,8 @@ variables:
   value: '**/Notification/Dockerfile'
 - name: serviceName
   value: 'Notification'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
 
 steps:
   - template: ../azure-nuget-package-source.yml
@@ -57,7 +59,7 @@ steps:
     displayName: "Build & Push Notification Docker Image"
     condition: always()
     inputs:
-      containerRegistry: 'Link ACR'
+      containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

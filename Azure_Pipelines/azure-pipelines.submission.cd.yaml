@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - master
+    - main
   paths:
     include:
     - Submission/*
@@ -28,6 +28,8 @@ variables:
   value: '**/Submission/Dockerfile'
 - name: serviceName
   value: 'Submission'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
 
 steps:
   - template: ../azure-nuget-package-source.yml
@@ -56,7 +58,7 @@ steps:
     displayName: "Build & Push Account Docker Image"
     condition: always()
     inputs:
-      containerRegistry: 'Link ACR'
+      containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
