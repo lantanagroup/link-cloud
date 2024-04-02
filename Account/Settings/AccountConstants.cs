@@ -2,7 +2,7 @@
 {
     public static class AccountConstants
     {
-        public const string ServiceName = "Account Service";
+        public const string ServiceName = "Account";
 
         public static class AppSettingsSectionNames
         {

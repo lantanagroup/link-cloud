@@ -1,0 +1,10 @@
+spring:
+  cloud:
+    azure:
+      appconfiguration:
+        enabled: false
+        stores:
+          - connection-string: ${AZURE_APP_CONFIG_CONNECTION_STRING}
+            selects:
+              - label-filter: ',Validation'
+                key-filter: '/'
