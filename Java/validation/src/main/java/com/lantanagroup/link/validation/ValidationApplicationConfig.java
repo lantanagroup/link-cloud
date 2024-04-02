@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation;
 
-import com.lantanagroup.link.validation.kafka.KafkaErrorHandler;
+import com.lantanagroup.link.shared.kafka.KafkaErrorHandler;
+import com.lantanagroup.link.shared.security.SecurityHelper;
 import com.lantanagroup.link.validation.model.PatientEvaluatedModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,12 +32,6 @@ public class ValidationApplicationConfig {
 
     @Bean
     SecurityFilterChain web(HttpSecurity http) throws Exception {
-        // TODO: This needs to be updated to secure the application
-        http
-                .authorizeHttpRequests((authorizeRequests) ->
-                        authorizeRequests
-                                .anyRequest()
-                                .anonymous());
-        return http.build();
+        return SecurityHelper.build(http);
     }
 }
