@@ -5,6 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import org.hl7.fhir.r4.model.ResourceType;
 
+import java.time.Instant;
 import java.util.Date;
 
 @Entity
@@ -21,15 +22,9 @@ public class PatientResource {
 
     private String resourceId;
 
-    private Types type;
+    private PatientResourceStages stage;
 
     private String resourceJson;
 
-    private Date timestamp;
-
-    public enum Types {
-        Original,
-        Normalized,
-        Evaluated
-    }
+    private Instant timestamp;
 }
