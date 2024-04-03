@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - master
+    - main
   paths:
     include:
     - DemoApiGateway/*
@@ -17,6 +17,7 @@ variables:
     $(Build.BuildId)
   registry-repo-Name: 'link-api-gw'
   dockerPath: '**/DemoApiGateway/Dockerfile'
+  containerRegistry: 'NHSNLink ACR Premium'
 
 steps:
   - task: PowerShell@2
@@ -73,7 +74,7 @@ steps:
     displayName: "Build & Push DemoApiGateway Docker Image"
     condition: always()
     inputs:
-      containerRegistry: 'Link ACR'
+      containerRegistry: $(containerRegistry)
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

@@ -25,12 +25,12 @@
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="Azure.Identity" Version="1.10.4" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.2.1" />
-    <PackageReference Include="CompareNETObjects" Version="4.*" />
+	<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
+	<PackageReference Include="CompareNETObjects" Version="4.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
 	<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
-    <PackageReference Include="CronExpressionDescriptor" Version="2.*" />
+    <PackageReference Include="CronExpressionDescriptor" Version="2.* />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.8.2" />
@@ -72,8 +72,7 @@
     </EmbeddedResource>
   </ItemGroup>
 
-
-	<!--<Target Name="CreateSwaggerJson" AfterTargets="Build" Condition="$(Configuration)=='Debug'">
+  <!--<Target Name="CreateSwaggerJson" AfterTargets="Build" Condition="$(Configuration)=='Debug'">
     <Exec Command="dotnet swagger tofile -\-output ./api.json $(OutputPath)$(AssemblyName).dll v1" WorkingDirectory="$(ProjectDir)" />
   </Target>-->
 
