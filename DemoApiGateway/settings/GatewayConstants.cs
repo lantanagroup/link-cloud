@@ -2,6 +2,7 @@
 {
     public class GatewayConstants
     {
+        public const string ServiceName = "DemoApiGateway";
 
         public static class AppSettingsSectionNames
         {
@@ -12,6 +13,7 @@
             public const string Gateway = "GatewayConfig";
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string Telemetry = "TelemetryConfig";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
 
         public static class LoggingIds

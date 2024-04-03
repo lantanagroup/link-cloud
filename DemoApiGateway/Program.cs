@@ -22,6 +22,8 @@ using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.DemoApiGateway.Services.Client.DataAcquisition;
 using LantanaGroup.Link.DemoApiGateway.Services.Client.Normalization;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +37,33 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(GatewayConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                            // Load configuration values with no label
+                            .Select("*", LabelFilter.Null)
+                            // Load configuration values for service name
+                            .Select("*", GatewayConstants.ServiceName)
+                            // Load configuration values for service name and environment
+                            .Select("*", GatewayConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetSection(GatewayConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
