@@ -3,13 +3,19 @@ trigger:
     include:
     - DemoApiGateway/*
 
+name: Demo API Gateway CI
+
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'DemoApiGateway/DemoApiGateway.csproj'
-  nugetPath: 'DemoApiGateway/nuget.config'
-  serviceName: 'DemoApiGateway'
+- group: Link_BOTW_Build_Package_Variables
+- name: project
+  value: 'DemoApiGateway/DemoApiGateway.csproj'
+- name: nugetPath
+  value: 'DemoApiGateway/nuget.config'
+- name: serviceName
+  value: 'DemoApiGateway'
 
 steps:
   - template: ../azure-nuget-package-source.yml
