@@ -1,7 +1,7 @@
 ﻿
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Commands;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Models.Messages;
 using Microsoft.Extensions.Logging;

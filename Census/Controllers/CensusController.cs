@@ -1,4 +1,4 @@
-﻿using Census.Settings;
+﻿using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Commands;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;

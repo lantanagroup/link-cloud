@@ -1,10 +1,11 @@
 ﻿using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Census.Domain.Entities;
 
-[BsonCollection("censusPatientListEntity")]
-public class CensusPatientListEntity : BaseEntity
+[Table("CensusPatientList")]
+public class CensusPatientListEntity : SqlBaseEntity
 {
     public string FacilityId { get; set; }
     public string PatientId { get; set; }
