@@ -1,23 +1,24 @@
-﻿using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo;
+﻿
+using LantanaGroup.Link.Tenant.Repository.Context;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IFacilityConfigurationRepo _datastore;
+        protected readonly FacilityDbContext _dataContext;
 
-        public DatabaseHealthCheck(IFacilityConfigurationRepo datastore)
+        public DatabaseHealthCheck(FacilityDbContext dataContext)
         {
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _dataContext = dataContext;
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             try
             {
-                bool outcome = await _datastore.HealthCheck();
+                bool outcome = await _dataContext.Database.CanConnectAsync();
 
                 if (outcome)
                 {

@@ -13,15 +13,15 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240401142717_AddFacilitiesTable'
+    WHERE [MigrationId] = N'20240403135254_AddFacilitiesTable'
 )
 BEGIN
     CREATE TABLE [Facilities] (
         [Id] uniqueidentifier NOT NULL,
         [FacilityId] nvarchar(max) NOT NULL,
         [FacilityName] nvarchar(max) NULL,
-        [MRPModifyDate] datetime2 NOT NULL,
-        [MRPCreatedDate] datetime2 NOT NULL,
+        [MRPModifyDate] datetime2 NULL,
+        [MRPCreatedDate] datetime2 NULL,
         [CreatedOn] datetime2 NOT NULL,
         [LastModifiedOn] datetime2 NULL,
         [MonthlyReportingPlans] nvarchar(max) NULL,
@@ -33,11 +33,11 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240401142717_AddFacilitiesTable'
+    WHERE [MigrationId] = N'20240403135254_AddFacilitiesTable'
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20240401142717_AddFacilitiesTable', N'8.0.3');
+    VALUES (N'20240403135254_AddFacilitiesTable', N'8.0.3');
 END;
 GO
 

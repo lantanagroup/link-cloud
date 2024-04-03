@@ -3,7 +3,6 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Quartz;
 using System.Diagnostics;
 
@@ -166,7 +165,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateFacility(string id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Update Facility with Id: {updatedFacility.Id} and Facility Name: {updatedFacility.FacilityName}");
 
@@ -175,7 +174,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         FacilityConfigModel existingFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
 
         // validate id and updatedFacility.id match
-        if (id != updatedFacility.Id)
+        if (id.ToString() != updatedFacility.Id)
         {
             _logger.LogError($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
 
@@ -207,13 +206,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         return NoContent();
     }
 
-    /// <summary>
-    /// Delete a facility by Id.
-    /// </summary>
-    /// <param name="id"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    [HttpDelete("{facilityId}")]
+        /// <summary>
+        /// Delete a facility by Id.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        [HttpDelete("{facilityId}")]
     public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
     {
            

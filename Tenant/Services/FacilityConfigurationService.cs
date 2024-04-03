@@ -1,5 +1,4 @@
-﻿using MongoDB.Driver;
-using LantanaGroup.Link.Tenant.Entities;
+﻿using LantanaGroup.Link.Tenant.Entities;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 using LantanaGroup.Link.Shared.Application.Models;
 using Confluent.Kafka;
@@ -13,6 +12,7 @@ using System.Diagnostics;
 using OpenTelemetry.Trace;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+using LantanaGroup.Link.Tenant.Commands;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -29,6 +29,8 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
 
+        private readonly CreateAuditEventCommand _createAuditEventCommand;
+
         static FacilityConfigurationService()
         {
             _topics.Add(KafkaTopic.RetentionCheckScheduled);
@@ -36,13 +38,14 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, IOptions<MeasureApiConfig> measureApiConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<MeasureApiConfig> measureApiConfig, HttpClient httpClient)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _measureApiConfig = measureApiConfig ?? throw new ArgumentNullException(nameof(_measureApiConfig));
             _logger = logger;
             _httpClient = httpClient;
+            _createAuditEventCommand = createAuditEventCommand;
         }
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken)
@@ -59,10 +62,10 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.SearchAsync(facilityId, facilityName, cancellationToken);
         }
 
-        public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)
+        public async Task<FacilityConfigModel> GetFacilityById(Guid id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Id Query");
-            return await _facilityConfigurationRepo.GetAsyncById(new Guid(id), cancellationToken);
+            return await _facilityConfigurationRepo.GetAsyncById(id, cancellationToken);
         }
 
         public async Task<FacilityConfigModel> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
@@ -104,6 +107,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
                     newFacility.MRPCreatedDate = DateTime.UtcNow;
+                    newFacility.Id = Guid.NewGuid();
                     created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
                 }
             }
@@ -119,36 +123,14 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
 
-            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Create Event"))
-            {
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+            // send audit event
+            AuditEventMessage auditMessageEvent  = Helper.CreateFacilityAuditEvent(newFacility);
+            _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
 
-                // audit create facility event
-                try
-                {
-                    AuditEventMessage auditEvent;
-                    Headers headers;
-                    Helper.CreateFacilityAuditEvent(newFacility, out auditEvent, out headers);
-                    // send the Audit Event
-
-                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
-                    {
-                        Key = newFacility.FacilityId,
-                        Value = auditEvent,
-                        Headers = headers
-                    });
-
-
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Failed to generate an audit event for create of facility configuration {newFacility.Id}.", ex);
-                }
-            }
             return created;
         }
 
-        public async Task<string> UpdateFacility(string id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
+        public async Task<string> UpdateFacility(Guid id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
         {
             FacilityConfigModel existingFacility;
 
@@ -174,7 +156,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 FacilityConfigModel foundFacility = GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken).Result;
 
-                if (foundFacility != null && foundFacility.Id.ToString().ToLower() != id.ToLower())
+                if (foundFacility != null && foundFacility.Id != id)
                 {
                     this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
@@ -183,6 +165,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 this.ValidateSchedules(newFacility);
             }
+            // audit update facility event
+            AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
+
             try
             { 
                 using (ServiceActivitySource.Instance.StartActivity("Update the Facility Command"))
@@ -208,30 +193,9 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException($"Facility {newFacility.FacilityId} failed to create. " + ex.Message);
             }
 
-            // audit update facility event
-            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Update Event"))
-            {
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-                try
-                {
-                    AuditEventMessage auditEvent;
-                    Headers headers;
-                    Helper.UpdateFacilityAuditEvent(newFacility, existingFacility, out auditEvent, out headers);
-
-                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
-                    {
-                        Key = newFacility.FacilityId,
-                        Value = auditEvent,
-                        Headers = headers
-                    });
-
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Failed to generate an audit event for update of facility configuration {newFacility.Id}.", ex);
-                }
-            }
-            return id;
+            // audit update facility event          
+            _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
+            return id.ToString();
         }
 
         public async Task<string> RemoveFacility(string facilityId, CancellationToken cancellationToken)
@@ -275,31 +239,9 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException($"Facility {facilityId} failed to delete. " + ex.Message);
             }
 
-            using (ServiceActivitySource.Instance.StartActivity("Produce Audit Delete Event"))
-            {
-
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-                // audit delete facility event
-                try
-                {
-                    AuditEventMessage auditEvent;
-                    Headers headers;
-                    Helper.DeleteFacilityAuditEvent(existingFacility, out auditEvent, out headers);
-
-                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
-                    {
-                        Key = existingFacility.FacilityId,
-                        Value = auditEvent,
-                        Headers = headers
-                    });
-
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Failed to generate an audit event for delete of facility configuration {existingFacility.Id}.", ex);
-                }
-            }
+            // audit delete facility event
+            AuditEventMessage auditMessageEvent = Helper.DeleteFacilityAuditEvent(existingFacility);
+            _ = Task.Run(() => _createAuditEventCommand.Execute(existingFacility.FacilityId, auditMessageEvent, cancellationToken));
             return facilityId;
         }
 
