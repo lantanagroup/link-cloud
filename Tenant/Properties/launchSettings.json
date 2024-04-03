@@ -2,8 +2,19 @@
   "profiles": {
     "Docker": {
       "commandName": "Docker",
-      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "DockerfileRunArguments": "--name=Link-Tenant --network=local-link -p 7334:7330 -p 7335:7332",
+      "launchUrl": "http://localhost:7334/swagger",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
       "environmentVariables": {
+        "ExternalConfigurationSource": "AzureAppConfiguration",
+        "ConnectionStrings__AzureAppConfiguration": "Endpoint=https://aca-configs.azconfig.io;Id=v2kd;Secret=WNzmUMf0s8KJUAaM4u6lAsAC3Pnhl3Rp0gC+wxrAkKc=",
+        "Link__Tenant__KafkaConnection__BootstrapServers__0": "kafka:9092/",
+        "Link__Tenant__MongoDB__ConnectionString": "mongodb://root:Temp123@mongodb:27017/",
+        "Link__Tenant__Logging__Serilog__WriteTo__1__Args__uri": "http://loki:3100",
+        "Link__Tenant__TelemetryConfig__TelemetryCollectorEndpoint": "http://collector:55690",
+        "Kestrel__Endpoints__Http__Url": "http://*:7330",
+        "Kestrel__Endpoints__Https__Url": "http://*:7332",
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "publishAllPorts": true,
@@ -12,6 +23,8 @@
     "ConsoleApp": {
       "commandName": "Project",
       "environmentVariables": {
+        "ExternalConfigurationSource": "AzureAppConfiguration",
+        "ConnectionStrings__AzureAppConfiguration": "Endpoint=https://aca-configs.azconfig.io;Id=v2kd;Secret=WNzmUMf0s8KJUAaM4u6lAsAC3Pnhl3Rp0gC+wxrAkKc=",
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "http://localhost:5012;https://localhost:7012",
