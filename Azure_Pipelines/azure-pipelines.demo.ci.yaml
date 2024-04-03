@@ -20,8 +20,6 @@ variables:
   value: 'DemoApiGateway'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: NodeTool@0
     inputs:
       versionSpec: '16.x'
