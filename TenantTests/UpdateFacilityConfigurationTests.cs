@@ -77,7 +77,7 @@ namespace TenantTests
             .Setup(p => p.Value)
             .Returns(_measureApiConfig);
 
-            Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
+            Task<string> _updatedFacilityId = _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.UpdateAsync(_model, CancellationToken.None), Times.Once);
 
@@ -122,7 +122,7 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
+            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));
         }
 
         [Fact]
@@ -173,7 +173,7 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
+            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));
         }
     }
 }
