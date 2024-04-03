@@ -56,7 +56,7 @@ namespace TenantTests
             .Setup(p => p.Value)
             .Returns(_measureApiConfig);
 
-            Task<FacilityConfigModel> facility = _service.GetFacilityById(id, CancellationToken.None);
+            Task<FacilityConfigModel> facility = _service.GetFacilityById(Guid.Parse(id), CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsyncById(id, CancellationToken.None), Times.Once);
 
