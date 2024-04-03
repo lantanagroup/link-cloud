@@ -117,6 +117,13 @@
             <version>2.2.0</version>
         </dependency>
 
+        <!-- Azure App Config -->
+        <dependency>
+            <groupId>com.azure.spring</groupId>
+            <artifactId>spring-cloud-azure-appconfiguration-config-web</artifactId>
+            <version>5.11.0</version>
+        </dependency>
+
         <!-- SHARED LIBRARY -->
         <dependency>
             <groupId>com.lantanagroup.link</groupId>
