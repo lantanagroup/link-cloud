@@ -53,7 +53,9 @@ steps:
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
-      tags: '$(tags)'
+      tags: |
+        $(tags1)
+        $(tags2)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
