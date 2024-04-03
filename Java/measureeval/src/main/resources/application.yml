@@ -11,11 +11,11 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:7080/realms/master
+  main:
+    allow-bean-definition-overriding: true
   data:
     mongodb:
       uri: mongodb://localhost:27017/measureeval
-      username: root
-      password: example
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
