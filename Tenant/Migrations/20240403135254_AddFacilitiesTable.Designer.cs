@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Tenant.Migrations
 {
     [DbContext(typeof(FacilityDbContext))]
-    [Migration("20240401142717_AddFacilitiesTable")]
+    [Migration("20240403135254_AddFacilitiesTable")]
     partial class AddFacilitiesTable
     {
         /// <inheritdoc />
@@ -44,10 +44,10 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<DateTime?>("LastModifiedOn")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("MRPCreatedDate")
+                    b.Property<DateTime?>("MRPCreatedDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("MRPModifyDate")
+                    b.Property<DateTime?>("MRPModifyDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");

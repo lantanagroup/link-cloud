@@ -41,10 +41,10 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<DateTime?>("LastModifiedOn")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("MRPCreatedDate")
+                    b.Property<DateTime?>("MRPCreatedDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("MRPModifyDate")
+                    b.Property<DateTime?>("MRPModifyDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");

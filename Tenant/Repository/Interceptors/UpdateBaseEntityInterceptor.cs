@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Shared.Domain.Entities;
 
 namespace LantanaGroup.Link.Tenant.Repository.Interceptors
 {
@@ -15,7 +16,7 @@ namespace LantanaGroup.Link.Tenant.Repository.Interceptors
                 return base.SavingChangesAsync(eventData, result, cancellationToken);
             }
 
-            var entries = context.ChangeTracker.Entries<BaseEntity>();
+            var entries = context.ChangeTracker.Entries<Entities.BaseEntity>();
 
             foreach (var entry in entries)
             {

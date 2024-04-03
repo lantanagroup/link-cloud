@@ -1,15 +1,16 @@
 ﻿using Google.Api;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MongoDB.Driver;
-using Tenant;
+
 
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
-public class FacilityConfigurationRepo : BaseConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
+public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
 {
     private readonly ILogger<FacilityConfigurationRepo> _logger;
     protected new readonly FacilityDbContext _dbContext;
@@ -46,6 +47,26 @@ public class FacilityConfigurationRepo : BaseConfigurationRepo<FacilityConfigMod
     {
         return await _dbContext.Facilities.FirstOrDefaultAsync(o => o.FacilityId == facilityId, cancellationToken);
     }
+
+    public async Task<FacilityConfigModel> GetAsyncById(Guid id, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Facilities.FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+    }
+
+    public async virtual Task<bool> RemoveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.Facilities.Where(g => g.Id == id).FirstOrDefaultAsync();
+
+        if (entity is null) return false;
+
+        _dbContext.Facilities.Remove(entity);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
+
+    }
+
 
     public async Task<HealthCheckResult> HealthCheck(CancellationToken cancellationToken)
     {

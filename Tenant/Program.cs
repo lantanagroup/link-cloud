@@ -30,6 +30,7 @@ using LantanaGroup.Link.Tenant.Repository.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+using LantanaGroup.Link.Tenant.Commands;
 
 namespace Tenant
 {
@@ -114,6 +115,8 @@ namespace Tenant
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
+            builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context
             builder.Services.AddDbContext<FacilityDbContext>((sp, options) =>

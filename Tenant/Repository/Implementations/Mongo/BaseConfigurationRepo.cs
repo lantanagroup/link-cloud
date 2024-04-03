@@ -8,7 +8,7 @@ using LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo;
 
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Mongo;
 
-public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Entities.BaseEntity
+public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Shared.Domain.Entities.BaseEntity
 {
     private readonly ILogger<BaseConfigurationRepo<T>> _logger;
 
@@ -37,7 +37,7 @@ public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Enti
 
     public async virtual Task<bool> CreateAsync(T newFacility, CancellationToken cancellationToken)
     {
-        newFacility.Id = Guid.NewGuid();
+        newFacility.Id = Guid.NewGuid().ToString();
 
         await _collection.InsertOneAsync(newFacility);
 
@@ -53,7 +53,7 @@ public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Enti
 
     public async virtual Task<bool> UpdateAsync(string id, T newFacility, CancellationToken cancellationToken)
     {
-        await _collection.ReplaceOneAsync(x => x.Id.ToString() == id, newFacility);
+        await _collection.ReplaceOneAsync(x => x.Id == id, newFacility);
 
         return true;
     }

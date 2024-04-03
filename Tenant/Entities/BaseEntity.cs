@@ -3,11 +3,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Tenant.Entities
 {
-    public class BaseEntity 
+    public class BaseEntity : Shared.Domain.Entities.SqlBaseEntity
     {
         [Key]
-        public Guid Id { get; set; }
-        public DateTime CreatedOn { get; set; }
-        public DateTime? LastModifiedOn { get; set; }
+        public new Guid Id { get; set; }
     }
 }
