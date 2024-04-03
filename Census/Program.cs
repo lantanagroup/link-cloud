@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Census.Jobs;
 using Census.Repositories;
 using Census.Services;
@@ -17,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
@@ -37,8 +39,36 @@ SetupMiddleware(app);
 app.Run();
 
 
-static void RegisterServices(WebApplicationBuilder builder) 
+static void RegisterServices(WebApplicationBuilder builder)
 {
+    //load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(CensusConstants.AppSettings.ExternalConfigurationSource).Get<string>();
+
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        switch (externalConfigurationSource)
+        {
+            case ("AzureAppConfiguration"):
+                builder.Configuration.AddAzureAppConfiguration(options =>
+                {
+                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
+                         // Load configuration values with no label
+                         .Select("*", LabelFilter.Null)
+                         // Load configuration values for service name
+                         .Select("*", CensusConstants.ServiceName)
+                         // Load configuration values for service name and environment
+                         .Select("*", CensusConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+
+                    options.ConfigureKeyVault(kv =>
+                    {
+                        kv.SetCredential(new DefaultAzureCredential());
+                    });
+
+                });
+                break;
+        }
+    }
+
     var serviceInformation = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {

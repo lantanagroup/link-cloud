@@ -57,7 +57,6 @@ namespace Tenant
 
         static void RegisterServices(WebApplicationBuilder builder)
         {
-
             //load external configuration source if specified
             var externalConfigurationSource = builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
 

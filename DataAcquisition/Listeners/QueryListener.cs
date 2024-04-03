@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -23,19 +24,24 @@ public class QueryListener : BackgroundService
     private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
     private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
 
+    private readonly IDeadLetterExceptionHandler<string, string> _deadLetterConsumerHandler;
+
     private readonly ILogger<QueryListener> _logger;
     private readonly IMediator _mediator;
-    
+
     public QueryListener(
         ILogger<QueryListener> logger,
         IMediator mediator,
         IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
-        IKafkaProducerFactory<string, object> kafkaProducerFactory)
+        IKafkaProducerFactory<string, object> kafkaProducerFactory,
+        IDeadLetterExceptionHandler<string, string> deadLetterConsumerHandler)
     {
         _logger = logger;
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+        _deadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
+        _deadLetterConsumerHandler.ServiceName = DataAcquisitionConstants.ServiceName;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -50,7 +56,7 @@ public class QueryListener : BackgroundService
 
     private async System.Threading.Tasks.Task StartConsumerLoop(CancellationToken cancellationToken)
     {
-        var settings = new ConsumerConfig 
+        var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
             GroupId = "DataAcquisition-Query"
@@ -66,19 +72,55 @@ public class QueryListener : BackgroundService
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            rawmessage = consumer.Consume(cancellationToken);
+            try
+            {
+                rawmessage = consumer.Consume(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
+                continue;
+            }
+
             IBaseMessage deserializedMessage = null;
             (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
 
             if (rawmessage != null)
             {
-                var message = MessageDeserializer.DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                IBaseMessage? message = null;
+                try
+                {
+                    message = MessageDeserializer.DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deserializing message: {1}", ex.Message);
+
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
+                    continue;
+                }
+
                 deserializedMessage = message;
-                messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+
+                try
+                {
+                    messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error extracting facility id and correlation id from message");
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                 {
-                    var errorMessage = $"No Facility ID provided. Unable to process message: {message}";
-                    _logger.LogWarning(errorMessage);
+                    var errorMessage = "No Facility ID provided. Unable to process message: {1}";
+                    _logger.LogWarning(errorMessage, message);
+                    _deadLetterConsumerHandler.HandleException(rawmessage, new Exception($"No Facility ID provided. Unable to process message: {message}"), AuditEventType.Query, "");
                     continue;
                 }
 
@@ -101,17 +143,9 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    ProduceAuditMessage(new AuditEventMessage
-                    {
-                        CorrelationId = messageMetaData.correlationId,
-                        FacilityId = messageMetaData.facilityId,
-                        Action = AuditEventType.Query,
-                        //Resource = string.Join(',', deserializedMessage.Type),
-                        EventDate = DateTime.UtcNow,
-                        ServiceName = DataAcquisitionConstants.ServiceName,
-                        Notes = $"Failed to get {rawmessage.Topic}\nException Message: {ex}\nRaw Message: {JsonConvert.SerializeObject(rawmessage)}",
-                    });
-                    _logger.LogError(ex,"Error producing message: {1}", ex.Message);
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
+                    _logger.LogError(ex, "Error producing message: {1}", ex.Message);
                     responseMessages = null;
                     continue;
                 }
@@ -132,6 +166,7 @@ public class QueryListener : BackgroundService
                             Key = messageMetaData.facilityId,
                             Value = (PatientIDsAcquiredMessage)responseMessages[0]
                         };
+
                         await producer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
                     }
                     else
@@ -166,16 +201,9 @@ public class QueryListener : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    ProduceAuditMessage(new AuditEventMessage
-                    {
-                        CorrelationId = messageMetaData.correlationId,
-                        FacilityId = messageMetaData.facilityId,
-                        Action = AuditEventType.Query,
-                        ServiceName = DataAcquisitionConstants.ServiceName,
-                        EventDate = DateTime.UtcNow,
-                        Notes = $"Failed to produce message. \nException Message: {ex}\nRaw Kafka Message: {rawmessage}",
-                    });
-                    _logger.LogError($"Failed to produce message", ex);
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
+                    _logger.LogError(ex, "Failed to produce message");
                     continue;
                 }
                 consumer.Commit(rawmessage);
@@ -192,7 +220,10 @@ public class QueryListener : BackgroundService
                     EventDate = DateTime.UtcNow,
                     Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
                 });
-                _logger.LogWarning($"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}");
+                _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
+
+                _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                _deadLetterConsumerHandler.HandleException(rawmessage, new Exception("Message meets no condition for processing"), AuditEventType.Query, messageMetaData.facilityId);
             }
         }
     }

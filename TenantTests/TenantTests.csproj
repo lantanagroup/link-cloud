@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.1.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="xunit" Version="2.*" />
 	<PackageReference Include="Moq.AutoMock" Version="*-*" />
@@ -22,6 +21,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
   </ItemGroup>
 
   <ItemGroup>
