@@ -26,11 +26,11 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Tenant.Listeners;
-using LantanaGroup.Link.Tenant.Repository.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Commands;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 
 namespace Tenant
 {
