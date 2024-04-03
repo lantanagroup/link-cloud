@@ -18,17 +18,17 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async Task<List<T>> GetAsync(CancellationToken cancellationToken)
+    public async Task<List<T>> GetAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.Set<T>().ToListAsync(cancellationToken);
     }
 
-    public async Task<T> GetAsyncById(string id, CancellationToken cancellationToken)
+    public async Task<T> GetAsyncById(string id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
-    public async virtual Task<bool> CreateAsync(T entity, CancellationToken cancellationToken)
+    public async virtual Task<bool> CreateAsync(T entity, CancellationToken cancellationToken = default)
     {
         _dbContext.Set<T>().Add(entity);
 
@@ -38,7 +38,7 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
     }
 
 
-    public async virtual Task<bool> UpdateAsync(T entity, CancellationToken cancellationToken)
+    public async virtual Task<bool> UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
         _dbContext.Set<T>().Update(entity);
 
@@ -48,7 +48,7 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
 
     }
 
-    public async virtual Task<bool> RemoveAsync(string id, CancellationToken cancellationToken)
+    public async virtual Task<bool> RemoveAsync(string id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefaultAsync();
 
