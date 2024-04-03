@@ -1,4 +1,4 @@
-package com.lantanagroup.link.validation.kafka;
+package com.lantanagroup.link.shared.kafka;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

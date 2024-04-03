@@ -1,4 +1,4 @@
-package com.lantanagroup.link.shared;
+package com.lantanagroup.link.shared.fhir;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
