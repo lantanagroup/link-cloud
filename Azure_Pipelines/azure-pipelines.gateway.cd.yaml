@@ -23,6 +23,8 @@ variables:
   value: 'link-api-gw'
 - name: dockerPath
   value: '**/DemoApiGateway/Dockerfile'
+- name: serviceName
+  value: 'DemoApiGateway'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
