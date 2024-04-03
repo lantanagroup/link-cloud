@@ -16,7 +16,7 @@ variables:
 - name: tags2
   value: '$(Build.BuildId)'
 - name: registry-repo-Name
-  value: 'link-api-gw'
+  value: 'link-demo-app'
 - name: dockerPath
   value: '**/DemoApp/Dockerfile'
 - name: workingDir
