@@ -2,13 +2,20 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
 WORKDIR /app
-EXPOSE 80
-EXPOSE 443
+
+ENV \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
+RUN apk add --no-cache \
+    icu-data-full \
+    icu-libs
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["DemoApiGateway/DemoApiGateway.csproj", "DemoApiGateway/"]
-RUN dotnet restore "DemoApiGateway/DemoApiGateway.csproj"
+COPY ["DemoApiGateway/nuget.config", "DemoApiGateway/"]
+RUN dotnet restore "DemoApiGateway/DemoApiGateway.csproj" --configfile "DemoApiGateway/nuget.config"
 COPY . .
 WORKDIR "/src/DemoApiGateway"
 RUN dotnet build "DemoApiGateway.csproj" -c Release -o /app/build
