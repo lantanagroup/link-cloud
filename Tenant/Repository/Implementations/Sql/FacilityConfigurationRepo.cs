@@ -25,7 +25,6 @@ public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfig
     {
 
         var query = _dbContext.Facilities.AsNoTracking().AsQueryable();
-     #region Build Query
 
         if (facilityId is not null && facilityId.Length > 0)
         {
@@ -37,10 +36,14 @@ public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfig
             query = query.Where(x => x.FacilityName == facilityName);
         }
 
-        #endregion
         var facilities = await query.ToListAsync(cancellationToken);
 
         return facilities;
+    }
+
+    public async Task<List<FacilityConfigModel>> GetAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.Set<FacilityConfigModel>().ToListAsync(cancellationToken);
     }
 
     public async Task<FacilityConfigModel> GetAsyncByFacilityId(string facilityId, CancellationToken cancellationToken)
