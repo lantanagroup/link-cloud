@@ -1,10 +1,9 @@
-﻿using Census.Commands;
-using Census.Domain.Entities;
+﻿using Census.Domain.Entities;
 using Census.Models;
 using Census.Repositories;
-using Census.Services;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Commands;
+using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;

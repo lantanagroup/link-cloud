@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Application.Interfaces;
 
-public interface ICensusHistoryRepository : IMongoDbRepository<PatientCensusHistoricEntity>
+public interface ICensusHistoryRepository : ISqlPersistenceRepository<PatientCensusHistoricEntity>
 {
-    List<PatientCensusHistoricEntity> GetAllCensusReportsForFacility(string facilityId);
+    Task<IEnumerable<PatientCensusHistoricEntity>> GetAllCensusReportsForFacility(string facilityId);
 }
