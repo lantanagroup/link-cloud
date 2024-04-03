@@ -1,5 +1,6 @@
 package com.lantanagroup.link.shared.security;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,6 +16,8 @@ public class SecurityHelper {
                     // - consider putting the Authorization Manager classes in the shared module
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").access(customAuthorizationManager());
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").hasRole("ROLE_USER");
+
+                    authorizeRequests.requestMatchers(HttpMethod.GET, "/_health").permitAll();
                     authorizeRequests.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(resourceServer -> {
