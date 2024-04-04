@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Utilities;
+
+namespace LantanaGroup.Link.Shared.Application.Models;
 
 public enum KafkaTopic
 {
@@ -29,5 +31,18 @@ public enum KafkaTopic
     ReportSubmitted,
     BundleEvalRequested,
     PatientsToQuery,
-    SubmitReport
+    SubmitReport,
+    [StringValue("MeasureEvaluated-Retry")]
+    MeasureEvaluatedRetry,
+    [StringValue("ReportSubmitted-Retry")]
+    ReportSubmittedRetry,
+    [StringValue("BundleEvalRequested-Retry")]
+    BundleEvalRequestedRetry,
+    [StringValue("PatientsToQuery-Retry")]
+    PatientsToQueryRetry,
+    [StringValue("SubmitReport-Retry")]
+    SubmitReportRetry,
+    [StringValue("ReportScheduled-Retry")]
+    ReportScheduledRetry
+
 }

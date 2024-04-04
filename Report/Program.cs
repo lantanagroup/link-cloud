@@ -149,6 +149,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
     builder.Services.AddHostedService<MeasureReportScheduleService>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

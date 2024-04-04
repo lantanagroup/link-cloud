@@ -1,0 +1,107 @@
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services;
+using MediatR;
+using Microsoft.Extensions.Logging;
+using Quartz;
+
+namespace LantanaGroup.Link.Shared.Jobs
+{
+    [DisallowConcurrentExecution]
+    public class RetryJob : IJob
+    {
+        private readonly ILogger<RetryJob> _logger;
+        private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
+        private readonly IMediator _mediator;
+        private readonly ISchedulerFactory _schedulerFactory;
+
+        public RetryJob(ILogger<RetryJob> logger,
+            IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
+            IMediator mediator,
+            ISchedulerFactory schedulerFactory)
+        {
+            _logger = logger;
+            _retryKafkaProducerFactory = retryKafkaProducerFactory;
+            _mediator = mediator;
+            _schedulerFactory = schedulerFactory;
+        }
+
+        public async Task Execute(IJobExecutionContext context)
+        {
+            try
+            {
+                var triggerMap = context.Trigger.JobDataMap;
+
+                var retryEntity =
+                    (RetryEntity)triggerMap["RetryService"];
+
+
+                _logger.LogInformation(
+                    $"Executing RetryJob for {retryEntity.Topic}-{retryEntity.Id}");
+
+
+                ProducerConfig config = new ProducerConfig()
+                {
+                    ClientId = retryEntity.ClientId
+                };
+
+                using (var prod = _retryKafkaProducerFactory.CreateProducer(config))
+                {
+
+                    var darKey = retryEntity.Key;
+                    var darValue = retryEntity.Value;
+
+                    prod.Produce(retryEntity.Topic,
+                        new Message<string, string>
+                        {
+                            Key = darKey, 
+                            Value = darValue, 
+                            Headers = retryEntity.Headers
+                        });
+
+                    prod.Flush();
+                }
+
+                using (var producer = _retryKafkaProducerFactory.CreateAuditEventProducer())
+                {
+                    try
+                    {
+                        var val = new AuditEventMessage
+                        {
+                            FacilityId = retryEntity.FacilityId,
+                            ServiceName = retryEntity.ServiceName,
+                            Action = AuditEventType.Create,
+                            EventDate = DateTime.UtcNow,
+                            Resource = retryEntity.Topic,
+                            Notes = retryEntity.JobId
+                        };
+
+                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                            new Message<string, AuditEventMessage>
+                            {
+                                Value = val,
+                                Headers = retryEntity.Headers
+                            });
+                        producer.Flush();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to generate a {nameof(KafkaTopic.AuditableEventOccurred)} message");
+                    }
+                }
+                
+
+                // remove the job from the scheduler
+                await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {ex.Message + Environment.NewLine + ex.StackTrace}");
+                throw;
+            }
+        }
+    }
+}
