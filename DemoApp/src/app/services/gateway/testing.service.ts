@@ -9,14 +9,13 @@ import { ErrorHandlingService } from '../error-handling.service';
 import { IPatientEvent } from '../../interfaces/testing/patient-event.interface';
 import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/testing/data-acquisition-requested.interface';
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
+import { AppConfigService } from '../app-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TestService {
-  private baseApiUrl = `${environment.baseApiUrl}/api`;
-
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   generateReportScheduledEvent(facilityId: string, reportType: string, startDate: Date, endDate: Date): Observable<IEntityCreatedResponse> {
     let event: IReportScheduled = {
@@ -26,7 +25,7 @@ export class TestService {
       endDate: endDate
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/testing/report-scheduled`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/report-scheduled`, event)
       .pipe(
         tap(_ => console.log(`Request for a new report scheduled event was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -44,7 +43,7 @@ export class TestService {
       eventType: eventType
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/testing/patient-event`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/patient-event`, event)
       .pipe(
         tap(_ => console.log(`Request for a new patient event was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -62,7 +61,7 @@ export class TestService {
       reports: reports
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/testing/data-acquisition-requested-event`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/data-acquisition-requested-event`, event)
       .pipe(
         tap(_ => console.log(`Request for a new data acquisition requested event was sent.`)),
         map((response: IEntityCreatedResponse) => {
