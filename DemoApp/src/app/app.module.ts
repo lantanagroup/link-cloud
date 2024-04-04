@@ -22,17 +22,13 @@ import { MatSelectModule } from '@angular/material/select';
 
 import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
 
-import { environment } from '../environments/environment';
 import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
-import { DataAcquisitionFhirQueryConfigFormComponent } from './components/data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
-import { DataAcquisitionFhirQueryConfigDialogComponent } from './components/data-acquisition/data-acquisition-fhir-query-config-dialog/data-acquisition-fhir-query-config-dialog.component';
-import { DataAcquisitionFhirListConfigDialogComponent } from './components/data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
-import { DataAcquisitionFhirListConfigFormComponent } from './components/data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
-import { DataAcquisitionAuthenticationConfigFormComponent } from './components/data-acquisition/data-acquisition-authentication-config-form/data-acquisition-authentication-config-form.component';
-import { DataAcquisitionAuthenticationConfigDialogComponent } from './components/data-acquisition/data-acquisition-authentication-config-dialog/data-acquisition-authentication-config-dialog.component';
-import { MatDateSelectionModel } from '@angular/material/datepicker';
+import { APP_INITIALIZER } from '@angular/core';
+import { AppConfigService } from './services/app-config.service';
 
-
+export function initConfig(appConfig: AppConfigService) {
+  return () => appConfig.loadConfig();
+}
 
 @NgModule({
   declarations: [
@@ -41,7 +37,7 @@ import { MatDateSelectionModel } from '@angular/material/datepicker';
   imports: [
     OAuthModule.forRoot({
       resourceServer: {
-        allowedUrls: [`${environment.baseApiUrl}/api`],
+        // allowedUrls: [`${environment.baseApiUrl}/api`], TODO: Not sure how to get this from a run-time config
         sendAccessToken: true
       }
     }),
@@ -63,6 +59,12 @@ import { MatDateSelectionModel } from '@angular/material/datepicker';
     MatSelectModule,
   ],
   providers: [
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initConfig,
+      deps: [AppConfigService],
+      multi: true,
+    },
     StyleManagerService,
     HttpInterceptorProviders
   ],
