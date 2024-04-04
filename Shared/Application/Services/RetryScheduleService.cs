@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Jobs;
 using MediatR;
 using Microsoft.Extensions.Hosting;
@@ -13,27 +14,39 @@ namespace LantanaGroup.Link.Shared.Application.Services
         private readonly ILogger<RetryScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IMediator _mediator;
+        private readonly RetryRepository _retryRepository;
 
         public IScheduler Scheduler { get; set; } = default!;
 
-        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IMediator mediator)
+        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository repository)
         {
             _logger = logger;
             _jobFactory = jobFactory;
             _schedulerFactory = schedulerFactory;
-            _mediator = mediator;
+            _retryRepository = repository;
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-            Scheduler.JobFactory = _jobFactory;
+            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+            scheduler.JobFactory = _jobFactory;
 
+            var retries = await _retryRepository.GetAllAsync(cancellationToken);
 
+            foreach (var retry in retries)
+            {
+                try
+                {
+                    await CreateJobAndTrigger(retry, scheduler);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Could not schedule {retry.Id}: {ex.Message}");
+                }
+            }
 
-            await Scheduler.Start(cancellationToken);
+            await scheduler.Start(cancellationToken);
             _logger.LogInformation("RetryScheduleService started.");
         }
 
@@ -59,7 +72,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put("RetryService", entity);
+            jobDataMap.Put("RetryEntity", entity);
 
             return JobBuilder
                 .Create(typeof(RetryJob))
@@ -74,7 +87,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
         {
             JobDataMap jobDataMap = new JobDataMap();
 
-            jobDataMap.Put("RetryService", entity);
+            jobDataMap.Put("RetryEntity", entity);
 
             return TriggerBuilder
                 .Create()
