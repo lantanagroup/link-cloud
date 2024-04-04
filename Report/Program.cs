@@ -28,6 +28,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,6 +117,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
     builder.Services.AddSingleton<ReportRepository>();
     builder.Services.AddSingleton<PatientsToQueryRepository>();
+    builder.Services.AddSingleton<RetryRepository>();
 
     // Add controllers
     builder.Services.AddControllers();

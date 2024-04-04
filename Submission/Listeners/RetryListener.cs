@@ -2,10 +2,11 @@
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Quartz;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Quartz;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -17,14 +18,16 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaConsumerFactory;
 
         private readonly ISchedulerFactory _schedulerFactory;
-
+        private readonly RetryRepository _retryRepository;
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory)
+            ISchedulerFactory schedulerFactory,
+            RetryRepository retryRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
+            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,7 +40,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "ReportScheduledEvent",
+                GroupId = "SubmissionRetryService",
                 EnableAutoCommit = false
             };
 
@@ -45,8 +48,8 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(KafkaTopic.SubmitReportRetry.GetStringValue());
-                
-                _logger.LogInformation($"Started Report Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+
+                _logger.LogInformation($"Started Submission Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 
                 try
                 {
@@ -70,13 +73,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         var retryEntity = new RetryEntity
                         {
-                            Id = Guid.NewGuid(),
+                            Id = Guid.NewGuid().ToString(),
                             ClientId = config.GroupId,
                             ServiceName = "Submission",
                             FacilityId = consumeResult.Message.Key,
+                            ScheduledTrigger = "",
                             Topic = consumeResult.Topic,
-                            Offset = consumeResult.Offset.Value,
-                            Partition = consumeResult.Partition.Value,
                             Key = consumeResult.Message.Key,
                             Value = consumeResult.Message.Value,
                             RetryCount = retryCount,
@@ -84,6 +86,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             Headers = consumeResult.Message.Headers,
                             CreateDate = DateTime.UtcNow
                         };
+
+                        await _retryRepository.AddAsync(retryEntity, cancellationToken);
 
                         await RetryScheduleService.CreateJobAndTrigger(retryEntity,
                             await _schedulerFactory.GetScheduler(cancellationToken));

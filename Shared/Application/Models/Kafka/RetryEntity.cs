@@ -1,17 +1,19 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Domain.Attributes;
+using LantanaGroup.Link.Shared.Domain.Entities;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Application.Models
 {
-    public class RetryEntity
+    [BsonCollection("retryEntity")]
+    [BsonIgnoreExtraElements]
+    public class RetryEntity : BaseEntity
     {
-        public Guid? Id { get; set; }
         public string? ServiceName { get; set; }
         public string? ClientId { get; set; }
 
         public string? FacilityId { get; set; }
         public string? Topic { get; set; }
-        public long Offset { get; set; }
-        public int Partition { get; set; }
         public string? Key { get; set; }
         public string? Value { get; set; }
         public Headers? Headers { get; set; }    
@@ -20,7 +22,7 @@ namespace LantanaGroup.Link.Report.Application.Models
         public string? CorrelationId { get; set; }
         public DateTime CreateDate { get; set; }
 
-
+        [BsonIgnore]
         public string JobId => $"{Id?.ToString() ?? string.Empty}-{FacilityId ?? string.Empty}-{Topic ?? string.Empty}";
     }
 }

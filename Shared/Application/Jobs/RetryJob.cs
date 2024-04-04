@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Shared.Jobs
                 var triggerMap = context.Trigger.JobDataMap;
 
                 var retryEntity =
-                    (RetryEntity)triggerMap["RetryService"];
+                    (RetryEntity)triggerMap["RetryEntity"];
 
 
                 _logger.LogInformation(
