@@ -21,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +95,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitReportListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     //Add health checks
     builder.Services.AddHealthChecks();

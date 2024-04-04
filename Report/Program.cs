@@ -138,16 +138,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     //builder.Services.AddSingleton<IKafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>, KafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
+    // Add quartz scheduler
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
+
     // Add hosted services
     builder.Services.AddHostedService<MeasureEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<ReportSubmittedListener>();
     builder.Services.AddHostedService<PatientsToQueryListener>();
-
-    // Add quartz scheduler
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
     builder.Services.AddHostedService<MeasureReportScheduleService>();
     builder.Services.AddHostedService<RetryScheduleService>();
 
