@@ -22,6 +22,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +88,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
     builder.Services.AddSingleton<TenantSubmissionRepository>();
+    builder.Services.AddSingleton<RetryRepository>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
 
