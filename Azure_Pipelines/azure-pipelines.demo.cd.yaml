@@ -4,46 +4,55 @@ trigger:
     - main
   paths:
     include:
-    - DemoApiGateway/*
+    - DemoApp/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
 - group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'DemoApiGateway/DemoApiGateway.csproj'
-- name: nugetPath
-  value: 'DemoApiGateway/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
   value: '$(Build.BuildId)'
 - name: registry-repo-Name
-  value: 'link-api-gw'
+  value: 'link-demo-app'
 - name: dockerPath
-  value: '**/DemoApiGateway/Dockerfile'
+  value: '**/DemoApp/Dockerfile'
+- name: workingDir
+  value: 'DemoApp/'
 - name: serviceName
-  value: 'DemoApiGateway'
+  value: 'DemoApp'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '16.x'
+    displayName: 'Install Node.js'
+ 
+  - task: Npm@1  
+    displayName: 'Angular CLI 13.2.5'  
+    inputs:  
+      command: custom  
+      verbose: false  
+      customCommand: 'install -g @angular/cli'
 
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: Npm@1  
+    displayName: 'npm install'  
     inputs:
-      command: restore
-      projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
+      command: custom  
+      workingDir: $(workingDir)
+      customCommand: 'install'
+      
+  - task: Npm@1  
+    displayName: Build  
+    inputs: 
+      command: custom  
+      verbose: false 
+      workingDir: $(workingDir)
+      customCommand: 'run build'
   
   - task: Docker@2
     displayName: "Build & Push DemoApiGateway Docker Image"
@@ -56,7 +65,7 @@ steps:
       tags: |
         $(tags1)
         $(tags2)
-      buildContext: '$(Build.Repository.LocalPath)'
+      buildContext: '$(workingDir)'
 
   - task: PublishPipelineArtifact@1
     inputs:

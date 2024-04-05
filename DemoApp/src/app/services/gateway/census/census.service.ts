@@ -6,14 +6,13 @@ import { ICensusConfiguration } from 'src/app/interfaces/census/census-config-mo
 import { Observable, catchError, map, tap } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
+import { AppConfigService } from '../../app-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CensusService {
-  private baseApiUrl = `${environment.baseApiUrl}/api`;
-
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   createConfiguration(facilityId: string, scheduledTrigger: string): Observable<IEntityCreatedResponse> {
     let census: ICensusConfiguration = {
@@ -21,7 +20,7 @@ export class CensusService {
       scheduledTrigger: scheduledTrigger
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/census/config`, census)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config`, census)
       .pipe(
         tap(_ => console.log(`Request for configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -37,7 +36,7 @@ export class CensusService {
       scheduledTrigger: scheduledTrigger
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/census/config/${facilityId}`, census)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`, census)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -48,7 +47,7 @@ export class CensusService {
   }
 
   getConfiguration(facilityId: string): Observable<ICensusConfiguration> {
-    return this.http.get<ICensusConfiguration>(`${this.baseApiUrl}/census/config/${facilityId}`)
+    return this.http.get<ICensusConfiguration>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -56,7 +55,7 @@ export class CensusService {
   }
 
   deleteConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.baseApiUrl}/census/config/${facilityId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/census/config/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
