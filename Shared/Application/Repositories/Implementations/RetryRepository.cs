@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

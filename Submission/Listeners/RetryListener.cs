@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
@@ -8,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
 using System.Text;
 
-namespace LantanaGroup.Link.Report.Listeners
+namespace LantanaGroup.Link.Submission.Listeners
 {
     public class RetryListener : BackgroundService
     {

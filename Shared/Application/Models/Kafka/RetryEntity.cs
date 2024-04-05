@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace LantanaGroup.Link.Report.Application.Models
+namespace LantanaGroup.Link.Shared.Application.Models
 {
     [BsonCollection("retryEntity")]
     [BsonIgnoreExtraElements]
