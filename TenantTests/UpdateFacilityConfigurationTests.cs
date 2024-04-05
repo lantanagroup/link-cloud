@@ -61,7 +61,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync( _model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync( _model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
             .Setup(p => p.GetAsyncById(Guid.Parse(id), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
@@ -110,10 +110,10 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
+           .Setup(p => p.GetAsyncById(new Guid(id), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
@@ -161,10 +161,10 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+           .Setup(p => p.GetAsyncById(new Guid(id), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_modelFound));
