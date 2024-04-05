@@ -99,6 +99,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientsToQueryValue>, KafkaConsumerFactory<string, PatientsToQueryValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
 
     //Producres
     builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
@@ -151,6 +152,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ReportSubmittedListener>();
     builder.Services.AddHostedService<PatientsToQueryListener>();
     builder.Services.AddHostedService<MeasureReportScheduleService>();
+    builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
