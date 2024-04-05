@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Jobs;
 using MediatR;
