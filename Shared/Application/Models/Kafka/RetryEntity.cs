@@ -15,8 +15,8 @@ namespace LantanaGroup.Link.Shared.Application.Models
         public string? FacilityId { get; set; }
         public string? Topic { get; set; }
         public string? Key { get; set; }
-        public string? Value { get; set; }
-        public Headers? Headers { get; set; }    
+        public string? Value { get; set; } 
+        public Dictionary<string, string>? Headers { get; set; }
         public string? ScheduledTrigger { get; set; }
         public int RetryCount { get; set; }
         public string? CorrelationId { get; set; }

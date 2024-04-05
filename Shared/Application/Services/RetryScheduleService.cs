@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using Amazon.Runtime.Internal.Util;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Jobs;
 using MediatR;
@@ -89,11 +90,17 @@ namespace LantanaGroup.Link.Shared.Application.Services
 
             jobDataMap.Put("RetryEntity", entity);
 
+
+            var duration = System.Xml.XmlConvert.ToTimeSpan(entity.ScheduledTrigger);
+            
+            var offset = DateBuilder.DateOf(duration.Hours, duration.Minutes, duration.Seconds);
+
+
             return TriggerBuilder
                 .Create()
+                .StartAt(offset)
                 .ForJob(jobKey)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithCronSchedule(entity.ScheduledTrigger)
                 .WithDescription($"{entity.Id}-{entity.ScheduledTrigger}")
                 .UsingJobData(jobDataMap)
                 .Build();
