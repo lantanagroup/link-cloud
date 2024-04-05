@@ -77,7 +77,6 @@ namespace LantanaGroup.Link.Report.Listeners
                         
                         var retryEntity = new RetryEntity
                         {
-                            Id = Guid.NewGuid().ToString(),
                             ClientId = config.GroupId,
                             ServiceName = ReportConstants.ServiceName,
                             FacilityId = consumeResult.Message.Key,

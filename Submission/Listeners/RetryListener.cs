@@ -72,7 +72,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                         var retryEntity = new RetryEntity
                         {
-                            Id = Guid.NewGuid().ToString(),
                             ClientId = config.GroupId,
                             ServiceName = "Submission",
                             FacilityId = consumeResult.Message.Key,
