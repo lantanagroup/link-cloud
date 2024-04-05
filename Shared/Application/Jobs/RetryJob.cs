@@ -58,7 +58,8 @@ namespace LantanaGroup.Link.Shared.Jobs
                         {
                             Key = darKey, 
                             Value = darValue, 
-                            Headers = retryEntity.Headers
+                            //TODO: Daniel - Add back
+                            //Headers = retryEntity.Headers
                         });
 
                     prod.Flush();
@@ -82,7 +83,8 @@ namespace LantanaGroup.Link.Shared.Jobs
                             new Message<string, AuditEventMessage>
                             {
                                 Value = val,
-                                Headers = retryEntity.Headers
+                                //TODO: Daniel - Add back
+                                //Headers = retryEntity.Headers
                             });
                         producer.Flush();
                     }
