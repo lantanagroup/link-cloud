@@ -23,6 +23,10 @@ using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using Quartz.Spi;
+using LantanaGroup.Link.Submission.Application.Factories;
+using Quartz.Impl;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +102,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add hosted services
     builder.Services.AddHostedService<SubmitReportListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
+
+    // Add quartz scheduler
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 
     //Add health checks
     builder.Services.AddHealthChecks();
