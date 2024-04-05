@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken);
         }
 
-        public async Task<bool> CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
+        public async Task CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Facility Configuration");
 
@@ -100,7 +100,6 @@ namespace LantanaGroup.Link.Tenant.Services
                 this.ValidateSchedules(newFacility);
             }
 
-            bool created = false;
             try
             {
 
@@ -108,7 +107,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     newFacility.MRPCreatedDate = DateTime.UtcNow;
                     newFacility.Id = Guid.NewGuid();
-                    created = await _facilityConfigurationRepo.CreateAsync(newFacility, cancellationToken);
+                    await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -127,7 +126,6 @@ namespace LantanaGroup.Link.Tenant.Services
             AuditEventMessage auditMessageEvent  = Helper.CreateFacilityAuditEvent(newFacility);
             _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
 
-            return created;
         }
 
         public async Task<string> UpdateFacility(Guid id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)

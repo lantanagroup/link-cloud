@@ -41,8 +41,8 @@ namespace TenantTests
                 ScheduledTasks = new List<ScheduledTaskModel>(),
                 MRPCreatedDate = DateTime.Now,
                 MRPModifyDate = DateTime.Now,
-                CreatedOn = DateTime.Now,
-                LastModifiedOn = DateTime.Now
+                CreateDate = DateTime.Now,
+                ModifyDate = DateTime.Now
             };
 
             _measureApiConfig = new MeasureApiConfig()
@@ -57,7 +57,7 @@ namespace TenantTests
            _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.CreateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.AddAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
@@ -68,11 +68,9 @@ namespace TenantTests
               .Setup(p => p.Value)
               .Returns(_measureApiConfig);
 
-            var result = await _service.CreateFacility(_model,CancellationToken.None);
+             await _service.CreateFacility(_model,CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.CreateAsync(_model, CancellationToken.None), Times.Once);
-
-             Assert.True(result);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
         }
 
         //TODO: Fix this, because as of now the create step appears to be mocked and we can't actually detect duplicate creations in unit testing
@@ -109,7 +107,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.CreateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.AddAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None))
