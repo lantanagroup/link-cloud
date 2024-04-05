@@ -5,14 +5,13 @@ import { catchError, map, retry, tap } from 'rxjs/operators';
 import { PagedAuditModel } from '../../models/audit/paged-audit-model.model';
 import { environment } from '../../../environments/environment';
 import { ErrorHandlingService } from '../error-handling.service';
+import { AppConfigService } from '../app-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuditService {
-  private baseApiUrl = `${environment.baseApiUrl}/api`;
-
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   list(searchText: string, filterFacilityBy: string, filterCorrelationBy: string, filterServiceBy: string,
     filterActionBy: string, filterUserBy: string, sortBy: string, pageSize: number, pageNumber: number): Observable<PagedAuditModel> {
@@ -20,7 +19,7 @@ export class AuditService {
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    return this.http.get<PagedAuditModel>(`${this.baseApiUrl}/audit?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&filterCorrelationBy=${filterCorrelationBy}&filterServiceBy=${filterServiceBy}&filterActionBy=${filterActionBy}&filterUserBy=${filterUserBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
+    return this.http.get<PagedAuditModel>(`${this.appConfigService.config?.baseApiUrl}/audit?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&filterCorrelationBy=${filterCorrelationBy}&filterServiceBy=${filterServiceBy}&filterActionBy=${filterActionBy}&filterUserBy=${filterUserBy}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
     .pipe(
       tap(_ => console.log(`fetched audit logs.`)),
       map((response: PagedAuditModel) => {

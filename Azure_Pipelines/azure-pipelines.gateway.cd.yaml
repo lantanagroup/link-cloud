@@ -10,51 +10,26 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'DemoApiGateway/DemoApiGateway.csproj'
-  nugetPath: 'DemoApiGateway/nuget.config'
-  tags: |
-    latest
-    $(Build.BuildId)
-  registry-repo-Name: 'link-api-gw'
-  dockerPath: '**/DemoApiGateway/Dockerfile'
-  containerRegistry: 'NHSNLink ACR Premium'
+- group: Link_BOTW_Build_Package_Variables
+- name: project
+  value: 'DemoApiGateway/DemoApiGateway.csproj'
+- name: nugetPath
+  value: 'DemoApiGateway/nuget.config'
+- name: tags1
+  value: 'latest'
+- name: tags2
+  value: '$(Build.BuildId)'
+- name: registry-repo-Name
+  value: 'link-api-gw'
+- name: dockerPath
+  value: '**/DemoApiGateway/Dockerfile'
+- name: serviceName
+  value: 'DemoApiGateway'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
 
 steps:
-  - task: PowerShell@2
-    displayName: 'Transform nuget.config'
-    inputs:
-      targetType: 'inline'
-      script: |
-        $path = '$(System.DefaultWorkingDirectory)/DemoApiGateway/nuget.config'
-        $nugetUrl = '$(nuget)'
-        $sharedUrl = '$(Shared_BOTW_Feed)'
-        $token = '$(ClearTextPassword)'
-        $basePath = '$(System.DefaultWorkingDirectory)'
-        
-        $xml = [xml](Get-Content -Path $path)
-        
-        $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'nuget' }
-        $node.value = $nugetUrl
-        
-        Write-Host "updated nuget url:"
-        Write-Host $node.value
-        
-        $node = $xml.configuration.packageSources.add |
-                where { $_.key -eq 'Shared_BOTW_Feed' }
-        $node.value = $sharedUrl
-        
-        Write-Host "Shared botw url:"
-        Write-Host $node.value
-        
-        $node = $xml.configuration.packageSourceCredentials.Shared_BOTW_Feed.add |
-                where { $_.key -eq 'ClearTextPassword' }
-        $node.value = $token
-        
-        Write-Host "updated token:"
-        Write-Host $node.value
-        
-        $xml.Save($path)
+  - template: ../azure-nuget-package-source.yml
 
   - task: DotNetCoreCLI@2
     displayName: Restore
@@ -78,7 +53,9 @@ steps:
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
-      tags: '$(tags)'
+      tags: |
+        $(tags1)
+        $(tags2)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
