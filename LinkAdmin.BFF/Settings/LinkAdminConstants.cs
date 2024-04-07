@@ -2,7 +2,7 @@
 {
     public class LinkAdminConstants
     {
-        public const string ServiceName = "LinkAdminBFF";
+        public const string ServiceName = "LinkAdminBFF";        
 
         public static class AppSettingsSectionNames
         {
@@ -26,6 +26,13 @@
             public const string OpenIdConnect = "link_openid_connect";
         }
 
+        public static class LinkBearerService
+        {
+            public const string LinkBearerIssuer = "LinkServiceAdmin";
+            public const string LinkBearerAudience = "LinkSevices";
+            public const string LinkBearerKeyName = "link-bearer-key";            
+        }
+
         public static class LinkAdminLoggingIds
         {
             public const int RequestRecieved = 1000;
@@ -37,6 +44,10 @@
             public const int KafkaProducerPatientEvent = 1006;
             public const int KafkaProducerReportScheduled = 1007;
             public const int KafkaProducerDataAcquisitionRequested = 1008;
+            public const int LinkAdminTokenGenerated = 1009;
+            public const int LinkAdminTokenGenerationException = 1010;
+            public const int LinkAdminTokenKeyRefreshed = 1011;
+            public const int LinkAdminTokenKeyRefreshException = 1012;
         }
     }
 }

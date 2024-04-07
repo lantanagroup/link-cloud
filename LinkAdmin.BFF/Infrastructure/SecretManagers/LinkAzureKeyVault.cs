@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers
             return secret.Value.Value;
         }
 
-        public async Task<bool> SetSecretAync(string secretName, string secretValue, CancellationToken cancellationToken)
+        public async Task<bool> SetSecretAsync(string secretName, string secretValue, CancellationToken cancellationToken)
         {
             var result = await _secretClient.SetSecretAsync(secretName, secretValue, cancellationToken);  
             return result.Value != null;

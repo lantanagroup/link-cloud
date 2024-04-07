@@ -19,7 +19,8 @@ using Serilog.Settings.Configuration;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,12 +85,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add Secret Manager
-    var secretManager = builder.Configuration.GetValue<string>("SecretManager");
-    if (!string.IsNullOrEmpty(secretManager))
+    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
     {
         builder.Services.AddSecretManager(options =>
         {
-            options.Manager = secretManager;
+            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
         });
     }    
 
@@ -186,14 +186,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
     }    
+    if(builder.Configuration.GetValue<bool>("EnableBearerTokenFeature"))
+    {
+        builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
+    }
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
-
+       
     // Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
     builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
+    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
+    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
 
     // Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()
@@ -348,7 +354,9 @@ static void SetupMiddleware(WebApplication app)
     else
     {
         app.UseExceptionHandler();
-    }   
+    }
+
+    app.UseStatusCodePages();
 
     app.UseHttpsRedirection();
 
@@ -366,7 +374,7 @@ static void SetupMiddleware(WebApplication app)
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
     app.UseAuthentication();
-    //app.UseMiddleware<UserScopeMiddleware>();
+    app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization(); 
 
     // Register endpoints

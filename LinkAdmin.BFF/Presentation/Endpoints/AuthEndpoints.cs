@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             var authEndpoints = app.MapGroup("/")
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {                    
-                    Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
+                    Tags = new List<OpenApiTag> { new() { Name = "Authentication" } }
                 });
 
             authEndpoints.MapGet("/login", Login)                
