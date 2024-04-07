@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
 
             //update secret manager
-            var result = await _secretManager.SetSecretAsync("LinkBearerKey", key, CancellationToken.None);
+            var result = await _secretManager.SetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key, CancellationToken.None);
 
             if (!result)
             {

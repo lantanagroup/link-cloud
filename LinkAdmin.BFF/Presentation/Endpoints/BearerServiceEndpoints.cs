@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Generates a bearer token for the current user to use with Link Services."
                 });
 
-            tokenEndpoints.MapPost("/refresh-key", RefreshKey)
+            tokenEndpoints.MapGet("/refresh-key", RefreshKey)
                 .RequireAuthorization("AuthenticatedUser")
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)

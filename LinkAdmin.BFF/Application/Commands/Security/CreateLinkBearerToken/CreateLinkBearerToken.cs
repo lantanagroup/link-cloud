@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
                 var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)), SecurityAlgorithms.HmacSha512Signature);
 
-                var token = new JwtSecurityToken(
+                var token = new JwtSecurityToken(                                    
                                     issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,
                                     audience: LinkAdminConstants.LinkBearerService.LinkBearerAudience,
                                     claims: user.Claims,
