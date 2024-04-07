@@ -19,6 +19,7 @@ using Serilog.Settings.Configuration;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,9 +65,33 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+
+    //Add Redis 
+    builder.Services.AddRedisCache(options =>
+    {
+        options.Environment = builder.Environment;
+
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+        
+        if(string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
+    });
+
+    // Add Secret Manager
+    var secretManager = builder.Configuration.GetValue<string>("SecretManager");
+    if (!string.IsNullOrEmpty(secretManager))
+    {
+        builder.Services.AddSecretManager(options =>
+        {
+            options.Manager = secretManager;
+        });
+    }    
 
     // Add Authentication
     List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];

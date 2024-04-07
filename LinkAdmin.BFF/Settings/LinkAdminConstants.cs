@@ -14,12 +14,14 @@
             public const string Serilog = "Serilog";
             public const string Kafka = "KafkaConnection";
             public const string EnableSwagger = "EnableSwagger";
+            public const string SecretManagement = "SecretManagement";
         }
 
         public static class AuthenticationSchemes
         {
             public const string Cookie = "link_cookie";
             public const string JwtBearerToken = "link_jwt_bearer";
+            public const string LinkBearerToken = "link_link_bearer";
             public const string Oauth2 = "link_oauth2";
             public const string OpenIdConnect = "link_openid_connect";
         }
