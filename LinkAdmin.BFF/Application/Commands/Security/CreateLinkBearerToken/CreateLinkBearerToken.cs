@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
@@ -15,12 +16,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ILogger<CreateLinkBearerToken> _logger;
         private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
+        private readonly IDataProtectionProvider _dataProtectionProvider;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
+            _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
         }
 
         public async Task<string> ExecuteAsync(ClaimsPrincipal user)
@@ -29,16 +32,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             
             try
             {
+                var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
                 string? bearerKey = _cache.GetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName);
 
                 if (bearerKey == null)
                 {
 
                     bearerKey = await _secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
-                    _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                    _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
                 }
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)), SecurityAlgorithms.HmacSha512Signature);
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey))), SecurityAlgorithms.HmacSha512Signature);
 
                 var token = new JwtSecurityToken(                                    
                                     issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,

@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -77,8 +78,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
-    builder.Services.AddSingleton(builder.Configuration
-        .GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
+    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -90,6 +90,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<AccountRepository>();
     builder.Services.AddScoped<GroupRepository>();
     builder.Services.AddScoped<RoleRepository>();
+
+    // Add tenant API service
+    builder.Services.AddHttpClient();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     //Add health checks
     builder.Services.AddHealthChecks()

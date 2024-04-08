@@ -1,6 +1,7 @@
 ﻿
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Security.Cryptography;
 
@@ -11,12 +12,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ILogger<RefreshSigningKey> _logger;
         private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
+        private readonly IDataProtectionProvider _dataProtectionProvider;
 
-        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, IDistributedCache cache, ISecretManager secretManager)
+        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
+            _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
         }
 
         public async Task<bool> ExecuteAsync()
@@ -32,7 +35,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 return false;
             }
 
-            _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key);
+            var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
+            _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
 
             _logger.LogInformation("Bearer key refreshed");
 

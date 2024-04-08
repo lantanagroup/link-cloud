@@ -38,6 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Settings
         public static class LinkDataProtectors
         {
             public const string LinkUser = "LinkUser";
+            public const string LinkSigningKey = "LinkSigningKey";
         }
 
         public static class LinkAdminLoggingIds
