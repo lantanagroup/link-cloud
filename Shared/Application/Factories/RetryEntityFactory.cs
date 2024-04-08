@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
 
             RetryEntity retryEntity = new RetryEntity
             {
-                ServiceName = "Submission",
+                ServiceName = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionService).Value ?? "",
                 FacilityId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionFacilityId).Value ?? "",
                 ScheduledTrigger = triggerDate,
                 Topic = consumeResult.Topic,

@@ -136,13 +136,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Error in Report Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
+                        _logger.LogError($"Error in Submission Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError($"Operation Cancelled: {oce.Message}", oce);
                 consumer.Close();
                 consumer.Dispose();
             }
