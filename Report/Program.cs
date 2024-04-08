@@ -28,6 +28,8 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,6 +88,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
 
 
     // Add services to the container.
@@ -98,10 +101,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientsToQueryValue>, KafkaConsumerFactory<string, PatientsToQueryValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
 
-    //Producres
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+
+    //Producers
     builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>, KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
 
     //Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
@@ -116,6 +123,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
     builder.Services.AddSingleton<ReportRepository>();
     builder.Services.AddSingleton<PatientsToQueryRepository>();
+    builder.Services.AddSingleton<RetryRepository>();
 
     // Add controllers
     builder.Services.AddControllers();
@@ -138,17 +146,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     //builder.Services.AddSingleton<IKafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>, KafkaWrapper<Ignore, ReportRequestedMessage, Null, ReportScheduledMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
+    // Add quartz scheduler
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<RetryJob>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
+
     // Add hosted services
     builder.Services.AddHostedService<MeasureEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<ReportSubmittedListener>();
     builder.Services.AddHostedService<PatientsToQueryListener>();
-
-    // Add quartz scheduler
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
     builder.Services.AddHostedService<MeasureReportScheduleService>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
@@ -169,6 +180,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Measure Evaluated Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, DeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>, TransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue>>();
+
+    //Retry Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
 
     // Logging using Serilog

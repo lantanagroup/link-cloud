@@ -21,6 +21,13 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using Quartz.Spi;
+using LantanaGroup.Link.Submission.Application.Factories;
+using Quartz.Impl;
+using Quartz;
+using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +86,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<FileSystemConfig>(builder.Configuration.GetRequiredSection(nameof(FileSystemConfig)));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -86,6 +94,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
     builder.Services.AddSingleton<TenantSubmissionRepository>();
+    builder.Services.AddSingleton<RetryRepository>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
 
@@ -94,6 +103,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitReportListener>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
+
+    // Add quartz scheduler
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<RetryJob>();
 
     //Add health checks
     builder.Services.AddHealthChecks();
@@ -106,8 +122,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     // Add repositories
     // TODO
@@ -116,6 +135,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Report Scheduled Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+
+    //Retry Listener
+    //Retry Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

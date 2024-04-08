@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }, cancellationToken);
 
                             await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                            await _schedulerFactory.GetScheduler(cancellationToken));
+                                await _schedulerFactory.GetScheduler(cancellationToken));
                         }
                     }
                     catch (ConsumeException ex)
