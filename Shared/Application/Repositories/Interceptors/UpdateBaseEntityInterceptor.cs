@@ -15,17 +15,17 @@ namespace LantanaGroup.Link.Shared.Application.Repositories.Interceptors
                     return base.SavingChangesAsync(eventData, result, cancellationToken);
                 }
 
-                var entries = context.ChangeTracker.Entries<SqlBaseEntity>();
+                var entries = context.ChangeTracker.Entries<BaseEntityExtended>();
 
                 foreach (var entry in entries)
                 {
                     switch (entry.State)
                     {
                         case EntityState.Added:
-                            entry.Property(p => p.CreatedOn).CurrentValue = DateTime.UtcNow;
+                            entry.Property(p => p.CreateDate).CurrentValue = DateTime.UtcNow;
                             break;
                         case EntityState.Modified:
-                            entry.Property(p => p.LastModifiedOn).CurrentValue = DateTime.UtcNow;
+                            entry.Property(p => p.ModifyDate).CurrentValue = DateTime.UtcNow;
                             break;
                     }
                 }

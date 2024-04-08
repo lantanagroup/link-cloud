@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
-public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T : SqlBaseEntity
+public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : BaseEntity
 {
     protected readonly ILogger _logger;
 
@@ -18,49 +18,61 @@ public class BaseSqlConfigurationRepo<T> : ISqlPersistenceRepository<T> where T 
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async Task<List<T>> GetAsync(CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Set<T>().ToListAsync(cancellationToken);
-    }
-
-    public async Task<T> GetAsyncById(string id, CancellationToken cancellationToken = default)
+    public async Task<T> GetAsync(string id, CancellationToken cancellationToken)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
-    public async virtual Task<bool> CreateAsync(T entity, CancellationToken cancellationToken = default)
+    public async virtual Task AddAsync(T entity, CancellationToken cancellationToken)
     {
+
         _dbContext.Set<T>().Add(entity);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return true;
     }
 
-
-    public async virtual Task<bool> UpdateAsync(T entity, CancellationToken cancellationToken = default)
+    public async virtual Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
     {
         _dbContext.Set<T>().Update(entity);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return true;
+        return entity;
 
     }
 
-    public async virtual Task<bool> RemoveAsync(string id, CancellationToken cancellationToken = default)
+    public async virtual Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
         var entity = await _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefaultAsync();
 
-        if (entity is null) return false;
-        
-        _dbContext.Set<T>().Remove(entity);
-  
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (entity is null) return;
 
-        return true;
+        _dbContext.Set<T>().Remove(entity);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
     }
 
+    public void Add(T entity)
+    {
+        throw new NotImplementedException();
+    }
+
+    public T Get(string id)
+    {
+        throw new NotImplementedException();
+    }
+
+
+    public T Update(T entity)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Delete(string id)
+    {
+        throw new NotImplementedException();
+    }
 
 }
