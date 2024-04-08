@@ -19,6 +19,8 @@ public class CensusConfigRepository : BaseSqlConfigurationRepo<CensusConfigEntit
 
     public CensusConfigRepository(ILogger<CensusConfigRepository> logger, CensusContext dbContext) : base(logger, dbContext)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<CensusConfigEntity> GetByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
