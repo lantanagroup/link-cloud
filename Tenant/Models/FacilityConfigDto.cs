@@ -9,7 +9,5 @@ namespace LantanaGroup.Link.Tenant.Models
         public string? FacilityName { get; set; }
         public List<ScheduledTaskDto>? ScheduledTasks { get; set; } = new List<ScheduledTaskDto>();
         public List<MonthlyReportingPlanModel>? MonthlyReportingPlans { get; set; } = new List<MonthlyReportingPlanModel>();
-        public DateTime MRPModifyDate { get; set; }
-        public DateTime MRPCreatedDate { get; set; }
     }
 }

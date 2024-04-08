@@ -14,9 +14,10 @@ namespace LantanaGroup.Link.Tenant.Utils
     public class Helper
     {
 
-        public static void CreateFacilityAuditEvent(FacilityConfigModel facility, out AuditEventMessage auditEvent, out Headers headers)
+        public static AuditEventMessage CreateFacilityAuditEvent(FacilityConfigModel facility)
         {
-            auditEvent = new AuditEventMessage();
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
             auditEvent.ServiceName = TenantConstants.ServiceName;
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
@@ -24,11 +25,10 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.Resource = typeof(FacilityConfigModel).Name;
             auditEvent.Notes = $"New facility configuration ({facility.Id}) created for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
-            headers = new Headers();
-            headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId));
+            return auditEvent;
         }
 
-        public static void UpdateFacilityAuditEvent(FacilityConfigModel updatedfacility, FacilityConfigModel existingFacility, out AuditEventMessage auditEvent, out Headers headers)
+        public static AuditEventMessage UpdateFacilityAuditEvent(FacilityConfigModel updatedfacility, FacilityConfigModel existingFacility)
         {
             CompareLogic compareLogic = new CompareLogic();
             compareLogic.Config.MaxDifferences = 1000;
@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.Tenant.Utils
             AuditEventMessage auditEventLocal = new AuditEventMessage();
             auditEventLocal.PropertyChanges = new List<PropertyChangeModel>();
             list.ForEach(d => {
+                if (d.PropertyName == "CreatedOn" || d.PropertyName == "LastModifiedOn" || d.PropertyName == "MRPCreatedDate" || d.PropertyName == "MRPModifyDate") return;
                 auditEventLocal.PropertyChanges.Add(new PropertyChangeModel
                 {
                     PropertyName = d.PropertyName,
@@ -45,7 +46,8 @@ namespace LantanaGroup.Link.Tenant.Utils
                 });
 
             });
-            auditEvent = auditEventLocal;
+            AuditEventMessage auditEvent = auditEventLocal;
+            auditEvent.FacilityId = updatedfacility.FacilityId;
             auditEvent.ServiceName = TenantConstants.ServiceName;
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
@@ -53,13 +55,13 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.Resource = typeof(FacilityConfigModel).Name;
             auditEvent.Notes = $"Updated facility configuration ({updatedfacility.Id}) for '{updatedfacility.FacilityId}'. Differences are {result.DifferencesString}";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
-            headers = new Headers();
-            headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId));
+            return auditEvent;
         }
 
-        public static void DeleteFacilityAuditEvent(FacilityConfigModel facility, out AuditEventMessage auditEvent, out Headers headers)
+        public static AuditEventMessage DeleteFacilityAuditEvent(FacilityConfigModel facility)
         {
-            auditEvent = new AuditEventMessage();
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
             auditEvent.ServiceName = TenantConstants.ServiceName;
             auditEvent.EventDate = DateTime.UtcNow;
             auditEvent.User = "SystemUser";
@@ -67,8 +69,7 @@ namespace LantanaGroup.Link.Tenant.Utils
             auditEvent.Resource = typeof(FacilityConfigModel).Name;
             auditEvent.Notes = $"Deleted facility configuration ({facility.Id}) for '{facility.FacilityId}'";
             auditEvent.CorrelationId = Guid.NewGuid().ToString();
-            headers = new Headers();
-            headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId));
+            return auditEvent;
         }
 
         public static bool ValidateTopic(string strTopic, List<KafkaTopic> topics)

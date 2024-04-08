@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Tenant.Services
             await _facilityCollection.InsertOneAsync(FacilityConfigModel);
         }
 
-        public async Task<FacilityConfigModel> GetAsyncById(string id) => await _facilityCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
+        public async Task<FacilityConfigModel> GetAsyncById(string id) => await _facilityCollection.Find(x => x.Id.ToString() == id).FirstOrDefaultAsync();
 
 
         public async Task UpdateAsync(string id, FacilityConfigModel FacilityConfigModel)
@@ -71,30 +71,30 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException($"Facility {FacilityConfigModel.FacilityId} already exists");
             }
 
-            await _facilityCollection.ReplaceOneAsync(x => x.Id == id, FacilityConfigModel);
+            await _facilityCollection.ReplaceOneAsync(x => x.Id.ToString() == id, FacilityConfigModel);
         }
 
         public async Task RemoveAsync(string id)
         {
-            await _facilityCollection.DeleteOneAsync(x => x.Id == id);
+            await _facilityCollection.DeleteOneAsync(x => x.Id.ToString() == id);
         }
 
         public List<FacilityConfigModel> Get() => _facilityCollection.Find(_ => true).ToList();
 
         FacilityConfigModel ITenantConfigurationService.GetById(string id)
         {
-            return _facilityCollection.Find(x => x.Id == id).FirstOrDefault();
+            return _facilityCollection.Find(x => x.Id.ToString() == id).FirstOrDefault();
         }
 
         void ITenantConfigurationService.Update(string id, FacilityConfigModel FacilityConfigModel)
         {
             // TO-DO validation:  faciltyId is unique and scheduled topic is unique for an facilityId
-            _facilityCollection.ReplaceOne(x => x.Id == id, FacilityConfigModel);
+            _facilityCollection.ReplaceOne(x => x.Id.ToString() == id, FacilityConfigModel);
         }
 
         void ITenantConfigurationService.Remove(string id)
         {
-            _facilityCollection.DeleteOne(x => x.Id == id);
+            _facilityCollection.DeleteOne(x => x.Id.ToString() == id);
         }
 
         void ITenantConfigurationService.Create(FacilityConfigModel FacilityConfigModel)

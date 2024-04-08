@@ -1,7 +1,7 @@
 
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,7 +18,7 @@ namespace TenantTests
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
-        private const string id = "64b6dd4efe21820a49c1698a";
+        private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
 
         private AutoMocker? _mocker;
         private FacilityConfigurationService? _service;
@@ -50,15 +50,15 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.GetAsyncById(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+                .Setup(p => p.GetAsyncById(Guid.Parse(id), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IOptions<MeasureApiConfig>>()
             .Setup(p => p.Value)
             .Returns(_measureApiConfig);
 
-            Task<FacilityConfigModel> facility = _service.GetFacilityById(id, CancellationToken.None);
+            Task<FacilityConfigModel> facility = _service.GetFacilityById(Guid.Parse(id), CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsyncById(id, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsyncById(Guid.Parse(id), CancellationToken.None), Times.Once);
 
             Assert.NotNull(facility.Result);
 

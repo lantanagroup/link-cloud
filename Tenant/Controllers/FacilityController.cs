@@ -3,7 +3,6 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Quartz;
 using System.Diagnostics;
 
@@ -71,21 +70,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            var filterBuilder = Builders<FacilityConfigModel>.Filter;
-
-            var filter = filterBuilder.Empty;
-
-            if (!string.IsNullOrEmpty(facilityId))
-            {
-                filter = filterBuilder.Eq(f => f.FacilityId, facilityId);
+            if (facilityId == null && facilityName == null) {
+                facilities = await _facilityConfigurationService.GetAllFacilities(cancellationToken);
             }
-
-            if (!string.IsNullOrEmpty(facilityName))
+            else
             {
-               filter &= filterBuilder.Eq(f => f.FacilityName, facilityName);
+                facilities = await _facilityConfigurationService.GetFacilitiesByFilters(facilityId, facilityName, cancellationToken);
             }
-
-            facilities = filter == filterBuilder.Empty ? await _facilityConfigurationService.GetAllFacilities(cancellationToken) : await _facilityConfigurationService.GetFacilitiesByFilters(filter, cancellationToken);
        
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
@@ -137,7 +128,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <summary>
         /// Find a facility config by Id
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [HttpGet("{facilityId}")]
@@ -174,7 +165,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateFacility(string id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"Update Facility with Id: {updatedFacility.Id} and Facility Name: {updatedFacility.FacilityName}");
 
@@ -183,7 +174,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         FacilityConfigModel existingFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
 
         // validate id and updatedFacility.id match
-        if (id != updatedFacility.Id)
+        if (id.ToString() != updatedFacility.Id)
         {
             _logger.LogError($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
 
@@ -191,6 +182,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
         try
         {
+
             await _facilityConfigurationService.UpdateFacility(id, dest, cancellationToken);
         }
         catch (ApplicationException ex)
@@ -214,13 +206,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         return NoContent();
     }
 
-    /// <summary>
-    /// Delete a facility by Id.
-    /// </summary>
-    /// <param name="id"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    [HttpDelete("{facilityId}")]
+        /// <summary>
+        /// Delete a facility by Id.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        [HttpDelete("{facilityId}")]
     public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
     {
            
@@ -241,7 +233,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
         using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
         {
-            await ScheduleService.DeleteJobsForFacility(existingFacility.Id, existingFacility.ScheduledTasks, _scheduler);
+            await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
         }
 
         return NoContent();
