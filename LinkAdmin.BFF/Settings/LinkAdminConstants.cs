@@ -1,8 +1,10 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Settings
+﻿using Microsoft.Identity.Client;
+
+namespace LantanaGroup.Link.LinkAdmin.BFF.Settings
 {
     public class LinkAdminConstants
     {
-        public const string ServiceName = "LinkAdminBFF";        
+        public const string ServiceName = "LinkAdminBFF";           
 
         public static class AppSettingsSectionNames
         {
@@ -13,8 +15,8 @@
             public const string Telemetry = "TelemetryConfig";
             public const string Serilog = "Serilog";
             public const string Kafka = "KafkaConnection";
-            public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
+            public const string LinkServiceDiscovery = "LinkServiceDiscovery"; 
         }
 
         public static class AuthenticationSchemes
@@ -31,6 +33,11 @@
             public const string LinkBearerIssuer = "LinkServiceAdmin";
             public const string LinkBearerAudience = "LinkSevices";
             public const string LinkBearerKeyName = "link-bearer-key";            
+        }
+
+        public static class LinkDataProtectors
+        {
+            public const string LinkUser = "LinkUser";
         }
 
         public static class LinkAdminLoggingIds

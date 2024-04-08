@@ -21,6 +21,8 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using Microsoft.AspNetCore.Authentication;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,9 +69,27 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<LinkServiceDiscovery>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkServiceDiscovery));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+
+    // Add fluent validation
+    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
+
+    // Add HttpClientFactory
+    builder.Services.AddHttpClient();
+
+    // Add data protection
+    builder.Services.AddDataProtection();
+
+    // Add commands
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
+    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
+    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
+    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
+    builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
     //Add Redis 
     builder.Services.AddRedisCache(options =>
@@ -93,7 +113,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         });
     }    
 
+
+
     // Add Authentication
+    builder.Services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
+
     List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
 
     var defaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
@@ -204,17 +228,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
     }
-
-    // Add fluent validation
-    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
-       
-    // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
-    builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
-    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
-    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
-    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
-
+    
     // Add YARP (reverse proxy)
     builder.Services.AddReverseProxy()
         .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -375,7 +389,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseHttpsRedirection();
 
     // Configure swagger
-    if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
+    if (app.Configuration.GetValue<bool>("EnableSwagger"))
     {
         var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
