@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
-using LantanaGroup.Link.Tenant.Repository;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,7 +22,7 @@ namespace TenantTests
 
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private const string id = "64b6dd4efe21820a49c1698a";
+        private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
 
         public ILogger<FacilityConfigurationService> logger = Mock.Of<ILogger<FacilityConfigurationService>>();
 
@@ -35,7 +35,7 @@ namespace TenantTests
 
             _model = new FacilityConfigModel()
             {
-                Id = id,
+                Id = new Guid(id),
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -52,7 +52,7 @@ namespace TenantTests
               .Setup(p => p.GetAsyncByFacilityId(facilityId, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.RemoveAsync(id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.RemoveAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
             .Setup(p => p.CreateAuditEventProducer())
@@ -64,7 +64,7 @@ namespace TenantTests
 
             Task<string> facility = _service.RemoveFacility(facilityId, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.RemoveAsync(id, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.RemoveAsync(_model.Id, CancellationToken.None), Times.Once);
 
             Assert.NotEmpty(facility.Result);
 
