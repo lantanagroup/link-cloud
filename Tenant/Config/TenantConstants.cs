@@ -21,6 +21,8 @@ namespace LantanaGroup.Link.Tenant.Config
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string EnableSwagger = "EnableSwagger";
             public const string Serilog = "Logging:Serilog";
+            public const string DatabaseProvider = "DatabaseProvider";
+            public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
         }
 
         public static class TenantLoggingIds

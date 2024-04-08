@@ -3,12 +3,12 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using static LantanaGroup.Link.Tenant.Config.TenantConstants;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Shared.Domain.Attributes;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Mongo;
 
-namespace LantanaGroup.Link.Tenant.Repository;
+namespace LantanaGroup.Link.Tenant.Repository.Implementations.Mongo;
 
-public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : BaseEntity
+public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Shared.Domain.Entities.BaseEntity
 {
     private readonly ILogger<BaseConfigurationRepo<T>> _logger;
 
@@ -27,13 +27,13 @@ public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Base
 
         _database = _client.GetDatabase(mongoConnection.Value.DatabaseName);
 
-       _collection = _database.GetCollection<T>(GetCollectionName(typeof(T)));
+        _collection = _database.GetCollection<T>(GetCollectionName(typeof(T)));
 
     }
 
     public async virtual Task<List<T>> GetAsync(CancellationToken cancellationToken) => await _collection.Find(_ => true).ToListAsync();
 
-    public async virtual Task<T> GetAsyncById(string id, CancellationToken cancellationToken) => await _collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+    public async virtual Task<T> GetAsyncById(string id, CancellationToken cancellationToken) => await _collection.Find(x => x.Id.ToString() == id).FirstOrDefaultAsync();
 
     public async virtual Task<bool> CreateAsync(T newFacility, CancellationToken cancellationToken)
     {
@@ -53,40 +53,40 @@ public class BaseConfigurationRepo<T> : IPersistenceRepository<T> where T : Base
 
     public async virtual Task<bool> UpdateAsync(string id, T newFacility, CancellationToken cancellationToken)
     {
-       await _collection.ReplaceOneAsync(x => x.Id == id, newFacility);
-       
-       return true;
+        await _collection.ReplaceOneAsync(x => x.Id == id, newFacility);
+
+        return true;
     }
 
     public async virtual Task<bool> RemoveAsync(string id, CancellationToken cancellationToken)
     {
-        await _collection.DeleteOneAsync(x => x.Id == id);
+        await _collection.DeleteOneAsync(x => x.Id.ToString() == id);
 
         return true;
     }
 
     public async virtual Task<List<T>> FindAsync(FilterDefinition<T> filter, CancellationToken cancellationToken)
     {
-       return await _collection.Find(filter).ToListAsync();
+        return await _collection.Find(filter).ToListAsync();
     }
 
     public virtual List<T> Get() => _collection.Find(_ => true).ToList();
 
     public virtual T GetById(string id)
     {
-        return _collection.Find(x => x.Id == id).FirstOrDefault();
+        return _collection.Find(x => x.Id.ToString() == id).FirstOrDefault();
     }
 
     public virtual bool Update(string id, T FacilityConfigModel)
     {
-        _collection.ReplaceOne(x => x.Id == id, FacilityConfigModel);
+        _collection.ReplaceOne(x => x.Id.ToString() == id, FacilityConfigModel);
 
         return true;
     }
 
     public virtual bool Remove(string id)
     {
-        _collection.DeleteOne(x => x.Id == id);
+        _collection.DeleteOne(x => x.Id.ToString() == id);
 
         return true;
     }
