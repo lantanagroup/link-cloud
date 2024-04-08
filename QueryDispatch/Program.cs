@@ -114,6 +114,7 @@ builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionReque
 builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
 builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
+builder.Services.AddTransient<IKafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>>();
 
 builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
@@ -135,6 +136,7 @@ builder.Services.AddTransient<IGetAllPatientDispatchQuery, GetAllPatientDispatch
 
 //Excepation Handlers
 builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
+builder.Services.AddTransient<IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue>, DeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue>>();
 builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventValue>, TransientExceptionHandler<string, PatientEventValue>>();
 
