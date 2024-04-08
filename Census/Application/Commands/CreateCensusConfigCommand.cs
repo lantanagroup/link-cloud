@@ -92,7 +92,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
 
             try
             {
-                await _censusConfigService.CreateAsync(existingEntity, cancellationToken);
+                await _censusConfigService.AddAsync(existingEntity, cancellationToken);
             }
             catch (Exception ex)
             {
