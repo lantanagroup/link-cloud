@@ -12,9 +12,9 @@ namespace LantanaGroup.Link.Census.Application.Commands
     public class GetCensusConfigQueryHandler : IRequestHandler<GetCensusConfigQuery, CensusConfigModel>
     {
         private readonly ILogger<GetCensusConfigQueryHandler> _logger;
-        private readonly ICensusConfigMongoRepository _repository;
+        private readonly ICensusConfigRepository _repository;
 
-        public GetCensusConfigQueryHandler(ILogger<GetCensusConfigQueryHandler> logger, ICensusConfigMongoRepository repository)
+        public GetCensusConfigQueryHandler(ILogger<GetCensusConfigQueryHandler> logger, ICensusConfigRepository repository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Census.Application.Commands
 
         public async Task<CensusConfigModel> Handle(GetCensusConfigQuery request, CancellationToken cancellationToken)
         {
-            var configEntity = await _repository.GetAsync(request.FacilityId, cancellationToken);
+            var configEntity = await _repository.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
 
             if (configEntity == null)
             {

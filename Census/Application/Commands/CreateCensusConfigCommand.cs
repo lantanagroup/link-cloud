@@ -1,7 +1,7 @@
 ﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
-using LantanaGroup.Link.Census.Models.Exceptions;
+using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Quartz;
@@ -16,13 +16,13 @@ public class CreateCensusConfigCommand : IRequest
 public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConfigCommand>
 {
     private readonly ILogger<CreateCensusConfigCommandHandler> _logger;
-    private readonly ICensusConfigMongoRepository _censusConfigService;
+    private readonly ICensusConfigRepository _censusConfigService;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly ICensusSchedulingRepository _censusSchedulingRepo;
     private readonly IMediator _mediator;
     private readonly ITenantApiService _tenantApiService;
 
-    public CreateCensusConfigCommandHandler(ILogger<CreateCensusConfigCommandHandler> logger, ICensusConfigMongoRepository censusConfigService, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IMediator mediator, ITenantApiService tenantApiService)
+    public CreateCensusConfigCommandHandler(ILogger<CreateCensusConfigCommandHandler> logger, ICensusConfigRepository censusConfigService, ISchedulerFactory schedulerFactory, ICensusSchedulingRepository censusSchedulingRepo, IMediator mediator, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _censusConfigService = censusConfigService ?? throw new ArgumentNullException(nameof(censusConfigService));
@@ -39,7 +39,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
             throw new MissingTenantConfigurationException($"Facility {request.CensusConfigEntity.FacilityId} not found.");
         }
 
-        var existingEntity = _censusConfigService.Get(request.CensusConfigEntity.FacilityId);
+        var existingEntity = await _censusConfigService.GetByFacilityIdAsync(request.CensusConfigEntity.FacilityId);
 
         if (existingEntity != null)
         {
@@ -91,7 +91,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
 
             try
             {
-                await _censusConfigService.AddAsync(existingEntity, cancellationToken);
+                await _censusConfigService.CreateAsync(existingEntity, cancellationToken);
             }
             catch (Exception ex)
             {

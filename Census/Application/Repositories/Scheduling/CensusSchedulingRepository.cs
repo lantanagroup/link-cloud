@@ -92,6 +92,10 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         }
     }
 
+    public void Dispose()
+    {
+    }
+
     public void GetAllJobs(IScheduler scheduler)
     {
         var jobGroups = scheduler.GetJobGroupNames().Result;
