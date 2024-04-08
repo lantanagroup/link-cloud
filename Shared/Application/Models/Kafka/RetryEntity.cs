@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Shared.Application.Models
         public string Key { get; set; }
         public string Value { get; set; } 
         public Dictionary<string, string> Headers { get; set; }
-        public string ScheduledTrigger { get; set; }
+        public DateTime ScheduledTrigger { get; set; }
         public int RetryCount { get; set; }
         public string CorrelationId { get; set; }
         public DateTime CreateDate { get; set; }
