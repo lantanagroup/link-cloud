@@ -16,19 +16,16 @@ namespace LantanaGroup.Link.Shared.Jobs
     {
         private readonly ILogger<RetryJob> _logger;
         private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
-        private readonly IMediator _mediator;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly RetryRepository _retryRepository;
 
         public RetryJob(ILogger<RetryJob> logger,
             IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
-            IMediator mediator,
             ISchedulerFactory schedulerFactory,
             RetryRepository retryRepository)
         {
             _logger = logger;
             _retryKafkaProducerFactory = retryKafkaProducerFactory;
-            _mediator = mediator;
             _schedulerFactory = schedulerFactory;
             _retryRepository = retryRepository;
         }
