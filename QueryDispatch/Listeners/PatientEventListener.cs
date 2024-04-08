@@ -10,6 +10,8 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using QueryDispatch.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -22,8 +24,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly IGetScheduledReportQuery _getScheduledReportQuery;
         private readonly IGetQueryDispatchConfigurationQuery _getQueryDispatchConfigurationQuery;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
+        private readonly ITransientExceptionHandler<string, PatientEventValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientEventValue> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
 
-        public PatientEventListener(ILogger<PatientEventListener> logger, IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory, IQueryDispatchFactory queryDispatchFactory, ICreatePatientDispatchCommand createPatientDispatchCommand, IGetScheduledReportQuery getScheduledReportQuery, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory) 
+        public PatientEventListener(ILogger<PatientEventListener> logger, IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory, IQueryDispatchFactory queryDispatchFactory, ICreatePatientDispatchCommand createPatientDispatchCommand, IGetScheduledReportQuery getScheduledReportQuery, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler, ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler) 
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -32,6 +37,18 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _getScheduledReportQuery = getScheduledReportQuery;
             _getQueryDispatchConfigurationQuery = getQueryDispatchConfigurationQuery;
             _auditProducerFactory = auditProducerFactory;
+            _deadLetterExceptionHandler = deadLetterExceptionHandler;
+            _transientExceptionHandler = transientExceptionHandler;
+            _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
+
+            _transientExceptionHandler.ServiceName = "QueryDispatch";
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Retry";
+
+            _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
+
+            _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
+            _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,21 +78,19 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         }
                         catch (ConsumeException e)
                         {
-                            _logger.LogError($"Consume failure, potentially schema related: {e.Error.Reason}");
-                            var potentialFacilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
-
-                            var auditValue = new AuditEventMessage
+                            var facilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
+                            var converted_record = new ConsumeResult<string, string>()
                             {
-                                FacilityId = potentialFacilityId,
-                                Action = AuditEventType.Query,
-                                ServiceName = "QueryDispatch",
-                                EventDate = DateTime.UtcNow,
-                                Notes = $"Kafka PatientEvent consume failure, potentially schema related \nException Message: {e.Error}",
+                                Message = new Message<string, string>()
+                                {
+                                    Key = facilityId,
+                                    Value = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value),
+                                    Headers = e.ConsumerRecord.Message.Headers
+                                }
                             };
 
-                            ProduceAuditEvent(auditValue, e.ConsumerRecord.Message.Headers);
+                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
 
-                            //TODO: We will eventually have Error/Retry workflows implemented
                             _patientEventConsumer.Commit();
 
                             continue;
@@ -83,7 +98,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                         try
                         {
-                            
                             PatientEventValue value = consumeResult.Message.Value;
                             string correlationId = string.Empty;
 
@@ -93,7 +107,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             }
                             else
                             {
-                                correlationId = Guid.NewGuid().ToString();
+                                throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
                             }
 
                             _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
@@ -104,26 +118,35 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                             if (dispatchSchedule == null)
                             {
-                                throw new Exception($"Query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
                             }
                                 
                             DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                             if (dischargeDispatchSchedule == null)
                             {
-                                throw new Exception($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
                             }
                                 
                             PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
 
                             if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
-                            { 
-                                //TODO - Daniel: We will eventually have Error/Retry workflows implemented
-                                throw new Exception($"No active scheduled report periods found for facility {consumeResult.Message.Key}");
+                            {
+                                throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}", AuditEventType.Query);
                             }
                                 
                             await _createPatientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
 
+                            _patientEventConsumer.Commit(consumeResult);
+                        }
+                        catch (DeadLetterException ex)
+                        {
+                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                            _patientEventConsumer.Commit(consumeResult);
+                        }
+                        catch (TransientException ex)
+                        {
+                            _transientExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
                             _patientEventConsumer.Commit(consumeResult);
                         }
                         catch (Exception ex)
@@ -141,7 +164,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                             ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                            //TODO: We will eventually have Error/Retry workflows implemented
+                            _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key);
                             _patientEventConsumer.Commit();
 
                             continue;
