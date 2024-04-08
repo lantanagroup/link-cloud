@@ -54,4 +54,8 @@
     <Folder Include="Application\Interfaces\Factories\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
+  </ItemGroup>
+
 </Project>

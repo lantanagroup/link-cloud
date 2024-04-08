@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="8.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Routing.Abstractions" Version="2.2.0" />
   </ItemGroup>
 
 </Project>

@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             var cacheAccount = _cache.GetString(userKey);            
             
             Account? account = cacheAccount is not null ? JsonConvert.DeserializeObject<Account>(protector.Unprotect(cacheAccount)) :
-                _getLinkAccount.ExecuteAsync(principal, CancellationToken.None).Result;           
+                await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);           
 
             if (account is null) //if no account found, return an empty principal
             {

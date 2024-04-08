@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Link.Authorization.Infrastructure.Requirements;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Link.Authorization
 {
@@ -9,6 +10,14 @@ namespace Link.Authorization
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .RequireRole("LinkAdministrator")
+                .Build();
+        }
+
+        public static AuthorizationPolicy FacilityAccess()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .AddRequirements(new FacilityRequirement())
                 .Build();
         }
 
