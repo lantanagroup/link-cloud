@@ -62,30 +62,15 @@ namespace LantanaGroup.Link.Tenant.Listeners
                 this._consumer.Close();
             }
         }
-
-        private void TestMongo()
-        {
-            var client = new MongoClient(this._mongoConnection.Value.ConnectionString);
-            var db = client.GetDatabase(DbName);
-            var coll = db.GetCollection<FacilityConfigModel>(CollectionName);
-            var tenants = coll
-                .Find(_ => true)
-                .ToList();
-            var tenant = coll.Find(e => e.Id == "636d72819b243e5ea362d520").ToList();
-            Console.WriteLine("test");
-        }
-
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            this._logger.LogError("test error in loki");
-            //this.TestMongo();
             Task.Factory.StartNew(() => this.Start());
-          //  return Task.CompletedTask;
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
         }
+
     }
 }

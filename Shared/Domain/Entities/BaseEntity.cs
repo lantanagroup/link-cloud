@@ -6,8 +6,6 @@ namespace LantanaGroup.Link.Shared.Domain.Entities;
 
 public class BaseEntity
 {
-    [BsonId]
-    [BsonIgnoreIfDefault]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public string? Id { get; set; }
 }

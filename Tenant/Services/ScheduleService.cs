@@ -3,15 +3,11 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
+using LantanaGroup.Link.Tenant.Repository.Context;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Threading;
-using static LantanaGroup.Link.Tenant.Config.TenantConstants;
-using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
-using static Quartz.Logging.OperationName;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
@@ -25,6 +21,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
 
+        private readonly IServiceScopeFactory _scopeFactory;
 
         static ScheduleService()
         {
@@ -34,13 +31,13 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public ScheduleService(
            ISchedulerFactory schedulerFactory,
-           FacilityConfigurationService facilityConfigurationService,
+           IServiceScopeFactory serviceScopeFactory,
            IJobFactory jobFactory)
         {
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
-            _facilityConfigurationService = facilityConfigurationService;
-
+        //   _facilityConfigurationService = facilityConfigurationService;
+            this._scopeFactory = serviceScopeFactory;
         }
 
         public IScheduler Scheduler { get; set; }
@@ -52,11 +49,16 @@ namespace LantanaGroup.Link.Tenant.Services
 
             Scheduler.JobFactory = _jobFactory;
 
-            List<FacilityConfigModel> facilities = _facilityConfigurationService.GetAllFacilities(cancellationToken).Result;
+            //List<FacilityConfigModel> facilities = _facilityConfigurationService.GetAllFacilities(cancellationToken).Result;
 
-            foreach (FacilityConfigModel facility in facilities)
+            using (var scope = _scopeFactory.CreateScope())
             {
-                await AddJobsForFacility(facility, Scheduler);
+                var _context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
+                var facilities = await _context.Facilities.ToListAsync();
+                foreach (FacilityConfigModel facility in facilities)
+                {
+                    await AddJobsForFacility(facility, Scheduler);
+                }
             }
 
             await Scheduler.Start(cancellationToken);
@@ -131,7 +133,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             }
 
-            ScheduleService.DeleteJobsForFacility(newFacility.Id, tasksToBeDeleted, scheduler);
+            ScheduleService.DeleteJobsForFacility(newFacility.Id.ToString(), tasksToBeDeleted, scheduler);
 
             // update and add new jobs
 

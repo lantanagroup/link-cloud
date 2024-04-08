@@ -90,6 +90,14 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         return result;
     }
 
+    public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested) return null;
+
+        var result = (await _collection.FindAsync(_ => true, cancellationToken: cancellationToken)).ToList();
+        return result;
+    }
+
     public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return null;
