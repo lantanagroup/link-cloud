@@ -1,0 +1,24 @@
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+spring:
+  application:
+    name: measureeval
+  main:
+    allow-bean-definition-overriding: true
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/measureeval
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: measureeval
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    producer:
+      client-id: measureeval
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";

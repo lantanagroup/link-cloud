@@ -1,37 +1,26 @@
 trigger:
   paths:
     include:
-    - Validation/*
+    - Java/validation/*
 
 pool:
   vmImage: 'ubuntu-latest'
-
+  
 variables:
-  project: 'Validation/Validation.csproj'
-  testProject: 'ValidationUnitTests/ValidationUnitTests.csproj'
-  nugetPath: 'Validation/nuget.config'
-  serviceName: 'Validation'
+- group: Link_BOTW_Build_Package_Variables
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: JavaToolInstaller@0
     inputs:
-      command: restore
-      projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
-  - task: DotNetCoreCLI@2
+  - task: Maven@2
+    displayName: Maven Install
+    env:
+      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      command: 'test'
-      projects: $(testProject)
-    displayName: 'Run Tests'
-
+      mavenPomFile: 'Java/validation/pom.xml'
+      goals: install
+      options: '-s Java/validation/.m2/settings.xml'

@@ -10,17 +10,16 @@ import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-respon
 import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import { IDataAcquisitionFhirListConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
+import { AppConfigService } from '../../app-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataAcquisitionService {
-  private baseApiUrl = `${environment.baseApiUrl}/api`;
-
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   getFhirQueryConfiguration(facilityId: string): Observable<IDataAcquisitionQueryConfigModel> {
-    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.baseApiUrl}/data/query/${facilityId}/config`)
+    return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/query/${facilityId}/config`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR query configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -28,7 +27,7 @@ export class DataAcquisitionService {
   }
 
   createFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/data/query/config`, fhirQueryConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/query/config`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -39,7 +38,7 @@ export class DataAcquisitionService {
   }
 
   updateFhirQueryConfiguration(facilityId: string, fhirQueryConfig: IDataAcquisitionQueryConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/data/query/${facilityId}/config`, fhirQueryConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/query/${facilityId}/config`, fhirQueryConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -50,7 +49,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirQueryConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.baseApiUrl}/data/query/${facilityId}/config`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/query/${facilityId}/config`)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -58,7 +57,7 @@ export class DataAcquisitionService {
   }
 
   getFhirListConfiguration(facilityId: string): Observable<IDataAcquisitionFhirListConfigModel> {
-    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.baseApiUrl}/data/list/${facilityId}/config`)
+    return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/list/${facilityId}/config`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR list configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -66,7 +65,7 @@ export class DataAcquisitionService {
   }
 
   createFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/data/list/config`, fhirListConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/list/config`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -77,7 +76,7 @@ export class DataAcquisitionService {
   }
 
   updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/data/list/${facilityId}/config`, fhirListConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/list/${facilityId}/config`, fhirListConfig)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -88,7 +87,7 @@ export class DataAcquisitionService {
   }
 
   deleteFhirListConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.baseApiUrl}/data/list/${facilityId}/config`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/list/${facilityId}/config`)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -96,7 +95,7 @@ export class DataAcquisitionService {
   }
 
   getAuthenticationConfig(facilityId: string, queryConfigType: string) {
-    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`)
+    return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`)
     .pipe(
         tap(_ => console.log(`Fetched authentication configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -104,7 +103,7 @@ export class DataAcquisitionService {
   }
 
   createAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.post<IEntityCreatedResponse>(`${this.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`, authenticationConfig)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -115,7 +114,7 @@ export class DataAcquisitionService {
   }
 
   updateAuthenticationConfig(facilityId: string, queryConfigType: string, authenticationConfig: IDataAcquisitionAuthenticationConfigModel): Observable<IEntityCreatedResponse> {
-    return this.http.put<IEntityCreatedResponse>(`${this.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`, authenticationConfig)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`, authenticationConfig)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -126,7 +125,7 @@ export class DataAcquisitionService {
   }
 
 deleteAuthenticationConfig(facilityId: string, queryConfigType: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/auth/${facilityId}/config/${queryConfigType}`)
       .pipe(
         tap(_ => console.log(`Request for authentication configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
