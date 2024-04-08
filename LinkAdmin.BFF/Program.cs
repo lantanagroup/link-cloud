@@ -170,6 +170,20 @@ static void RegisterServices(WebApplicationBuilder builder)
             
         });        
     }  
+
+    // Add Link Bearer Token authorization schema if feature is enabled
+    if(builder.Configuration.GetValue<bool>("EnableBearerTokenFeature"))
+    {
+        if(!LinkAdminConstants.AuthenticationSchemes.LinkBearerToken.Equals(defaultChallengeScheme))
+            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken);
+
+        builder.Services.AddLinkBearerServiceAuthentication(options =>
+        {
+            options.Environment = builder.Environment;
+            options.Authority = LinkAdminConstants.LinkBearerService.LinkBearerIssuer;
+            options.Audience = LinkAdminConstants.LinkBearerService.LinkBearerAudience;
+        });
+    }
     
     // Add Authorization
     builder.Services.AddAuthorization(builder =>
