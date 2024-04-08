@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LantanaGroup.Link.Census.Domain.Entities;
 
 [Table("CensusPatientList")]
-public class CensusPatientListEntity : SqlBaseEntity
+public class CensusPatientListEntity : BaseEntity
 {
     public string FacilityId { get; set; }
     public string PatientId { get; set; }

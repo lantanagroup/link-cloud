@@ -89,7 +89,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             }
         }
 
-        await _historyRepository.CreateAsync(new PatientCensusHistoricEntity
+        await _historyRepository.AddAsync(new PatientCensusHistoricEntity
         {
             CensusDateTime = DateTime.UtcNow,
             FacilityId = request.FacilityId
