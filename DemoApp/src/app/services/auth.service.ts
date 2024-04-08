@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { UserProfileService } from './user-profile.service';
-import { authCodeFlowConfig } from '../config/auth-code-flow.config';
 import { filter } from 'rxjs';
 import { UserProfile } from '../models/user-pofile.model';
+import { AppConfigService } from './app-config.service';
 
 
 @Injectable({
@@ -13,10 +13,10 @@ export class AuthService {
   userProfile!: UserProfile;
   
 
-  constructor(private oauthService: OAuthService, private profileService: UserProfileService) {
+  constructor(private oauthService: OAuthService, private profileService: UserProfileService, appConfigService: AppConfigService) {
 
     if (!this.oauthService.hasValidAccessToken()) {
-      this.oauthService.configure(authCodeFlowConfig);
+      this.oauthService.configure(appConfigService.getAuthCodeFlowConfig());
       this.oauthService.loadDiscoveryDocumentAndLogin();
       this.oauthService.setupAutomaticSilentRefresh();
 
