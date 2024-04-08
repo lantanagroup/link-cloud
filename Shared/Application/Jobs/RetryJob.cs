@@ -2,10 +2,12 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Quartz;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Jobs
 {
@@ -16,16 +18,19 @@ namespace LantanaGroup.Link.Shared.Jobs
         private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
         private readonly IMediator _mediator;
         private readonly ISchedulerFactory _schedulerFactory;
+        private readonly RetryRepository _retryRepository;
 
         public RetryJob(ILogger<RetryJob> logger,
             IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
             IMediator mediator,
-            ISchedulerFactory schedulerFactory)
+            ISchedulerFactory schedulerFactory,
+            RetryRepository retryRepository)
         {
             _logger = logger;
             _retryKafkaProducerFactory = retryKafkaProducerFactory;
             _mediator = mediator;
             _schedulerFactory = schedulerFactory;
+            _retryRepository = retryRepository;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -33,19 +38,21 @@ namespace LantanaGroup.Link.Shared.Jobs
             try
             {
                 var triggerMap = context.Trigger.JobDataMap;
+                var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
 
-                var retryEntity =
-                    (RetryEntity)triggerMap["RetryEntity"];
+                _logger.LogInformation($"Executing RetryJob for {retryEntity.Topic}-{retryEntity.Id}");
 
+                // remove the job from the scheduler and database
+                await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
+                await _retryRepository.DeleteAsync(retryEntity.Id);
 
-                _logger.LogInformation(
-                    $"Executing RetryJob for {retryEntity.Topic}-{retryEntity.Id}");
+                ProducerConfig config = new ProducerConfig();
+                Headers headers = new Headers();
 
-
-                ProducerConfig config = new ProducerConfig()
+                foreach (var header in retryEntity.Headers)
                 {
-                    ClientId = retryEntity.ClientId
-                };
+                    headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
+                }
 
                 using (var prod = _retryKafkaProducerFactory.CreateProducer(config))
                 {
@@ -58,8 +65,7 @@ namespace LantanaGroup.Link.Shared.Jobs
                         {
                             Key = darKey, 
                             Value = darValue, 
-                            //TODO: Daniel - Add back
-                            //Headers = retryEntity.Headers
+                            Headers = headers
                         });
 
                     prod.Flush();
@@ -83,8 +89,7 @@ namespace LantanaGroup.Link.Shared.Jobs
                             new Message<string, AuditEventMessage>
                             {
                                 Value = val,
-                                //TODO: Daniel - Add back
-                                //Headers = retryEntity.Headers
+                                Headers = headers
                             });
                         producer.Flush();
                     }
@@ -93,10 +98,6 @@ namespace LantanaGroup.Link.Shared.Jobs
                         _logger.LogError(ex, $"Failed to generate a {nameof(KafkaTopic.AuditableEventOccurred)} message");
                     }
                 }
-                
-
-                // remove the job from the scheduler
-                await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
             }
             catch (Exception ex)
             {

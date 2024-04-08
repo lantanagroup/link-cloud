@@ -27,6 +27,7 @@ using Quartz.Spi;
 using LantanaGroup.Link.Submission.Application.Factories;
 using Quartz.Impl;
 using Quartz;
+using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,6 +109,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<RetryJob>();
 
     //Add health checks
     builder.Services.AddHealthChecks();
@@ -123,6 +125,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     // Add repositories
     // TODO
@@ -131,6 +135,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Report Scheduled Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
+
+    //Retry Listener
+    //Retry Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
