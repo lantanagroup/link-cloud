@@ -1,9 +1,8 @@
 ﻿namespace LantanaGroup.Link.Census.Application.Services;
 
-using Census.Domain.Entities;
+using global::Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
-using LantanaGroup.Link.Census.Application.Repositories;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
@@ -14,8 +13,9 @@ public class ScheduleService : BackgroundService
     private readonly ILogger<ScheduleService> _logger;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly IJobFactory _jobFactory;
-    private readonly CensusConfigMongoRepository _censusConfigRepo;
-    private readonly ICensusSchedulingRepository _censusSchedulingRepo;
+    //private readonly ICensusConfigRepository _censusConfigRepo;
+    //private readonly ICensusSchedulingRepository _censusSchedulingRepo;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
 
@@ -28,15 +28,17 @@ public class ScheduleService : BackgroundService
     public ScheduleService(
         ILogger<ScheduleService> logger,
        ISchedulerFactory schedulerFactory,
-       CensusConfigMongoRepository censusConfigRepo,
+       //ICensusConfigRepository censusConfigRepo,
        IJobFactory jobFactory,
-       ICensusSchedulingRepository censusSchedulingRepo)
+       //ICensusSchedulingRepository censusSchedulingRepo,
+       IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         _jobFactory = jobFactory ?? throw new ArgumentNullException(nameof(jobFactory));
-        _censusConfigRepo = censusConfigRepo ?? throw new ArgumentNullException(nameof(censusConfigRepo));
-        _censusSchedulingRepo = censusSchedulingRepo ?? throw new ArgumentNullException(nameof(censusSchedulingRepo));
+        //_censusConfigRepo = censusConfigRepo ?? throw new ArgumentNullException(nameof(censusConfigRepo));
+        //_censusSchedulingRepo = censusSchedulingRepo ?? throw new ArgumentNullException(nameof(censusSchedulingRepo));
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
     public IScheduler Scheduler { get; set; }
@@ -48,11 +50,15 @@ public class ScheduleService : BackgroundService
 
         Scheduler.JobFactory = _jobFactory;
 
-        List<CensusConfigEntity> facilities = await _censusConfigRepo.GetAllFacilities(cancellationToken);
+        using var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigRepository>();
+
+        List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
+
+        using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
 
         foreach (CensusConfigEntity facility in facilities)
         {
-            _censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
+            censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
         }
 
         await Scheduler.Start(cancellationToken);

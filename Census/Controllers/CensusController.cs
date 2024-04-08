@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Census.Commands;
+﻿using LantanaGroup.Link.Census.Application.Commands;
+using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;

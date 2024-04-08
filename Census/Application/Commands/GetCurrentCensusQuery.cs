@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Census.Repositories;
 using MediatR;
 
 namespace LantanaGroup.Link.Census.Application.Commands;

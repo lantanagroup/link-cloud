@@ -1,6 +1,4 @@
-﻿using LantanaGroup.Link.Census.Models.Messages;
-
-namespace LantanaGroup.Link.Census.Application.Models;
+﻿namespace LantanaGroup.Link.Census.Application.Models;
 
 public abstract class BaseResponse : IBaseResponse
 {

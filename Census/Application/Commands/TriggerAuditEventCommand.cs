@@ -1,9 +1,6 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Census.Models.Messages;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using MediatR;
 using System.Text;
 

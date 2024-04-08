@@ -72,7 +72,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
 
         foreach (var patient in patientUpdates)
         {
-            await _patientListRepository.UpdateAsync(patient);
+            await _patientListRepository.UpdateAsync(patient, cancellationToken);
             if (patient.IsDischarged)
             {
                 eventList.Add(new PatientEventResponse
@@ -89,11 +89,11 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             }
         }
 
-        await _historyRepository.AddAsync(new PatientCensusHistoricEntity
+        await _historyRepository.CreateAsync(new PatientCensusHistoricEntity
         {
             CensusDateTime = DateTime.UtcNow,
             FacilityId = request.FacilityId
-        });
+        }, cancellationToken);
 
         return eventList;
     }

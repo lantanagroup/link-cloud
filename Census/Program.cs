@@ -30,6 +30,7 @@ using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,6 +86,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
+    builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
 
@@ -102,16 +105,19 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     });
 
-    builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddHttpClient();
+
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
     builder.Services.AddTransient<INonTransientExceptionHandler<string, string>, NonTransientPatientIDsAcquiredExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -140,11 +146,10 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
-    builder.Services.AddSingleton<ICensusSchedulingRepository, CensusSchedulingRepository>();
-    builder.Services.AddSingleton<CensusConfigMongoRepository>();
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<SchedulePatientListRetrieval>();
+    builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
+    builder.Services.AddTransient<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<SchedulePatientListRetrieval>();
 
     builder.Services.AddHostedService<CensusListener>();
     builder.Services.AddHostedService<ScheduleService>();

@@ -1,13 +1,14 @@
-﻿using LantanaGroup.Link.Census.Application.Repositories;
+﻿using LantanaGroup.Link.Census.Application.Interfaces;
+using LantanaGroup.Link.Census.Application.Repositories;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Census.Application.HealthChecks
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly CensusConfigMongoRepository _datastore;
+        private readonly ICensusConfigRepository _datastore;
 
-        public DatabaseHealthCheck(CensusConfigMongoRepository datastore)
+        public DatabaseHealthCheck(ICensusConfigRepository datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
