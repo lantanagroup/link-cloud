@@ -33,11 +33,14 @@ namespace LantanaGroup.Link.Shared.Application.Factories
                 headers.Add(KafkaConstants.HeaderConstants.RetryCount, retryCount.ToString());
             }
 
+            var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(consumerSettings.ConsumerRetryDuration[retryCount - 1]);
+            var triggerDate = DateTime.UtcNow.Add(triggerDuration);
+
             RetryEntity retryEntity = new RetryEntity
             {
                 ServiceName = "Submission",
                 FacilityId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionFacilityId).Value ?? "",
-                ScheduledTrigger = consumerSettings.ConsumerRetryDuration[retryCount - 1],
+                ScheduledTrigger = triggerDate,
                 Topic = consumeResult.Topic,
                 Key = consumeResult.Message.Key,
                 Value = consumeResult.Message.Value,

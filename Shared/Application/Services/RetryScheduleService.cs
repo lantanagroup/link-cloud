@@ -90,14 +90,10 @@ namespace LantanaGroup.Link.Shared.Application.Services
 
             jobDataMap.Put("RetryEntity", entity);
 
-
-            var duration = System.Xml.XmlConvert.ToTimeSpan(entity.ScheduledTrigger);
-            
-            var offset = DateBuilder.DateOf(duration.Hours, duration.Minutes, duration.Seconds);
-
+            var offset = DateBuilder.DateOf(entity.ScheduledTrigger.Hour, entity.ScheduledTrigger.Minute, entity.ScheduledTrigger.Second);
 
             return TriggerBuilder
-                .Create()
+                .Create()                
                 .StartAt(offset)
                 .ForJob(jobKey)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
