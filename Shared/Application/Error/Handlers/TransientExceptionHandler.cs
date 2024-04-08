@@ -4,7 +4,9 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -51,7 +53,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers);
+                    consumeResult.Message.Headers, facilityId);
             }
             catch (Exception e)
             {
@@ -89,7 +91,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers);
+                    consumeResult.Message.Headers, facilityId);
             }
             catch (Exception e)
             {
@@ -109,12 +111,22 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers)
+        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
                 throw new Exception(
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
+            }
+
+            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+            {
+                headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+            }
+
+            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
+            {
+                headers.Add(KafkaConstants.HeaderConstants.ExceptionFacilityId, Encoding.UTF8.GetBytes(facilityId));
             }
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
