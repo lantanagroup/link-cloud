@@ -13,12 +13,11 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
+using Microsoft.Extensions.Options;
+using MongoDB.Driver.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Linq;
-using Hl7.Fhir.Specification;
-using MongoDB.Driver.Linq;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -33,6 +32,7 @@ public class PatientDataAcquiredListener : BackgroundService
 
     public PatientDataAcquiredListener(
         ILogger<PatientDataAcquiredListener> logger,
+        IOptions<ServiceInformation> serviceInformation,
         IMediator mediator,
         IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
@@ -43,6 +43,8 @@ public class PatientDataAcquiredListener : BackgroundService
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
+        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
     }
 
     ~PatientDataAcquiredListener()
