@@ -25,6 +25,7 @@
 	<ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
     <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.3.1" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
@@ -66,10 +67,6 @@
   <ItemGroup>
     <Folder Include="Listeners\" />
     <Folder Include="Migrations\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
