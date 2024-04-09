@@ -89,6 +89,7 @@ public class PatientDataAcquiredListener : BackgroundService
                 // Update the signature of HandleException to reflect the fact that we anticipate (and explicitly check for) potentially null values?
                 // For now, use the null-forgiving operator (here and below) to suppress compiler warnings
                 _deadLetterExceptionHandler.HandleException(null!, ex, AuditEventType.Create, null!);
+                kafkaConsumer.Commit([ex.ConsumerRecord.TopicPartitionOffset]);
                 continue;
             }
 
