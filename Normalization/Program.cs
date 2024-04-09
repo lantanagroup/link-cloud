@@ -11,14 +11,18 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -80,16 +84,21 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
-
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientNormalizedMessage>, KafkaProducerFactory<string, PatientNormalizedMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
+
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientDataAcquiredMessage>, KafkaProducerFactory<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientNormalizedMessage>, KafkaProducerFactory<string, PatientNormalizedMessage>>();
+
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage>, DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
@@ -108,9 +117,18 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddSingleton<RetryRepository>();
+
+    builder.Services.AddSingleton<IJobFactory, JobFactory>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddSingleton<RetryJob>();
+
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
     builder.Services.AddSingleton<IConfigRepository, ConfigRepository>();
     builder.Services.AddHostedService<PatientDataAcquiredListener>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
     // Add services to the container.
