@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -18,6 +19,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
     public class RetryListener : BackgroundService
     {
         private readonly ILogger<RetryListener> _logger;
+        private readonly IOptions<ServiceInformation> _serviceInformation;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly RetryRepository _retryRepository;
@@ -26,6 +28,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
 
         public RetryListener(ILogger<RetryListener> logger,
+            IOptions<ServiceInformation> serviceInformation,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
             RetryRepository retryRepository,
@@ -34,6 +37,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
             _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
@@ -41,7 +45,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _deadLetterExceptionHandler.ServiceName = "Normalization";
+            _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -96,7 +100,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
                         if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                         {
                             //If retry event is not from the Normalization service, disregard the retry event
-                            if (Encoding.UTF8.GetString(exceptionService) != "Normalization")
+                            if (Encoding.UTF8.GetString(exceptionService) != _serviceInformation.Value.Name)
                             {
                                 consumer.Commit(consumeResult);
                                 continue;
