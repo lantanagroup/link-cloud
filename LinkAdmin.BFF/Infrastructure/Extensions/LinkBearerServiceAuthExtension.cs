@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
@@ -23,6 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                 options.Authority = linkBearerServiceOptions.Authority;
                 options.Audience = linkBearerServiceOptions.Audience;
                 options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {
@@ -76,8 +78,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             public IWebHostEnvironment Environment { get; set; } = null!;
             public string? Authority { get; set; } = null!;
             public string? Audience { get; set; } = null!;
-            public string NameClaimType { get; set; } = "email";
-            public string RoleClaimType { get; set; } = "roles";
+            public string NameClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Email;
+            public string RoleClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Role;
             public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];
         }
     }

@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Settings;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
@@ -21,6 +22,7 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Extensions
                 options.Authority = NotificationConstants.LinkBearerService.LinkBearerIssuer;
                 options.Audience = NotificationConstants.LinkBearerService.LinkBearerAudience;
                 options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {
@@ -73,8 +75,8 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Extensions
         public class LinkBearerServiceOptions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
-            public string NameClaimType { get; set; } = "email";
-            public string RoleClaimType { get; set; } = "roles";
+            public string NameClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Email;
+            public string RoleClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Role;
             public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];
         }
 
