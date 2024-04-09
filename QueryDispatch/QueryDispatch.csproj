@@ -20,7 +20,7 @@
   <ItemGroup>
 	<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
 	<PackageReference Include="Azure.Identity" Version="1.10.4" />
-	<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
+	<!--<PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />-->
     <PackageReference Include="CompareNETObjects" Version="4.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
@@ -45,6 +45,10 @@
 
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
   <ItemGroup>
