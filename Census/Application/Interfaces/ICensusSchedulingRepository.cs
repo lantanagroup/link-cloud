@@ -3,7 +3,7 @@ using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Interfaces;
 
-public interface ICensusSchedulingRepository
+public interface ICensusSchedulingRepository : IDisposable
 {
     Task AddJobForFacility(CensusConfigEntity censusConfig, IScheduler scheduler);
 

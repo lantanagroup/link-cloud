@@ -1,8 +1,7 @@
-﻿using Census.Commands;
-using Census.Models;
-using Census.Settings;
-using LantanaGroup.Link.Census.Commands;
-using LantanaGroup.Link.Census.Models.Exceptions;
+﻿using LantanaGroup.Link.Census.Application.Commands;
+using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Exceptions;
+using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;

@@ -1,26 +1,27 @@
 using Azure.Identity;
-using Census.Jobs;
-using Census.Repositories;
-using Census.Services;
-using Census.Settings;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Census.Application.Errors;
+using LantanaGroup.Link.Census.Application.HealthChecks;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.HealthChecks;
+using LantanaGroup.Link.Census.Application.Jobs;
+using LantanaGroup.Link.Census.Application.Repositories;
+using LantanaGroup.Link.Census.Application.Repositories.Scheduling;
+using LantanaGroup.Link.Census.Application.Services;
+using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Listeners;
-using LantanaGroup.Link.Census.Repositories;
-using LantanaGroup.Link.Census.Repositories.Scheduling;
-using LantanaGroup.Link.Census.Services;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -29,6 +30,7 @@ using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,16 +86,38 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
-    builder.Services.AddSingleton<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddScoped<ICensusConfigMongoRepository, CensusConfigMongoRepository>();
+    builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+
+    builder.Services.AddDbContext<CensusContext>((sp, options) =>
+    {
+
+        var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+
+        switch (builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider))
+        {
+            case "SqlServer":
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString(CensusConstants.AppSettings.SqlServer))
+                   .AddInterceptors(updateBaseEntityInterceptor);
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });
+
+    builder.Services.AddHttpClient();
+
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
     builder.Services.AddTransient<INonTransientExceptionHandler<string, string>, NonTransientPatientIDsAcquiredExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -122,11 +146,10 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
-    builder.Services.AddSingleton<ICensusSchedulingRepository, CensusSchedulingRepository>();
-    builder.Services.AddSingleton<CensusConfigMongoRepository>();
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<SchedulePatientListRetrieval>();
+    builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
+    builder.Services.AddTransient<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<SchedulePatientListRetrieval>();
 
     builder.Services.AddHostedService<CensusListener>();
     builder.Services.AddHostedService<ScheduleService>();
