@@ -95,18 +95,26 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch (ConsumeException ex)
             {
-                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key);
+                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
                 ConsumeResult<string, string> result = new ConsumeResult<string, string>
                 {
                     Message = new Message<string, string>
                     {
-                        Headers = ex.ConsumerRecord.Message.Headers,
+                        Headers = ex.ConsumerRecord?.Message?.Headers,
                         Key = facilityId,
-                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? [])
                     }
                 };
                 _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
-                kafkaConsumer.Commit([ex.ConsumerRecord.TopicPartitionOffset]);
+                TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                if (offset == null)
+                {
+                    kafkaConsumer.Commit();
+                }
+                else
+                {
+                    kafkaConsumer.Commit([offset]);
+                }
                 continue;
             }
 
