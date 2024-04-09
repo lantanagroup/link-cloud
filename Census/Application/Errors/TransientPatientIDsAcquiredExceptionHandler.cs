@@ -1,8 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Models.Messages;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Census.Application.Errors;

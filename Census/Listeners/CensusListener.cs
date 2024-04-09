@@ -1,11 +1,11 @@
-﻿using Census.Settings;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Commands;
-using LantanaGroup.Link.Census.Models;
-using LantanaGroup.Link.Census.Models.Messages;
+using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Messages;
+using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;

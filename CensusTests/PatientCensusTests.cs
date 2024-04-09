@@ -1,9 +1,9 @@
 ﻿
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Interfaces;
-using LantanaGroup.Link.Census.Commands;
+using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Census.Models.Messages;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -130,12 +130,12 @@ public class PatientCensusTests
                 ReportId = "456"
             }
         };
-        mockRepo.Setup(x => x.GetAllCensusReportsForFacility(It.IsAny<string>())).Returns(mockHistoryList);
+        mockRepo.Setup(x => x.GetAllCensusReportsForFacility(It.IsAny<string>())).Returns(Task.FromResult(mockHistoryList.AsEnumerable()));
         var handler = new GetCensusHistoryQueryHandler(mockLogger.Object, mockRepo.Object);
         var query = new GetCensusHistoryQuery { FacilityId = "123" };
 
         // Act
-        var result = await handler.Handle(query, CancellationToken.None);
+        var result = (await handler.Handle(query, CancellationToken.None)).ToList();
         var expectedReportId = "123-12/06/2023 10:34:28 PM";
         // Assert
         Assert.NotNull(result);
@@ -200,8 +200,8 @@ public class PatientCensusTests
         });
 
         mockPatientListRepo.Setup(x => x.GetActivePatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingPatientList);
-        mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusPatientListEntity());
-        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        mockHistoryRepo.Setup(x => x.CreateAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
 
         var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand
@@ -248,8 +248,8 @@ public class PatientCensusTests
         });
 
         mockPatientListRepo.Setup(x => x.GetActivePatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingPatientList);
-        mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusPatientListEntity());
-        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        mockHistoryRepo.Setup(x => x.CreateAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
 
         var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand
