@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
             }
 
             var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(consumerSettings.ConsumerRetryDuration[retryCount - 1]);
-            var triggerDate = DateTime.UtcNow.Add(triggerDuration);
+            var triggerDate = DateTime.Now.Add(triggerDuration);
 
             RetryEntity retryEntity = new RetryEntity
             {

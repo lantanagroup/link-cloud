@@ -27,6 +27,8 @@ public enum KafkaTopic
     NotificationRequested,
     PatientCensusScheduled,
     PatientEvent,
+    [StringValue("PatientEvent-Retry")]
+    PatientEventRetry,
     MeasureEvaluated,
     ReportSubmitted,
     BundleEvalRequested,

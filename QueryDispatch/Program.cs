@@ -15,11 +15,15 @@ using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
 using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
 using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
@@ -84,6 +88,7 @@ else
 builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(QueryDispatchConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
+builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
 
 // Add services to the container.
 builder.Services.AddGrpc();
@@ -103,9 +108,15 @@ builder.Services.AddTransient<IUpdateQueryDispatchConfigurationCommand, UpdateQu
 //Add factories
 builder.Services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
 builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
+builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
 
 builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
 builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
+builder.Services.AddTransient<IKafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>>();
+
+builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
 builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
@@ -114,6 +125,7 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 builder.Services.AddSingleton<IScheduledReportRepository, ScheduledReportMongoRepo>();
 builder.Services.AddSingleton<IPatientDispatchRepository, PatientDispatchMongoRepo>();
 builder.Services.AddSingleton<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationMongoRepo>();
+builder.Services.AddSingleton<RetryRepository>();
 
 //Add Queries
 builder.Services.AddTransient<IGetScheduledReportQuery, GetScheduledReportQuery>();
@@ -122,15 +134,24 @@ builder.Services.AddTransient<IGetQueryDispatchConfigurationQuery, GetQueryDispa
 builder.Services.AddTransient<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
 builder.Services.AddTransient<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
 
+//Excepation Handlers
+builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
+builder.Services.AddTransient<IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue>, DeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue>>();
+builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventValue>, TransientExceptionHandler<string, PatientEventValue>>();
+
 //Add Services
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
 builder.Services.AddHostedService<PatientEventListener>();
 builder.Services.AddHostedService<ReportScheduledEventListener>();
+builder.Services.AddHostedService<RetryListener>();
 builder.Services.AddHostedService<ScheduleService>();
+builder.Services.AddHostedService<RetryScheduleService>();
 
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
+builder.Services.AddSingleton<RetryJob>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
