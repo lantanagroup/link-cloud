@@ -13,7 +13,7 @@ using Quartz;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.QueryDispatch.Listeners
+namespace LantanaGroup.Link.Normalization.Listeners
 {
     public class RetryListener : BackgroundService
     {
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
+            _deadLetterExceptionHandler.ServiceName = "Normalization";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "QueryDispatchRetry",
+                GroupId = "NormalizationRetry",
                 EnableAutoCommit = false
             };
 
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             {
                 consumer.Subscribe(new List<string>() { KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue() } );
 
-                _logger.LogInformation($"Started Query Dispatch Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+                _logger.LogInformation($"Started Normalization Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -95,8 +95,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     {
                         if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                         {
-                            //If retry event is not from the Query Dispatch service, disregard the retry event
-                            if (Encoding.UTF8.GetString(exceptionService) != "QueryDispatch")
+                            //If retry event is not from the Normalization service, disregard the retry event
+                            if (Encoding.UTF8.GetString(exceptionService) != "Normalization")
                             {
                                 consumer.Commit(consumeResult);
                                 continue;
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Error in Query Dispatch Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
+                        _logger.LogError($"Error in Normalization Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
                     }
                 }
             }
