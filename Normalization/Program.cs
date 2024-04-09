@@ -82,9 +82,12 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+    IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
+    builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
+    var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
+
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
-    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -127,9 +130,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
     builder.Services.AddSingleton<IConfigRepository, ConfigRepository>();
-    builder.Services.AddHostedService<PatientDataAcquiredListener>();
-    builder.Services.AddHostedService<RetryListener>();
-    builder.Services.AddHostedService<RetryScheduleService>();
+    if (consumerSettings == null || !consumerSettings.DisableConsumer)
+    {
+        builder.Services.AddHostedService<PatientDataAcquiredListener>();
+    }
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+    }
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
     // Add services to the container.
