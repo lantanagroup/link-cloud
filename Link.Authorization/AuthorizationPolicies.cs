@@ -1,18 +1,18 @@
-﻿using Link.Authorization.Infrastructure.Requirements;
+﻿using Link.Authorization.Infrastructure;
+using Link.Authorization.Infrastructure.Requirements;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Link.Authorization
 {
     public static class AuthorizationPolicies
     {
-        public static AuthorizationPolicy CanViewAuditLogs() 
+        public static AuthorizationPolicy LinkAdminAccess()
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole("LinkAdministrator")
+                .RequireRole(LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
                 .Build();
         }
-
         public static AuthorizationPolicy FacilityAccess()
         {
             return new AuthorizationPolicyBuilder()
@@ -21,11 +21,19 @@ namespace Link.Authorization
                 .Build();
         }
 
+        public static AuthorizationPolicy CanViewAuditLogs() 
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
+                .Build();
+        }        
+
         public static AuthorizationPolicy CanCreateNotifiactionConfigurations()
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole("LinkAdministrator")
+                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
                 .Build();
         }
 
@@ -33,7 +41,7 @@ namespace Link.Authorization
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole("LinkAdministrator")
+                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
                 .Build();
         }
 
@@ -41,7 +49,7 @@ namespace Link.Authorization
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole("LinkAdministrator")
+                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
                 .Build();
         }
     }

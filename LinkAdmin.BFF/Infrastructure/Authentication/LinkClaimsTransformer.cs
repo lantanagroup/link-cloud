@@ -2,6 +2,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
@@ -32,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
         {
             if (principal.Identity is not ClaimsIdentity identity) { return principal; }
 
-            var accountId = identity.FindFirst("email")?.Value;
+            var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
 
             if (accountId == null) { return principal; }
 
@@ -54,29 +55,35 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             // Cache the account for 5 minutes if it is not already in the cache
             if(cacheAccount is null)
-            {
-                
+            {                
                 _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
             }                  
 
             // Remove the existing 'sub' claim and replace with link account id
-            var existingSubClaim = identity.FindFirst("sub");
+            var existingSubClaim = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject);
             if (existingSubClaim != null)
             {
                 identity.RemoveClaim(existingSubClaim);
-                identity.AddClaim(new Claim("sub", account.Id));
-            }                   
+                identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Subject, account.Id));
+            }          
 
             // Add the account role claims
-            foreach (var role in account.Roles)
+            var userRoleClaims = account.Groups.SelectMany(g => g.Roles).Select(r => r.Name).Distinct().ToList();
+            foreach(var role in account.Roles)
             {
-                identity.AddClaim(new Claim("role", role.Name));
+                if(!userRoleClaims.Contains(role.Name))
+                    userRoleClaims.Add(role.Name);
+            }
+
+            foreach (var role in userRoleClaims)
+            {
+                identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, role));
             }
 
             // Add facility ids associated with the user
             foreach (var facility in account.FacilityIds)
             {
-                identity.AddClaim(new Claim("facilities", facility));
+                identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Facility, facility));
             }
 
             return principal;

@@ -284,6 +284,12 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 return BadRequest(message);
             }
 
+            //var authorizationResult = await _authorizationService.AuthorizeAsync(User, facilityId, "FacilityAccess");
+            //if(!authorizationResult.Succeeded)
+            //{
+            //    return Forbid();
+            //}
+
             //add id to current activity
             var activity = Activity.Current;
             activity?.AddTag("facility.id", facilityId);
@@ -303,36 +309,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
                 throw;
             }
-
-
-            //var authorizationResult = await _authorizationService.AuthorizeAsync(User, facilityId, "FacilityAccess");
-            //if (authorizationResult.Succeeded)
-            //{
-            //    //add id to current activity
-            //    var activity = Activity.Current;
-            //    activity?.AddTag("facility.id", facilityId);
-            //    _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
-
-
-            //    try
-            //    {
-            //        NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, HttpContext.RequestAborted);
-
-            //        if (config == null) { return NotFound(); }
-
-            //        return Ok(config);
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
-            //        throw;
-            //    }
-            //}
-            //else
-            //{
-            //    return Forbid();
-            //}
-
+            
         }
 
         /// <summary>
