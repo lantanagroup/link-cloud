@@ -64,7 +64,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    IConfigurationSection serviceInformationSection = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation);
+    builder.Services.Configure<ServiceInformation>(serviceInformationSection);
+    var serviceInformation = serviceInformationSection.Get<ServiceInformation>();
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
@@ -89,17 +91,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         KafkaProducerFactory<string, LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage>
         >();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
-    builder.Services.AddTransient(serviceProvider =>
-    {
-        IKafkaProducerFactory<string, PatientDataAcquiredMessage> producerFactory =
-            ActivatorUtilities.CreateInstance<KafkaProducerFactory<string, PatientDataAcquiredMessage>>(serviceProvider);
-        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> handler =
-            ActivatorUtilities.CreateInstance<DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>(serviceProvider, producerFactory);
-        handler.ServiceName = serviceInformation.Name;
-        handler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
-        return handler;
-    });
-    
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientDataAcquiredMessage>, KafkaProducerFactory<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage>, DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>();
+
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     builder.Services.AddControllers();
