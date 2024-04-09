@@ -23,6 +23,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,10 +87,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientNormalizedMessage>, KafkaProducerFactory<string, PatientNormalizedMessage>>();
-    builder.Services.AddTransient<
-        IKafkaProducerFactory<string, LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage>,
-        KafkaProducerFactory<string, LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage>
-        >();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientDataAcquiredMessage>, KafkaProducerFactory<string, PatientDataAcquiredMessage>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage>, DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>();
