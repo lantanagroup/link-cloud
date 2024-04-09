@@ -269,7 +269,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         ///     Server Error: 500
         /// </returns>
         [HttpGet("facility/{facilityId}")]
-        //[Authorize(Policy = "AuthenticatedUser")]        
+        [Authorize(Policy = "AuthenticatedUser")]        
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(NotificationConfigurationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -284,11 +284,11 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 return BadRequest(message);
             }
 
-            //var authorizationResult = await _authorizationService.AuthorizeAsync(User, facilityId, "FacilityAccess");
-            //if(!authorizationResult.Succeeded)
-            //{
-            //    return Forbid();
-            //}
+            var authorizationResult = await _authorizationService.AuthorizeAsync(User, facilityId, "FacilityAccess");
+            if (!authorizationResult.Succeeded)
+            {
+                return Forbid();
+            }
 
             //add id to current activity
             var activity = Activity.Current;

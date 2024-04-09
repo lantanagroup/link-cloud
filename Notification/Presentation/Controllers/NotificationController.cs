@@ -169,7 +169,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogGetNotificationByFacilityId(facilityId);
 
                 //Get list of audit events using supplied filters and pagination
-                PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
+                PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(User, facilityId, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(notificationList.Metadata));
