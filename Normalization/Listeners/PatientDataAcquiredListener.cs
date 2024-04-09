@@ -27,6 +27,7 @@ public class PatientDataAcquiredListener : BackgroundService
     private readonly IMediator _mediator;
     private readonly IKafkaConsumerFactory<string, PatientDataAcquiredMessage> _consumerFactory;
     private readonly IKafkaProducerFactory<string, PatientNormalizedMessage> _producerFactory;
+    private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> _deadLetterExceptionHandler;
     private bool _cancelled = false;
 
@@ -36,12 +37,16 @@ public class PatientDataAcquiredListener : BackgroundService
         IMediator mediator,
         IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
+        IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
         IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
+        _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
+        _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
         _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
@@ -85,10 +90,17 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch (ConsumeException ex)
             {
-                // TODO: DLEH correctly handles these nulls despite declaring the corresponding parameters as non-nullable
-                // Update the signature of HandleException to reflect the fact that we anticipate (and explicitly check for) potentially null values?
-                // For now, use the null-forgiving operator (here and below) to suppress compiler warnings
-                _deadLetterExceptionHandler.HandleException(null!, ex, AuditEventType.Create, null!);
+                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key);
+                ConsumeResult<string, string> result = new ConsumeResult<string, string>
+                {
+                    Message = new Message<string, string>
+                    {
+                        Headers = ex.ConsumerRecord.Message.Headers,
+                        Key = facilityId,
+                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                    }
+                };
+                _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
                 kafkaConsumer.Commit([ex.ConsumerRecord.TopicPartitionOffset]);
                 continue;
             }
@@ -103,7 +115,7 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, null!);
+                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, message.Message.Key);
                 kafkaConsumer.Commit(message);
                 continue;
             }
