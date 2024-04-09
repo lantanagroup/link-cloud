@@ -82,6 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add data protection
     builder.Services.AddDataProtection();
+    //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
@@ -91,7 +92,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
-    //Add Redis 
+    //Add Redis     
     builder.Services.AddRedisCache(options =>
     {
         options.Environment = builder.Environment;

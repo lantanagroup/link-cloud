@@ -22,6 +22,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
         }
 
+        //TODO: Add back data protection once key persience is implemented
         public async Task<bool> ExecuteAsync()
         {
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
@@ -36,7 +37,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             }
 
             var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-            _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
+            //_cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
+            _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key);
 
             _logger.LogInformation("Bearer key refreshed");
 

@@ -26,6 +26,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
         }
 
+        //TODO: Add back data protection once key persience is implemented
         public async Task<string> ExecuteAsync(ClaimsPrincipal user)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
@@ -39,10 +40,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 {
 
                     bearerKey = await _secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
-                    _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                    //_cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                    _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
                 }
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey))), SecurityAlgorithms.HmacSha512Signature);
+                //var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey))), SecurityAlgorithms.HmacSha512Signature);
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)), SecurityAlgorithms.HmacSha512Signature);
 
                 var token = new JwtSecurityToken(                                    
                                     issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,

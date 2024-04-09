@@ -21,6 +21,20 @@
             public const string AllowReflection = "Link:Notification:AllowReflection";
         }
 
+        public static class LinkBearerService
+        {
+            public const string LinkBearerIssuer = "LinkServiceAdmin";
+            public const string LinkBearerAudience = "LinkSevices";
+            public const string LinkBearerKeyName = "link-bearer-key";
+            public const string Schema = "link_admin_bearer";
+        }
+
+        public static class LinkDataProtectors
+        {
+            public const string LinkUser = "LinkUser";
+            public const string LinkSigningKey = "LinkSigningKey";
+        }
+
         public static class NotificationLoggingIds
         {
             public const int GenerateItems = 1000;

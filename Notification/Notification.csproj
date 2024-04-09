@@ -33,6 +33,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0-preview.2.24128.4" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.*" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.*" />
@@ -55,6 +56,10 @@
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
     <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
   </ItemGroup>
 
   <ItemGroup>

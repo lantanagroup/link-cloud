@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Link.Authorization.Infrastructure.Extensions
 {
-    internal static class LinkAuthorizationHandlersExtension
+    public static class LinkAuthorizationHandlersExtension
     {
         public static IServiceCollection AddLinkAuthorizationHandlers(this IServiceCollection services)
         {           

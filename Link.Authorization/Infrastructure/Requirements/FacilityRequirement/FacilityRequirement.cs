@@ -7,26 +7,18 @@ namespace Link.Authorization.Infrastructure.Requirements
     {
     }
 
-    public class FacilityRequirementHandler : AuthorizationHandler<FacilityRequirement>
+    public class FacilityRequirementHandler : AuthorizationHandler<FacilityRequirement, string>
     {
-        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, FacilityRequirement requirement)
+        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, FacilityRequirement requirement, string facilityId)
         {
             if (!context.User.HasClaim(c => c.Type == "facilities"))
             {
                 return Task.CompletedTask;
             }
 
-            var facilityIdClaim = context.User.FindAll(c => c.Type == "facilities").ToList();
+            var facilityIdClaim = context.User.FindAll(c => c.Type == "facilities").ToList();           
 
-            var routeData = context.Resource as RouteData;
-            if (routeData == null)
-            {
-                return Task.CompletedTask;
-            }
-
-            var requestFacilityId = routeData.Values["facilityId"] as string;
-
-            if (facilityIdClaim.Any(x => x.Value.Equals(requestFacilityId, StringComparison.OrdinalIgnoreCase)))
+            if (facilityIdClaim.Any(x => x.Value.Equals(facilityId, StringComparison.OrdinalIgnoreCase)))
             {
                 context.Succeed(requirement);
             }

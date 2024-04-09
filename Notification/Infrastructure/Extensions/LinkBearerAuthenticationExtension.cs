@@ -1,32 +1,30 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
-using LantanaGroup.Link.LinkAdmin.BFF.Settings;
-using Microsoft.AspNetCore.Authentication;
+﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.Notification.Infrastructure.Extensions
 {
-    public static class LinkBearerServiceAuthExtension
+    public static class LinkBearerAuthenticationExtension
     {
-        //TODO: Add back data protection once key persience is implemented
-        public static IServiceCollection AddLinkBearerServiceAuthentication(this IServiceCollection services, Action<LinkBearerServiceOptions>? options)
+        public static IServiceCollection AddLinkBearerAuthentication(this IServiceCollection services, Action<LinkBearerServiceOptions>? options)
         {
             var linkBearerServiceOptions = new LinkBearerServiceOptions();
             options?.Invoke(linkBearerServiceOptions);
 
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-            services.AddAuthentication().AddJwtBearer(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken, options =>
-            {                               
-                options.Authority = linkBearerServiceOptions.Authority;
-                options.Audience = linkBearerServiceOptions.Audience;
+            services.AddAuthentication().AddJwtBearer(NotificationConstants.LinkBearerService.Schema, options =>
+            {
+                options.Authority = NotificationConstants.LinkBearerService.LinkBearerIssuer;
+                options.Audience = NotificationConstants.LinkBearerService.LinkBearerAudience;
                 options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
 
                 options.TokenValidationParameters = new()
                 {
-                    ValidIssuer = linkBearerServiceOptions.Authority,
+                    ValidIssuer = NotificationConstants.LinkBearerService.LinkBearerIssuer,
                     NameClaimType = linkBearerServiceOptions.NameClaimType,
                     RoleClaimType = linkBearerServiceOptions.RoleClaimType,
                     //avoid jwt confustion attacks (ie: circumvent token signature checking)
@@ -38,12 +36,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                         //check if bearer key is in cache, if not get it from the secret manager
                         var cache = services.BuildServiceProvider().GetRequiredService<IDistributedCache>();
-                        string? cachedBearerKey = cache.GetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName);
+                        string? cachedBearerKey = cache.GetString(NotificationConstants.LinkBearerService.LinkBearerKeyName);
 
                         if (cachedBearerKey == null)
                         {
                             var secretManager = services.BuildServiceProvider().GetRequiredService<ISecretManager>();
-                            var vaultResult = secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                            var vaultResult = secretManager.GetSecretAsync(NotificationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
 
                             bearerKey = vaultResult.Result;
 
@@ -54,10 +52,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
                             //protect the bearer key and store it in the cache
                             //cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
-                            cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                            cache.SetString(NotificationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
                         }
                         else
-                        {                                                     
+                        {
+                            //TODO: Uncomment this line when the data protector is implemented                            
                             //bearerKey = protector.Unprotect(cachedBearerKey);
                             bearerKey = cachedBearerKey;
                         }
@@ -74,11 +73,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
         public class LinkBearerServiceOptions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
-            public string? Authority { get; set; } = null!;
-            public string? Audience { get; set; } = null!;
             public string NameClaimType { get; set; } = "email";
             public string RoleClaimType { get; set; } = "roles";
             public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];
         }
+
     }
 }

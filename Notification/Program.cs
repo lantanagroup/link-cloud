@@ -11,6 +11,7 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Comma
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
+using LantanaGroup.Link.Notification.Infrastructure.Extensions;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Listeners;
@@ -21,6 +22,9 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using Link.Authorization;
+using Link.Authorization.Infrastructure.Extensions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -144,6 +148,34 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
+    //Add Redis 
+    builder.Services.AddRedisCache(options =>
+    {
+        options.Environment = builder.Environment;
+
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+        
+        if(string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
+    });
+
+    // Add Secret Manager
+    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    {
+        builder.Services.AddSecretManager(options =>
+        {
+            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
+        });
+    }
+
+    builder.Services.AddLinkBearerAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+    });
+
+
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
@@ -182,15 +214,27 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddCorsService(builder.Environment);
 
     //configure servive api security   
-    var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
-    if (idpConfig != null)
+    //var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
+    //if (idpConfig != null)
+    //{
+    //    builder.Services.AddAuthenticationService(idpConfig, builder.Environment);
+    //}
+    //else
+    //{
+    //    throw new NullReferenceException("Identity Provider Configuration was null.");
+    //}
+
+    builder.Services.AddAuthorization(builder =>
     {
-        builder.Services.AddAuthenticationService(idpConfig, builder.Environment);
-    }
-    else
-    {
-        throw new NullReferenceException("Identity Provider Configuration was null.");
-    }
+        builder.AddPolicy("FacilityAccess", AuthorizationPolicies.FacilityAccess());
+
+        builder.AddPolicy("AuthenticatedUser", pb => {
+            pb.RequireAuthenticatedUser()
+                .AddAuthenticationSchemes(NotificationConstants.LinkBearerService.Schema);
+        });
+    });
+
+    builder.Services.AddLinkAuthorizationHandlers();
 
     //builder.Services.AddAuthorizationService();
 
@@ -272,7 +316,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseRouting();
     app.UseCors("CorsPolicy");
     app.UseAuthentication();
-    app.UseMiddleware<UserScopeMiddleware>();
+    //app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();    
 
     //map health check middleware

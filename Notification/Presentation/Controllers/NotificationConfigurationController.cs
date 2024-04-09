@@ -10,6 +10,7 @@ using LantanaGroup.Link.Notification.Presentation.Models;
 using System.Diagnostics;
 using System.Net;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.Notification.Presentation.Controllers
 {
@@ -18,6 +19,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
     public class NotificationConfigurationController : ControllerBase
     {
         private readonly ILogger<NotificationConfigurationController> _logger;
+        private readonly IAuthorizationService _authorizationService;
         private readonly INotificationConfigurationFactory _configurationFactory;
         private readonly IFacilityClient _facilityClient;
 
@@ -32,16 +34,16 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
 
         private int maxNotificationConfigurationPageSize = 20;
 
-        public NotificationConfigurationController(ILogger<NotificationConfigurationController> logger, INotificationConfigurationFactory configurationFactory, 
-            IFacilityClient facilityClient, ICreateFacilityConfigurationCommand createFacilityConfigurationCommand, 
-            IUpdateFacilityConfigurationCommand updateFacilityConfigurationCommand, IFacilityConfigurationExistsQuery facilityConfigurationExistsQuery, 
-            IGetFacilityConfigurationQuery getFacilityConfigurationQuery, IGetNotificationConfigurationQuery getNotificationConfigurationQuery, 
-            IGetFacilityConfigurationListQuery getFacilityConfigurationListQuery, IDeleteFacilityConfigurationCommand deleteFacilityConfigurationCommand)
+        public NotificationConfigurationController(ILogger<NotificationConfigurationController> logger, INotificationConfigurationFactory configurationFactory,
+            IFacilityClient facilityClient, ICreateFacilityConfigurationCommand createFacilityConfigurationCommand,
+            IUpdateFacilityConfigurationCommand updateFacilityConfigurationCommand, IFacilityConfigurationExistsQuery facilityConfigurationExistsQuery,
+            IGetFacilityConfigurationQuery getFacilityConfigurationQuery, IGetNotificationConfigurationQuery getNotificationConfigurationQuery,
+            IGetFacilityConfigurationListQuery getFacilityConfigurationListQuery, IDeleteFacilityConfigurationCommand deleteFacilityConfigurationCommand, IAuthorizationService authorizationService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configurationFactory = configurationFactory ?? throw new ArgumentNullException(nameof(configurationFactory));
             _facilityClient = facilityClient ?? throw new ArgumentNullException(nameof(facilityClient));
-            
+
             _createFacilityConfigurationCommand = createFacilityConfigurationCommand ?? throw new ArgumentNullException(nameof(createFacilityConfigurationCommand));
             _updateFacilityConfigurationCommand = updateFacilityConfigurationCommand ?? throw new ArgumentNullException(nameof(updateFacilityConfigurationCommand));
             _facilityConfigurationExistsQuery = facilityConfigurationExistsQuery ?? throw new ArgumentNullException(nameof(facilityConfigurationExistsQuery));
@@ -49,6 +51,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             _getNotificationConfigurationQuery = getNotificationConfigurationQuery ?? throw new ArgumentNullException(nameof(getNotificationConfigurationQuery));
             _getFacilityConfigurationListQuery = getFacilityConfigurationListQuery ?? throw new ArgumentNullException(nameof(getFacilityConfigurationListQuery));
             _deleteFacilityConfigurationCommand = deleteFacilityConfigurationCommand ?? throw new ArgumentNullException(nameof(deleteFacilityConfigurationCommand));
+            _authorizationService = authorizationService ?? throw new ArgumentNullException(nameof(authorizationService));
         }
 
         /// <summary>
@@ -266,6 +269,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         ///     Server Error: 500
         /// </returns>
         [HttpGet("facility/{facilityId}")]
+        //[Authorize(Policy = "AuthenticatedUser")]        
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(NotificationConfigurationModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -285,6 +289,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             activity?.AddTag("facility.id", facilityId);
             _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
 
+
             try
             {
                 NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, HttpContext.RequestAborted);
@@ -298,6 +303,35 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
                 throw;
             }
+
+
+            //var authorizationResult = await _authorizationService.AuthorizeAsync(User, facilityId, "FacilityAccess");
+            //if (authorizationResult.Succeeded)
+            //{
+            //    //add id to current activity
+            //    var activity = Activity.Current;
+            //    activity?.AddTag("facility.id", facilityId);
+            //    _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
+
+
+            //    try
+            //    {
+            //        NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, HttpContext.RequestAborted);
+
+            //        if (config == null) { return NotFound(); }
+
+            //        return Ok(config);
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
+            //        throw;
+            //    }
+            //}
+            //else
+            //{
+            //    return Forbid();
+            //}
 
         }
 
