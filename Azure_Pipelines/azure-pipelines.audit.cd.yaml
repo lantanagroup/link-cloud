@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Audit/*
+    - DotNet/Audit/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -12,11 +12,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Audit/Audit.csproj'
+  value: 'DotNet/Audit/Audit.csproj'
 - name: testProject
-  value: 'AuditUnitTests/AuditUnitTests.csproj'
+  value: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
 - name: nugetPath
-  value: 'Audit/nuget.config'
+  value: 'DotNet/Audit/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -24,7 +24,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-audit'
 - name: dockerPath
-  value: '**/Audit/Dockerfile'
+  value: '**/DotNet/Audit/Dockerfile'
 - name: serviceName
   value: 'Audit'  
 - name: containerRegistry

@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Census/*
+    - DotNet/Census/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Census/Census.csproj'
-  testProject: 'CensusUnitTests/CensusUnitTests.csproj'
-  nugetPath: 'Census/nuget.config'
+  project: 'DotNet/Census/Census.csproj'
+  testProject: 'DotNet/CensusUnitTests/CensusUnitTests.csproj'
+  nugetPath: 'DotNet/Census/nuget.config'
   serviceName: 'Census'
 
 steps:

@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - DataAcquisition/*
+    - DotNet/DataAcquisition/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DataAcquisition/DataAcquisition.csproj'
+  value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
 - name: testProject
-  value: 'DataAcquisitionTests/DataAcquisitionTests.csproj'
+  value: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
 - name: nugetPath
-  value: 'DataAcquisition/nuget.config'
+  value: 'DotNet/DataAcquisition/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-dataacquisition'
 - name: dockerPath
-  value: '**/DataAcquisition/Dockerfile'
+  value: '**/DotNet/DataAcquisition/Dockerfile'
 - name: serviceName
   value: 'DataAcquisition'
 - name: containerRegistry
