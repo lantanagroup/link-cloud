@@ -72,7 +72,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
         {
             existingEntity = new CensusConfigEntity
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.NewGuid(),
                 FacilityID = request.CensusConfigEntity.FacilityId,
                 ScheduledTrigger = request.CensusConfigEntity.ScheduledTrigger,
                 CreateDate = DateTime.UtcNow,

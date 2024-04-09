@@ -13,17 +13,15 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240408185717_InitialCreate'
+    WHERE [MigrationId] = N'20240409145111_Init'
 )
 BEGIN
     CREATE TABLE [CensusConfig] (
-        [Id] nvarchar(450) NOT NULL,
+        [Id] uniqueidentifier NOT NULL,
         [FacilityID] nvarchar(max) NOT NULL,
         [ScheduledTrigger] nvarchar(max) NOT NULL,
         [CreateDate] datetime2 NOT NULL,
         [ModifyDate] datetime2 NOT NULL,
-        [CreatedOn] datetime2 NOT NULL,
-        [LastModifiedOn] datetime2 NULL,
         CONSTRAINT [PK_CensusConfig] PRIMARY KEY ([Id])
     );
 END;
@@ -31,11 +29,11 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240408185717_InitialCreate'
+    WHERE [MigrationId] = N'20240409145111_Init'
 )
 BEGIN
     CREATE TABLE [CensusPatientList] (
-        [Id] nvarchar(450) NOT NULL,
+        [Id] uniqueidentifier NOT NULL,
         [FacilityId] nvarchar(max) NOT NULL,
         [PatientId] nvarchar(max) NOT NULL,
         [DisplayName] nvarchar(max) NOT NULL,
@@ -44,8 +42,8 @@ BEGIN
         [DischargeDate] datetime2 NOT NULL,
         [CreatedDate] datetime2 NOT NULL,
         [UpdatedDate] datetime2 NOT NULL,
-        [CreatedOn] datetime2 NOT NULL,
-        [LastModifiedOn] datetime2 NULL,
+        [CreateDate] datetime2 NOT NULL,
+        [ModifyDate] datetime2 NULL,
         CONSTRAINT [PK_CensusPatientList] PRIMARY KEY ([Id])
     );
 END;
@@ -53,16 +51,16 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240408185717_InitialCreate'
+    WHERE [MigrationId] = N'20240409145111_Init'
 )
 BEGIN
     CREATE TABLE [PatientCensusHistory] (
-        [Id] nvarchar(450) NOT NULL,
+        [Id] uniqueidentifier NOT NULL,
         [FacilityId] nvarchar(max) NOT NULL,
         [CensusDateTime] datetime2 NOT NULL,
         [ReportId] nvarchar(max) NOT NULL,
-        [CreatedOn] datetime2 NOT NULL,
-        [LastModifiedOn] datetime2 NULL,
+        [CreateDate] datetime2 NOT NULL,
+        [ModifyDate] datetime2 NULL,
         CONSTRAINT [PK_PatientCensusHistory] PRIMARY KEY ([Id])
     );
 END;
@@ -70,11 +68,11 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20240408185717_InitialCreate'
+    WHERE [MigrationId] = N'20240409145111_Init'
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20240408185717_InitialCreate', N'8.0.3');
+    VALUES (N'20240409145111_Init', N'8.0.3');
 END;
 GO
 
