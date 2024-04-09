@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Normalization/*
+    - DotNet/Normalization/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Normalization/Normalization.csproj'
-  testProject: 'NormalizationUnitTests/NormalizationUnitTests.csproj'
-  nugetPath: 'Normalization/nuget.config'
+  project: 'DotNet/Normalization/Normalization.csproj'
+  testProject: 'DotNet/NormalizationUnitTests/NormalizationUnitTests.csproj'
+  nugetPath: 'DotNet/Normalization/nuget.config'
   serviceName: 'Normalization'
 
 steps:

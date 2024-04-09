@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Normalization/*
+    - DotNet/Normalization/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Normalization/Normalization.csproj'
+  value: 'DotNet/Normalization/Normalization.csproj'
 - name: testProject
-  value: 'NormalizationUnitTests/NormalizationUnitTests.csproj'
+  value: 'DotNet/NormalizationUnitTests/NormalizationUnitTests.csproj'
 - name: nugetPath
-  value: 'Normalization/nuget.config'
+  value: 'DotNet/Normalization/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-normalization'
 - name: dockerPath
-  value: '**/Normalization/Dockerfile'
+  value: '**/DotNet/Normalization/Dockerfile'
 - name: serviceName
   value: 'Normalization'
 - name: containerRegistry

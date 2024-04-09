@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - DemoApp/*
+    - DotNet/DemoApp/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -18,9 +18,9 @@ variables:
 - name: registry-repo-Name
   value: 'link-demo-app'
 - name: dockerPath
-  value: '**/DemoApp/Dockerfile'
+  value: '**/DotNet/DemoApp/Dockerfile'
 - name: workingDir
-  value: 'DemoApp/'
+  value: 'DotNet/DemoApp/'
 - name: serviceName
   value: 'DemoApp'
 - name: containerRegistry

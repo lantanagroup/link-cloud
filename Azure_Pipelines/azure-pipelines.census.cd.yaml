@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Census/*
+    - DotNet/Census/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Census/Census.csproj'
+  value: 'DotNet/Census/Census.csproj'
 - name: testProject
-  value: 'CensusUnitTests/CensusUnitTests.csproj'
+  value: 'DotNet/CensusUnitTests/CensusUnitTests.csproj'
 - name: nugetPath
-  value: 'Census/nuget.config'
+  value: 'DotNet/Census/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-census'
 - name: dockerPath
-  value: '**/Census/Dockerfile'
+  value: '**/DotNet/Census/Dockerfile'
 - name: serviceName
   value: 'Census'
 - name: containerRegistry

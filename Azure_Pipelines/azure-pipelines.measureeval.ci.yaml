@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - MeasureEval/*
+    - DotNet/MeasureEval/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'MeasureEval/MeasureEval.csproj'
-  testProject: 'MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
-  nugetPath: 'MeasureEval/nuget.config'
+  project: 'DotNet/MeasureEval/MeasureEval.csproj'
+  testProject: 'DotNet/MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
+  nugetPath: 'DotNet/MeasureEval/nuget.config'
   serviceName: 'MeasureEval'
 
 steps:

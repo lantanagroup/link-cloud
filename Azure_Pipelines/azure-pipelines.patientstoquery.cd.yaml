@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - PatientsToQuery/*
+    - DotNet/PatientsToQuery/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'PatientsToQuery/PatientsToQuery.csproj'
+  value: 'DotNet/PatientsToQuery/PatientsToQuery.csproj'
 - name: testProject
-  value: 'PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
+  value: 'DotNet/PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
 - name: nugetPath
-  value: 'PatientsToQuery/nuget.config'
+  value: 'DotNet/PatientsToQuery/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-patientquery'
 - name: dockerPath
-  value: '**/PatientsToQuery/Dockerfile'
+  value: '**/DotNet/PatientsToQuery/Dockerfile'
 - name: serviceName
   value: 'PatientsToQuery'
 - name: containerRegistry

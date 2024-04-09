@@ -4,7 +4,7 @@ trigger:
       - main
   paths:
     include:
-    - Shared/*
+    - DotNet/Shared/*
 
 name: $(BuildDefinitionName)_$(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
 
@@ -28,65 +28,27 @@ steps:
     displayName: 'Restore'
     inputs:
       command: restore
-      projects: 'Shared/Shared.csproj'
+      projects: 'DotNet/Shared/Shared.csproj'
       
   - task: DotNetCoreCLI@2
     displayName: 'Build'
     inputs:
       command: 'build'
-      projects: 'Shared/Shared.csproj'
+      projects: 'DotNet/Shared/Shared.csproj'
       
   - task: DotNetCoreCLI@2
     displayName: 'Pack'
     inputs:
      command: 'pack'
-     packagesToPack: 'Shared/Shared.csproj'
-     #configuration: $(buildConfiguration)
-     configuration: 'Shared/Shared.csproj'
-     #versioningScheme: 'byEnvVar'
-     #versionEnvVar: $sharedVersion
+     packagesToPack: 'DotNet/Shared/Shared.csproj'
+     configuration: 'DotNet/Shared/Shared.csproj'
      packDirectory: '$(build.artifactstagingdirectory)/publish'
      includesymbols: true
-     #arguments: '--output $(build.artifactstagingdirectory)/publish'
      modifyOutputPath: false
-
-  # - task: NuGetCommand@2
-  #   displayName: 'Pack NuGet'
-  #   inputs:
-  #     command: pack
-  #     packagesToPack: 'Shared/Shared.csproj'
-  #     configuration: 'Shared/Shared.csproj'
-  #     packDestination: $(build.artifactstagingdirectory)/publish'
-  #     versioningScheme: byEnvVar
-  #     versionEnvVar: sharedVersion
-  #     includeSymbols: true
-  #     verbosityPack: Detailed
-
-
-  # - task: DotNetCoreCLI@2
-  #   displayName: 'Publish'
-  #   inputs:
-  #     command: publish
-  #     publishWebProjects: false
-  #     projects: 'Shared/Shared.csproj'
-  #     arguments: '--output $(build.artifactstagingdirectory)/publish'
-  #     modifyOutputPath: false
 
   - task: PublishBuildArtifacts@1
     displayName: 'Publish Artifact: drop'
     inputs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
-
-  
-
-#  - task: NuGetAuthenticate@0
-#    displayName: 'NuGet Authenticate'
-
-#  - task: NuGetCommand@2
-#    displayName: 'NuGet push'
-#    inputs:
-#      command: push
-#      publishVstsFeed: 'nhsnlink/Shared_BOTW_Feed'
-#      allowPackageConflicts: true
 
   
