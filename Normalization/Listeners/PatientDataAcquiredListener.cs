@@ -29,6 +29,7 @@ public class PatientDataAcquiredListener : BackgroundService
     private readonly IKafkaProducerFactory<string, PatientNormalizedMessage> _producerFactory;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<string, PatientDataAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
 
     public PatientDataAcquiredListener(
@@ -38,7 +39,8 @@ public class PatientDataAcquiredListener : BackgroundService
         IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler)
+        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<string, PatientDataAcquiredMessage> transientExceptionHandler)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -50,6 +52,9 @@ public class PatientDataAcquiredListener : BackgroundService
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
         _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
+        _transientExceptionHandler = transientExceptionHandler;
+        _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _transientExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Retry";
     }
 
     ~PatientDataAcquiredListener()
@@ -133,13 +138,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 
@@ -229,13 +229,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 
@@ -274,13 +269,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered building/producing kafka message for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 

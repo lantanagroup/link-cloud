@@ -100,6 +100,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage>, DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientDataAcquiredMessage>, TransientExceptionHandler<string, PatientDataAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
