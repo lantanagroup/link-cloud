@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Report/*
+    - DotNet/Report/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Report/Report.csproj'
-  testProject: 'ReportUnitTests/ReportUnitTests.csproj'
-  nugetPath: 'Report/nuget.config'
+  project: 'DotNet/Report/Report.csproj'
+  testProject: 'DotNet/ReportUnitTests/ReportUnitTests.csproj'
+  nugetPath: 'DotNet/Report/nuget.config'
   serviceName: 'Report'
 
 steps:

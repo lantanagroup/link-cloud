@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - Shared/*
+    - DotNet/Shared/*
 
 name: $(BuildDefinitionName)_$(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
 
@@ -13,12 +13,12 @@ steps:
     displayName: 'Restore'
     inputs:
       command: restore
-      projects: 'Shared/Shared.csproj'
+      projects: 'DotNet/Shared/Shared.csproj'
       
   - task: DotNetCoreCLI@2
     displayName: 'Build'
     inputs:
       command: 'build'
-      projects: 'Shared/Shared.csproj'
+      projects: 'DotNet/Shared/Shared.csproj'
 
   

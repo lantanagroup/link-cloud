@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Report/*
+    - DotNet/Report/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Report/Report.csproj'
+  value: 'DotNet/Report/Report.csproj'
 - name: testProject
-  value: 'ReportUnitTests/ReportUnitTests.csproj'
+  value: 'DotNet/ReportUnitTests/ReportUnitTests.csproj'
 - name: nugetPath
-  value: 'Report/nuget.config'
+  value: 'DotNet/Report/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-report'
 - name: dockerPath
-  value: '**/Report/Dockerfile'
+  value: '**/DotNet/Report/Dockerfile'
 - name: serviceName
   value: 'Report'
 - name: containerRegistry

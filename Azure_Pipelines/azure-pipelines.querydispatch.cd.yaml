@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - QueryDispatch/*
+    - DotNet/QueryDispatch/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'QueryDispatch/QueryDispatch.csproj'
+  value: 'DotNet/QueryDispatch/QueryDispatch.csproj'
 - name: testProject
-  value: 'QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
+  value: 'DotNet/QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
 - name: nugetPath
-  value: 'QueryDispatch/nuget.config'
+  value: 'DotNet/QueryDispatch/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-querydispatch'
 - name: dockerPath
-  value: '**/QueryDispatch/Dockerfile'
+  value: '**/DotNet/QueryDispatch/Dockerfile'
 - name: serviceName
   value: 'QueryDispatch'
 - name: containerRegistry

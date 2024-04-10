@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Notification/*
+    - DotNet/Notification/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Notification/Notification.csproj'
+  value: 'DotNet/Notification/Notification.csproj'
 - name: testProject
-  value: 'NotificationUnitTests/NotificationUnitTests.csproj'
+  value: 'DotNet/NotificationUnitTests/NotificationUnitTests.csproj'
 - name: nugetPath
-  value: 'Notification/nuget.config'
+  value: 'DotNet/Notification/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-notification'
 - name: dockerPath
-  value: '**/Notification/Dockerfile'
+  value: '**/DotNet/Notification/Dockerfile'
 - name: serviceName
   value: 'Notification'
 - name: containerRegistry
