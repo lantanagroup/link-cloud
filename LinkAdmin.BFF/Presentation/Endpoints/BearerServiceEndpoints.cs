@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             try 
             {
                 var user = context.User;
-                var token = await _createLinkBearerToken.ExecuteAsync(user);
+                var token = await _createLinkBearerToken.ExecuteAsync(user, 10);
 
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, user.Claims.First(c => c.Type == "sub")?.Value ?? "subject missing");
 

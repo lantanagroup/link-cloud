@@ -23,6 +23,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.AspNetCore.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
+using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -229,10 +230,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
     }
-    
+
     // Add YARP (reverse proxy)
-    builder.Services.AddReverseProxy()
-        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+    builder.Services.AddYarpProxy(builder.Configuration);
 
     // Add health checks
     builder.Services.AddHealthChecks();
@@ -416,7 +416,7 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    app.MapReverseProxy().RequireAuthorization("AuthenticatedUser");
+    app.MapReverseProxy();
 
     // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

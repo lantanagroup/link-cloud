@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             //create a bearer token
-            var bearerToken = await _createLinkBearerToken.ExecuteAsync(principal);
+            var bearerToken = await _createLinkBearerToken.ExecuteAsync(principal, 2);
             if (string.IsNullOrEmpty(bearerToken)) 
             { 
                 _logger.LogError("Failed to create bearer token");

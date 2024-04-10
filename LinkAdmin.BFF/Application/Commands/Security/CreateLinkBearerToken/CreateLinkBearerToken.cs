@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         }
 
         //TODO: Add back data protection once key persience is implemented
-        public async Task<string> ExecuteAsync(ClaimsPrincipal user)
+        public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
             
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                                     issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,
                                     audience: LinkAdminConstants.LinkBearerService.LinkBearerAudience,
                                     claims: user.Claims,
-                                    expires: DateTime.Now.AddMinutes(10),
+                                    expires: DateTime.Now.AddMinutes(timespan),
                                     signingCredentials: credentials
                                 );
 
