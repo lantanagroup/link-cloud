@@ -15,7 +15,7 @@ public class CensusConfigController : Controller
 {
     private readonly ILogger<CensusConfigController> _logger;
     private readonly IMediator _mediator;
-    
+
     public CensusConfigController(ILogger<CensusConfigController> logger, IMediator mediator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -48,13 +48,13 @@ public class CensusConfigController : Controller
             });
             SendAudit("", censusConfig.FacilityId, AuditEventType.Create);
         }
-        catch(MissingTenantConfigurationException ex)
+        catch (MissingTenantConfigurationException ex)
         {
             _logger.LogError(ex.Message);
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
             return BadRequest(ex.Message);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
@@ -73,7 +73,7 @@ public class CensusConfigController : Controller
     public async Task<ActionResult<CensusConfigModel>> Get(string facilityId)
     {
         var response = await _mediator.Send(new GetCensusConfigQuery { FacilityId = facilityId });
-        if(response == null)
+        if (response == null)
             return NoContent();
         return Ok(response);
     }
@@ -97,7 +97,7 @@ public class CensusConfigController : Controller
             return BadRequest("ScheduledTrigger is required.");
         }
 
-        if(!string.Equals(facilityId, censusConfig.FacilityId, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(facilityId, censusConfig.FacilityId, StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"FacilityID in request path does not match facility in request body.");
         }
@@ -117,14 +117,14 @@ public class CensusConfigController : Controller
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
             return BadRequest(ex.Message);
         }
-        catch (Exception ex) 
+        catch (Exception ex)
         {
             _logger.LogError(ex.Message);
             SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
             return StatusCode(500);
         }
-        
-        if(configResponse == null)
+
+        if (configResponse == null)
         {
             return NoContent();
         }
@@ -152,7 +152,7 @@ public class CensusConfigController : Controller
             SendAudit(string.Empty, facilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
             return StatusCode(500);
         }
-        
+
         return Ok();
     }
 

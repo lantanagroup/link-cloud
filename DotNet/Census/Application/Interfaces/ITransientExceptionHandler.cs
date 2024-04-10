@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.Census.Application.Interfaces;
 
-public interface ITransientExceptionHandler<K,V>
+public interface ITransientExceptionHandler<K, V>
 {
-    void HandleException(ConsumeResult<K,V> consumeResult, Exception ex);
+    void HandleException(ConsumeResult<K, V> consumeResult, Exception ex);
 }

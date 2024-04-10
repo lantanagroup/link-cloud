@@ -7,7 +7,6 @@ public static class CensusConstants
     {
         public const string ServiceInformation = "ServiceInformation";
         public const string Kafka = "KafkaConnection";
-        public const string Mongo = "MongoDB";
         public const string SqlServer = "SqlServer";
         public const string DatabaseProvider = "DatabaseProvider";
         public const string Telemetry = "TelemetryConfig";
@@ -31,15 +30,6 @@ public static class CensusConstants
     {
         public const string PatientIDsAcquired = "PatientIDsAcquired";
         public const string PatientIDsAcquiredError = "PatientIDsAcquired-Error";
-    }
-
-    public static class MongoDb
-    {
-        public static class CollectionName
-        {
-            public const string CensusHistory = "CensusHistory";
-            public const string CensusPatientList = "CensusPatientList";
-        }
     }
 
     public static class CensusLoggingIds

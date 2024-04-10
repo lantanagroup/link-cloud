@@ -37,7 +37,7 @@ public class CensusController : Controller
             });
             return Ok(history);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);

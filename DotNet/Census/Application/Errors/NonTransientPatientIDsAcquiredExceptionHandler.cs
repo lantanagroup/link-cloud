@@ -12,8 +12,8 @@ namespace LantanaGroup.Link.Census.Application.Errors;
 public class NonTransientPatientIDsAcquiredExceptionHandler<K, V> : INonTransientExceptionHandler<K, V>
 {
     private readonly ILogger<NonTransientPatientIDsAcquiredExceptionHandler<K, V>> _logger;
-    private readonly IKafkaProducerFactory<string,AuditEventMessage> _auditProducerFactory;
-    private readonly IKafkaProducerFactory<string,string> _deadLetterProducerFactory;
+    private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
+    private readonly IKafkaProducerFactory<string, string> _deadLetterProducerFactory;
 
     public NonTransientPatientIDsAcquiredExceptionHandler(ILogger<NonTransientPatientIDsAcquiredExceptionHandler<K, V>> logger, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IKafkaProducerFactory<string, string> deadLetterProducerFactory)
     {
@@ -70,7 +70,7 @@ public class NonTransientPatientIDsAcquiredExceptionHandler<K, V> : INonTransien
             _logger.LogError(producerException, "An error occurred producing an audit event.");
             return;
         }
-        
+
         var key = consumeResult.Message.Key as string;
         string? value = null;
         try

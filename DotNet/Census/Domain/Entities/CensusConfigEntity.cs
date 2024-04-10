@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using LantanaGroup.Link.Census.Domain.Entities;
+﻿using LantanaGroup.Link.Census.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Census.Domain.Entities
 {

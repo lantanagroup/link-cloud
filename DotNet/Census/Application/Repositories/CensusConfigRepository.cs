@@ -1,13 +1,8 @@
 ﻿using Census.Domain.Entities;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using MongoDB.Bson;
-using MongoDB.Driver;
 using static LantanaGroup.Link.Census.Application.Settings.CensusConstants;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;

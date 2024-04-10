@@ -17,11 +17,10 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -30,7 +29,6 @@ using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,7 +81,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Mongo));
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
@@ -128,10 +125,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
-    
+
     builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
-    
+
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
     builder.Services.AddSwaggerGen(c =>
     {
@@ -194,12 +191,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 }
 
-static void SetupMiddleware(WebApplication app) 
-{   
+static void SetupMiddleware(WebApplication app)
+{
     //if (app.Environment.IsDevelopment())
     //{
-        app.UseSwagger();
-        app.UseSwaggerUI();
+    app.UseSwagger();
+    app.UseSwaggerUI();
     //}
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))

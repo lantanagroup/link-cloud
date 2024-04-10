@@ -17,8 +17,8 @@ namespace LantanaGroup.Link.Census.Listeners;
 
 public class CensusListener : BackgroundService
 {
-    private readonly IKafkaConsumerFactory<string,string> _kafkaConsumerFactory;
-    private readonly IKafkaProducerFactory<string,object> _kafkaProducerFactory;
+    private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
+    private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
     private readonly ILogger<CensusListener> _logger;
     private readonly IMediator _mediator;
     private readonly INonTransientExceptionHandler<string, string> _nonTransientExceptionHandler;
@@ -67,7 +67,7 @@ public class CensusListener : BackgroundService
                 {
                     rawmessage = kafkaConsumer.Consume(cancellationToken);
                 }
-                catch(ConsumeException ex)
+                catch (ConsumeException ex)
                 {
                     _nonTransientExceptionHandler.HandleException(ex);
                     kafkaConsumer.Commit(rawmessage);
@@ -87,7 +87,7 @@ public class CensusListener : BackgroundService
                     }
                     catch (Exception ex)
                     {
-                        _nonTransientExceptionHandler.HandleException(rawmessage,ex);
+                        _nonTransientExceptionHandler.HandleException(rawmessage, ex);
                         kafkaConsumer.Commit(rawmessage);
                         var errorMessage = $"Unable to deserialize message: {rawmessage?.Message?.Value}";
                         _logger.LogError(errorMessage);
@@ -146,7 +146,7 @@ public class CensusListener : BackgroundService
                 }
             }
         }
-        catch(OperationCanceledException ex) 
+        catch (OperationCanceledException ex)
         {
             _logger.LogInformation($"Stopped census consumer for topic '{KafkaTopic.PatientIDsAcquired}' at {DateTime.UtcNow}");
             kafkaConsumer.Close();
@@ -156,9 +156,9 @@ public class CensusListener : BackgroundService
 
     private async System.Threading.Tasks.Task ProduceEvents(IEnumerable<BaseResponse> events, IProducer<string, object> producer, CancellationToken cancellationToken = default)
     {
-        foreach(var ev in events)
+        foreach (var ev in events)
         {
-            if(ev.TopicName == KafkaTopic.PatientEvent.ToString())
+            if (ev.TopicName == KafkaTopic.PatientEvent.ToString())
             {
                 if (((PatientEventResponse)ev).PatientEvent == null) return;
                 PatientEvent? patientEvent = ((PatientEventResponse)ev).PatientEvent;
@@ -187,7 +187,7 @@ public class CensusListener : BackgroundService
         using var auditProducer = _kafkaProducerFactory.CreateAuditEventProducer();
 
         Headers? headers = null;
-        
+
         try
         {
             await auditProducer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, Shared.Application.Models.Kafka.AuditEventMessage>
@@ -206,12 +206,12 @@ public class CensusListener : BackgroundService
                     Resource = auditEvent.Resource
                 }
             });
-        } 
-        catch(Exception ex)
+        }
+        catch (Exception ex)
         {
             _logger.LogError("There was an issue sending an audit.", ex);
         }
-        
+
     }
 
     private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, string> message)
@@ -248,7 +248,7 @@ public class CensusListener : BackgroundService
         doc.RootElement.TryGetProperty("PatientIds", out var patientids);
         var patientidsStr = patientids.ToString();
         var fhirList = new FhirJsonParser().Parse<List>(patientidsStr);
-        return new PatientIDsAcquired 
+        return new PatientIDsAcquired
         {
             PatientIds = fhirList
         };
