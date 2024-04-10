@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Jobs;

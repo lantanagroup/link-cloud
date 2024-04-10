@@ -1,10 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;
 
@@ -22,7 +19,7 @@ public class CensusPatientListRepository : BaseSqlConfigurationRepo<CensusPatien
     public async Task<List<CensusPatientListEntity>> GetActivePatientsForFacility(string facilityId, CancellationToken cancellationToken = default)
     {
         CheckIfNullOrString(facilityId, nameof(facilityId));
-        
+
         var activePatients = _context.CensusPatientLists.Where(x => x.FacilityId == facilityId && !x.IsDischarged).ToList();
         return activePatients;
     }
