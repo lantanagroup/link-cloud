@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - MeasureEval/*
+    - DotNet/MeasureEval/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'MeasureEval/MeasureEval.csproj'
+  value: 'DotNet/MeasureEval/MeasureEval.csproj'
 - name: testProject
-  value: 'MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
+  value: 'DotNet/MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
 - name: nugetPath
-  value: 'MeasureEval/nuget.config'
+  value: 'DotNet/MeasureEval/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-measureeval'
 - name: dockerPath
-  value: '**/MeasureEval/Dockerfile'
+  value: '**/DotNet/MeasureEval/Dockerfile'
 - name: serviceName
   value: 'MeasureEval'
 - name: containerRegistry

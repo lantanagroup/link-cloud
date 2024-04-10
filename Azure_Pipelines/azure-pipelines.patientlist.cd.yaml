@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - PatientList/*
+    - DotNet/PatientList/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'PatientList/PatientList.csproj'
+  value: 'DotNet/PatientList/PatientList.csproj'
 - name: testProject
-  value: 'PatientListUnitTests/PatientListUnitTests.csproj'
+  value: 'DotNet/PatientListUnitTests/PatientListUnitTests.csproj'
 - name: nugetPath
-  value: 'PatientList/nuget.config'
+  value: 'DotNet/PatientList/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-patientlist'
 - name: dockerPath
-  value: '**/PatientList/Dockerfile'
+  value: '**/DotNet/PatientList/Dockerfile'
 - name: serviceName
   value: 'PatientList'
 - name: containerRegistry

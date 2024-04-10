@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Audit/*
+    - DotNet/Audit/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Audit/Audit.csproj'
-  testProject: 'AuditUnitTests/AuditUnitTests.csproj'
-  nugetPath: 'Audit/nuget.config'
+  project: 'DotNet/Audit/Audit.csproj'
+  testProject: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
+  nugetPath: 'DotNet/Audit/nuget.config'
   serviceName: 'Audit'
 
 steps:

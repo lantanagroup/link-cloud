@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - PatientList/*
+    - DotNet/PatientList/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'PatientList/PatientList.csproj'
-  testProject: 'PatientListUnitTests/PatientListUnitTests.csproj'
-  nugetPath: 'PatientList/nuget.config'
+  project: 'DotNet/PatientList/PatientList.csproj'
+  testProject: 'DotNet/PatientListUnitTests/PatientListUnitTests.csproj'
+  nugetPath: 'DotNet/PatientList/nuget.config'
   serviceName: 'PatientList'
 
 steps:
