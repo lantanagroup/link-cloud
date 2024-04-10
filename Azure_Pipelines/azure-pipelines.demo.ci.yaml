@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - DotNet/DemoApp/*
+    - Web/DemoApp/*
 
 name: Demo API Gateway CI
 
