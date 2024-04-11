@@ -1,10 +1,10 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("queryPlan")]
+[Table("queryPlan")]
 public class QueryPlan : BaseEntity
 {
     public string PlanName { get; set; }

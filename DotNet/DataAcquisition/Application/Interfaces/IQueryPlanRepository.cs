@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
-public interface IQueryPlanRepository : IMongoDbRepository<QueryPlan>
+public interface IQueryPlanRepository : IPersistenceRepository<QueryPlan>, IDisposable
 {
     Task<List<QueryPlan>> GetQueryPlansByFacilityId(string facilityId, CancellationToken cancellationToken = default);
     Task<QueryPlan> GetByFacilityAndReportAsync(string facilityId, string reportType, CancellationToken cancellationToken = default);

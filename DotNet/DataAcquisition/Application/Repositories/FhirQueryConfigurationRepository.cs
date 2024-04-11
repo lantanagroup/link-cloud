@@ -1,38 +1,40 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class FhirQueryConfigurationRepository : MongoDbRepository<FhirQueryConfiguration>, IFhirQueryConfigurationRepository
+public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQueryConfiguration>, IFhirQueryConfigurationRepository
 {
-    public FhirQueryConfigurationRepository(IOptions<MongoConnection> mongoSettings) 
-        : base(mongoSettings)
+    private readonly ILogger<FhirQueryConfigurationRepository> _logger;
+    private readonly DataAcquisitionDbContext _dbContext;
+
+    public FhirQueryConfigurationRepository(ILogger<FhirQueryConfigurationRepository> logger, DataAcquisitionDbContext dbContext) 
+        : base(logger, dbContext)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<AuthenticationConfiguration> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, facilityId);
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
+        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
 
         return queryResult?.Authentication;
     }
 
     public async Task SaveAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, facilityId);
-        
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
+        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
 
         if (queryResult != null)
         {
             queryResult.Authentication = config;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+            _dbContext.FhirQueryConfigurations.Update(queryResult);
+            _dbContext.SaveChanges();
         }
     }
 
@@ -51,8 +53,7 @@ public class FhirQueryConfigurationRepository : MongoDbRepository<FhirQueryConfi
 
     public override async Task<FhirQueryConfiguration> GetAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, facilityId);
-        var queryResult = await(await _collection.FindAsync(filter)).FirstOrDefaultAsync();
+        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
         return queryResult;
     }
 
@@ -92,5 +93,10 @@ public class FhirQueryConfigurationRepository : MongoDbRepository<FhirQueryConfi
     public override async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
         await _collection.DeleteOneAsync(x => x.FacilityId == facilityId, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        throw new NotImplementedException();
     }
 }
