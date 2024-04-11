@@ -14,6 +14,7 @@ using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Extensions;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Infrastructure.Middleware;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
@@ -317,6 +318,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseCors("CorsPolicy");
     app.UseAuthentication();
     //app.UseMiddleware<UserScopeMiddleware>();
+    app.UseMiddleware<LoggingScopeMiddleware>();
     app.UseAuthorization();    
 
     //map health check middleware

@@ -56,6 +56,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                                 );
 
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+                activity?.AddTag("link.token", jwt);
 
                 return jwt;
 
