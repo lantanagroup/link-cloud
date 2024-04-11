@@ -44,7 +44,7 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
             throw new MissingPatientIdOrPatientIdentifierException();
         }
 
-        if (!string.IsNullOrWhiteSpace(request.PatientId))
+        if (!string.IsNullOrWhiteSpace(request.PatientId) && !request.PatientId.StartsWith("Patient/"))
             request.PatientId = $"Patient/{request.PatientId}";
 
         FhirQueryConfiguration? fhirConfig;
