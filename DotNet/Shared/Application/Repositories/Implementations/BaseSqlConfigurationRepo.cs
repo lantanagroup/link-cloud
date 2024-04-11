@@ -18,7 +18,7 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async Task<T> GetAsync(string id, CancellationToken cancellationToken)
+    public async virtual Task<T> GetAsync(string id, CancellationToken cancellationToken)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
@@ -54,23 +54,23 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     }
 
-    public void Add(T entity)
+    public virtual void Add(T entity)
     {
         throw new NotImplementedException();
     }
 
-    public T Get(string id)
+    public virtual T Get(string id)
     {
         throw new NotImplementedException();
     }
 
 
-    public T Update(T entity)
+    public virtual T Update(T entity)
     {
         throw new NotImplementedException();
     }
 
-    public void Delete(string id)
+    public virtual void Delete(string id)
     {
         throw new NotImplementedException();
     }
