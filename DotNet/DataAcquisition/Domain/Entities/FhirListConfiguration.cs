@@ -1,10 +1,10 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("fhirListConfiguration")]
+[Table("fhirListConfiguration")]
 public class FhirListConfiguration : BaseEntity
 {
     public string FacilityId { get; set; }

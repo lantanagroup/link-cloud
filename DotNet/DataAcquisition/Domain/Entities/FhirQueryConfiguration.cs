@@ -1,11 +1,11 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("fhirQueryConfiguration")]
+[Table("fhirQueryConfiguration")]
 public class FhirQueryConfiguration : BaseEntity
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
