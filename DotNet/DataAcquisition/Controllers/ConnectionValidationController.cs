@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/ConnectionValidation")]
+[Route("api/connectionValidation")]
 [ApiController]
 public class ConnectionValidationController : Controller
 {
