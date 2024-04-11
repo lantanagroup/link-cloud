@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                 options.Scope.Add("openid");
 
                 options.ClaimActions.MapJsonKey("sub", "sub");
-                options.ClaimActions.MapJsonKey("email", "email");
+                options.ClaimActions.MapJsonKey("email", "email");  
                 options.ClaimActions.MapJsonKey("name", "name");
                 options.ClaimActions.MapJsonKey("given_name", "given_name");
                 options.ClaimActions.MapJsonKey("family_name", "family_name");

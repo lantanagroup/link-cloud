@@ -23,7 +23,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.AspNetCore.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
-using Yarp.ReverseProxy.Transforms;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,7 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
 
     // Add data protection
-    builder.Services.AddDataProtection();
+    builder.Services.AddDataProtection().SetApplicationName("Link");
     //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands
@@ -113,11 +113,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         {
             options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
         });
-    }    
-
-
+    }
 
     // Add Authentication
+    #region Authentication
     builder.Services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
 
     List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
@@ -210,7 +209,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.Audience = LinkAdminConstants.LinkBearerService.LinkBearerAudience;
         });
     }
-    
+    #endregion
+
     // Add Authorization
     builder.Services.AddAuthorization(builder =>
     {
