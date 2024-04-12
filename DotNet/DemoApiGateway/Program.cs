@@ -2,7 +2,6 @@ using LantanaGroup.Link.DemoApiGateway.settings;
 using Serilog;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.IdentityModel.Tokens.Jwt;
-using Link.Authorization;
 using LantanaGroup.Link.DemoApiGateway.Application.Factory;
 using Serilog.Exceptions;
 using Serilog.Enrichers.Span;
@@ -24,6 +23,8 @@ using LantanaGroup.Link.DemoApiGateway.Services.Client.DataAcquisition;
 using LantanaGroup.Link.DemoApiGateway.Services.Client.Normalization;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
+using Link.Authorization.Policies;
+using Link.Authorization.Requirements;
 
 var builder = WebApplication.CreateBuilder(args);
 
