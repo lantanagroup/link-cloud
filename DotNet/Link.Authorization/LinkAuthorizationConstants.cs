@@ -13,6 +13,7 @@
 
         public static class LinkUserClaims
         {
+            public const string LinkSystemAccount = "SystemAccount";
             public const string LinkAdministartor = "LinkAdministrator";
         }
     }

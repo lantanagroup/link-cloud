@@ -14,16 +14,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ILogger<GetLinkAccount> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkServiceDiscovery> _serviceRegistry;
+        private readonly IOptions<LinkBearerServiceConfig> _bearerServiceConfig;
         private readonly ICreateLinkBearerToken _createLinkBearerToken;
 
-        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<LinkServiceDiscovery> serviceRegistry, ICreateLinkBearerToken createLinkBearerToken)
+        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<LinkServiceDiscovery> serviceRegistry, IOptions<LinkBearerServiceConfig> bearerServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
-            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
+            _bearerServiceConfig = bearerServiceConfig ?? throw new ArgumentNullException(nameof(bearerServiceConfig));
+            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));            
         }
-
 
         public async Task<Account?> ExecuteAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
         {
@@ -53,8 +54,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             //create a system account principal
             var claims = new List<Claim>
             {
-                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Email, "link.admin@nhsnlink.org"), //this needs to be configurable
-                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, "SystemAccount"),
+                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
+                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
                 new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
             };
 
@@ -72,7 +73,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
 
             //send the request to the account service
-            var response = await client.GetAsync($"api/account/email/{accountId}", cancellationToken);
+            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceApiUrl}/api/email/{accountId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
