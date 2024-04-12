@@ -51,10 +51,12 @@ static void RegisterServices(WebApplicationBuilder builder)
                 builder.Configuration.AddAzureAppConfiguration(options =>
                 {
                     options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                        // Load configuration values with no label
-                        .Select("Link:Audit*", LabelFilter.Null)
-                        // Override with any configuration values specific to current hosting env
-                        .Select("Link:Audit*", builder.Environment.EnvironmentName);
+                                // Load configuration values with no label
+                                .Select("*", LabelFilter.Null)
+                                // Load configuration values for service name
+                                .Select("*", AuditConstants.ServiceName)
+                                // Load configuration values for service name and environment
+                                .Select("*", AuditConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
 
                     options.ConfigureKeyVault(kv =>
                     {
