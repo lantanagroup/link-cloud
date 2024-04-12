@@ -7,11 +7,11 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["Submission/Submission.csproj", "Submission/"]
-COPY ["Submission/nuget.config", "Submission/"]
-RUN dotnet restore "Submission/Submission.csproj"  --configfile "Submission/nuget.config"
+COPY ["DotNet/Submission/Submission.csproj", "DotNet/Submission/"]
+COPY ["DotNet/Submission/nuget.config", "DotNet/Submission/"]
+RUN dotnet restore "DotNet/Submission/Submission.csproj"  --configfile "DotNet/Submission/nuget.config"
 COPY . .
-WORKDIR "/src/Submission"
+WORKDIR "/src/DotNet/Submission"
 RUN dotnet build "Submission.csproj" -c Release -o /app/build
 
 FROM build AS publish

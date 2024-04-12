@@ -7,11 +7,11 @@ WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["Normalization/Normalization.csproj", "Normalization/"]
-COPY ["Normalization/nuget.config", "Normalization/"]
-RUN dotnet restore "Normalization/Normalization.csproj" --configfile "Normalization/nuget.config"
+COPY ["DotNet/Normalization/Normalization.csproj", "DotNet/Normalization/"]
+COPY ["DotNet/Normalization/nuget.config", "DotNet/Normalization/"]
+RUN dotnet restore "DotNet/Normalization/Normalization.csproj" --configfile "DotNet/Normalization/nuget.config"
 COPY . .
-WORKDIR "/src/Normalization"
+WORKDIR "/src/DotNet/Normalization"
 RUN dotnet build "Normalization.csproj" -c Release -o /app/build
 
 FROM build AS publish
