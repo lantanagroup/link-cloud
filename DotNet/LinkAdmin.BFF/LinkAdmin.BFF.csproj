@@ -25,6 +25,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.4" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="8.0.0-preview" />
     <PackageReference Include="Microsoft.Extensions.Telemetry" Version="8.4.0" />
@@ -51,6 +52,10 @@
   <ItemGroup>
     <Folder Include="Application\Factories\" />
     <Folder Include="Application\Interfaces\Factories\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
   </ItemGroup>
 
 </Project>

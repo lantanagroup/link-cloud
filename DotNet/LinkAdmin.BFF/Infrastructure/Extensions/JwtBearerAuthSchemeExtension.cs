@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                 options.Authority = jwtBearerOptions.Authority;
                 options.Audience = jwtBearerOptions.Audience;
                 options.RequireHttpsMetadata = !jwtBearerOptions.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {

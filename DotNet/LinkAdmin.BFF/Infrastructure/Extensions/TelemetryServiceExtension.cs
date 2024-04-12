@@ -29,6 +29,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         {
                             options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                         })
+                        .AddHttpClientInstrumentation(options => {
+                            options.FilterHttpRequestMessage = (httpContext) =>
+                            {
+                                return !(httpContext.RequestUri is not null
+                                    && (
+                                        httpContext.RequestUri.PathAndQuery.StartsWith("/loki") ||
+                                        httpContext.RequestUri.PathAndQuery.Contains("swagger") ||
+                                        httpContext.RequestUri.PathAndQuery.StartsWith("/health")                                       
+                                    ));
+                            };
+                        })
+                        .AddSource("Yarp.ReverseProxy")
                         .AddConfluentKafkaInstrumentation()
                         .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryServiceOptions.TelemetryCollectorEndpoint); }));
 
