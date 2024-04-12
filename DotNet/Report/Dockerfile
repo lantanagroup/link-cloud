@@ -7,11 +7,11 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["Report/Report.csproj", "Report/"]
-COPY ["Report/nuget.config", "Report/"]
-RUN dotnet restore "Report/Report.csproj" --configfile "Report/nuget.config"
+COPY ["DotNet/Report/Report.csproj", "DotNet/Report/"]
+COPY ["DotNet/Report/nuget.config", "DotNet/Report/"]
+RUN dotnet restore "DotNet/Report/Report.csproj" --configfile "DotNet/Report/nuget.config"
 COPY . .
-WORKDIR "/src/Report"
+WORKDIR "/src/DotNet/Report"
 RUN dotnet build "Report.csproj" -c Release -o /app/build
 
 FROM build AS publish

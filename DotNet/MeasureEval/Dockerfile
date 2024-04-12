@@ -7,11 +7,11 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["MeasureEval/MeasureEval.csproj", "MeasureEval/"]
-COPY ["MeasureEval/nuget.config", "MeasureEval/"]
-RUN dotnet restore "MeasureEval/MeasureEval.csproj" --configfile "MeasureEval/nuget.config"
+COPY ["DotNet/MeasureEval/MeasureEval.csproj", "DotNet/MeasureEval/"]
+COPY ["DotNet/MeasureEval/nuget.config", "DotNet/MeasureEval/"]
+RUN dotnet restore "DotNet/MeasureEval/MeasureEval.csproj" --configfile "DotNet/MeasureEval/nuget.config"
 COPY . .
-WORKDIR "/src/MeasureEval"
+WORKDIR "/src/DotNet/MeasureEval"
 RUN dotnet build "MeasureEval.csproj" -c Release -o /app/build
 
 FROM build AS publish
