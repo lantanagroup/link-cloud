@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -93,6 +94,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database");
+
+    // Add tenant API service
+    builder.Services.AddHttpClient();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Add controllers
     builder.Services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
