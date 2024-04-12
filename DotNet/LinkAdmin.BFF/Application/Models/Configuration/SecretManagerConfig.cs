@@ -2,6 +2,6 @@
 {
     public class SecretManagerConfig
     {
-        public string ManagerUri { get; set; }
+        public string ManagerUri { get; set; } = null!;
     }
 }

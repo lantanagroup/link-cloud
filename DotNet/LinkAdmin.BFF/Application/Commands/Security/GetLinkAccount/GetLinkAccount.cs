@@ -6,6 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using System.Diagnostics;
 using Link.Authorization.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
@@ -32,13 +33,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             if(principal.Identity is not ClaimsIdentity identity) { return null; }
             
             //get the account id from the claims
-            var accountId = identity.FindFirst("email")?.Value;
+            var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
             if (accountId == null) { return null; }
 
             //check if the account service uri is set
             if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceApiUrl)) 
             {
-                _logger.LogError("Account service uri is not set");
+                _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
                 return null; 
             }
 
@@ -49,25 +50,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate system account claims principle to request user account information");                    
-            //create a bearer token
-            //TODO: what should be the user making this request? The actuall user or a system account?
+
             //create a system account principal
             var claims = new List<Claim>
             {
-                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
-                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
-                new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
+                new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
+                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
+                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
             };
 
             var systemPrinciple = new ClaimsPrincipal(new ClaimsIdentity(claims));
 
+            //create a bearer token for the system account
             var bearerToken = await _createLinkBearerToken.ExecuteAsync(systemPrinciple, 2);
             if (string.IsNullOrEmpty(bearerToken))
             {
-                _logger.LogError("Failed to create bearer token");
+                _logger.LogLinkAdminTokenGenerationException("Failed to create bearer token for user account retrieval");
                 return null;
             }
-
 
             //add the bearer token to the request
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
@@ -77,12 +77,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Failed to get account from account service");
+                _logger.LogLinkServiceRequestException("Account", $"Failed to retrieve account information for user.");
                 return null;
             }
 
             //read the response
-            var account = await response.Content.ReadFromJsonAsync<Account>();
+            var account = await response.Content.ReadFromJsonAsync<Account>(cancellationToken: cancellationToken);
 
             return account;
 

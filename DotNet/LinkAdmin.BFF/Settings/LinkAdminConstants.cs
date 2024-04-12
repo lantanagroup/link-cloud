@@ -56,6 +56,11 @@
             public const int LinkAdminTokenGenerationException = 1010;
             public const int LinkAdminTokenKeyRefreshed = 1011;
             public const int LinkAdminTokenKeyRefreshException = 1012;
+            public const int LinkAdminTokenKeyRefreshedSuccess = 1013;
+            public const int GatewayServiceUriException = 1014;
+            public const int LinkServiceRequestGenerated = 1015;
+            public const int LinkServiceRequestException = 1016;
+
         }
     }
 }

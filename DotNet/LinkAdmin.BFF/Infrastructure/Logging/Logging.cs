@@ -82,5 +82,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
             "New Data Acquisition Requested event with a correlation id of {correlationId} was created.")]
         public static partial void LogKafkaProducerDataAcquisitionRequested(this ILogger logger, string correlationId);
 
+        [LoggerMessage(
+            LinkAdminLoggingIds.GatewayServiceUriException,
+            LogLevel.Error,
+            "An exception occured while accessing service {service} uri: {exception}")]
+        public static partial void LogGatewayServiceUriException(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestGenerated,
+            LogLevel.Information,
+            "A new request was generated for service {service}.")]
+        public static partial void LogLinkServiceRequestGenerated(this ILogger logger, string service);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestException,
+            LogLevel.Error,
+            "An exception occured while making a request to service {service}: {exception}")]
+        public static partial void LogLinkServiceRequestException(this ILogger logger, string service, string exception);
     }
 }
