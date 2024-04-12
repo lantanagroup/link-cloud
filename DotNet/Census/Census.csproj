@@ -8,6 +8,7 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	<RootNamespace>LantanaGroup.Link.Census</RootNamespace>
 	<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+	  <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
 	<PropertyGroup>
