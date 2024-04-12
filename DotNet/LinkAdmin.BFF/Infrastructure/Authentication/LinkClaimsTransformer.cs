@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;

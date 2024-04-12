@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Microsoft.OpenApi.Models;

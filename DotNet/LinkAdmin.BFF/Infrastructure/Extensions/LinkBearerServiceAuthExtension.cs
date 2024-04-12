@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;

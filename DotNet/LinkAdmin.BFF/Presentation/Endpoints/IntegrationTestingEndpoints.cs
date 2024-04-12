@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using Microsoft.OpenApi.Models;

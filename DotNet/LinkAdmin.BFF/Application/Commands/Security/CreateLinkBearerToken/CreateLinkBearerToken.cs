@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.DataProtection;

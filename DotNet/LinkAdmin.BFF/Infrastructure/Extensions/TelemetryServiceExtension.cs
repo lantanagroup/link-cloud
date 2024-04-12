@@ -1,5 +1,5 @@
 ﻿using Confluent.Kafka.Extensions.OpenTelemetry;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;

@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure

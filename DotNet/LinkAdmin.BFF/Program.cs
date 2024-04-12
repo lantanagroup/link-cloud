@@ -1,7 +1,5 @@
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
@@ -23,6 +21,8 @@ using Microsoft.AspNetCore.DataProtection;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using Microsoft.AspNetCore.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

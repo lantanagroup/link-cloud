@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models
+﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration
 {
     /// <summary>
     /// Authentication schema configuration

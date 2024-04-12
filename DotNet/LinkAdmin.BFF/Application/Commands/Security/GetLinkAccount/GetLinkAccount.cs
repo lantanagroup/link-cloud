@@ -1,11 +1,11 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using System.Diagnostics;
 using Link.Authorization.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
