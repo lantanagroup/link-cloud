@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             if (accountId == null) { return null; }
 
             //check if the account service uri is set
-            if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUri)) 
+            if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceApiUrl)) 
             {
                 _logger.LogError("Account service uri is not set");
                 return null; 
@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             //create a http client
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUri);
+            client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceApiUrl);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

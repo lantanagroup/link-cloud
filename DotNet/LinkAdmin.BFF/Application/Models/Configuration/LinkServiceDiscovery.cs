@@ -2,6 +2,6 @@
 {
     public class LinkServiceDiscovery
     {
-        public string? AccountServiceUri { get; set; }
+        public string? AccountServiceApiUrl { get; set; }
     }
 }
