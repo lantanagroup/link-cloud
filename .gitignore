@@ -407,3 +407,6 @@ FodyWeavers.xsd
 
 ## Maven
 **/target/
+
+## Terraform
+*.exe
