@@ -77,8 +77,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
-    builder.Services.AddSingleton(builder.Configuration
-        .GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
+    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -188,6 +187,12 @@ static void SetupMiddleware(WebApplication app)
     app.MapGrpcService<GroupService>();
     app.MapGrpcService<RoleService>();
     app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+
+    app.MapGet("/api/account/email/{email}", async (AccountRepository accountRepository, string email) =>
+    {
+        AccountModel? account = await accountRepository.GetAccountByEmailAsync(email);
+        return account;
+    });
 
     // Ensure database created
     using (var scope = app.Services.CreateScope())
