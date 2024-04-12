@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
@@ -31,15 +32,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             if (!result)
             {
-                _logger.LogError("Failed to update secret manager with new bearer key");
+                _logger.LogLinkAdminTokenKeyRefreshException("Failed to update secret manager with new bearer key");
                 return false;
             }
+
+            _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
 
             var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
             //_cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
             _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key);
-
-            _logger.LogInformation("Bearer key refreshed");
 
             return true;
         }
