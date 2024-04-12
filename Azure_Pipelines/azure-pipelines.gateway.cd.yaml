@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - DemoApiGateway/*
+    - DotNet/DemoApiGateway/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -12,9 +12,9 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DemoApiGateway/DemoApiGateway.csproj'
+  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
 - name: nugetPath
-  value: 'DemoApiGateway/nuget.config'
+  value: 'DotNet/DemoApiGateway/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -22,7 +22,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-api-gw'
 - name: dockerPath
-  value: '**/DemoApiGateway/Dockerfile'
+  value: '**/DotNet/DemoApiGateway/Dockerfile'
 - name: serviceName
   value: 'DemoApiGateway'
 - name: containerRegistry

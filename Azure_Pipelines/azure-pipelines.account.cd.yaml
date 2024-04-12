@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Account/*
+    - DotNet/Account/*
 pr: none
 
 pool:
@@ -15,9 +15,9 @@ variables:
 - name: project
   value: 'Account/Account.csproj'
 - name: testProject
-  value: 'AccountUnitTests/AccountUnitTests.csproj'
+  value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
 - name: nugetPath
-  value: 'Account/nuget.config'
+  value: 'DotNet/Account/nuget.config'
 - name: serviceName
   value: 'Account'
 - name: tags1
@@ -27,7 +27,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-account'
 - name: dockerPath
-  value: '**/Account/Dockerfile'
+  value: '**/DotNet/Account/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
   

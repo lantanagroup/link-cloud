@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - DemoApp/*
+    - Web/DemoApp/*
 
 name: Demo API Gateway CI
 
@@ -11,11 +11,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DemoApiGateway/DemoApiGateway.csproj'
+  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
 - name: nugetPath
-  value: 'DemoApiGateway/nuget.config'
+  value: 'DotNet/DemoApiGateway/nuget.config'
 - name: workingDir
-  value: 'DemoApp/'
+  value: 'DotNet/DemoApp/'
 - name: serviceName
   value: 'DemoApiGateway'
 

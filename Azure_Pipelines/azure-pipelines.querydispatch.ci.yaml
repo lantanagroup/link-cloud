@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - QueryDispatch/*
+    - DotNet/QueryDispatch/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'QueryDispatch/QueryDispatch.csproj'
-  testProject: 'QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
-  nugetPath: 'QueryDispatch/nuget.config'
+  project: 'DotNet/QueryDispatch/QueryDispatch.csproj'
+  testProject: 'DotNet/QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
+  nugetPath: 'DotNet/QueryDispatch/nuget.config'
   serviceName: 'QueryDispatch'
 
 steps:

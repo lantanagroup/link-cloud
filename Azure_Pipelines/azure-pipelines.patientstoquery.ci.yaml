@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - PatientsToQuery/*
+    - DotNet/PatientsToQuery/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'PatientsToQuery/PatientsToQuery.csproj'
-  testProject: 'PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
-  nugetPath: 'PatientsToQuery/nuget.config'
+  project: 'DotNet/PatientsToQuery/PatientsToQuery.csproj'
+  testProject: 'DotNet/PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
+  nugetPath: 'DotNet/PatientsToQuery/nuget.config'
   serviceName: 'PatientsToQuery'
 
 steps:

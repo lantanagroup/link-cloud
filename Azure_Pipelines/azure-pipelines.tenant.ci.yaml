@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Tenant/*
+    - DotNet/Tenant/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Tenant/Tenant.csproj'
-  testProject: 'TenantUnitTests/TenantUnitTests.csproj'
-  nugetPath: 'Tenant/nuget.config'
+  project: 'DotNet/Tenant/Tenant.csproj'
+  testProject: 'DotNet/TenantUnitTests/TenantUnitTests.csproj'
+  nugetPath: 'DotNet/Tenant/nuget.config'
   serviceName: 'Tenant'
 
 steps:

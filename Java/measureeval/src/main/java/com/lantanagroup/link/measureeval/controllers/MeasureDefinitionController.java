@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/measure-definition")
+@RequestMapping("/api/measure-definition")
 public class MeasureDefinitionController {
     private final MeasureDefinitionCache measureDefinitionCache;
 

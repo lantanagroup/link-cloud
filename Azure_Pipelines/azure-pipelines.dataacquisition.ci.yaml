@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - DataAcquisition/*
+    - DotNet/DataAcquisition/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'DataAcquisition/DataAcquisition.csproj'
-  testProject: 'DataAcquisitionTests/DataAcquisitionTests.csproj'
-  nugetPath: 'DataAcquisition/nuget.config'
+  project: 'DotNet/DataAcquisition/DataAcquisition.csproj'
+  testProject: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
+  nugetPath: 'DotNet/DataAcquisition/nuget.config'
   serviceName: 'DataAcquisition'
 
 steps:

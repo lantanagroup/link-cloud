@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Tenant/*
+    - DotNet/Tenant/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Tenant/Tenant.csproj'
+  value: 'DotNet/Tenant/Tenant.csproj'
 - name: testProject
-  value: 'TenantUnitTests/TenantUnitTests.csproj'
+  value: 'DotNet/TenantUnitTests/TenantUnitTests.csproj'
 - name: nugetPath
-  value: 'Tenant/nuget.config'
+  value: 'DotNet/Tenant/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-tenant'
 - name: dockerPath
-  value: '**/Tenant/Dockerfile'
+  value: '**/DotNet/Tenant/Dockerfile'
 - name: serviceName
   value: 'Tenant'
 - name: containerRegistry
