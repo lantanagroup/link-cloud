@@ -1,0 +1,180 @@
+# We strongly recommend using the required_providers block to set the
+# Azure Provider source and version being used
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "=3.0.0"
+    }
+  }
+}
+
+# Configure the Microsoft Azure Provider
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy = true
+      recover_soft_deleted_key_vault = true
+    }
+  }
+}
+
+# Create a resource group
+resource "azurerm_resource_group" "link-rg" {
+  name     = "nhsnlink-rg"
+  location = "South Central US"
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+# Create client configuration
+data "azurerm_client_config" "current" {}
+
+# Create a virtual network within the resource group
+resource "azurerm_virtual_network" "link-vn" {
+  name                = "link-network"
+  resource_group_name = azurerm_resource_group.link-rg.name
+  location            = azurerm_resource_group.link-rg.location
+  address_space       = ["10.0.0.0/16"]
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+# Create a subnet within the virtual network
+resource "azurerm_subnet" "example" {
+  name                 = "internal"
+  resource_group_name  = azurerm_resource_group.link-rg.name
+  virtual_network_name = azurerm_virtual_network.example.name
+  address_prefixes     = [""] # Specify the address space for the subnet
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+# Create a Key Vault within the resource group
+resource "azurerm_key_vault" "LinkVault" {
+  name                        = "Link-Vault"
+  resource_group_name         = azurerm_resource_group.link-rg.name
+  location                    = azurerm_resource_group.link-rg.location
+  enabled_for_disk_encryption = true
+  soft_delete_retention_days  = 7
+  sku_name                    = "standard"
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "Get",
+    ]
+
+    secret_permissions = [
+      "Get",
+    ]
+
+    storage_permissions = [
+      "Get",
+    ]
+  }
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+# Create a Azure Event Hub within the resource group
+resource "azurerm_eventhub_namespace" "LinkEventHubNamespace" {
+  name                = "Link-EventHubNamespace"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "Standard"
+  capacity            = 1
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+resource "azurerm_eventhub_namespace" "LinkEventHub" {
+  name                = "Link-EventHub"
+  namespace_name      = azurerm_eventhub_namespace.example.name
+  resource_group_name = azurerm_resource_group.link-rg.name
+  location            = azurerm_resource_group.link-rg.location
+  partition_count     = 2
+  message_retention   = 1
+}
+
+# Create an Azure App Configuration within the resource group
+resource "azurerm_app_configuration" "LinkAppConfig" {
+  name                = "Link-AppConfig"
+  resource_group_name = azurerm_resource_group.link-rg.name
+  location            = azurerm_resource_group.link-rg.location
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+# Create an Azure Container Registry within the resource group
+resource "azurerm_container_registry" "LinkContainerRegistry" {
+  name                = "LinkContainerRegistry"
+  resource_group_name = azurerm_resource_group.link-rg.name
+  location            = azurerm_resource_group.link-rg.location
+  sku                 = "Basic"
+  admin_enabled       = false
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+#Create azure container app environemnt within the resource group
+
+resource "azurerm_log_analytics_workspace" "LinkLogAnalytics" {
+  name                = "Link-LogAnalytics"
+  location            = azurerm_resource_group.link-rg.location
+  resource_group_name = azurerm_resource_group.link-rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+resource "azurerm_container_app_environment" "LinkAppEnvironment" {
+  name                = "Link-AppEnvironment"
+  resource_group_name = azurerm_resource_group.link-rg.name
+  location            = azurerm_resource_group.link-rg.location
+
+  tags = {
+    environment = "dev"
+  }
+}
+
+#Create Azure App Container within the resource group for the Audit Service
+resource "azurerm_container_group" "AuditService" {
+  name                         = "Audit-Service"
+  container_app_environment_id = azurerm_container_app_environment.LinkAppEnvironment.id
+  resource_group_name          = azurerm_resource_group.link-rg.name
+  revision_mode                = "Single"
+  
+  template {
+    container {
+      name   = "Audit-Service"
+      image  = "mcr.microsoft.com/oss/nginx/nginx:1.15.5-alpine" //replace with image for audit service
+      cpu    = "0.5"
+      memory = "1.5"
+    }
+  }  
+
+  tags = {
+    environment = "dev"
+  }
+}
