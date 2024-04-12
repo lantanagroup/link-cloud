@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - Submission/*
+    - DotNet/Submission/*
 pr: none
 
 pool:
@@ -13,11 +13,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Submission/Submission.csproj'
+  value: 'DotNet/Submission/Submission.csproj'
 - name: testProject
-  value: 'SubmissionUnitTests/SubmissionUnitTests.csproj'
+  value: 'DotNet/SubmissionUnitTests/SubmissionUnitTests.csproj'
 - name: nugetPath
-  value: 'Submission/nuget.config'
+  value: 'DotNet/Submission/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -25,7 +25,7 @@ variables:
 - name: registry-repo-Name
   value: 'link-submission'
 - name: dockerPath
-  value: '**/Submission/Dockerfile'
+  value: '**/DotNet/Submission/Dockerfile'
 - name: serviceName
   value: 'Submission'
 - name: containerRegistry

@@ -1,15 +1,15 @@
 trigger:
   paths:
     include:
-    - Notification/*
+    - DotNet/Notification/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  project: 'Notification/Notification.csproj'
-  testProject: 'NotificationUnitTests/NotificationUnitTests.csproj'
-  nugetPath: 'Notification/nuget.config'
+  project: 'DotNet/Notification/Notification.csproj'
+  testProject: 'DotNet/NotificationUnitTests/NotificationUnitTests.csproj'
+  nugetPath: 'DotNet/Notification/nuget.config'
   serviceName: 'Notification'
 
 steps:

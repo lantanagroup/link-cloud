@@ -6,6 +6,11 @@ springdoc:
 spring:
   application:
     name: ValidationService
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:7080/realms/master
   #datasource:
   #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
   #  username: link-user

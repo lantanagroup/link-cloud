@@ -6,6 +6,11 @@ springdoc:
 spring:
   application:
     name: measureeval
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:7080/realms/master
   main:
     allow-bean-definition-overriding: true
   data:
