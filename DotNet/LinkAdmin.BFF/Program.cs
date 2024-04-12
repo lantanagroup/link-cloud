@@ -19,6 +19,10 @@ using Serilog.Settings.Configuration;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using Microsoft.AspNetCore.Authentication;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,7 +49,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add service information
-    var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
@@ -64,12 +68,58 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<LinkServiceDiscovery>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkServiceDiscovery));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
+    // Add fluent validation
+    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
+
+    // Add HttpClientFactory
+    builder.Services.AddHttpClient();
+
+    // Add data protection
+    builder.Services.AddDataProtection().SetApplicationName("Link");
+    //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
+
+    // Add commands
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
+    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
+    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
+    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
+    builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
+
+
+    //Add Redis     
+    builder.Services.AddRedisCache(options =>
+    {
+        options.Environment = builder.Environment;
+
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+
+        if (string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
+    });
+
+    // Add Secret Manager
+    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    {
+        builder.Services.AddSecretManager(options =>
+        {
+            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
+        });
+    }
+
     // Add Authentication
-    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
+    #region Authentication
+    builder.Services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
+
+    List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];
 
     var defaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
     builder.Services.Configure<AuthenticationSchemaConfig>(options =>
@@ -82,10 +132,10 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.DefaultChallengeScheme = defaultChallengeScheme;
     });
 
-    var authBuilder = builder.Services.AddAuthentication(options => { 
+    var authBuilder = builder.Services.AddAuthentication(options => {
         options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
         options.DefaultChallengeScheme = defaultChallengeScheme;
-    });    
+    });
 
     authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
     {
@@ -95,9 +145,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add Oauth authorization scheme if enabled
-    if(builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
+    if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
     {
-        if(!LinkAdminConstants.AuthenticationSchemes.Oauth2.Equals(defaultChallengeScheme))
+        if (!LinkAdminConstants.AuthenticationSchemes.Oauth2.Equals(defaultChallengeScheme))
             authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.Oauth2);
 
         authBuilder.AddOAuthAuthentication(options =>
@@ -110,12 +160,12 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.UserInformationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
             options.CallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
         });
-    }  
-   
+    }
+
     // Add OpenIdConnect authorization scheme if enabled
     if (builder.Configuration.GetValue<bool>("Authentication:Schemas:OpenIdConnect:Enabled"))
     {
-        if(!LinkAdminConstants.AuthenticationSchemes.OpenIdConnect.Equals(defaultChallengeScheme))
+        if (!LinkAdminConstants.AuthenticationSchemes.OpenIdConnect.Equals(defaultChallengeScheme))
             authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
 
         authBuilder.AddOpenIdConnectAuthentication(options =>
@@ -127,25 +177,40 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:NameClaimType");
             options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:RoleClaimType");
         });
-    }    
+    }
 
     // Add JWT authorization scheme if enabled
     if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
     {
-        if(!LinkAdminConstants.AuthenticationSchemes.JwtBearerToken.Equals(defaultChallengeScheme))
+        if (!LinkAdminConstants.AuthenticationSchemes.JwtBearerToken.Equals(defaultChallengeScheme))
             authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
 
         authBuilder.AddJwTBearerAuthentication(options =>
-        {            
+        {
             options.Environment = builder.Environment;
             options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority");
             options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience");
             options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:NameClaimType");
             options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
-            
-        });        
-    }  
-    
+
+        });
+    }
+
+    // Add Link Bearer Token authorization schema if feature is enabled
+    if (builder.Configuration.GetValue<bool>("EnableBearerTokenFeature"))
+    {
+        if (!LinkAdminConstants.AuthenticationSchemes.LinkBearerToken.Equals(defaultChallengeScheme))
+            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken);
+
+        builder.Services.AddLinkBearerServiceAuthentication(options =>
+        {
+            options.Environment = builder.Environment;
+            options.Authority = LinkAdminConstants.LinkBearerService.LinkBearerIssuer;
+            options.Audience = LinkAdminConstants.LinkBearerService.LinkBearerAudience;
+        });
+    }
+    #endregion
+
     // Add Authorization
     builder.Services.AddAuthorization(builder =>
     {
@@ -160,19 +225,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
-    }    
+    }
+    if (builder.Configuration.GetValue<bool>("EnableBearerTokenFeature"))
+    {
+        builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
+    }
 
-    // Add fluent validation
-    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
-    // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
-    builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
-    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
 
     // Add YARP (reverse proxy)
-    builder.Services.AddReverseProxy()
-        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+    builder.Services.AddYarpProxy(builder.Configuration);
 
     // Add health checks
     builder.Services.AddHealthChecks();
@@ -323,8 +385,9 @@ static void SetupMiddleware(WebApplication app)
     else
     {
         app.UseExceptionHandler();
-    }   
+    }
 
+    app.UseStatusCodePages();
     app.UseHttpsRedirection();
 
     // Configure swagger
@@ -354,7 +417,7 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    app.MapReverseProxy().RequireAuthorization("AuthenticatedUser");
+    app.MapReverseProxy();
 
     // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
