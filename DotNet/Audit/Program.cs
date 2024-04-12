@@ -160,10 +160,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //builder.Services.AddAuthorizationService();
 
-    // Additional configuration is required to successfully run gRPC on macOS.
-    // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
     builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();
 
     //Add Hosted Services
