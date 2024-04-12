@@ -60,6 +60,8 @@
             public const int GatewayServiceUriException = 1014;
             public const int LinkServiceRequestGenerated = 1015;
             public const int LinkServiceRequestException = 1016;
+            public const int LinkServiceRequestWarning = 1017;
+            public const int LinkServiceRequestSuccess = 1018;
 
         }
     }

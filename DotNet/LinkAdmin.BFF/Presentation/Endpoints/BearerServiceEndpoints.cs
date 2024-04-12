@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Refreshes the signing key for link bearer tokens."
                 });
 
-            _logger.LogInformation("Bearer Service endpoints registered");
+            _logger.LogApiRegistration(nameof(BearerServiceEndpoints));
         }
 
         public async Task<IResult> CreateToken(HttpContext context)

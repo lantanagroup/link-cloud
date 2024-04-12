@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
@@ -48,7 +49,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             if (account is null) //if no account found, return an empty principal
             {
-                _logger.LogWarning("Account not found for {accountId}", accountId);
+                _logger.LogLinkServiceRequestWarning("Account not found for {accountId}", accountId);
+               
                 var invalidIdentity = new ClaimsIdentity();
                 return new ClaimsPrincipal(invalidIdentity);              
             };

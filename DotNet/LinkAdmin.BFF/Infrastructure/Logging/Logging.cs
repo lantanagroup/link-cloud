@@ -99,5 +99,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while making a request to service {service}: {exception}")]
         public static partial void LogLinkServiceRequestException(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestWarning,
+            LogLevel.Warning,
+            "While making a request to service {service}: {exception}")]
+        public static partial void LogLinkServiceRequestWarning(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestSuccess,
+            LogLevel.Information,
+            "Request to service {service} was successful.")]
+        public static partial void LogLinkServiceRequestSuccess(this ILogger logger, string service);
     }
 }
