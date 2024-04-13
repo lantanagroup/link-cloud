@@ -5,8 +5,6 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using MongoDB.Driver;
-
 
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 

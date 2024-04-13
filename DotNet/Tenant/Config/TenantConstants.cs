@@ -15,7 +15,6 @@ namespace LantanaGroup.Link.Tenant.Config
         {
             public const string ServiceInformation = "ServiceInformation";
             public const string KafkaConnection = "KafkaConnection";
-            public const string MongoDB = "MongoDB";
             public const string Telemetry = "TelemetryConfig";
             public const string MeasureApiConfig = "MeasureServiceRegistry";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";

@@ -1,4 +1,3 @@
-
 using LantanaGroup.Link.Tenant.Services;
 using Quartz;
 using Serilog;
@@ -25,7 +24,6 @@ using Serilog.Settings.Configuration;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Microsoft.EntityFrameworkCore;
-using LantanaGroup.Link.Tenant.Listeners;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
@@ -100,12 +98,9 @@ namespace Tenant
             // Add services to the container.
             builder.Services.AddGrpc();
             builder.Services.AddGrpcReflection();
-            builder.Services.AddHostedService<ListenerXX>();
             builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
-
-            builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MongoDB));
 
             builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
