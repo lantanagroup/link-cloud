@@ -7,10 +7,10 @@ namespace LantanaGroup.Link.Tenant.Services
     {
         private static string _version = string.Empty;
         private static string _serviceName = "Link Tenant Service";
-        private static string ReportScheduledCounter = "report-scheduled-observed";
+        private static string _reportScheduledCounter = "report-scheduled-observed";
 
         public static Meter meter = new Meter(_serviceName, _version);
-        public static Counter<int> ReportScheduledObserved = meter.CreateCounter<int>(ReportScheduledCounter);
+        public static Counter<int> ReportScheduledObserved = meter.CreateCounter<int>(_reportScheduledCounter);
 
         public static void Initialize(ServiceInformation serviceInfo)
         {
@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Tenant.Services
             //re-initialize meter
             Dispose();
             meter = new Meter(_serviceName, _version);
-            ReportScheduledObserved = meter.CreateCounter<int>(ReportScheduledCounter);
+            ReportScheduledObserved = meter.CreateCounter<int>(_reportScheduledCounter);
         }
 
         public static void Dispose()

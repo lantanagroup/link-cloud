@@ -9,12 +9,10 @@ namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
 public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
 {
-    private readonly ILogger<FacilityConfigurationRepo> _logger;
     protected new readonly FacilityDbContext _dbContext;
 
     public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base(logger, dbContext)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
