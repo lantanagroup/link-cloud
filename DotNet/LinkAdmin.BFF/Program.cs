@@ -19,8 +19,6 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
-using Microsoft.AspNetCore.Authentication;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
@@ -96,7 +94,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
-
     //Add Redis     
     builder.Services.AddRedisCache(options =>
     {
@@ -119,7 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         });
     }
 
-    // Add Authentication
+    // Add Link Security
     builder.Services.AddLinkSecurity(builder.Configuration, options => { 
         options.Environment = builder.Environment;
     });    
@@ -142,11 +139,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHealthChecks();    
 
     // Add swagger generation
-    builder.Services.AddEndpointsApiExplorer();
-    #region SwaggerGen
+    builder.Services.AddEndpointsApiExplorer();    
     builder.Services.AddSwaggerGen(c =>
     {
-
+        #region Authentication Schemas
         if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
         {
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -215,15 +211,14 @@ static void RegisterServices(WebApplicationBuilder builder)
                 },
                 new List<string>()
             }
-        });        
+        });
+        #endregion
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
 
-    });
-
-    #endregion
+    });   
 
     // Add logging redaction services
     builder.Services.AddRedactionService(options =>
