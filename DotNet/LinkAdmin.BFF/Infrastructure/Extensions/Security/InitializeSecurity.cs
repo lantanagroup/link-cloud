@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
@@ -13,6 +14,27 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             options?.Invoke(securityServiceOptions);
 
             services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
+            services.AddLinkAuthorizationHandlers();
+
+            if (securityServiceOptions.Environment.IsDevelopment() && configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
+            {
+                services.AddAuthentication(options =>
+                {
+                    options.RequireAuthenticatedSignIn = false;
+                });
+
+                //create anonymous access
+                services.AddAuthorization(options =>
+                {
+                    options.AddPolicy("AuthenticatedUser", pb =>
+                    {
+                        pb.RequireAssertion(context => true);
+                    });
+                });
+
+                return services;
+            
+            }                
 
             List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];
 

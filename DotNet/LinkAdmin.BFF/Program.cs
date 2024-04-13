@@ -24,6 +24,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
+using Link.Authorization.Requirements.PermissiveAccessRequirement;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,9 +118,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Link Security
-    builder.Services.AddLinkSecurity(builder.Configuration, options => { 
+    builder.Services.AddLinkSecurity(builder.Configuration, options =>
+    {
         options.Environment = builder.Environment;
-    });    
+    });
 
     // Add Endpoints
     builder.Services.AddTransient<IApi, AuthEndpoints>();
@@ -133,7 +135,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add YARP (reverse proxy)
-    builder.Services.AddYarpProxy(builder.Configuration);
+    builder.Services.AddYarpProxy(builder.Configuration, options => options.Environment = builder.Environment);
 
     // Add health checks
     builder.Services.AddHealthChecks();    
@@ -298,7 +300,14 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    app.MapReverseProxy();
+    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
+    {
+        app.MapReverseProxy().AllowAnonymous();
+    }
+    else
+    {
+        app.MapReverseProxy();
+    }    
 
     // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
