@@ -1,5 +1,4 @@
-﻿using Google.Api;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+﻿using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
@@ -13,7 +12,7 @@ public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfig
     private readonly ILogger<FacilityConfigurationRepo> _logger;
     protected new readonly FacilityDbContext _dbContext;
 
-    public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base( logger, dbContext)
+    public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base(logger, dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));

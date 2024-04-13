@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Tenant
             throw new RpcException(new Status(StatusCode.Unimplemented, ""));
         }
 
-        public override async  Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
+        public override async Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
         {
             Patient newPatient = new Patient();
             newPatient.Active = true;

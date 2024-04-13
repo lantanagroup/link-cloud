@@ -1,12 +1,10 @@
-﻿using Confluent.Kafka;
-using KellermanSoftware.CompareNetObjects;
+﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 
 using Quartz;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Tenant.Utils
@@ -36,7 +34,8 @@ namespace LantanaGroup.Link.Tenant.Utils
             List<Difference> list = result.Differences;
             AuditEventMessage auditEventLocal = new AuditEventMessage();
             auditEventLocal.PropertyChanges = new List<PropertyChangeModel>();
-            list.ForEach(d => {
+            list.ForEach(d =>
+            {
                 if (d.PropertyName == "CreatedOn" || d.PropertyName == "LastModifiedOn" || d.PropertyName == "MRPCreatedDate" || d.PropertyName == "MRPModifyDate") return;
                 auditEventLocal.PropertyChanges.Add(new PropertyChangeModel
                 {

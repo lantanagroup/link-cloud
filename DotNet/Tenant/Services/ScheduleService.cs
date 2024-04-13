@@ -36,12 +36,12 @@ namespace LantanaGroup.Link.Tenant.Services
         {
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
-        //   _facilityConfigurationService = facilityConfigurationService;
+            //   _facilityConfigurationService = facilityConfigurationService;
             this._scopeFactory = serviceScopeFactory;
         }
 
         public IScheduler Scheduler { get; set; }
-       // static ConcurrentDictionary<string, JobKey> jobs = new ConcurrentDictionary<string, JobKey>();
+        // static ConcurrentDictionary<string, JobKey> jobs = new ConcurrentDictionary<string, JobKey>();
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {

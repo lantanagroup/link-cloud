@@ -1,34 +1,31 @@
-using LantanaGroup.Link.Tenant.Services;
-using Quartz;
-using Serilog;
-using LantanaGroup.Link.Tenant.Config;
-using LantanaGroup.Link.Tenant.Jobs;
-
-using Quartz.Impl;
-using Quartz.Spi;
-
-
-using System.Reflection;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Azure.Identity;
+using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Tenant.Commands;
+using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
-using Confluent.Kafka.Extensions.OpenTelemetry;
-using System.Diagnostics;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
-using Serilog.Settings.Configuration;
-using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
-using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
-using LantanaGroup.Link.Tenant.Commands;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Tenant.Services;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
+using Serilog;
+using Serilog.Enrichers.Span;
+using Serilog.Exceptions;
+using Serilog.Settings.Configuration;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace Tenant
 {
