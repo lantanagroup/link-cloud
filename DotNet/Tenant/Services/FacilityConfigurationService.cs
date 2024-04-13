@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.GetAsync(cancellationToken);
         }
 
-        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string facilityId, string facilityName, CancellationToken cancellationToken)
+        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string? facilityId, string? facilityName, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
@@ -282,29 +282,35 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private void ValidateSchedules(FacilityConfigModel facility)
         {
+            if (facility.ScheduledTasks == null) return;
+
             foreach (ScheduledTaskModel scheduledTask in facility.ScheduledTasks)
             {
                 // validate topic
-                if (!Helper.ValidateTopic(scheduledTask.KafkaTopic, _topics))
+                if (scheduledTask.KafkaTopic != null && !Helper.ValidateTopic(scheduledTask.KafkaTopic, _topics))
                 {
                     throw new ApplicationException($"kafka topic {scheduledTask.KafkaTopic} is Invalid. Valid values are {string.Join(" and ", _topics.ToList())}");
                 }
+
                 // validate scheduleTrigger
                 foreach (ScheduledTaskModel.ReportTypeSchedule reportTypeSchedule in scheduledTask.ReportTypeSchedules)
                 {
-                    foreach (string trigger in reportTypeSchedule.ScheduledTriggers)
+                    if (reportTypeSchedule.ScheduledTriggers != null)
                     {
-                        if (!Helper.IsValidSchedule(trigger))
+                        foreach (string trigger in reportTypeSchedule.ScheduledTriggers)
                         {
-                            _logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
-                            throw new ApplicationException($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                            if (!Helper.IsValidSchedule(trigger))
+                            {
+                                _logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                                throw new ApplicationException($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                            }
                         }
                     }
                 }
             }
             // validate topic is unique within Facility
 
-            IEnumerable<string> duplicates = facility.ScheduledTasks.GroupBy(i => i.KafkaTopic).Where(g => g.Count() > 1).Select(g => g.Key);
+            IEnumerable<string?> duplicates = facility.ScheduledTasks.GroupBy(i => i.KafkaTopic).Where(g => g.Count() > 1).Select(g => g.Key);
 
             string duplicatedTopics = string.Join(" ", duplicates.ToList());
 
@@ -318,7 +324,7 @@ namespace LantanaGroup.Link.Tenant.Services
             foreach (ScheduledTaskModel facilityScheduledTask in facility.ScheduledTasks)
             {
 
-                IEnumerable<string> duplicatedReportTypes = facilityScheduledTask.ReportTypeSchedules.GroupBy(i => i.ReportType).Where(g => g.Count() > 1).Select(g => g.Key);
+                IEnumerable<string?> duplicatedReportTypes = facilityScheduledTask.ReportTypeSchedules.GroupBy(i => i.ReportType).Where(g => g.Count() > 1).Select(g => g.Key);
 
                 string duplicatedReportTypesString = string.Join(" ", duplicatedReportTypes.ToList());
 
@@ -327,14 +333,21 @@ namespace LantanaGroup.Link.Tenant.Services
                     _logger.LogError($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                     throw new ApplicationException($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                 }
+
                 int i = 1;
                 foreach (ReportTypeSchedule reportTypeSchedule in facilityScheduledTask.ReportTypeSchedules)
                 {
+                    if (reportTypeSchedule.ReportType == null)
+                    {
+                        throw new ApplicationException($"ReportType under KafkaTopic {facilityScheduledTask.KafkaTopic} must be specified.");
+                    }
+
                     // validate reportType not null and report trigers not emty            
                     if (string.IsNullOrWhiteSpace(reportTypeSchedule.ReportType))
                     {
                         schedulingErrors.AppendLine($"Report Type under KafkaTopic {facilityScheduledTask.KafkaTopic} and ReportTypeSchedule Number {i} must be specified.");
                     }
+
                     // validate the reportype is one of the known values
                     if (!MeasureDefinitionTypeValidation.Validate(reportTypeSchedule.ReportType))
                     {

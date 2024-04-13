@@ -17,8 +17,6 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly Quartz.Spi.IJobFactory _jobFactory;
 
-        private FacilityConfigurationService _facilityConfigurationService;
-
         private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
 
         private readonly IServiceScopeFactory _scopeFactory;
@@ -83,27 +81,32 @@ namespace LantanaGroup.Link.Tenant.Services
             }
         }
 
-        public static async Task DeleteJobsForFacility(String facilityId, List<ScheduledTaskModel> jobsToBeDeleted, IScheduler scheduler)
+        public static async Task DeleteJobsForFacility(String facilityId, List<ScheduledTaskModel>? jobsToBeDeleted, IScheduler scheduler)
         {
-            foreach (ScheduledTaskModel task in jobsToBeDeleted)
+            if (jobsToBeDeleted != null)
             {
-                var groupMatcher = GroupMatcher<JobKey>.GroupContains(task.KafkaTopic);
-
-                foreach (ScheduledTaskModel.ReportTypeSchedule reportTypeSchedule in task.ReportTypeSchedules)
+                foreach (ScheduledTaskModel task in jobsToBeDeleted)
                 {
-                    string jobKeyName = $"{facilityId}-{reportTypeSchedule.ReportType}";
+                    if (task.KafkaTopic == null) continue;
 
-                    JobKey jobKey = scheduler.GetJobKeys(groupMatcher).Result.FirstOrDefault(key => key.Name == jobKeyName);
+                    var groupMatcher = GroupMatcher<JobKey>.GroupContains(task.KafkaTopic);
 
-                    IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
-
-                    foreach (ITrigger trigger in triggers)
+                    foreach (ScheduledTaskModel.ReportTypeSchedule reportTypeSchedule in task.ReportTypeSchedules)
                     {
-                        TriggerKey oldTrigger = trigger.Key;
+                        string jobKeyName = $"{facilityId}-{reportTypeSchedule.ReportType}";
 
-                        await scheduler.UnscheduleJob(oldTrigger);
+                        JobKey jobKey = scheduler.GetJobKeys(groupMatcher).Result.FirstOrDefault(key => key.Name == jobKeyName);
+
+                        IReadOnlyCollection<ITrigger> triggers = scheduler.GetTriggersOfJob(jobKey).Result;
+
+                        foreach (ITrigger trigger in triggers)
+                        {
+                            TriggerKey oldTrigger = trigger.Key;
+
+                            await scheduler.UnscheduleJob(oldTrigger);
+                        }
+
                     }
-
                 }
             }
         }
@@ -186,16 +189,21 @@ namespace LantanaGroup.Link.Tenant.Services
         {
             _topicJobs.TryGetValue(topic, out Type jobType);
 
+            if (jobType is null) throw new ApplicationException($"Job Type not found for {topic}");
+            if (reportTypeSchedule.ReportType is null) throw new ApplicationException($"Report Type not found for {topic}");
+
             IJobDetail job = CreateJob(jobType, facility, reportTypeSchedule.ReportType, topic);
 
             await scheduler.AddJob(job, true);
 
-            foreach (string scheduledTrigger in reportTypeSchedule.ScheduledTriggers)
+            if (reportTypeSchedule.ScheduledTriggers != null)
             {
-                ITrigger trigger = CreateTrigger(scheduledTrigger, job.Key);
-                await scheduler.ScheduleJob(trigger);
+                foreach (string scheduledTrigger in reportTypeSchedule.ScheduledTriggers)
+                {
+                    ITrigger trigger = CreateTrigger(scheduledTrigger, job.Key);
+                    await scheduler.ScheduleJob(trigger);
+                }
             }
-
         }
 
         public static IJobDetail CreateJob(Type jobType, FacilityConfigModel facility, string reportType, string topic)

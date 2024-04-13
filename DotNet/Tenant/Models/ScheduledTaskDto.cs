@@ -8,14 +8,9 @@ namespace LantanaGroup.Link.Tenant.Models
 
         public List<ReportTypeDtoSchedule> ReportTypeSchedules { get; set; } = new List<ReportTypeDtoSchedule>();
 
-
-        /* [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
-         public Dictionary<string, string> EventData { get; set; }*/
-
         public class ReportTypeDtoSchedule
         {
-            public string ReportType { get; set; }
-            //public string ScheduledTrigger { get; set; }
+            public string? ReportType { get; set; }
             public List<string> ScheduledTriggers { get; set; } = new List<string>();
 
             public List<string>? ScheduledTriggerDescription

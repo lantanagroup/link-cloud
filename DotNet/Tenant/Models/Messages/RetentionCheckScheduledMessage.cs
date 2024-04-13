@@ -2,8 +2,8 @@
 {
     public class RetentionCheckScheduledMessage
     {
-        public string TenantId { get; set; }
-        public string FacilityId { get; set; }
+        public string? TenantId { get; set; }
+        public string? FacilityId { get; set; }
     }
 
 }
