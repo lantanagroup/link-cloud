@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices
 {
     public static class SecretManagerExtension
     {
@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             var secretManagerOptions = new SecretManagerOptions();
             options(secretManagerOptions);
 
-            switch(secretManagerOptions.Manager)
+            switch (secretManagerOptions.Manager)
             {
                 case "AzureKeyVault":
                     services.AddSingleton<ISecretManager, LinkAzureKeyVault>();

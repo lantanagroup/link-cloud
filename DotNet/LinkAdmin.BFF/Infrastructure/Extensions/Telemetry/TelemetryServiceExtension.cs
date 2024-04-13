@@ -4,12 +4,12 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry
 {
     public static class TelemetryServiceExtension
     {
         public static IServiceCollection AddOpenTelemetryService(this IServiceCollection services, Action<TelemetryServiceOptions> options)
-        {       
+        {
             var telemetryServiceOptions = new TelemetryServiceOptions();
             options.Invoke(telemetryServiceOptions);
 
@@ -29,14 +29,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                         {
                             options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                         })
-                        .AddHttpClientInstrumentation(options => {
+                        .AddHttpClientInstrumentation(options =>
+                        {
                             options.FilterHttpRequestMessage = (httpContext) =>
                             {
                                 return !(httpContext.RequestUri is not null
                                     && (
                                         httpContext.RequestUri.PathAndQuery.StartsWith("/loki") ||
                                         httpContext.RequestUri.PathAndQuery.Contains("swagger") ||
-                                        httpContext.RequestUri.PathAndQuery.StartsWith("/health")                                       
+                                        httpContext.RequestUri.PathAndQuery.StartsWith("/health")
                                     ));
                             };
                         })
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             }
 
             return services;
-        }        
+        }
     }
 
     public class TelemetryServiceOptions : TelemetryConfig

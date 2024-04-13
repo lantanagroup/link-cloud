@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class LinkBearerServiceAuthExtension
     {
@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             services.AddAuthentication().AddJwtBearer(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken, options =>
-            {                               
+            {
                 options.Authority = linkBearerServiceOptions.Authority;
                 options.Audience = linkBearerServiceOptions.Audience;
                 options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                             cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
                         }
                         else
-                        {                                                     
+                        {
                             //bearerKey = protector.Unprotect(cachedBearerKey);
                             bearerKey = cachedBearerKey;
                         }

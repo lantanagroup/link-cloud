@@ -1,6 +1,6 @@
 ﻿using StackExchange.Redis;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices
 {
     public static class RedisCacheExtension
     {
@@ -10,16 +10,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             options(redisCacheOptions);
 
             services.AddStackExchangeRedisCache(options =>
-            {                
+            {
                 options.ConfigurationOptions = new ConfigurationOptions
                 {
                     EndPoints = { redisCacheOptions.ConnectionString },
                 };
-                
-                if(!string.IsNullOrEmpty(redisCacheOptions.InstanceName))
+
+                if (!string.IsNullOrEmpty(redisCacheOptions.InstanceName))
                 {
                     options.InstanceName = redisCacheOptions.InstanceName;
-                }              
+                }
 
                 if (!string.IsNullOrEmpty(redisCacheOptions.Password))
                 {

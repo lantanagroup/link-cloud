@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class CorsServiceExtension
     {
@@ -9,19 +9,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
         {
             var corsServiceOptions = new CorsServiceOptions();
             options?.Invoke(corsServiceOptions);
-            
+
             services.AddCors(options =>
-            {                
+            {
                 CorsPolicyBuilder cpb = new();
 
-                if(corsServiceOptions.AllowedOrigins?.Length > 0)
+                if (corsServiceOptions.AllowedOrigins?.Length > 0)
                 {
                     cpb.WithOrigins(corsServiceOptions.AllowedOrigins);
 
-                    if(corsServiceOptions.AllowCredentials)
+                    if (corsServiceOptions.AllowCredentials)
                     {
                         cpb.AllowCredentials();
-                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders is not null ? corsServiceOptions.AllowedHeaders : corsServiceOptions.DefaultAllowedHeaders);                           
+                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders is not null ? corsServiceOptions.AllowedHeaders : corsServiceOptions.DefaultAllowedHeaders);
                     }
                 }
                 else
@@ -32,17 +32,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                     {
                         cpb.WithHeaders(corsServiceOptions.AllowedHeaders);
                     }
-                    else 
-                    { 
+                    else
+                    {
                         cpb.AllowAnyHeader();
                     }
 
                 }
 
                 cpb.WithMethods(corsServiceOptions.AllowedMethods is not null ? corsServiceOptions.AllowedMethods : corsServiceOptions.DefaultAllowedMethods);
-                cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);                    
-                cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));          
-                    
+                cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
+                cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
+
                 options.AddPolicy(corsServiceOptions?.PolicyName ?? CorsConfig.DefaultCorsPolicyName, cpb.Build());
 
                 //add health check endpoint to cors policy
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                     policy.AllowAnyHeader();
                     policy.AllowAnyMethod();
                     policy.AllowAnyOrigin();
-                });              
+                });
             });
 
             return services;
@@ -60,6 +60,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
     public class CorsServiceOptions : CorsConfig
     {
-        public IWebHostEnvironment Environment { get; set; } = null!;        
+        public IWebHostEnvironment Environment { get; set; } = null!;
     }
 }

@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var claims = new List<Claim>
             {
                 new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
-                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
+                new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
             };
 
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
 
             //send the request to the account service
-            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceApiUrl}/api/email/{accountId}", cancellationToken);
+            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceApiUrl}/api/account/email/{accountId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
