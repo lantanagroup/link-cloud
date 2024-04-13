@@ -15,8 +15,8 @@ namespace LantanaGroup.Link.Tenant
 
         public TenantService(ILogger<TenantService> logger, IOptions<KafkaConnection> kafkaConnection, FacilityConfigurationService tenantConfigurationService)
         {
-            this._logger = logger;
-            this._kafkaConnection = kafkaConnection;
+            _logger = logger;
+            _kafkaConnection = kafkaConnection;
         }
 
         public override async Task<GetFhirConnectionResponse> GetFhirConnection(GetFhirConnectionRequest request, ServerCallContext context)
@@ -43,9 +43,9 @@ namespace LantanaGroup.Link.Tenant
 
             var serializer = new FhirJsonSerializer();
 
-            using (var producer = new ProducerBuilder<Null, string>(this._kafkaConnection.Value.CreateProducerConfig()).Build())
+            using (var producer = new ProducerBuilder<Null, string>(_kafkaConnection.Value.CreateProducerConfig()).Build())
             {
-                this._logger.LogInformation("Produce Event!");
+                _logger.LogInformation("Produce Event!");
                 producer.Produce("my-topic", new Message<Null, string> { Value = request.Name });
             }
 

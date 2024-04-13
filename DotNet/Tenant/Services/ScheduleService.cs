@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
             //   _facilityConfigurationService = facilityConfigurationService;
-            this._scopeFactory = serviceScopeFactory;
+            _scopeFactory = serviceScopeFactory;
         }
 
         public IScheduler Scheduler { get; set; }

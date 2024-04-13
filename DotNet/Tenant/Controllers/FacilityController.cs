@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 dest = _mapperModelToDto.Map<FacilityConfigModel, FacilityConfigDto>(facility);
             }
 
-            return this.Ok(dest);
+            return Ok(dest);
         }
 
 
@@ -194,7 +194,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (Exception ex)
             {
-                this._logger.LogError("Exception is: " + ex.Message);
+                _logger.LogError("Exception is: " + ex.Message);
 
                 throw;
             }
@@ -227,7 +227,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
             catch (ApplicationException ex)
             {
-                this._logger.LogError("Exception: " + ex.Message);
+                _logger.LogError("Exception: " + ex.Message);
 
                 return BadRequest(ex.Message);
             }

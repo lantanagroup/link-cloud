@@ -84,19 +84,19 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this.ValidateFacility(newFacility);
+                ValidateFacility(newFacility);
 
                 var facility = await GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken);
 
                 // validates facility does not exist
                 if (facility is not null)
                 {
-                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+                    _logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-                this.ValidateSchedules(newFacility);
+                ValidateSchedules(newFacility);
             }
 
             try
@@ -140,13 +140,13 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this.ValidateFacility(newFacility);
+                ValidateFacility(newFacility);
 
                 existingFacility = GetFacilityById(id, cancellationToken).Result;
 
                 if (existingFacility is null)
                 {
-                    this._logger.LogError($"Facility with Id: {id} Not Found");
+                    _logger.LogError($"Facility with Id: {id} Not Found");
 
                     throw new ApplicationException($"Facility with Id: {id} Not Found");
                 }
@@ -155,12 +155,12 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
-                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+                    _logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-                this.ValidateSchedules(newFacility);
+                ValidateSchedules(newFacility);
             }
             // audit update facility event
             AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
@@ -212,7 +212,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (existingFacility is null)
                 {
-                    this._logger.LogError($"Facility with Id: {facilityId} Not Found");
+                    _logger.LogError($"Facility with Id: {facilityId} Not Found");
                     throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
                 }
             }
@@ -296,7 +296,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     {
                         if (!Helper.IsValidSchedule(trigger))
                         {
-                            this._logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                            _logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
                             throw new ApplicationException($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
                         }
                     }
@@ -310,7 +310,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             if (!duplicatedTopics.Equals(""))
             {
-                this._logger.LogError($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
+                _logger.LogError($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
                 throw new ApplicationException($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
             }
             // validate report Type within Topic
@@ -324,7 +324,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (!duplicatedReportTypesString.Equals(""))
                 {
-                    this._logger.LogError($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
+                    _logger.LogError($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                     throw new ApplicationException($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                 }
                 int i = 1;
@@ -370,7 +370,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                     if (!duplicatedTriggersString.Equals(""))
                     {
-                        this._logger.LogError($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
+                        _logger.LogError($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                         throw new ApplicationException($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                     }
 
