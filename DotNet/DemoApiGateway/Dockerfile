@@ -13,8 +13,9 @@ RUN apk add --no-cache \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["DemoApiGateway/DemoApiGateway.csproj", "DemoApiGateway/"]
-COPY ["DemoApiGateway/nuget.config", "DemoApiGateway/"]
+COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "Link.Authorization/"]
+COPY ["DotNet/DemoApiGateway/DemoApiGateway.csproj", "DemoApiGateway/"]
+COPY ["DotNet/DemoApiGateway/nuget.config", "DemoApiGateway/"]
 RUN dotnet restore "DemoApiGateway/DemoApiGateway.csproj" --configfile "DemoApiGateway/nuget.config"
 COPY . .
 WORKDIR "/src/DemoApiGateway"
