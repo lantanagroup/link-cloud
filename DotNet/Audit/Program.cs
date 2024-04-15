@@ -129,9 +129,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
         {          
             case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString))
-                .AddInterceptors(updateBaseEntityInterceptor);
+                string? connectionString = builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);
+
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
