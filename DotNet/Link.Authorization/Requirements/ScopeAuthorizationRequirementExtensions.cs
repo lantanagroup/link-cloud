@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 
-namespace Link.Authorization
+namespace Link.Authorization.Requirements
 {
     public static class ScopeAuthorizationRequirementExtensions
     {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class OAuthSchemeExtension
     {
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             public string TokenEndpoint { get; set; } = null!;
             public string UserInformationEndpoint { get; set; } = null!;
             public string? CallbackPath { get; set; } = "/signin-oauth2";
-            
+
         }
     }
 }

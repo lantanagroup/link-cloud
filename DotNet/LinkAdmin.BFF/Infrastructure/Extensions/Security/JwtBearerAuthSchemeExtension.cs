@@ -2,21 +2,22 @@
 using Microsoft.AspNetCore.Authentication;
 using System.IdentityModel.Tokens.Jwt;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class JwtBearerAuthSchemeExtension
     {
         public static AuthenticationBuilder AddJwTBearerAuthentication(this AuthenticationBuilder builder, Action<JwTBearerOptions>? options)
         {
             var jwtBearerOptions = new JwTBearerOptions();
-            options?.Invoke(jwtBearerOptions);   
-            
-            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();           
+            options?.Invoke(jwtBearerOptions);
+
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             builder.AddJwtBearer(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken, options =>
             {
                 options.Authority = jwtBearerOptions.Authority;
                 options.Audience = jwtBearerOptions.Audience;
                 options.RequireHttpsMetadata = !jwtBearerOptions.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {

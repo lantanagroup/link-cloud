@@ -4,7 +4,7 @@ using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
 using System.Text;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry
 {
     public static class RedactionServiceExtension
     {
@@ -14,14 +14,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
             var redactionServiceOptions = new RedactionServiceOptions();
             options?.Invoke(redactionServiceOptions);
 
-            services.AddRedaction(x => {
+            services.AddRedaction(x =>
+            {
 
                 x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
 
-                
+
                 if (!string.IsNullOrEmpty(redactionServiceOptions.HmacKey))
                 {
-                    x.SetHmacRedactor(opts => {
+                    x.SetHmacRedactor(opts =>
+                    {
                         opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(redactionServiceOptions.HmacKey));
                         opts.KeyId = 808;
                     }, new DataClassificationSet(DataTaxonomy.PiiData));

@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
             services.AddProblemDetails(options => {
                 options.CustomizeProblemDetails = ctx =>
-                {
+                {                    
                     ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
