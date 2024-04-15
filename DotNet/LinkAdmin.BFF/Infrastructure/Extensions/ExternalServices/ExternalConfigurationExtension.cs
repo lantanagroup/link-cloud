@@ -2,7 +2,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices
 {
     public static class ExternalConfigurationExtension
     {
@@ -10,12 +10,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
         {
             var externalConfigurationOptions = new ExternalConfigurationOptions();
             options?.Invoke(externalConfigurationOptions);
-            
+
             if (!string.IsNullOrEmpty(externalConfigurationOptions.ExternalConfigurationSource))
             {
                 switch (externalConfigurationOptions.ExternalConfigurationSource)
                 {
-                    case ("AzureAppConfiguration"):
+                    case "AzureAppConfiguration":
                         builder.Configuration.AddAzureAppConfiguration(options =>
                         {
                             options.Connect(externalConfigurationOptions.ExternalConfigurationConnectionString)

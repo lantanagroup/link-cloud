@@ -1,6 +1,7 @@
 ﻿using Hl7.FhirPath.Sprache;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -59,8 +60,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Initiates the logout process for link"
                 });
 
-            _logger.LogInformation("Auth Endpoints Registered");
-
+            _logger.LogApiRegistration(nameof(AuthEndpoints));
         }
 
         public IResult Login()

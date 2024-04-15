@@ -1,7 +1,5 @@
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
@@ -19,6 +17,13 @@ using Serilog.Settings.Configuration;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,7 +50,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add service information
-    var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    var serviceInformation = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
@@ -64,95 +69,57 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<LinkServiceDiscovery>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkServiceDiscovery));
+    builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
 
-    // Add Authentication
-    List<string> authSchemas = [ LinkAdminConstants.AuthenticationSchemes.Cookie];
+    // Add fluent validation
+    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
-    var defaultChallengeScheme = builder.Configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
-    builder.Services.Configure<AuthenticationSchemaConfig>(options =>
+    // Add HttpClientFactory
+    builder.Services.AddHttpClient();
+
+    // Add data protection
+    builder.Services.AddDataProtection().SetApplicationName("Link");
+    //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
+
+    // Add commands
+    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
+    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
+    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
+    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
+    builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
+
+    //Add Redis     
+    builder.Services.AddRedisCache(options =>
     {
-        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+        options.Environment = builder.Environment;
 
-        if (string.IsNullOrEmpty(defaultChallengeScheme))
-            throw new NullReferenceException("DefaultChallengeScheme is required.");
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
 
-        options.DefaultChallengeScheme = defaultChallengeScheme;
+        if (string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
     });
 
-    var authBuilder = builder.Services.AddAuthentication(options => { 
-        options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
-        options.DefaultChallengeScheme = defaultChallengeScheme;
-    });    
-
-    authBuilder.AddCookie(LinkAdminConstants.AuthenticationSchemes.Cookie, options =>
+    // Add Secret Manager
+    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
     {
-        options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-    });
-
-    //Add Oauth authorization scheme if enabled
-    if(builder.Configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
-    {
-        if(!LinkAdminConstants.AuthenticationSchemes.Oauth2.Equals(defaultChallengeScheme))
-            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.Oauth2);
-
-        authBuilder.AddOAuthAuthentication(options =>
+        builder.Services.AddSecretManager(options =>
         {
-            options.Environment = builder.Environment;
-            options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId")!;
-            options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientSecret")!;
-            options.AuthorizationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!;
-            options.TokenEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!;
-            options.UserInformationEndpoint = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation")!;
-            options.CallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");
+            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
         });
-    }  
-   
-    // Add OpenIdConnect authorization scheme if enabled
-    if (builder.Configuration.GetValue<bool>("Authentication:Schemas:OpenIdConnect:Enabled"))
-    {
-        if(!LinkAdminConstants.AuthenticationSchemes.OpenIdConnect.Equals(defaultChallengeScheme))
-            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
+    }
 
-        authBuilder.AddOpenIdConnectAuthentication(options =>
-        {
-            options.Environment = builder.Environment;
-            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority")!;
-            options.ClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId")!;
-            options.ClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret")!;
-            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:NameClaimType");
-            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:RoleClaimType");
-        });
-    }    
-
-    // Add JWT authorization scheme if enabled
-    if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
+    // Add Link Security
+    builder.Services.AddLinkSecurity(builder.Configuration, options =>
     {
-        if(!LinkAdminConstants.AuthenticationSchemes.JwtBearerToken.Equals(defaultChallengeScheme))
-            authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
-
-        authBuilder.AddJwTBearerAuthentication(options =>
-        {            
-            options.Environment = builder.Environment;
-            options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority");
-            options.Audience = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience");
-            options.NameClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:NameClaimType");
-            options.RoleClaimType = builder.Configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
-            
-        });        
-    }  
-    
-    // Add Authorization
-    builder.Services.AddAuthorization(builder =>
-    {
-        builder.AddPolicy("AuthenticatedUser", pb => {
-            pb.RequireAuthenticatedUser()
-                .AddAuthenticationSchemes([.. authSchemas]);         
-        });
+        options.Environment = builder.Environment;
     });
 
     // Add Endpoints
@@ -160,47 +127,23 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
-    }    
-
-    // Add fluent validation
-    builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
-
-    // Add commands
-    builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
-    builder.Services.AddTransient<ICreateReportScheduled,  CreateReportScheduled>();
-    builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
+    }
+    if (builder.Configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
+    {
+        builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
+    }
 
     // Add YARP (reverse proxy)
-    builder.Services.AddReverseProxy()
-        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+    builder.Services.AddYarpProxy(builder.Configuration, options => options.Environment = builder.Environment);
 
     // Add health checks
-    builder.Services.AddHealthChecks();
-
-    // Configure CORS
-    var corsConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
-    if(corsConfig != null)
-    {
-        builder.Services.AddCorsService(options =>
-        {
-            options.Environment = builder.Environment;
-            options.PolicyName = corsConfig.PolicyName;   
-            options.AllowedHeaders = corsConfig.AllowedHeaders;
-            options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
-            options.AllowedMethods = corsConfig.AllowedMethods;
-            options.AllowedOrigins = corsConfig.AllowedOrigins;       
-        });
-    }
-    else
-    {
-        throw new NullReferenceException("CORS Configuration was null.");
-    }
+    builder.Services.AddHealthChecks();    
 
     // Add swagger generation
-    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddEndpointsApiExplorer();    
     builder.Services.AddSwaggerGen(c =>
     {
-
+        #region Authentication Schemas
         if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
         {
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -269,13 +212,14 @@ static void RegisterServices(WebApplicationBuilder builder)
                 },
                 new List<string>()
             }
-        });        
+        });
+        #endregion
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
 
-    });
+    });   
 
     // Add logging redaction services
     builder.Services.AddRedactionService(options =>
@@ -323,8 +267,9 @@ static void SetupMiddleware(WebApplication app)
     else
     {
         app.UseExceptionHandler();
-    }   
+    }
 
+    app.UseStatusCodePages();
     app.UseHttpsRedirection();
 
     // Configure swagger
@@ -354,7 +299,14 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    app.MapReverseProxy().RequireAuthorization("AuthenticatedUser");
+    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
+    {
+        app.MapReverseProxy().AllowAnonymous();
+    }
+    else
+    {
+        app.MapReverseProxy();
+    }    
 
     // Map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

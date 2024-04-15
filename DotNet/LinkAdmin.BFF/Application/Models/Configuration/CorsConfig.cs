@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models
+﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration
 {
     /// <summary>
     /// CORS configuration options
@@ -9,17 +9,17 @@
         /// Default CORS policy name
         /// </summary>
         public const string DefaultCorsPolicyName = "DefaultCorsPolicy";
-        
+
         /// <summary>
         /// Default allowed headers
         /// </summary>
         public string[] DefaultAllowedHeaders { get; } = ["Authorization", "Content-Type", "Accept", "Origin", "User-Agent", "X-Requested-With"];
-        
+
         /// <summary>
         /// Default allowed methods
         /// </summary>
         public string[] DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
-        
+
         /// <summary>
         /// Default allowed exposed headers
         /// </summary>
@@ -29,7 +29,7 @@
         /// Whether to allow credentials
         /// </summary>
         public bool AllowCredentials { get; set; } = false;
-        
+
         /// <summary>
         /// The name of the CORS policy
         /// </summary>
