@@ -337,11 +337,6 @@ namespace LantanaGroup.Link.Tenant.Services
                 int i = 1;
                 foreach (ReportTypeSchedule reportTypeSchedule in facilityScheduledTask.ReportTypeSchedules)
                 {
-                    if (reportTypeSchedule.ReportType == null)
-                    {
-                        throw new ApplicationException($"ReportType under KafkaTopic {facilityScheduledTask.KafkaTopic} must be specified.");
-                    }
-
                     // validate reportType not null and report trigers not emty            
                     if (string.IsNullOrWhiteSpace(reportTypeSchedule.ReportType))
                     {
