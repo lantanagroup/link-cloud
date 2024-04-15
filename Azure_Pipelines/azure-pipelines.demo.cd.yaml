@@ -18,9 +18,9 @@ variables:
 - name: registry-repo-Name
   value: 'link-demo-app'
 - name: dockerPath
-  value: '**/DotNet/DemoApp/Dockerfile'
+  value: '**/Web/DemoApp/Dockerfile'
 - name: workingDir
-  value: 'DotNet/DemoApp/'
+  value: 'Web/DemoApp/'
 - name: serviceName
   value: 'DemoApp'
 - name: containerRegistry
