@@ -20,23 +20,23 @@ using LantanaGroup.Link.Report.Settings;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
-    public class MeasureEvaluatedListener : BackgroundService
+    public class ResourceEvaluatedListener : BackgroundService
     {
 
-        private readonly ILogger<MeasureEvaluatedListener> _logger;
-        private readonly IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue> _kafkaConsumerFactory;
+        private readonly ILogger<ResourceEvaluatedListener> _logger;
+        private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IMediator _mediator;
 
-        private readonly ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
         private string Name => this.GetType().Name;
 
-        public MeasureEvaluatedListener(ILogger<MeasureEvaluatedListener> logger, IKafkaConsumerFactory<MeasureEvaluatedKey, MeasureEvaluatedValue> kafkaConsumerFactory,
+        public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
-            ITransientExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureEvaluatedKey, MeasureEvaluatedValue> deadLetterExceptionHandler)
+            ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -48,10 +48,10 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _transientExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Retry";
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Retry";
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.MeasureEvaluated) + "-Error";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = "MeasureEvaluatedEvent",
+                GroupId = "ResourceEvaluatedEvent",
                 EnableAutoCommit = false
             };
 
@@ -76,12 +76,12 @@ namespace LantanaGroup.Link.Report.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.MeasureEvaluated));
-                _logger.LogInformation($"Started measure evaluated consumer for topic '{nameof(KafkaTopic.MeasureEvaluated)}' at {DateTime.UtcNow}");
+                consumer.Subscribe(nameof(KafkaTopic.ResourceEvaluated));
+                _logger.LogInformation($"Started resource evaluated consumer for topic '{nameof(KafkaTopic.ResourceEvaluated)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<MeasureEvaluatedKey, MeasureEvaluatedValue>? consumeResult = null;
+                    ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>? consumeResult = null;
                     var facilityId = string.Empty;
                     try
                     {
@@ -119,38 +119,48 @@ namespace LantanaGroup.Link.Report.Listeners
                                            }, cancellationToken)
                                        ?? throw new TransactionException(
                                            $"{Name}: report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
-                        var measureReport = new MeasureReport();
+
+                        var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand() { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId  });
+
+                        if (entry == null) 
+                        {
+                            entry = new MeasureReportSubmissionEntryModel
+                            {
+                                FacilityId = key.FacilityId,
+                                MeasureReportScheduleId = schedule.Id,
+                                PatientId = value.PatientId,
+                                ContainedResources = new List<string>()
+                            };
+                        }
+
+                        var jsonParser = new FhirJsonParser();
+
+                        MeasureReport measureReport = null;
 
                         try
                         {
-                            measureReport = JsonSerializer.Deserialize<MeasureReport>(value.Result,
-                                new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                            measureReport = jsonParser.Parse<MeasureReport>(value.Resource);
+                            entry.MeasureReport = measureReport.ToJson();
                         }
-                        catch (Exception ex)
-                        {
-                            throw new DeadLetterException(
-                                $"{Name}: Unable to deserialize MeasureEvaluatedValue.Result: " + value.Result, AuditEventType.Create);
-                        }
-
-                        // ensure measure report has an ID to avoid inserting duplicates during bundling
-                        if (string.IsNullOrEmpty(measureReport.Id))
-                        {
-                            measureReport.Id = Guid.NewGuid().ToString();
+                        catch (Exception ex) 
+                        { 
+                            entry.ContainedResources.Add(value.Resource);
                         }
 
-                        // add this measure report to the measure report entry collection
-                        MeasureReportSubmissionEntryModel entry = new MeasureReportSubmissionEntryModel
+                        if (entry.Id == null)
                         {
-                            FacilityId = key.FacilityId,
-                            MeasureReportScheduleId = schedule.Id,
-                            PatientId = value.PatientId,
-                            MeasureReport = await new FhirJsonSerializer().SerializeToStringAsync(measureReport)
-                        };
-
-                        await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
-                        {
-                            MeasureReportSubmissionEntry = entry
-                        }, cancellationToken);
+                            await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                            {
+                                MeasureReportSubmissionEntry = entry
+                            }, cancellationToken);
+                        }
+                        else
+                        { 
+                            await _mediator.Send(new UpdateMeasureReportSubmissionEntryCommand
+                            {
+                                MeasureReportSubmissionEntry = entry
+                            }, cancellationToken);
+                        }
 
                         #region Patients To Query & Submision Report Handling
 

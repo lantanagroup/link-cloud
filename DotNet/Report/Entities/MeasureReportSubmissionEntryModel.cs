@@ -16,6 +16,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
         public string MeasureReport { get; set; } = string.Empty;
+        public List<string> ContainedResources { get; set; } = new List<string>();
 
     }
 }
