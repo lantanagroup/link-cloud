@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace LantanaGroup.Link.Tenant.Config
 {
     public static class TenantConstants
@@ -15,7 +9,6 @@ namespace LantanaGroup.Link.Tenant.Config
         {
             public const string ServiceInformation = "ServiceInformation";
             public const string KafkaConnection = "KafkaConnection";
-            public const string MongoDB = "MongoDB";
             public const string Telemetry = "TelemetryConfig";
             public const string MeasureApiConfig = "MeasureServiceRegistry";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
@@ -44,8 +37,8 @@ namespace LantanaGroup.Link.Tenant.Config
 
             public const string StartDate = "StartDate";
 
-            public const string EndDate =   "EndDate";
+            public const string EndDate = "EndDate";
         }
-        
+
     }
 }

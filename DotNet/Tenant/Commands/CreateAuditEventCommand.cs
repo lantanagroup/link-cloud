@@ -1,13 +1,14 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Services;
 using System.Text;
 
 namespace LantanaGroup.Link.Tenant.Commands
 {
-    public class CreateAuditEventCommand { 
+    public class CreateAuditEventCommand
+    {
 
         private readonly ILogger<CreateAuditEventCommand> _logger;
 
