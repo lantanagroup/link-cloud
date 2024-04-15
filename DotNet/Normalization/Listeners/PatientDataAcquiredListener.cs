@@ -13,12 +13,11 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
+using Microsoft.Extensions.Options;
+using MongoDB.Driver.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Linq;
-using Hl7.Fhir.Specification;
-using MongoDB.Driver.Linq;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -28,21 +27,34 @@ public class PatientDataAcquiredListener : BackgroundService
     private readonly IMediator _mediator;
     private readonly IKafkaConsumerFactory<string, PatientDataAcquiredMessage> _consumerFactory;
     private readonly IKafkaProducerFactory<string, PatientNormalizedMessage> _producerFactory;
+    private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<string, PatientDataAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
 
     public PatientDataAcquiredListener(
         ILogger<PatientDataAcquiredListener> logger,
+        IOptions<ServiceInformation> serviceInformation,
         IMediator mediator,
         IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
-        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler)
+        IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<string, PatientDataAcquiredMessage> transientExceptionHandler)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
+        _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
+        _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
+        _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
+        _transientExceptionHandler = transientExceptionHandler;
+        _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
+        _transientExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Retry";
     }
 
     ~PatientDataAcquiredListener()
@@ -83,10 +95,26 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch (ConsumeException ex)
             {
-                // TODO: DLEH correctly handles these nulls despite declaring the corresponding parameters as non-nullable
-                // Update the signature of HandleException to reflect the fact that we anticipate (and explicitly check for) potentially null values?
-                // For now, use the null-forgiving operator (here and below) to suppress compiler warnings
-                _deadLetterExceptionHandler.HandleException(null!, ex, AuditEventType.Create, null!);
+                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
+                ConsumeResult<string, string> result = new ConsumeResult<string, string>
+                {
+                    Message = new Message<string, string>
+                    {
+                        Headers = ex.ConsumerRecord?.Message?.Headers,
+                        Key = facilityId,
+                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? [])
+                    }
+                };
+                _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
+                TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                if (offset == null)
+                {
+                    kafkaConsumer.Commit();
+                }
+                else
+                {
+                    kafkaConsumer.Commit([offset]);
+                }
                 continue;
             }
 
@@ -100,7 +128,7 @@ public class PatientDataAcquiredListener : BackgroundService
             }
             catch (Exception ex)
             {
-                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, null!);
+                _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, message.Message.Key);
                 kafkaConsumer.Commit(message);
                 continue;
             }
@@ -118,13 +146,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 
@@ -214,13 +237,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 
@@ -259,13 +277,8 @@ public class PatientDataAcquiredListener : BackgroundService
                 var errorMessage = $"An error was encountered building/producing kafka message for {messageMetaData.facilityId}";
 
                 _logger.LogError(errorMessage, ex);
-                await _mediator.Send(new TriggerAuditEventCommand
-                {
-                    Notes = $"{errorMessage}\n{ex.Message}\n{ex.StackTrace}",
-                    CorrelationId = messageMetaData.correlationId,
-                    FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
-                });
+                _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                kafkaConsumer.Commit(message);
                 continue;
             }
 
