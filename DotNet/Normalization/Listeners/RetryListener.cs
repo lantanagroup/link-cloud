@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
-                consumer.Subscribe(KafkaTopic.PatientAcquiredRetry.GetStringValue());
+                consumer.Subscribe(KafkaTopic.ResourceAcquired + "-Retry"); // fixed this later
 
                 _logger.LogInformation($"Started Normalization Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 

@@ -8,7 +8,8 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
 {
     public class UnknownOperationCommand : IRequest<OperationCommandResult>
     {
-        public Bundle Bundle { get; set; }
+        public Base Resource { get; set; }
+
         public List<PropertyChangeModel> PropertyChanges { get; set; }
     }
 
