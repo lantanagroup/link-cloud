@@ -7,6 +7,9 @@ public enum KafkaTopic
     DataAcquired,
     PatientIDsAcquired,
     PatientAcquired,
+    ResourceAcquired,
+    [StringValue("ResourceAcquired-Retry")]
+    ResourceAcquiredRetry,
     [StringValue("PatientAcquired-Retry")]
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
@@ -14,6 +17,7 @@ public enum KafkaTopic
     DataAcquisitionFailed,
     PatientDataEvaluated,
     PatientNormalized,
+    ResourceNormalized,
     PatientDischarged,
     PatientDataAcquired,
     ReportBundled,
