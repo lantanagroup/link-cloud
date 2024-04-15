@@ -12,8 +12,8 @@
             public const string Kafka = "KafkaConnection";
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
             public const string DatabaseProvider = "DatabaseProvider";
-            public const string Smtp = "Notification:SmtpConnection";
-            public const string Channels = "Notification:Channels";
+            public const string Smtp = "SmtpConnection";
+            public const string Channels = "Channels";
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string Telemetry = "TelemetryConfig";
             public const string Serilog = "Serilog";
