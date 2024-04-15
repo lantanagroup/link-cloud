@@ -24,7 +24,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
-using Link.Authorization.Requirements.PermissiveAccessRequirement;
 
 var builder = WebApplication.CreateBuilder(args);
 
