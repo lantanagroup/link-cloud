@@ -21,26 +21,26 @@ using System.Text.Json.Nodes;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
-public class PatientDataAcquiredListener : BackgroundService
+public class ResourceAcquiredListener : BackgroundService
 {
-    private readonly ILogger<PatientDataAcquiredListener> _logger;
+    private readonly ILogger<ResourceAcquiredListener> _logger;
     private readonly IMediator _mediator;
-    private readonly IKafkaConsumerFactory<string, PatientDataAcquiredMessage> _consumerFactory;
-    private readonly IKafkaProducerFactory<string, PatientNormalizedMessage> _producerFactory;
+    private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
+    private readonly IKafkaProducerFactory<string, ResourceNormalizedMessage> _producerFactory;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<string, PatientDataAcquiredMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
 
-    public PatientDataAcquiredListener(
-        ILogger<PatientDataAcquiredListener> logger,
+    public ResourceAcquiredListener(
+        ILogger<ResourceAcquiredListener> logger,
         IOptions<ServiceInformation> serviceInformation,
         IMediator mediator,
-        IKafkaConsumerFactory<string, PatientDataAcquiredMessage> consumerFactory,
-        IKafkaProducerFactory<string, PatientNormalizedMessage> producerFactory,
+        IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
+        IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<string, PatientDataAcquiredMessage> transientExceptionHandler)
+        IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -48,16 +48,16 @@ public class PatientDataAcquiredListener : BackgroundService
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
         _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
-        _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
+        _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
         _deadLetterExceptionHandler.ServiceName = serviceInformation.Value.Name;
-        _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Error";
+        _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
-        _transientExceptionHandler.Topic = $"{nameof(KafkaTopic.PatientAcquired)}-Retry";
+        _transientExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Retry";
     }
 
-    ~PatientDataAcquiredListener()
+    ~ResourceAcquiredListener()
     {
      
     }
@@ -76,15 +76,15 @@ public class PatientDataAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = "NormalizationService-PatientDataAcquired",
+            GroupId = "NormalizationService-ResourceAcquired",
             EnableAutoCommit = false
         });
         using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig());
-        kafkaConsumer.Subscribe(new string[] { KafkaTopic.PatientAcquired.ToString() });
+        kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
-            ConsumeResult<string, PatientDataAcquiredMessage> message;
+            ConsumeResult<string, ResourceAcquiredMessage> message;
             try
             {
                 message = kafkaConsumer.Consume(cancellationToken);
@@ -153,12 +153,12 @@ public class PatientDataAcquiredListener : BackgroundService
 
             var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
 
-            Bundle bundle = null;
+            Base resource = null;
             try
             {
-                bundle = DeserializeBundle(message.Message.Value.PatientBundle);
+                resource = DeserializeResource(message.Message.Value.Resource);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                 kafkaConsumer.Commit(message);
@@ -167,14 +167,14 @@ public class PatientDataAcquiredListener : BackgroundService
 
             var operationCommandResult = new OperationCommandResult
             {
-                Bundle = bundle,
+                Resource = resource,
                 PropertyChanges = new List<PropertyChangeModel>()
             };
 
             //fix resource ids
             operationCommandResult = await _mediator.Send(new FixResourceIDCommand
             {
-                Bundle = bundle,
+                Resource = resource,
                 PropertyChanges = operationCommandResult.PropertyChanges
             });
 
@@ -198,35 +198,35 @@ public class PatientDataAcquiredListener : BackgroundService
                     {
                         ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             Operation = conceptMapOperation,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                         ConditionalTransformationOperation => await _mediator.Send(new ConditionalTransformationCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             Operation = (ConditionalTransformationOperation)op.Value,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                         CopyElementOperation => await _mediator.Send(new CopyElementCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             Operation = (CopyElementOperation)op.Value,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                         CopyLocationIdentifierToTypeOperation => await _mediator.Send(new CopyLocationIdentifierToTypeCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                         PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                         _ => await _mediator.Send(new UnknownOperationCommand
                         {
-                            Bundle = bundle,
+                            Resource = resource,
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                     };
@@ -248,7 +248,7 @@ public class PatientDataAcquiredListener : BackgroundService
                 {
                     CorrelationId = messageMetaData.correlationId,
                     FacilityId = messageMetaData.facilityId,
-                    patientDataAcquiredMessage = message.Value,
+                    resourceAcquiredMessage = message.Value,
                     PropertyChanges = operationCommandResult.PropertyChanges
                 });
 
@@ -258,19 +258,20 @@ public class PatientDataAcquiredListener : BackgroundService
                     {
                         new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
                     };
-                var patientNormalizedMessage = new PatientNormalizedMessage
+                var resourceNormalizedMessage = new ResourceNormalizedMessage
                 {
                     PatientId = message.Value.PatientId,
-                    PatientBundle = serializedBundle,
+                    Resource = message.Value.Resource,
+                    QueryType = message.Value.QueryType,
                     ScheduledReports = message.Message.Value.ScheduledReports
                 };
-                Message<string, PatientNormalizedMessage> produceMessage = new Message<string, PatientNormalizedMessage>
+                Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
                 {
                     Key = messageMetaData.facilityId,
                     Headers = headers,
-                    Value = patientNormalizedMessage
+                    Value = resourceNormalizedMessage
                 };
-                await kafkaProducer.ProduceAsync(KafkaTopic.PatientNormalized.ToString(), produceMessage);
+                await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
             }
             catch(Exception ex)
             {
@@ -296,7 +297,7 @@ public class PatientDataAcquiredListener : BackgroundService
         
     }
 
-    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, PatientDataAcquiredMessage> message)
+    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, ResourceAcquiredMessage> message)
     {
         var facilityId = message.Key;
         var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
@@ -310,26 +311,20 @@ public class PatientDataAcquiredListener : BackgroundService
         return (facilityId, correlationId);
     }
 
-    private Bundle DeserializeBundle(object rawBundle)
+    private Base DeserializeStringToResource(string json)
     {
-        Bundle bundle = null;
+        return JsonSerializer.Deserialize<Resource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+    }
 
-        return rawBundle switch
+    private Base DeserializeResource(object resource)
+    {
+        return resource switch
         {
-            JsonElement => DeserializeStringToBundle(JsonObject.Create(((JsonElement)rawBundle)).ToJsonString()),
-            string => DeserializeStringToBundle((string)rawBundle),
+            JsonElement => DeserializeStringToResource(JsonObject.Create((JsonElement)resource).ToJsonString()),
+            string => DeserializeStringToResource((string)resource),
             _ => throw new DeserializationUnsupportedTypeException()
         };
+
     }
 
-    private Bundle DeserializeStringToBundle(string json)
-    {
-        return JsonSerializer.Deserialize<Bundle>(
-            json, 
-            new JsonSerializerOptions().ForFhir(
-                ModelInfo.ModelInspector, 
-                new FhirJsonPocoDeserializerSettings { Validator = null }
-                )
-            );
-    }
 }

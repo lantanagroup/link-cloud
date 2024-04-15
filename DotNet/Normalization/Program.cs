@@ -94,16 +94,17 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataAcquiredMessage>, KafkaConsumerFactory<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ResourceAcquiredMessage>, KafkaConsumerFactory<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientDataAcquiredMessage>, KafkaProducerFactory<string, PatientDataAcquiredMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientNormalizedMessage>, KafkaProducerFactory<string, PatientNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceAcquiredMessage>, KafkaProducerFactory<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceNormalizedMessage>, KafkaProducerFactory<string, ResourceNormalizedMessage>>();
 
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientDataAcquiredMessage>, DeadLetterExceptionHandler<string, PatientDataAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientDataAcquiredMessage>, TransientExceptionHandler<string, PatientDataAcquiredMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ResourceAcquiredMessage>, DeadLetterExceptionHandler<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
+
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -130,10 +131,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
     builder.Services.AddSingleton<IConfigRepository, ConfigRepository>();
+
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<PatientDataAcquiredListener>();
+         builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
+
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<RetryListener>();
