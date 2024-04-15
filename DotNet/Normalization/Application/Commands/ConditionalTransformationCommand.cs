@@ -6,13 +6,15 @@ using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
+using System.Collections.Generic;
 using static Hl7.Fhir.Model.Encounter;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands
 {
     public class ConditionalTransformationCommand : IRequest<OperationCommandResult>
     {
-        public Bundle Bundle { get; set; }
+        public Base Resource { get; set; }
+
         public ConditionalTransformationOperation Operation { get; set; }
         public List<PropertyChangeModel> PropertyChanges { get; set; }
     }
@@ -28,24 +30,32 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
             _conditionalTransformationEvaluationService = conditionalTransformationEvaluationService ?? throw new ArgumentNullException(nameof(conditionalTransformationEvaluationService));
         }
 
+
+        private ResourceType GetFhirResourceType(string requestedResource)
+        {
+            var success = Enum.TryParse(typeof(ResourceType), requestedResource, out var resourceType);
+            if (success)
+            {
+                return (ResourceType)resourceType;
+            }
+            throw new Exception($"Resource Not found for name {requestedResource}");
+        }
+
         public async Task<OperationCommandResult> Handle(ConditionalTransformationCommand request, CancellationToken cancellationToken)
         {
-            Bundle bundle = request.Bundle;
+            Base resource = request.Resource;
+
             var operationCommandResult = new OperationCommandResult();
 
-            var selectedResources = bundle.Select($"Bundle.entry.resource.ofType({request.Operation.TransformResource})").ToList();
 
             List<(Base? ele, Base resource)> selectedElements = new List<(Base? ele, Base resource)>();
 
-            selectedResources.ForEach(resource =>
-            {
-                selectedElements.AddRange(resource.Select(request.Operation.TransformElement).ToList().Select(x => (x, resource)));
-            });
+            selectedElements.AddRange(resource.Select(request.Operation.TransformElement).ToList().Select(x => (x, resource)));
 
             selectedElements.ForEach(x => assignElement(x.ele, x.resource, request));
 
             operationCommandResult.PropertyChanges = request.PropertyChanges;
-            operationCommandResult.Bundle = bundle;
+            operationCommandResult.Resource = resource;
             return operationCommandResult;
         }
         private void assignElement(Base eleToUpdate, Base resource, ConditionalTransformationCommand request)
@@ -78,4 +88,5 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
             }
         }
     }
+
 }

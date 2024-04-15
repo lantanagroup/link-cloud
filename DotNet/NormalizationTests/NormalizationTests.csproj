@@ -29,6 +29,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="TestResource.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="TestBundle.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
