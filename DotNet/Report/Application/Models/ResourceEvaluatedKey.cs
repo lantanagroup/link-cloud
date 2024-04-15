@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.Report.Application.Models
 {
-    public class MeasureEvaluatedKey
+    public class ResourceEvaluatedKey
     {
 
         public string FacilityId { get; set; } = string.Empty;

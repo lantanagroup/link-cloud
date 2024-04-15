@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 consumer.Subscribe(new List<string>() 
                 { 
                     KafkaTopic.ReportScheduledRetry.GetStringValue(), 
-                    KafkaTopic.MeasureEvaluatedRetry.GetStringValue(), 
+                    KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), 
                     KafkaTopic.ReportSubmittedRetry.GetStringValue(), 
                     KafkaTopic.PatientsToQueryRetry.GetStringValue() 
                 });
