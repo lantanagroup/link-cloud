@@ -21,7 +21,6 @@ steps:
     inputs:
       command: restore
       projects: '$(project)'
-      feedsToUse: config
       verbosityRestore: Diagnostic
   
   - task: DotNetCoreCLI@2
