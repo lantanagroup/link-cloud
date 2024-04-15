@@ -18,10 +18,11 @@ namespace CensusUnitTests
     public class CRUDCommandTests
     {
         //private ILogger<CreateCensusConfigCommand> _logger;
-        private IOptions<MongoConnection> _mongoSettings;
-        private Mock<ISchedulerFactory> _schedulerFactoryMock;
-        private Mock<ScheduleService> _scheduleServiceMock;
+        private IOptions<MongoConnection>? _mongoSettings;
+        private Mock<ISchedulerFactory>? _schedulerFactoryMock;
+        private Mock<ScheduleService>? _scheduleServiceMock;
 
+        [Fact]
         public void Setup()
         {
             _mongoSettings = Mock.Of<IOptions<MongoConnection>>();
@@ -51,7 +52,7 @@ namespace CensusUnitTests
             mocker.Use(tenantApiService);
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.CreateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
@@ -98,7 +99,7 @@ namespace CensusUnitTests
             mocker.Use(tenantApiService);
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.CreateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Throws(new Exception());
@@ -146,7 +147,7 @@ namespace CensusUnitTests
             mocker.Use(tenantApiService);
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(),It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.CreateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Throws(new Exception());
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Throws(new Exception());
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
@@ -193,7 +194,7 @@ namespace CensusUnitTests
             mocker.Use(tenantApiService);
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.CreateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Throws(new Exception());
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Throws(new Exception());
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
@@ -229,7 +230,7 @@ namespace CensusUnitTests
             var censusConfigMongoRepoMock = new Mock<ICensusConfigRepository>();
             var censusSchedulingRepoMock = new Mock<ICensusSchedulingRepository>();
 
-            censusConfigMongoRepoMock.Setup(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigMongoRepoMock.Setup(x => x.RemoveByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(Setup => Setup.DeleteJobsForFacility(It.IsAny<string>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
 
             var handler = new DeleteCensusConfigCommandHandler(logger, censusConfigMongoRepoMock.Object, schedulingFactoryMock.Object, censusSchedulingRepoMock.Object);
@@ -260,7 +261,7 @@ namespace CensusUnitTests
             var censusConfigMongoRepoMock = new Mock<ICensusConfigRepository>();
             var censusSchedulingRepoMock = new Mock<ICensusSchedulingRepository>();
 
-            censusConfigMongoRepoMock.Setup(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Throws(new Exception());
+            censusConfigMongoRepoMock.Setup(x => x.RemoveByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Throws(new Exception());
             censusSchedulingRepoMock.Setup(Setup => Setup.DeleteJobsForFacility(It.IsAny<string>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
 
             var handler = new DeleteCensusConfigCommandHandler(logger, censusConfigMongoRepoMock.Object, schedulingFactoryMock.Object, censusSchedulingRepoMock.Object);
@@ -291,7 +292,7 @@ namespace CensusUnitTests
             var censusConfigMongoRepoMock = new Mock<ICensusConfigRepository>();
             var censusSchedulingRepoMock = new Mock<ICensusSchedulingRepository>();
 
-            censusConfigMongoRepoMock.Setup(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigMongoRepoMock.Setup(x => x.RemoveByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(Setup => Setup.DeleteJobsForFacility(It.IsAny<string>(), It.IsAny<IScheduler>())).Throws(new Exception());
 
             var handler = new DeleteCensusConfigCommandHandler(logger, censusConfigMongoRepoMock.Object, schedulingFactoryMock.Object, censusSchedulingRepoMock.Object);
@@ -397,7 +398,7 @@ namespace CensusUnitTests
                 FacilityID = facilityId,
                 ScheduledTrigger = "0 0 0 * * ?"
             }));
-            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusConfigEntity());
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
 
             var handler = new UpdateCensusCommandHandler(logger, censusConfigMongoRepoMock.Object, _schedulerFactoryMock.Object, censusSchedulingRepoMock.Object, mediatorMock.Object, tenantApiService);
@@ -437,7 +438,7 @@ namespace CensusUnitTests
                 FacilityID = facilityId,
                 ScheduledTrigger = "0 0 0 * * ?"
             }));
-            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusConfigEntity());
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Throws(new Exception());
 
             var handler = new UpdateCensusCommandHandler(logger, censusConfigMongoRepoMock.Object, _schedulerFactoryMock.Object, censusSchedulingRepoMock.Object, mediatorMock.Object, tenant.Object);
@@ -472,8 +473,8 @@ namespace CensusUnitTests
             var mediatorMock = new Mock<IMediator>();
             var tenant = new Mock<ITenantApiService>();
 
-            censusConfigMongoRepoMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult((CensusConfigEntity)null));
-            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigMongoRepoMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusConfigEntity());
+            censusConfigMongoRepoMock.Setup(x => x.UpdateAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusConfigEntity());
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
 
             var handler = new UpdateCensusCommandHandler(logger, censusConfigMongoRepoMock.Object, _schedulerFactoryMock.Object, censusSchedulingRepoMock.Object, mediatorMock.Object, tenant.Object);

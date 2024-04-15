@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.DataAcquisition.Application.Models;
 
-public class Bundle
+public class DataAcqBundle
 {
     public string ResourceType { get; set; } = "Bundle";
     public string Id { get; set; } = "bundle";
