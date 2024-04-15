@@ -52,9 +52,11 @@ static void RegisterServices(WebApplicationBuilder builder)
                 {
                     options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
                         // Load configuration values with no label
-                        .Select("Link:Audit*", LabelFilter.Null)
-                        // Override with any configuration values specific to current hosting env
-                        .Select("Link:Audit*", builder.Environment.EnvironmentName);
+                        .Select("*", LabelFilter.Null)
+                        // Load configuration values for service name
+                        .Select("*", AuditConstants.ServiceName)
+                        // Load configuration values for service name and environment
+                        .Select("*", AuditConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
 
                     options.ConfigureKeyVault(kv =>
                     {
@@ -160,10 +162,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //builder.Services.AddAuthorizationService();
 
-    // Additional configuration is required to successfully run gRPC on macOS.
-    // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
     builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();
 
     //Add Hosted Services
