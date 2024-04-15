@@ -8,7 +8,8 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
 {
     public class CopyLocationIdentifierToTypeCommand : IRequest<OperationCommandResult>
     {
-        public Bundle Bundle { get; set; }
+        public Base Resource { get; set; }
+
         public List<PropertyChangeModel> PropertyChanges { get; set; }
     }
 
@@ -17,74 +18,72 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
 
         public async Task<OperationCommandResult> Handle(CopyLocationIdentifierToTypeCommand request, CancellationToken cancellationToken)
         {
-            var bundle = request.Bundle;
+            var resource = request.Resource;
             var propertyChanges = request.PropertyChanges;
-            foreach (var entry in bundle.Entry)
+            if (resource.TypeName == ResourceType.Location.ToString())
             {
-                if (entry.Resource.TypeName == ResourceType.Location.ToString())
+                var locationResource = (Location)resource;
+                var identifiers = locationResource.Identifier;
+                var types = locationResource.Type;
+                if (identifiers.Count > 0)
                 {
-                    var locationResource = (Location)entry.Resource;
-                    var identifiers = locationResource.Identifier;
-                    var types = locationResource.Type;
-                    if (identifiers.Count > 0)
+                    foreach (var identifier in identifiers)
                     {
-                        foreach (var identifier in identifiers)
-                        {
-                            var codings = new List<Coding>();
-                            var type = new CodeableConcept();
-                            var coding = new Coding();
-                            coding.Code = identifier.Value;
-                            coding.System = identifier.System;
+                        var codings = new List<Coding>();
+                        var type = new CodeableConcept();
+                        var coding = new Coding();
+                        coding.Code = identifier.Value;
+                        coding.System = identifier.System;
 
-                            propertyChanges.Add(new PropertyChangeModel
-                            {
-                                PropertyName = nameof(coding.Code),
-                                NewPropertyValue = coding.Code,
-                            });
-                            propertyChanges.Add(new PropertyChangeModel
-                            {
-                                PropertyName = nameof(coding.System),
-                                NewPropertyValue = coding.System,
-                            });
-                            propertyChanges.Add(new PropertyChangeModel
-                            {
-                                PropertyName = nameof(codings),
-                                InitialPropertyValue = codings?.ToString(),
-                            });
-
-                            codings.Add(coding);
-
-                            propertyChanges.Add(new PropertyChangeModel
-                            {
-                                PropertyName = nameof(codings),
-                                NewPropertyValue = codings?.ToString(),
-                            });
-
-                            type.Coding = codings;
-
-                            propertyChanges.Add(new PropertyChangeModel
-                            {
-                                PropertyName = nameof(type.Coding),
-                                NewPropertyValue = type.Coding.ToString(),
-                            });
-
-                            types.Add(type);
-                        }
-                        var locationType = ((Location)entry.Resource).Type;
                         propertyChanges.Add(new PropertyChangeModel
                         {
-                            PropertyName = nameof(locationType),
-                            InitialPropertyValue = locationType?.ToString(),
-                            NewPropertyValue = types?.ToString()
+                            PropertyName = nameof(coding.Code),
+                            NewPropertyValue = coding.Code,
                         });
-                        ((Location)entry.Resource).Type = types;
+                        propertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = nameof(coding.System),
+                            NewPropertyValue = coding.System,
+                        });
+                        propertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = nameof(codings),
+                            InitialPropertyValue = codings?.ToString(),
+                        });
+
+                        codings.Add(coding);
+
+                        propertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = nameof(codings),
+                            NewPropertyValue = codings?.ToString(),
+                        });
+
+                        type.Coding = codings;
+
+                        propertyChanges.Add(new PropertyChangeModel
+                        {
+                            PropertyName = nameof(type.Coding),
+                            NewPropertyValue = type.Coding.ToString(),
+                        });
+
+                        types.Add(type);
                     }
+                    var locationType = ((Location)resource).Type;
+                    propertyChanges.Add(new PropertyChangeModel
+                    {
+                        PropertyName = nameof(locationType),
+                        InitialPropertyValue = locationType?.ToString(),
+                        NewPropertyValue = types?.ToString()
+                    });
+                    ((Location)resource).Type = types;
                 }
+          
             }
 
             return new OperationCommandResult
             {
-                Bundle = bundle,
+                Resource = resource,
                 PropertyChanges = propertyChanges,
             };
         }
