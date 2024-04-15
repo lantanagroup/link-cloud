@@ -4,12 +4,11 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
@@ -27,6 +26,7 @@ public class GetPatientDataRequest : IRequest<List<IBaseMessage>>
     public string FacilityId { get; set; }
     public DataAcquisitionRequestedMessage Message { get; set; }
     public string CorrelationId { get; set; }
+    public QueryPlanType QueryPlanType { get; set; }
 }
 
 public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataRequest, List<IBaseMessage>>
@@ -35,6 +35,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
     private readonly IFhirQueryConfigurationRepository _fhirQueryRepo;
     private readonly IQueryPlanRepository _queryPlanRepository;
     private readonly IReferenceResourcesRepository _referenceResourcesRepository;
+    private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
     private readonly IMediator _mediator;
     private readonly IFhirApiRepository _fhirRepo;
 
@@ -44,7 +45,8 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         IQueryPlanRepository queryPlanRepository,
         IMediator mediator,
         IFhirApiRepository fhirRepo,
-        IReferenceResourcesRepository referenceResourcesRepository)
+        IReferenceResourcesRepository referenceResourcesRepository,
+        IQueriedFhirResourceRepository queriedFhirResourceRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryRepo = fhirQueryRepo ?? throw new ArgumentNullException(nameof(fhirQueryRepo));
@@ -52,6 +54,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _referenceResourcesRepository = referenceResourcesRepository ?? throw new ArgumentNullException(nameof(referenceResourcesRepository));
+        _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
     }
 
     public async Task<List<IBaseMessage>> Handle(GetPatientDataRequest request, CancellationToken cancellationToken)
@@ -87,7 +90,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         foreach(var scheduledReport in request.Message.ScheduledReports)
         {
             var patientId = TEMPORARYPatientIdPart(request.Message.PatientId);
-            Hl7.Fhir.Model.Bundle bundle = new Hl7.Fhir.Model.Bundle();
+            Bundle bundle = new Bundle();
             bundle.Type = Bundle.BundleType.Transaction;
             bundle.Identifier = new Identifier 
             {
@@ -95,6 +98,17 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             };
 
             var patient = await _fhirRepo.GetPatient(fhirQueryConfiguration.FhirServerBaseUrl, patientId, fhirQueryConfiguration.Authentication);
+            _queriedFhirResourceRepository.Add(new QueriedFhirResourceRecord
+            {
+                FacilityId = request.FacilityId,
+                PatientId = patientId,
+                CorrelationId = request.CorrelationId,
+                ResourceId = patientId,
+                ResourceType = nameof(Patient),
+                ResponseCode = 200.ToString(),
+                CreateDate = DateTime.UtcNow,
+                ModifyDate = DateTime.UtcNow
+            });
 
             bundle.AddResourceEntry(patient, patientId);
 
@@ -159,6 +173,19 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
+
+                await _queriedFhirResourceRepository.AddAsync(new QueriedFhirResourceRecord
+                {
+                    FacilityId = request.FacilityId,
+                    PatientId = TEMPORARYPatientIdPart(request.Message.PatientId),
+                    CorrelationId = request.CorrelationId,
+                    QueryType = request.QueryPlanType.ToString(),
+                    ResourceId = ((SingularParameterQueryFactoryResult)builtQuery)?.ResourceId,
+                    ResourceType = ((ParameterQueryConfig)queryConfig).ResourceType,
+                    ResponseCode = 200.ToString(),
+                    CreateDate = DateTime.UtcNow,
+                    ModifyDate = DateTime.UtcNow
+                });
             }
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
@@ -170,6 +197,19 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
+
+                await _queriedFhirResourceRepository.AddAsync(new QueriedFhirResourceRecord
+                {
+                    FacilityId = request.FacilityId,
+                    PatientId = TEMPORARYPatientIdPart(request.Message.PatientId),
+                    CorrelationId = request.CorrelationId,
+                    QueryType = request.QueryPlanType.ToString(),
+                    //ResourceId = ((PagedParameterQueryFactoryResult)builtQuery)?.,
+                    ResourceType = ((ParameterQueryConfig)queryConfig).ResourceType,
+                    ResponseCode = 200.ToString(),
+                    CreateDate = DateTime.UtcNow,
+                    ModifyDate = DateTime.UtcNow
+                });
             }
 
             if(builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
