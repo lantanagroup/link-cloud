@@ -26,7 +26,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
-    <ProjectReference Include="..\Notification\Notification.csproj" />
   </ItemGroup>
 
   <ItemGroup>
