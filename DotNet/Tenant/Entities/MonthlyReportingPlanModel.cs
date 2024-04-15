@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Tenant.Entities
 
         public int? ReportMonth { get; set; }
 
-        public int? ReportYear { get; set;}
+        public int? ReportYear { get; set; }
 
     }
 }

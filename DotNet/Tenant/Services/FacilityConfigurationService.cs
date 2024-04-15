@@ -1,18 +1,17 @@
-﻿using LantanaGroup.Link.Tenant.Entities;
-using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Confluent.Kafka;
-using System.Text;
-using LantanaGroup.Link.Tenant.Utils;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Tenant.Models;
-using System.Diagnostics;
-using OpenTelemetry.Trace;
-using LantanaGroup.Link.Tenant.Config;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Commands;
+using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Models;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+using LantanaGroup.Link.Tenant.Utils;
+using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
+using System.Text;
+using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -22,7 +21,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private readonly ILogger<FacilityConfigurationService> _logger;
         private readonly HttpClient _httpClient;
-        private static   List<KafkaTopic> _topics = new List<KafkaTopic>();
+        private static List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
         private readonly IOptions<MeasureApiConfig> _measureApiConfig;
 
@@ -49,13 +48,13 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken)
-        { 
+        {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Facilities Query");
-        
+
             return await _facilityConfigurationRepo.GetAsync(cancellationToken);
         }
 
-        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string facilityId, string facilityName, CancellationToken cancellationToken)
+        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string? facilityId, string? facilityName, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
@@ -85,19 +84,19 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this.ValidateFacility(newFacility);
+                ValidateFacility(newFacility);
 
                 var facility = await GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken);
 
                 // validates facility does not exist
                 if (facility is not null)
                 {
-                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+                    _logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-                this.ValidateSchedules(newFacility);
+                ValidateSchedules(newFacility);
             }
 
             try
@@ -123,7 +122,7 @@ namespace LantanaGroup.Link.Tenant.Services
             }
 
             // send audit event
-            AuditEventMessage auditMessageEvent  = Helper.CreateFacilityAuditEvent(newFacility);
+            AuditEventMessage auditMessageEvent = Helper.CreateFacilityAuditEvent(newFacility);
             _ = Task.Run(() => _createAuditEventCommand.Execute(newFacility.FacilityId, auditMessageEvent, cancellationToken));
 
         }
@@ -141,13 +140,13 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                this.ValidateFacility(newFacility);
+                ValidateFacility(newFacility);
 
                 existingFacility = GetFacilityById(id, cancellationToken).Result;
 
                 if (existingFacility is null)
                 {
-                    this._logger.LogError($"Facility with Id: {id} Not Found");
+                    _logger.LogError($"Facility with Id: {id} Not Found");
 
                     throw new ApplicationException($"Facility with Id: {id} Not Found");
                 }
@@ -156,18 +155,18 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (foundFacility != null && foundFacility.Id != id)
                 {
-                    this._logger.LogError($"Facility {newFacility.FacilityId} already exists");
+                    _logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-                this.ValidateSchedules(newFacility);
+                ValidateSchedules(newFacility);
             }
             // audit update facility event
             AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
 
             try
-            { 
+            {
                 using (ServiceActivitySource.Instance.StartActivity("Update the Facility Command"))
                 {
                     existingFacility.FacilityId = newFacility.FacilityId;
@@ -198,7 +197,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task<string> RemoveFacility(string facilityId, CancellationToken cancellationToken)
         {
-           FacilityConfigModel existingFacility;
+            FacilityConfigModel existingFacility;
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete Facility Configuration");
 
@@ -213,11 +212,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (existingFacility is null)
                 {
-                    this._logger.LogError($"Facility with Id: {facilityId} Not Found");
+                    _logger.LogError($"Facility with Id: {facilityId} Not Found");
                     throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
                 }
             }
-      
+
             try
             {
                 using (ServiceActivitySource.Instance.StartActivity("Delete the Facility Configuration Command"))
@@ -283,35 +282,41 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private void ValidateSchedules(FacilityConfigModel facility)
         {
+            if (facility.ScheduledTasks == null) return;
+
             foreach (ScheduledTaskModel scheduledTask in facility.ScheduledTasks)
             {
                 // validate topic
-                if (!Helper.ValidateTopic(scheduledTask.KafkaTopic, _topics))
+                if (scheduledTask.KafkaTopic != null && !Helper.ValidateTopic(scheduledTask.KafkaTopic, _topics))
                 {
                     throw new ApplicationException($"kafka topic {scheduledTask.KafkaTopic} is Invalid. Valid values are {string.Join(" and ", _topics.ToList())}");
                 }
+
                 // validate scheduleTrigger
                 foreach (ScheduledTaskModel.ReportTypeSchedule reportTypeSchedule in scheduledTask.ReportTypeSchedules)
                 {
-                    foreach (string trigger in reportTypeSchedule.ScheduledTriggers)
+                    if (reportTypeSchedule.ScheduledTriggers != null)
                     {
-                        if (!Helper.IsValidSchedule(trigger))
+                        foreach (string trigger in reportTypeSchedule.ScheduledTriggers)
                         {
-                            this._logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
-                            throw new ApplicationException($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                            if (!Helper.IsValidSchedule(trigger))
+                            {
+                                _logger.LogError($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                                throw new ApplicationException($"ScheduledTrigger {trigger} for facility {facility.FacilityId} and kafka topic {scheduledTask.KafkaTopic} is not valid chron expression");
+                            }
                         }
                     }
                 }
             }
             // validate topic is unique within Facility
 
-            IEnumerable<string> duplicates = facility.ScheduledTasks.GroupBy(i => i.KafkaTopic).Where(g => g.Count() > 1).Select(g => g.Key);
+            IEnumerable<string?> duplicates = facility.ScheduledTasks.GroupBy(i => i.KafkaTopic).Where(g => g.Count() > 1).Select(g => g.Key);
 
             string duplicatedTopics = string.Join(" ", duplicates.ToList());
 
             if (!duplicatedTopics.Equals(""))
             {
-                this._logger.LogError($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
+                _logger.LogError($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
                 throw new ApplicationException($"The following topics {duplicatedTopics} are duplicated for facility {facility.FacilityId} ");
             }
             // validate report Type within Topic
@@ -319,15 +324,16 @@ namespace LantanaGroup.Link.Tenant.Services
             foreach (ScheduledTaskModel facilityScheduledTask in facility.ScheduledTasks)
             {
 
-                IEnumerable<string> duplicatedReportTypes = facilityScheduledTask.ReportTypeSchedules.GroupBy(i => i.ReportType).Where(g => g.Count() > 1).Select(g => g.Key);
+                IEnumerable<string?> duplicatedReportTypes = facilityScheduledTask.ReportTypeSchedules.GroupBy(i => i.ReportType).Where(g => g.Count() > 1).Select(g => g.Key);
 
                 string duplicatedReportTypesString = string.Join(" ", duplicatedReportTypes.ToList());
 
                 if (!duplicatedReportTypesString.Equals(""))
                 {
-                    this._logger.LogError($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
+                    _logger.LogError($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                     throw new ApplicationException($"The following ReportTypes {duplicatedReportTypesString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic}");
                 }
+
                 int i = 1;
                 foreach (ReportTypeSchedule reportTypeSchedule in facilityScheduledTask.ReportTypeSchedules)
                 {
@@ -336,6 +342,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     {
                         schedulingErrors.AppendLine($"Report Type under KafkaTopic {facilityScheduledTask.KafkaTopic} and ReportTypeSchedule Number {i} must be specified.");
                     }
+
                     // validate the reportype is one of the known values
                     if (!MeasureDefinitionTypeValidation.Validate(reportTypeSchedule.ReportType))
                     {
@@ -348,12 +355,12 @@ namespace LantanaGroup.Link.Tenant.Services
                     if (String.IsNullOrEmpty(_measureApiConfig.Value.MeasureServiceApiUrl))
                     {
                         throw new ApplicationException($"MeasureEval service configuration from \"MeasureServiceRegistry.MeasureServiceApiUrl\" is missing");
-                    }   
+                    }
 
                     var response = _httpClient.GetAsync(requestUrl).Result;
 
                     // check respone status code
-                    if (!response.IsSuccessStatusCode) 
+                    if (!response.IsSuccessStatusCode)
                     {
                         throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
                     }
@@ -371,7 +378,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                     if (!duplicatedTriggersString.Equals(""))
                     {
-                        this._logger.LogError($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
+                        _logger.LogError($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                         throw new ApplicationException($"The following Trigger {duplicatedTriggersString} are duplicated for facility {facility.FacilityId} and KafakaTopic {facilityScheduledTask.KafkaTopic} and reportType {reportTypeSchedule.ReportType}");
                     }
 

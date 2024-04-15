@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Quartz;
+﻿using Quartz;
 using Quartz.Spi;
-using System;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
