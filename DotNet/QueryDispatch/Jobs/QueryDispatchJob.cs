@@ -48,7 +48,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     {
                         PatientId = patientDispatchEntity.PatientId,
                         ScheduledReports = new List<ScheduledReport>(),
-                        QueryType = QueryTypes.Initial
+                        QueryType = QueryTypes.Initial.ToString()
                     };
 
                     foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
