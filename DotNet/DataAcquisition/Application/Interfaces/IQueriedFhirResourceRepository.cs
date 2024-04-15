@@ -5,4 +5,5 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
 public interface IQueriedFhirResourceRepository : IMongoDbRepository<QueriedFhirResourceRecord>
 {
+    Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string facilityId, string? patientId = default, string? correlationId = default, CancellationToken cancellationToken = default);
 }
