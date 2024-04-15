@@ -7,11 +7,15 @@ using static Confluent.Kafka.ConfigPropertyNames;
 using System.Text;
 using System.Threading;
 using LantanaGroup.Link.Shared.Settings;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Shared.Application.Factories
 {
-    public class RetryEntityFactory : IRetryEntityFactory
+    public partial class RetryEntityFactory : IRetryEntityFactory
     {
+        [GeneratedRegex(@"-Retry$", RegexOptions.IgnoreCase, "en-US")]
+        private static partial Regex RetrySuffix();
+
         public RetryEntity CreateRetryEntity(ConsumeResult<string, string> consumeResult, ConsumerSettings consumerSettings) 
         {
             Dictionary<string, string> headers = new Dictionary<string, string>();
@@ -41,7 +45,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
                 ServiceName = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionService).Value ?? "",
                 FacilityId = headers.FirstOrDefault(x => x.Key == KafkaConstants.HeaderConstants.ExceptionFacilityId).Value ?? "",
                 ScheduledTrigger = triggerDate,
-                Topic = consumeResult.Topic,
+                Topic = RetrySuffix().Replace(consumeResult.Topic, ""),
                 Key = consumeResult.Message.Key,
                 Value = consumeResult.Message.Value,
                 RetryCount = retryCount,

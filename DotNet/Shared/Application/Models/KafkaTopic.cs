@@ -7,6 +7,8 @@ public enum KafkaTopic
     DataAcquired,
     PatientIDsAcquired,
     PatientAcquired,
+    [StringValue("PatientAcquired-Retry")]
+    PatientAcquiredRetry,
     DataAcquisitionScheduled,
     DataAcquisitionRequested,
     DataAcquisitionFailed,
