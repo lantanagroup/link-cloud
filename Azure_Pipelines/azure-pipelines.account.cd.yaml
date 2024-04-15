@@ -13,7 +13,7 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Account/Account.csproj'
+  value: 'DotNet/Account/Account.csproj'
 - name: testProject
   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
 - name: nugetPath
