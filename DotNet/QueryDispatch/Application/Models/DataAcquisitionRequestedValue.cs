@@ -1,6 +1,4 @@
-﻿using QueryDispatch.Application.Models;
-
-namespace LantanaGroup.Link.QueryDispatch.Application.Models
+﻿namespace LantanaGroup.Link.QueryDispatch.Application.Models
 {
     public class DataAcquisitionRequestedValue
     {
