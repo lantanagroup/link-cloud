@@ -132,6 +132,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IQueryPlanRepository,QueryPlanRepository>();
     builder.Services.AddSingleton<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
+    builder.Services.AddSingleton<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
     
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();

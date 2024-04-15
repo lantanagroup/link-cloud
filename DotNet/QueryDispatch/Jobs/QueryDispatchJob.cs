@@ -10,6 +10,7 @@ using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Application.Models;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -46,7 +47,8 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                     {
                         PatientId = patientDispatchEntity.PatientId,
-                        ScheduledReports = new List<ScheduledReport>()
+                        ScheduledReports = new List<ScheduledReport>(),
+                        QueryType = QueryTypes.Initial
                     };
 
                     foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
