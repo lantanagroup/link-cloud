@@ -83,9 +83,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                         { 
                             Message = new Message<string, string>()
                             {
-                                Headers = ex.ConsumerRecord.Message.Headers, 
-                                Key = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key),
-                                Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value),
+                                Headers = ex.ConsumerRecord.Message.Headers,
+                                Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null && ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : string.Empty,
+                                Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null && ex.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value) : string.Empty,
                             },  
                         };
 
