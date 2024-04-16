@@ -29,7 +29,7 @@ public class MeasureDefinitionController {
             measureDefinition.setId(md.getId());
             measureDefinition.setMeasureId(md.getMeasureId());
             measureDefinition.setMeasureName(md.getMeasureName());
-            measureDefinition.setMeasureUrl(md.getMeasureUrl());
+            measureDefinition.setMeasureDefinitionUrl(md.getMeasureDefinitionUrl());
             measureDefinition.setLastUpdated(md.getLastUpdated());
             return measureDefinition;
         }).toList();

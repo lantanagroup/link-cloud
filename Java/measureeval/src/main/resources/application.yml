@@ -1,5 +1,5 @@
 server:
-  port: 31819
+  port: 5135
 springdoc:
   api-docs:
     path: /api-docs
