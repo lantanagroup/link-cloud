@@ -9,7 +9,8 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
 public class QueriedFhirResourceRepository : MongoDbRepository<QueriedFhirResourceRecord>, IQueriedFhirResourceRepository
 {
-    public QueriedFhirResourceRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoDbRepository<QueriedFhirResourceRecord>> logger = null) : base(mongoSettings, logger)
+    public QueriedFhirResourceRepository(IOptions<MongoConnection> mongoSettings) 
+        : base(mongoSettings)
     {
     }
 
