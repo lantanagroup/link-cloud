@@ -22,12 +22,13 @@ public class FhirApiRepository : IFhirApiRepository
     private readonly IMediator _mediator;
     private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
 
-    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator)
+    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
     }
 
     public async Task<Bundle> GetPagedBundledResultsAsync(
