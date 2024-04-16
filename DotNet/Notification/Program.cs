@@ -239,26 +239,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (builder.Configuration.GetValue<bool>("TelemetryConfig:Enabled"))
     {
-        var telemetryConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>()
-            ?? throw new NullReferenceException("Telemetry Configuration was null.");
-
-        builder.Services.AddOpenTelemetryService(options => {
+        builder.Services.AddLinkTelemetry(builder.Configuration, options => { 
             options.Environment = builder.Environment;
-            options.EnableMetrics = telemetryConfig.EnableMetrics;
-            options.MeterName = $"Link.{NotificationConstants.ServiceName}";
-            options.EnableTracing = telemetryConfig.EnableTracing;
-            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
-
-            //configure OTEL Collector
-            options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
-            options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ?
-                telemetryConfig.OtelCollectorEndpoint : null;
-
-            //configure Azure Monitor
-            options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
-            options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
-                builder.Configuration.GetConnectionString("AzureMonitor") : null;
-        });
+        });        
 
         builder.Services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();
     }

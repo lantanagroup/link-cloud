@@ -2,6 +2,7 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Settings;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -10,6 +11,35 @@ namespace LantanaGroup.Link.Notification.Infrastructure.Extensions
 {
     public static class TelemetryServiceExtension
     {
+        public static IServiceCollection AddLinkTelemetry(this IServiceCollection services, IConfiguration configuration, Action<TelemetryServiceOptions> options)
+        {
+            var initTelemetryOptions = new TelemetryServiceOptions();
+            options.Invoke(initTelemetryOptions);
+
+            var telemetryConfig = configuration.GetSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>()
+            ?? throw new NullReferenceException("Telemetry Configuration was null.");
+
+            services.AddOpenTelemetryService(options => {
+                options.Environment = initTelemetryOptions.Environment;
+                options.EnableMetrics = telemetryConfig.EnableMetrics;
+                options.MeterName = $"Link.{NotificationConstants.ServiceName}";
+                options.EnableTracing = telemetryConfig.EnableTracing;
+                options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+
+                //configure OTEL Collector
+                options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
+                options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ?
+                    telemetryConfig.OtelCollectorEndpoint : null;
+
+                //configure Azure Monitor
+                options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
+                options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
+                    configuration.GetConnectionString("AzureMonitor") : null;
+            });
+
+            return services;
+        }
+
         public static IServiceCollection AddOpenTelemetryService(this IServiceCollection services, Action<TelemetryServiceOptions> options)
         {
             var telemetryServiceOptions = new TelemetryServiceOptions();
