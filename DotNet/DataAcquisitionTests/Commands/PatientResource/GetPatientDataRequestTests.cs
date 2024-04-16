@@ -50,7 +50,7 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
                 .ReturnsAsync(new List<QueryPlan>());
 
             _mocker.GetMock<IFhirApiRepository>()
-                .Setup(r => r.GetPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.GetPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Hl7.Fhir.Model.Patient());
 
             var result = await handler.Handle(request, CancellationToken.None);
@@ -88,7 +88,7 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
                 .ReturnsAsync(new List<QueryPlan>());
 
             _mocker.GetMock<IFhirApiRepository>()
-                .Setup(r => r.GetPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.GetPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Hl7.Fhir.Model.Patient());
 
             var result = await handler.Handle(request, CancellationToken.None);

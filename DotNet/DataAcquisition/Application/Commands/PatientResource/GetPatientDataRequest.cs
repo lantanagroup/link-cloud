@@ -35,7 +35,6 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
     private readonly IFhirQueryConfigurationRepository _fhirQueryRepo;
     private readonly IQueryPlanRepository _queryPlanRepository;
     private readonly IReferenceResourcesRepository _referenceResourcesRepository;
-    private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
     private readonly IMediator _mediator;
     private readonly IFhirApiRepository _fhirRepo;
 
@@ -54,7 +53,6 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _referenceResourcesRepository = referenceResourcesRepository ?? throw new ArgumentNullException(nameof(referenceResourcesRepository));
-        _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
     }
 
     public async Task<List<IBaseMessage>> Handle(GetPatientDataRequest request, CancellationToken cancellationToken)
@@ -97,18 +95,11 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 Value = patientId
             };
 
-            var patient = await _fhirRepo.GetPatient(fhirQueryConfiguration.FhirServerBaseUrl, patientId, fhirQueryConfiguration.Authentication);
-            _queriedFhirResourceRepository.Add(new QueriedFhirResourceRecord
-            {
-                FacilityId = request.FacilityId,
-                PatientId = patientId,
-                CorrelationId = request.CorrelationId,
-                ResourceId = patientId,
-                ResourceType = nameof(Patient),
-                ResponseCode = 200.ToString(),
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = DateTime.UtcNow
-            });
+            var patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl, 
+                patientId, request.CorrelationId, 
+                request.FacilityId, 
+                fhirQueryConfiguration.Authentication);
 
             bundle.AddResourceEntry(patient, patientId);
 
@@ -120,8 +111,8 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
                 try
                 {
-                    bundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle);
-                    bundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle);
+                    bundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.InitialQueries.ToString());
+                    bundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.SupplementalQueries.ToString());
 
                     var bundleEle = System.Text.Json.JsonSerializer.SerializeToElement(bundle, new JsonSerializerOptions().ForFhir());
                     messages.Add(new PatientAcquiredMessage
@@ -150,7 +141,8 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         FhirQueryConfiguration fhirQueryConfiguration,
         ScheduledReport scheduledReport,
         QueryPlan queryPlan,
-        Bundle bundle
+        Bundle bundle,
+        string queryPlanType
         )
     {
         foreach (var query in queryList)
@@ -168,48 +160,30 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 bundle = await _fhirRepo.GetSingularBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.Message.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
                     bundle,
                     (SingularParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
-
-                await _queriedFhirResourceRepository.AddAsync(new QueriedFhirResourceRecord
-                {
-                    FacilityId = request.FacilityId,
-                    PatientId = TEMPORARYPatientIdPart(request.Message.PatientId),
-                    CorrelationId = request.CorrelationId,
-                    QueryType = request.QueryPlanType.ToString(),
-                    ResourceId = ((SingularParameterQueryFactoryResult)builtQuery)?.ResourceId,
-                    ResourceType = ((ParameterQueryConfig)queryConfig).ResourceType,
-                    ResponseCode = 200.ToString(),
-                    CreateDate = DateTime.UtcNow,
-                    ModifyDate = DateTime.UtcNow
-                });
             }
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
                 bundle = await _fhirRepo.GetPagedBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.Message.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
                     bundle,
                     (PagedParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
-
-                await _queriedFhirResourceRepository.AddAsync(new QueriedFhirResourceRecord
-                {
-                    FacilityId = request.FacilityId,
-                    PatientId = TEMPORARYPatientIdPart(request.Message.PatientId),
-                    CorrelationId = request.CorrelationId,
-                    QueryType = request.QueryPlanType.ToString(),
-                    //ResourceId = ((PagedParameterQueryFactoryResult)builtQuery)?.,
-                    ResourceType = ((ParameterQueryConfig)queryConfig).ResourceType,
-                    ResponseCode = 200.ToString(),
-                    CreateDate = DateTime.UtcNow,
-                    ModifyDate = DateTime.UtcNow
-                });
             }
 
             if(builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
@@ -229,6 +203,10 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 var fullMissingResources = await _fhirRepo.GetReferenceResource(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     referenceQueryFactoryResult.ResourceType,
+                    request.Message.PatientId,
+                    request.FacilityId,
+                    request.CorrelationId,
+                    queryPlanType,
                     missingReferences,
                     (ReferenceQueryConfig)queryConfig,
                     fhirQueryConfiguration.Authentication);
