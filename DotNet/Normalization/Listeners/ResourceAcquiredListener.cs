@@ -253,7 +253,7 @@ public class ResourceAcquiredListener : BackgroundService
                     PropertyChanges = operationCommandResult.PropertyChanges
                 });
 
-                var serializedBundle = JsonSerializer.SerializeToElement(operationCommandResult.Bundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                //var serializedBundle = JsonSerializer.SerializeToElement(operationCommandResult.Bundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
 
                 var headers = new Headers
                     {
@@ -262,7 +262,7 @@ public class ResourceAcquiredListener : BackgroundService
                 var resourceNormalizedMessage = new ResourceNormalizedMessage
                 {
                     PatientId = message.Value.PatientId,
-                    Resource = message.Value.Resource,
+                    Resource = operationCommandResult.Resource,
                     QueryType = message.Value.QueryType,
                     ScheduledReports = message.Message.Value.ScheduledReports
                 };
