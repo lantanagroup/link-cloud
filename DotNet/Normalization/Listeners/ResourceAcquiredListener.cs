@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver.Linq;
@@ -54,7 +55,7 @@ public class ResourceAcquiredListener : BackgroundService
         _deadLetterExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
         _transientExceptionHandler = transientExceptionHandler;
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
-        _transientExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Retry";
+        _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
     }
 
     ~ResourceAcquiredListener()
