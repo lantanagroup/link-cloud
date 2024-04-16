@@ -15,8 +15,7 @@ public class QueriedFhirResourceRecord : BaseEntity
     public string QueryType { get; set; }
     public string ResourceType { get; set; }
     public string ResourceId { get; set; }
-    public string ResponseCode { get; set; }
-    public string OperationOutcome { get; set; }
+    public bool IsSuccessful { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTime? CreateDate { get; set; }
 
