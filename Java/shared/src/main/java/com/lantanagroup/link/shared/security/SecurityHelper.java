@@ -3,12 +3,14 @@ package com.lantanagroup.link.shared.security;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 public class SecurityHelper {
     public static SecurityFilterChain build(HttpSecurity http) throws Exception {
         http
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests -> {
                     //TODO: Add more specific authorization rules here
                     // - create security folder in src/main/java/com/lantanagroup/link/validation
@@ -17,7 +19,7 @@ public class SecurityHelper {
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").access(customAuthorizationManager());
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").hasRole("ROLE_USER");
 
-                    authorizeRequests.requestMatchers(HttpMethod.GET, "/_health").permitAll();
+                    authorizeRequests.requestMatchers(HttpMethod.GET, "/health").permitAll();
                     authorizeRequests.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(resourceServer -> {
@@ -30,7 +32,9 @@ public class SecurityHelper {
     }
 
     public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
-        return http.authorizeHttpRequests(authorizeRequests -> {
+        return http
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authorizeRequests -> {
                     authorizeRequests.anyRequest().permitAll();
                 })
                 .build();
