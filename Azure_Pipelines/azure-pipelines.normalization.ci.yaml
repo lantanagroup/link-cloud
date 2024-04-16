@@ -9,19 +9,14 @@ pool:
 variables:
   project: 'DotNet/Normalization/Normalization.csproj'
   testProject: 'DotNet/NormalizationUnitTests/NormalizationUnitTests.csproj'
-  nugetPath: 'DotNet/Normalization/nuget.config'
   serviceName: 'Normalization'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
