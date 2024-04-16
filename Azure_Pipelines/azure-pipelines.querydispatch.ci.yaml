@@ -2,6 +2,7 @@ trigger:
   paths:
     include:
     - DotNet/QueryDispatch/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

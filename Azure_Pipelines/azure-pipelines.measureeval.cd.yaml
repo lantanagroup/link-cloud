@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/MeasureEval/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:

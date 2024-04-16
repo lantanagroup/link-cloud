@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Submission/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:
