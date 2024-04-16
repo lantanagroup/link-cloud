@@ -24,7 +24,7 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
 		<PackageReference Include="Azure.Identity" Version="1.10.4" />
-		<PackageReference Include="com.lantanagroup.link.Shared" Version="2.1.2" />
+		<PackageReference Include="com.lantanagroup.link.Shared" Version="2.3.3" />
 		<PackageReference Include="CompareNETObjects" Version="4.*" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />

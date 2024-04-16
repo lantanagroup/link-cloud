@@ -182,9 +182,9 @@ public class QueryListener : BackgroundService
                             {
                                 Key = messageMetaData.facilityId,
                                 Headers = headers,
-                                Value = (PatientAcquiredMessage)responseMessage
+                                Value = (ResourceAcquired)responseMessage
                             };
-                            await producer.ProduceAsync(KafkaTopic.PatientAcquired.ToString(), produceMessage, cancellationToken);
+                            await producer.ProduceAsync(KafkaTopic.ResourceAcquired.ToString(), produceMessage, cancellationToken);
 
                             ProduceAuditMessage(new AuditEventMessage
                             {
