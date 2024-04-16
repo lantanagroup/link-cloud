@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             };
                         }
 
-                        var resource = JsonSerializer.Deserialize<Resource>(value.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+                        var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
 
                         if (resource == null)
                         {
