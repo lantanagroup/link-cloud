@@ -111,11 +111,27 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 (string queryPlanType, Bundle bundle) processedBundle = (null, bundle);
                 try
                 {
-                    processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.InitialQueries.ToString());
-                    processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.SupplementalQueries.ToString());
+                    processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.InitialQueries.ToString());
+                    processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.SupplementalQueries.ToString());
 
                     foreach(var entry in processedBundle.bundle.Entry)
                     {
+
+                        foreach (var child in entry.Resource.Children)
+                        {
+                            if (child is Resource)
+                            {
+                                var childResource = (Resource)child;
+                                messages.Add(new ResourceAcquired
+                                {
+                                    Resource = childResource,
+                                    ScheduledReports = new List<ScheduledReport> { scheduledReport },
+                                    PatientId = patientId,
+                                    QueryType = processedBundle.queryPlanType
+                                });
+                            }
+                        }
+
                         messages.Add(new ResourceAcquired
                         {
                             Resource = entry.Resource,
