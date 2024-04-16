@@ -8,6 +8,6 @@ public class OperationCommandResult
 {
     public Base Resource { get; set; }
 
-    public Bundle Bundle { get; set; }
+   // public Bundle Bundle { get; set; }
     public List<PropertyChangeModel> PropertyChanges { get; set; }
 }
