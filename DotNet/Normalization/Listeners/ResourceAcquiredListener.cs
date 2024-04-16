@@ -263,6 +263,7 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     PatientId = message.Value.PatientId,
                     Resource = serializedResource,
+
                     QueryType = message.Value.QueryType,
                     ScheduledReports = message.Message.Value.ScheduledReports
                 };
