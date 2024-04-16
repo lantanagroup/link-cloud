@@ -9,5 +9,5 @@ RUN mv validation/target/validation-*.jar validation/target/validation.jar
 FROM openjdk:17-jdk-alpine
 WORKDIR /app
 COPY --from=build /app/target/validation.jar validation.jar
-EXPOSE 8080
+EXPOSE 31820
 CMD ["java", "-jar", "validation.jar", "--add-opens java.base/java.util=ALL-UNNAMED"]

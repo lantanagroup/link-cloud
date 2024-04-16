@@ -11,5 +11,5 @@ RUN mv measureeval/target/measureeval-*.jar measureeval/target/measureeval.jar
 FROM openjdk:17-jdk-alpine
 WORKDIR /app
 COPY --from=build /app/target/measureeval.jar measureeval.jar
-EXPOSE 8080
+EXPOSE 31819
 CMD ["java", "-jar", "measureeval.jar", "--add-opens java.base/java.util=ALL-UNNAMED"]
