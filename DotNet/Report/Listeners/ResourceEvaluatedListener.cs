@@ -128,23 +128,23 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 FacilityId = key.FacilityId,
                                 MeasureReportScheduleId = schedule.Id,
-                                PatientId = value.PatientId,
-                                ContainedResources = new List<string>()
+                                PatientId = value.PatientId
                             };
                         }
 
-                        var jsonParser = new FhirJsonParser();
+                        var resource = JsonSerializer.Deserialize<Resource>(value.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
 
-                        MeasureReport measureReport = null;
-
-                        try
+                        if (resource == null)
                         {
-                            measureReport = jsonParser.Parse<MeasureReport>(value.Resource);
-                            entry.MeasureReport = measureReport.ToJson();
+                            throw new DeadLetterException($"{Name}: Unable to deserialize event resource", AuditEventType.Create);
                         }
-                        catch (Exception ex) 
-                        { 
-                            entry.ContainedResources.Add(value.Resource);
+                        else if (resource.TypeName == "MeasureReport")
+                        {
+                            entry.AddMeasureReport((MeasureReport)resource);
+                        }
+                        else 
+                        {
+                            entry.AddContainedResource(resource);
                         }
 
                         if (entry.Id == null)
