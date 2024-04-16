@@ -116,6 +116,22 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
                     foreach(var entry in processedBundle.bundle.Entry)
                     {
+
+                        foreach (var child in entry.Resource.Children)
+                        {
+                            if (child is Resource)
+                            {
+                                var childResource = (Resource)child;
+                                messages.Add(new ResourceAcquired
+                                {
+                                    Resource = childResource,
+                                    ScheduledReports = new List<ScheduledReport> { scheduledReport },
+                                    PatientId = patientId,
+                                    QueryType = processedBundle.queryPlanType
+                                });
+                            }
+                        }
+
                         messages.Add(new ResourceAcquired
                         {
                             Resource = entry.Resource,
