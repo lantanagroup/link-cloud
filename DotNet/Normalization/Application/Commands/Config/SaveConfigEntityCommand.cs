@@ -46,7 +46,7 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
         }
 
         bool tenantExists;
-      /*  try
+        try
         {
             tenantExists = await _tenantApiService.CheckFacilityExists(request.NormalizationConfigModel.FacilityId, cancellationToken);
         }
@@ -59,7 +59,7 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
         if (!tenantExists)
         {
             throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
-        }*/
+        }
 
         var existingEntity = await _configRepo.GetAsync(request.Source == SaveTypeSource.Create ? request.NormalizationConfigModel.FacilityId : request.FacilityId);
 
