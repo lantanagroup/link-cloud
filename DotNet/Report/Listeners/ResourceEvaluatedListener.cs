@@ -175,7 +175,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                        
 
-                        if (!schedule.PatientsToQueryDataRequested.GetValueOrDefault())
+                        if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
                         {
                             if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
                             {
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }, cancellationToken);
                             }
 
-                            if (readyForSubmission(schedule.Id).Result)
+                            if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
                             {
                                 using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
                                 prod.Produce(nameof(KafkaTopic.SubmitReport),
