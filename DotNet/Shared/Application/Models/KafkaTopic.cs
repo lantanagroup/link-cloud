@@ -20,6 +20,7 @@ public enum KafkaTopic
     ReportFailed,
     ReportRequestRejected,
     ReportScheduled,
+    ResourceAcquired,
     RetentionCheckScheduled,
     PatientResourcesNormalized,
     MeasureChanged,
