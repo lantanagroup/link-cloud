@@ -1,6 +1,4 @@
 ﻿using System.Text.Json;
-using System.Text.Json.Nodes;
-using Hl7.Fhir.Model;
 
 namespace LantanaGroup.Link.Report.Application.Models
 {
