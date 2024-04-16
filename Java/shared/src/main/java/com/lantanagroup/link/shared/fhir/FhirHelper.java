@@ -22,11 +22,15 @@ public class FhirHelper {
         return parser;
     }
 
-    public static void deserialize(String json) {
-        getParser().parseResource(json);
+    public static Resource deserialize(String json) {
+        return (Resource) getParser().parseResource(json);
     }
 
-    public static void serialize(Resource resource) {
-        getParser().encodeResourceToString(resource);
+    public static <T extends Resource> T deserialize(String json, Class<T> clazz) {
+        return getParser().parseResource(clazz, json);
+    }
+
+    public static String serialize(Resource resource) {
+        return getParser().encodeResourceToString(resource);
     }
 }
