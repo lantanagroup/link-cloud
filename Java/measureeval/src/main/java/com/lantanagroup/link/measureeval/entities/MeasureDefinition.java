@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Bundle;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 
@@ -14,18 +13,6 @@ import java.time.Instant;
 public class MeasureDefinition {
     @Id
     private String id;
-
-    @Field("measureDefinitionId")
-    private String measureId;
-
-    @Field("measureDefinitionName")
-    private String measureName;
-
-    /**
-     * The URL of where to get the measure definition from
-     */
-    @Field("url")
-    private String measureDefinitionUrl;
 
     private Instant lastUpdated;
 
