@@ -108,19 +108,23 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
                 var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
-
+                (string queryPlanType, Bundle bundle) processedBundle = (null, bundle);
                 try
                 {
-                    bundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.InitialQueries.ToString());
-                    bundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.SupplementalQueries.ToString());
+                    processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.InitialQueries.ToString());
+                    processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle, QueryPlanType.SupplementalQueries.ToString());
 
-                    var bundleEle = System.Text.Json.JsonSerializer.SerializeToElement(bundle, new JsonSerializerOptions().ForFhir());
-                    messages.Add(new PatientAcquiredMessage
+                    foreach(var entry in processedBundle.bundle.Entry)
                     {
-                        PatientId = patientId,
-                        PatientBundle = bundleEle,
-                        ScheduledReports = new List<ScheduledReport> { scheduledReport }
-                    });
+                        messages.Add(new ResourceAcquired
+                        {
+                            Resource = entry.Resource,
+                            ScheduledReports = new List<ScheduledReport> { scheduledReport },
+                            PatientId = patientId,
+                            QueryType = processedBundle.queryPlanType
+                        });
+                    }
+
                 }
                 catch(Exception ex)
                 {
@@ -135,7 +139,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         return messages;
     }
 
-    private async Task<Bundle> ProcessIQueryList(
+    private async Task<(string queryPlanType, Bundle bundle)> ProcessIQueryList(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -251,7 +255,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             }
 
         }
-        return bundle;
+        return (queryPlanType, bundle);
     }
 
     private Bundle AddExisitngReferenceListToBundle(List<ReferenceResources> resources, Bundle bundle)
