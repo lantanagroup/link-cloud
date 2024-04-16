@@ -2,13 +2,15 @@
 {
     public class TelemetryConfig
     {
+        public bool Enabled { get; set; } = true;
         public bool EnableTracing { get; set; } = true;
         public bool EnableMetrics { get; set; } = true;
+        public string? MeterName { get; set; }
         public bool EnableRuntimeInstrumentation { get; set; } = false;
-        public string TraceExporterEndpoint { get; set; } = string.Empty;
-        public string MetricsEndpoint { get; set; } = string.Empty;
-        public string TelemetryCollectorEndpoint { get; set; } = string.Empty;
-
+        public bool EnableOtelCollector = true;
+        public string? OtelCollectorEndpoint { get; set; }
+        public bool EnableAzureMonitor { get; set; } = false;
+        public string? AzureMonitorConnectionString { get; set; }
     }
    
 }

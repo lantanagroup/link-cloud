@@ -216,6 +216,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddOpenTelemetryService(options => {
             options.Environment = builder.Environment;
             options.EnableMetrics = telemetryConfig.EnableMetrics;
+            options.MeterName = $"Link.{AuditConstants.ServiceName}";
             options.EnableTracing = telemetryConfig.EnableTracing;
             options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
             

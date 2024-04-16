@@ -1,12 +1,12 @@
 ﻿using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Confluent.Kafka.Extensions.OpenTelemetry;
-using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Notification.Application.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
-namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
+namespace LantanaGroup.Link.Notification.Infrastructure.Extensions
 {
     public static class TelemetryServiceExtension
     {
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                         .AddProcessInstrumentation());
 
                 if (!string.IsNullOrEmpty(telemetryServiceOptions.MeterName))
-                { 
+                {
                     otel.WithMetrics(metricsProviderBuilder =>
                         metricsProviderBuilder
                             .AddMeter(telemetryServiceOptions.MeterName));

@@ -11,8 +11,10 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Comma
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
+using LantanaGroup.Link.Notification.Infrastructure.Extensions;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
@@ -235,14 +237,30 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    if (builder.Configuration.GetValue<bool>("TelemetryConfig:Enabled"))
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
+        var telemetryConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>()
+            ?? throw new NullReferenceException("Telemetry Configuration was null.");
+
+        builder.Services.AddOpenTelemetryService(options => {
+            options.Environment = builder.Environment;
+            options.EnableMetrics = telemetryConfig.EnableMetrics;
+            options.MeterName = $"Link.{NotificationConstants.ServiceName}";
+            options.EnableTracing = telemetryConfig.EnableTracing;
+            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+
+            //configure OTEL Collector
+            options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
+            options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ?
+                telemetryConfig.OtelCollectorEndpoint : null;
+
+            //configure Azure Monitor
+            options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
+            options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
+                builder.Configuration.GetConnectionString("AzureMonitor") : null;
+        });
+
+        builder.Services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();
     }
 
 }

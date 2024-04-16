@@ -32,14 +32,14 @@ namespace LantanaGroup.Link.Notification.Application.Extensions
                             options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                            
                         })
                         .AddConfluentKafkaInstrumentation()
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.OtelCollectorEndpoint); }));
 
             otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
                         .AddAspNetCoreInstrumentation()
                         .AddProcessInstrumentation()
                         .AddMeter("LinkNotificationService")
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.OtelCollectorEndpoint); }));
 
             if (telemetryConfig.EnableRuntimeInstrumentation)
             {

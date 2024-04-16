@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;

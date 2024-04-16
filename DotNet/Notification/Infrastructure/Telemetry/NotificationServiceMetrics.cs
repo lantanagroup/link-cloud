@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Settings;
 using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Notification.Infrastructure.Telemetry
 {  
     public class NotificationServiceMetrics : INotificationServiceMetrics
     {
-        public const string MeterName = "LinkNotificationService";
+        public const string MeterName = $"Link.{NotificationConstants.ServiceName}";
 
         public NotificationServiceMetrics(IMeterFactory meterFactory)
         {
