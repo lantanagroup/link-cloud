@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Tenant/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:

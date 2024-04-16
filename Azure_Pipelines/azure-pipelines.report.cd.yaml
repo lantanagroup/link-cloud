@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Report/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:

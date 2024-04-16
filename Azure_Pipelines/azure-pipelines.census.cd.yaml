@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Census/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:
