@@ -28,4 +28,11 @@ public class SecurityHelper {
                 });
         return http.build();
     }
+
+    public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
+        return http.authorizeHttpRequests(authorizeRequests -> {
+                    authorizeRequests.anyRequest().permitAll();
+                })
+                .build();
+    }
 }
