@@ -16,8 +16,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string FacilityId { get; set; } = string.Empty;
         public string MeasureReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
-        public string MeasureReport { get; private set; }
-        public bool ReadyForSubmission { get; private set; } = false;
+        public string MeasureReport { get; set; }
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
         public class ContainedResource
@@ -26,11 +25,9 @@ namespace LantanaGroup.Link.Report.Entities
             public string Resource { get; set; }
         }
 
-        public void AddMeasureReport(MeasureReport measureReport)
+        public  void AddMeasureReport(MeasureReport measureReport)
         {
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
-            MeasureReport = JsonSerializer.Serialize(measureReport, options).ToJson();
+            MeasureReport =  new FhirJsonSerializer().SerializeToString(measureReport);
 
             foreach (var evaluatedResource in measureReport.EvaluatedResource)
             {
@@ -45,14 +42,10 @@ namespace LantanaGroup.Link.Report.Entities
                     Reference = evaluatedResource.Reference
                 });
             }
-
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
         }
 
         public void AddContainedResource(Resource resource) 
         {
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
             var containedResource = ContainedResources.Where(x => x.Reference == resource.TypeName + "/" + resource.Id).FirstOrDefault();
 
             if (containedResource == null)
@@ -60,15 +53,13 @@ namespace LantanaGroup.Link.Report.Entities
                 ContainedResources.Add(new ContainedResource
                 {
                     Reference = resource.TypeName + "/" + resource.Id,
-                    Resource = JsonSerializer.Serialize(resource, options).ToJson()
-                });
+                    Resource =  new FhirJsonSerializer().SerializeToString(resource)
+                }); 
             }
             else
             {
-                containedResource.Resource = JsonSerializer.Serialize(resource, options).ToJson();
+                containedResource.Resource =  new FhirJsonSerializer().SerializeToString(resource);
             }
-
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
         }
     }
 }
