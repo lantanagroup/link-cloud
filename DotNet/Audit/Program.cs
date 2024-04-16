@@ -28,6 +28,7 @@ using LantanaGroup.Link.Audit.Persistance.Repositories;
 using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -205,17 +206,33 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    //Serilog.Debugging.SelfLog.Enable(Console.Error);  
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);      
+        
+    if (builder.Configuration.GetValue<bool>("TelemetryConfig:Enabled"))
+    {
+        var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>() 
+            ?? throw new NullReferenceException("Telemetry Configuration was null.");
+        
+        builder.Services.AddOpenTelemetryService(options => {
+            options.Environment = builder.Environment;
+            options.EnableMetrics = telemetryConfig.EnableMetrics;
+            options.EnableTracing = telemetryConfig.EnableTracing;
+            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+            
+            //configure OTEL Collector
+            options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
+            options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ? 
+                telemetryConfig.OtelCollectorEndpoint : null;
+            
+            //configure Azure Monitor
+            options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
+            options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ? 
+                builder.Configuration.GetConnectionString("AzureMonitor") : null;            
+        });
 
-    var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
-    if (telemetryConfig != null)
-    {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);        
+        builder.Services.AddSingleton<IAuditServiceMetrics, AuditServiceMetrics>();
     }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
-    }     
+   
 }
 
 #endregion

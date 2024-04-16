@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka.Extensions.OpenTelemetry;
+﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
+using Confluent.Kafka.Extensions.OpenTelemetry;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
@@ -22,7 +23,12 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                 .AddService(
                     serviceName: ServiceActivitySource.Instance.Name, 
                     serviceVersion: ServiceActivitySource.Instance.Version
-                ));            
+                ));
+
+            //add azure monitor exporter
+            otel.UseAzureMonitor(options => { 
+                //options.ConnectionString = 
+            });
 
             otel.WithTracing(tracerProviderBuilder =>
                     tracerProviderBuilder
@@ -32,17 +38,36 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                                 options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint                                                           
                             })
                         .AddEntityFrameworkCoreInstrumentation()
-                        .AddConfluentKafkaInstrumentation()
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddConfluentKafkaInstrumentation());
+
+            //add OTLP exporter if endpoint is provided
+            if (telemetryConfig.EnableOtelCollector)
+            {
+                otel.WithTracing(exportOptions =>
+                {
+                    exportOptions.AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.OtelCollectorEndpoint); });
+                });
+            }
+                        
 
             otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
                         .AddAspNetCoreInstrumentation()
                         .AddProcessInstrumentation()                        
                         .AddMeter("LinkAuditService")
-                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
+                        .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.OtelCollectorEndpoint); }));
 
-            if(telemetryConfig.EnableRuntimeInstrumentation)
+            //add OTLP exporter if endpoint is provided
+            if (!string.IsNullOrEmpty(telemetryConfig.OtelCollectorEndpoint))
+            {
+                otel.WithMetrics(exportOptions =>
+                {
+                    exportOptions.AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.OtelCollectorEndpoint); });
+                });
+            }
+
+
+            if (telemetryConfig.EnableRuntimeInstrumentation)
             {
                 otel.WithMetrics(metricsProviderBuilder =>
                     metricsProviderBuilder
@@ -59,7 +84,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
                 //otel.WithMetrics(metricsProviderBuilder =>
                 //    metricsProviderBuilder
                 //        .AddConsoleExporter());                
-            }
+            }           
 
             services.AddSingleton<IAuditServiceMetrics, AuditServiceMetrics>();
 
