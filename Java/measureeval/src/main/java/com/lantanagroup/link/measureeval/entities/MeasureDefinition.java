@@ -21,8 +21,11 @@ public class MeasureDefinition {
     @Field("measureDefinitionName")
     private String measureName;
 
+    /**
+     * The URL of where to get the measure definition from
+     */
     @Field("url")
-    private String measureUrl;
+    private String measureDefinitionUrl;
 
     private Instant lastUpdated;
 
