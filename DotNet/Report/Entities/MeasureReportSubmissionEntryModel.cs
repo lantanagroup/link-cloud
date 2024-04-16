@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
         public string MeasureReport { get; set; }
+        public bool ReadyForSubmission { get; private set; } = false;
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
         public class ContainedResource
@@ -42,6 +43,9 @@ namespace LantanaGroup.Link.Report.Entities
                     Reference = evaluatedResource.Reference
                 });
             }
+
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
+
         }
 
         public void AddContainedResource(Resource resource) 
@@ -60,6 +64,8 @@ namespace LantanaGroup.Link.Report.Entities
             {
                 containedResource.Resource =  new FhirJsonSerializer().SerializeToString(resource);
             }
+
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
         }
     }
 }

@@ -17,6 +17,8 @@ using System.Transactions;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
+using static LantanaGroup.Link.Report.Entities.MeasureReportSubmissionEntryModel;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -57,6 +59,13 @@ namespace LantanaGroup.Link.Report.Listeners
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
+        }
+
+        private async Task<bool> readyForSubmission(string scheduleId)
+        {
+            var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = scheduleId });
+          
+            return  submissionEntries.All(x => x.ReadyForSubmission);
         }
 
 
@@ -164,7 +173,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
                         #region Patients To Query & Submision Report Handling
 
-                        if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
+                       
+
+                        if (!schedule.PatientsToQueryDataRequested.GetValueOrDefault())
                         {
                             if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
                             {
@@ -176,7 +187,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }, cancellationToken);
                             }
 
-                            if (schedule.PatientsToQuery?.Count == 0)
+                            if (readyForSubmission(schedule.Id).Result)
                             {
                                 using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
                                 prod.Produce(nameof(KafkaTopic.SubmitReport),
