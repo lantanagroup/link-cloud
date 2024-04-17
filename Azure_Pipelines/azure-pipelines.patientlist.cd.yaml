@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/PatientList/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:

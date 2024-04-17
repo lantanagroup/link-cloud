@@ -2,6 +2,7 @@ trigger:
   paths:
     include:
     - DotNet/QueryDispatch/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -9,19 +10,14 @@ pool:
 variables:
   project: 'DotNet/QueryDispatch/QueryDispatch.csproj'
   testProject: 'DotNet/QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
-  nugetPath: 'DotNet/QueryDispatch/nuget.config'
   serviceName: 'QueryDispatch'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
