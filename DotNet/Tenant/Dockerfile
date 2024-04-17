@@ -15,9 +15,9 @@ RUN apk add --no-cache \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Tenant/Tenant.csproj", "DotNet/Tenant/"]
-COPY ["DotNet/Tenant/nuget.config", "DotNet/Tenant/"]
-RUN dotnet restore "DotNet/Tenant/Tenant.csproj" --configfile "DotNet/Tenant/nuget.config"
+RUN dotnet restore "DotNet/Tenant/Tenant.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Tenant"
 RUN dotnet build "Tenant.csproj" -c Release -o /app/build

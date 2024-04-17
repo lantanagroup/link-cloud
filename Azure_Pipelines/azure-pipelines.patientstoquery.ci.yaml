@@ -10,19 +10,14 @@ pool:
 variables:
   project: 'DotNet/PatientsToQuery/PatientsToQuery.csproj'
   testProject: 'DotNet/PatientsToQueryUnitTests/PatientsToQueryUnitTests.csproj'
-  nugetPath: 'DotNet/PatientsToQuery/nuget.config'
   serviceName: 'PatientsToQuery'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

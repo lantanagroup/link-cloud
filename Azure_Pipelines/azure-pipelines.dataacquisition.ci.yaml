@@ -10,19 +10,14 @@ pool:
 variables:
   project: 'DotNet/DataAcquisition/DataAcquisition.csproj'
   testProject: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
-  nugetPath: 'DotNet/DataAcquisition/nuget.config'
   serviceName: 'DataAcquisition'
 
 steps:
-  - template: ../azure-nuget-package-source.yml 
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
