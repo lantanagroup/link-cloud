@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
     - DotNet/Audit/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -15,8 +16,6 @@ variables:
   value: 'DotNet/Audit/Audit.csproj'
 - name: testProject
   value: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
-- name: nugetPath
-  value: 'DotNet/Audit/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -31,15 +30,11 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
