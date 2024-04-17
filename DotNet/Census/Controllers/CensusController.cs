@@ -46,6 +46,34 @@ public class CensusController : Controller
     }
 
     /// <summary>
+    /// Gets the admitted patients for a facility within a date range. If no dates are provided, it will return all active patients.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <returns></returns>
+    [HttpGet("history/admitted")]
+    public async Task<ActionResult<List<CensusPatientListEntity>>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    {
+        try
+        {
+            var patients = await _mediator.Send(new GetAdmittedPatientsQuery
+            {
+                FacilityId = facilityId,
+                StartDate = startDate,
+                EndDate = endDate
+            });
+            return Ok(patients);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error encountered:\n{1}\n{2}", ex.Message, ex.InnerException);
+            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
+            return StatusCode(500);
+        }
+    }   
+
+    /// <summary>
     /// Gets the current census for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
