@@ -1,19 +1,34 @@
 package com.lantanagroup.link.measureeval.consumers;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.lantanagroup.link.measureeval.Topics;
+import com.lantanagroup.link.measureeval.entities.AbstractResource;
+import com.lantanagroup.link.measureeval.entities.PatientResource;
+import com.lantanagroup.link.measureeval.entities.SharedResource;
+import com.lantanagroup.link.measureeval.models.ResourceNormalized;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
 
+@Component
 public class ResourceNormalizedConsumer {
-    private static final Logger log = LoggerFactory.getLogger(ResourceNormalizedConsumer.class);
+    private final MongoOperations mongoOperations;
 
-    @KafkaListener(topics = "ResourceNormalized")
-    public void onResourceNormalized(String message) {
-        log.info("Received ResourceNormalized: " + message);
+    public ResourceNormalizedConsumer(MongoOperations mongoOperations) {
+        this.mongoOperations = mongoOperations;
     }
 
-    @KafkaListener(topics = "ResourceNormalized-Error")
-    public void onResourceNormalizedError(String message) {
-        log.info("Received ResourceNormalized-Error: " + message);
+    @KafkaListener(topics = Topics.RESOURCE_NORMALIZED)
+    public void consume(ConsumerRecord<String, ResourceNormalized> message) {
+        ResourceNormalized value = message.value();
+        IBaseResource resource = value.getResource();
+        System.err.printf("Consuming message: %s%n", resource.fhirType());
+        AbstractResource entity = StringUtils.isEmpty(value.getPatientId())
+                ? new SharedResource()
+                : new PatientResource();
+        entity.setResource(resource);
+        mongoOperations.save(entity);
     }
 }
