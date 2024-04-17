@@ -75,7 +75,7 @@ steps:
      dotnet ef migrations script \
      --idempotent \
      --verbose \
-     -c CensusDbContext \
+     -c CensusContext \
      -s $(build.sourcesdirectory)/$(project) \
      -p $(build.sourcesdirectory)/$(project) \
      -o $(build.sourcesdirectory)/DotNet/Census/Scripts/censusDb.sql
