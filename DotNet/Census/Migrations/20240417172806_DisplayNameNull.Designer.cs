@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Domain.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Census.Migrations
 {
     [DbContext(typeof(CensusContext))]
-    partial class CensusContextModelSnapshot : ModelSnapshot
+    [Migration("20240417172806_DisplayNameNull")]
+    partial class DisplayNameNull
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

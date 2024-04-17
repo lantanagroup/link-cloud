@@ -50,8 +50,8 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             if (!activePatients.Any(x => x.PatientId == patient.PatientId))
             {
                 patient.AdmitDate = DateTime.UtcNow;
-                patient.CreatedDate = DateTime.UtcNow;
-                patient.UpdatedDate = DateTime.UtcNow;
+                patient.CreateDate = DateTime.UtcNow;
+                patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
             }
         }
@@ -63,7 +63,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             {
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
-                patient.UpdatedDate = DateTime.UtcNow;
+                patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
             }
         }
