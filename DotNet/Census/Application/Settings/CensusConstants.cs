@@ -7,7 +7,7 @@ public static class CensusConstants
     {
         public const string ServiceInformation = "ServiceInformation";
         public const string Kafka = "KafkaConnection";
-        public const string SqlServer = "SqlServer";
+        public const string DatabaseConnection = "DatabaseConnection";
         public const string DatabaseProvider = "DatabaseProvider";
         public const string Telemetry = "TelemetryConfig";
         public const string TenantApiSettings = "TenantApiSettings";
