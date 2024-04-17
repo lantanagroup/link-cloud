@@ -15,9 +15,9 @@ RUN apk add --no-cache \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Census/Census.csproj", "DotNet/Census/"]
-COPY ["DotNet/Census/nuget.config", "DotNet/Census/"]
-RUN dotnet restore "DotNet/Census/Census.csproj" --configfile "DotNet/Census/nuget.config"
+RUN dotnet restore "DotNet/Census/Census.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Census"
 RUN dotnet build "Census.csproj" -c Release -o /app/build

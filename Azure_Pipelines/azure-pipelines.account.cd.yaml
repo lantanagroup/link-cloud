@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Account/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:
@@ -16,8 +18,6 @@ variables:
   value: 'DotNet/Account/Account.csproj'
 - name: testProject
   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
-- name: nugetPath
-  value: 'DotNet/Account/nuget.config'
 - name: serviceName
   value: 'Account'
 - name: tags1
@@ -32,14 +32,11 @@ variables:
   value: 'NHSNLink ACR Premium'
   
 steps:
-  - template: ../azure-nuget-package-source.yml
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

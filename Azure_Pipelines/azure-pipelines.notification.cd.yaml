@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/Notification/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:
@@ -16,8 +18,6 @@ variables:
   value: 'DotNet/Notification/Notification.csproj'
 - name: testProject
   value: 'DotNet/NotificationUnitTests/NotificationUnitTests.csproj'
-- name: nugetPath
-  value: 'DotNet/Notification/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -32,15 +32,11 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

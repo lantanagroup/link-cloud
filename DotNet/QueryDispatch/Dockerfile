@@ -7,9 +7,9 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/QueryDispatch/QueryDispatch.csproj", "DotNet/QueryDispatch/"]
-COPY ["DotNet/QueryDispatch/nuget.config", "DotNet/QueryDispatch/"]
-RUN dotnet restore "DotNet/QueryDispatch/QueryDispatch.csproj" --configfile "DotNet/QueryDispatch/nuget.config"
+RUN dotnet restore "DotNet/QueryDispatch/QueryDispatch.csproj"
 COPY . .
 WORKDIR "/src/DotNet/QueryDispatch"
 RUN dotnet build "QueryDispatch.csproj" -c Release -o /app/build
