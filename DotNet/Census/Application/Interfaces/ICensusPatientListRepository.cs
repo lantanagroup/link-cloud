@@ -6,5 +6,5 @@ namespace LantanaGroup.Link.Census.Application.Interfaces;
 public interface ICensusPatientListRepository : IPersistenceRepository<CensusPatientListEntity>
 {
     Task<List<CensusPatientListEntity>> GetActivePatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
-    Task<List<CensusPatientListEntity>> GetAllPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task<List<CensusPatientListEntity>> GetAllPatientsForFacility(string facilityId, DateTime startDate = default, DateTime endDate = default, CancellationToken cancellationToken = default);
 }
