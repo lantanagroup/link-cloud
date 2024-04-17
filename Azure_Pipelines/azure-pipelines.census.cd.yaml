@@ -64,6 +64,22 @@ steps:
         $(tags2)
       buildContext: '$(Build.Repository.LocalPath)'
 
+  - task: DotNetCoreCLI@2
+    displayName: Install dotnet-ef
+    inputs:
+      command: 'custom'
+      custom: 'tool'
+      arguments: 'install --global dotnet-ef'
+
+  - script: |
+     dotnet ef migrations script \
+     --idempotent \
+     --verbose \
+     -c CensusDbContext \
+     -s $(build.sourcesdirectory)/$(project) \
+     -o $(build.artifactstagingdirectory)/DotNet/Census/Scripts/censusDb.sql
+    displayName: Generate SQL Script
+
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
