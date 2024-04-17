@@ -68,8 +68,13 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
         {
             var resource = splitContext[0];
             splitContext = splitContext.Skip(1).ToArray();
-            
-            if(splitContext.Length > 0)
+
+            if (!((Resource)receivedResource).TypeName.Equals(resource, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return receivedResource;
+            }
+
+            if (splitContext.Length > 0)
             {
                 List<Base?> selectedElements = new List<Base?>();              
                     
