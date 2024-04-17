@@ -13,7 +13,7 @@ variables:
   serviceName: 'Census'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
+  #- template: ../azure-nuget-package-source.yml
 
   - task: DotNetCoreCLI@2
     displayName: Restore
