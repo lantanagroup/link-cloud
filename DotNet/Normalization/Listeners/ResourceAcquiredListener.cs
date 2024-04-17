@@ -320,13 +320,24 @@ public class ResourceAcquiredListener : BackgroundService
 
     private Base DeserializeResource(object resource)
     {
-        return resource switch
+
+        switch (resource)
+        {
+            case JsonElement:
+                return DeserializeStringToResource(resource.ToString());
+            case string:
+                return DeserializeStringToResource((string)resource);
+            default:
+                throw new DeserializationUnsupportedTypeException();
+        }
+
+        /*return resource switch
         {
             JsonElement => DeserializeStringToResource(JsonObject.Create((JsonElement)resource).ToJsonString()),
             string => DeserializeStringToResource((string)resource),
             _ => throw new DeserializationUnsupportedTypeException()
         };
-
+*/
     }
 
 }

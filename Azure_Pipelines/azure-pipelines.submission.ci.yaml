@@ -2,25 +2,21 @@ trigger:
   paths:
     include:
     - DotNet/Submission/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
   project: 'DotNet/Submission/Submission.csproj'
-  nugetPath: 'DotNet/Submission/nuget.config'
   serviceName: 'Submission'
 
 steps:
-  - template: ../azure-nuget-package-source.yml 
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

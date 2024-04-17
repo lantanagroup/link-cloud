@@ -2,6 +2,7 @@ trigger:
   paths:
     include:
     - DotNet/Census/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -9,19 +10,14 @@ pool:
 variables:
   project: 'DotNet/Census/Census.csproj'
   testProject: 'DotNet/CensusUnitTests/CensusUnitTests.csproj'
-  nugetPath: 'DotNet/Census/nuget.config'
   serviceName: 'Census'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
