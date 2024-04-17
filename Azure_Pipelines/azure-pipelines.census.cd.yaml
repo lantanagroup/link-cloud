@@ -77,7 +77,7 @@ steps:
      --verbose \
      -c CensusDbContext \
      -s $(build.sourcesdirectory)/$(project) \
-     -o $(build.artifactstagingdirectory)/DotNet/Census/Scripts/censusDb.sql
+     -o $(build.sourcesdirectory)/DotNet/Census/Scripts/censusDb.sql
     displayName: Generate SQL Script
 
   - task: PublishPipelineArtifact@1
