@@ -23,7 +23,7 @@ public class TenantApiService : ITenantApiService
             return true;
 
         var httpClient = _httpClientFactory.CreateClient();
-        var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}/{facilityId}";
+        var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimStart('/').TrimEnd('/')}/{facilityId.TrimStart('/').TrimEnd('/')}";
         var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)
