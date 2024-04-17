@@ -15,9 +15,9 @@ RUN apk add --no-cache \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Audit/Audit.csproj", "DotNet/Audit/"]
-COPY ["DotNet/Audit/nuget.config", "DotNet/Audit/"]
-RUN dotnet restore "DotNet/Audit/Audit.csproj" --configfile "DotNet/Audit/nuget.config"
+RUN dotnet restore "DotNet/Audit/Audit.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Audit"
 RUN dotnet build "Audit.csproj" -c Release -o /app/build
