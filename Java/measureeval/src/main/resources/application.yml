@@ -1,31 +1,17 @@
 server:
   port: 5135
-springdoc:
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    path: /swagger-ui.html
+
 spring:
   application:
     name: measureeval
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:7080/realms/master
-  main:
-    allow-bean-definition-overriding: true
+
   data:
     mongodb:
-      uri: mongodb://localhost:27017/measureeval
+      database: ${spring.application.name}
+
   kafka:
-    bootstrap-servers: localhost:9092
     consumer:
-      group-id: measureeval
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: ${spring.application.name}
+
     producer:
-      client-id: measureeval
-    properties:
-      security.protocol: SASL_SSL
-      sasl.mechanism: PLAIN
-      #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+      client-id: ${spring.application.name}
