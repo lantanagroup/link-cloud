@@ -15,7 +15,6 @@
             public const string Kafka = "KafkaConnection";
             public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
-            public const string LinkServiceDiscovery = "GatewayConfig";
             public const string LinkBearerService = "LinkBearerServiceConfig";
         }
 

@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DemoApiGateway.Application.models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -7,17 +8,17 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
     public class AuditService : IAuditService
     {
         private readonly HttpClient _httpClient;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
-        public AuditService(HttpClient httpClient, IOptions<GatewayConfig> gatewayConfig)
+        public AuditService(HttpClient httpClient, IOptions<ServiceRegistry> serviceRegistry)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));          
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(_serviceRegistry));          
         }
         public async Task<HttpResponseMessage> ListAuditEvents(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, Guid? filterUserBy, string? sortBy, int pageSize = 10, int pageNumber = 1)
         {
 
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.AuditServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.AuditServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
