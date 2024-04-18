@@ -1,12 +1,12 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
-using System;
+using LantanaGroup.Link.Audit.Settings;
 using System.Diagnostics.Metrics;
 
 namespace LantanaGroup.Link.Audit.Infrastructure.Telemetry
 {
     public class AuditServiceMetrics : IAuditServiceMetrics
     {
-        public const string MeterName = "LinkAuditService";
+        public const string MeterName = $"Link.{AuditConstants.ServiceName}";
 
         private readonly Histogram<double> _auditSearchDuration;
         private readonly TimeProvider _timeProvider;
