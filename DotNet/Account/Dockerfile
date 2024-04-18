@@ -14,11 +14,11 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["Account/Account.csproj", "Account/"]
-COPY ["Account/nuget.config", "Account/"]
-RUN dotnet restore "Account/Account.csproj" --configfile "Account/nuget.config"
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
+COPY ["DotNet/Account/Account.csproj", "DotNet/Account/"]
+RUN dotnet restore "DotNet/Account/Account.csproj"
 COPY . .
-WORKDIR "/src/Account"
+WORKDIR "/src/DotNet/Account"
 RUN dotnet build "Account.csproj" -c Release -o /app/build
 
 FROM build AS publish

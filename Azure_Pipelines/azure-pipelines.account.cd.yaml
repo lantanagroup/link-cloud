@@ -1,10 +1,12 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/Account/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:
@@ -13,11 +15,9 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'Account/Account.csproj'
+  value: 'DotNet/Account/Account.csproj'
 - name: testProject
   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
-- name: nugetPath
-  value: 'DotNet/Account/nuget.config'
 - name: serviceName
   value: 'Account'
 - name: tags1
@@ -32,14 +32,11 @@ variables:
   value: 'NHSNLink ACR Premium'
   
 steps:
-  - template: ../azure-nuget-package-source.yml
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

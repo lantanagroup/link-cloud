@@ -1,13 +1,18 @@
-﻿using Hl7.Fhir.Model;
+﻿using Google.Protobuf.WellKnownTypes;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
+using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
+using Quartz.Xml.JobSchedulingData20;
+using System.Reflection.Metadata.Ecma335;
+using System.Threading;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -103,6 +108,26 @@ namespace LantanaGroup.Link.Report.Core
                 {
                     _logger.LogError($"{nameof(MeasureReportSubmissionModel)} with ID {entry.Id} could not be parsed into a valid MeasureReport.", ex);
                     continue;
+                }
+
+                if (entry.ContainedResources is not null && entry.ContainedResources.Count > 0)
+                {
+                    if (mr.Contained == null) mr.Contained = new List<Resource>();
+
+                    entry.ContainedResources.ForEach(r =>
+                    {
+                        Resource resource = null!;
+                        if (r.Resource == null) return;
+                        try
+                        {
+                            resource = parser.Parse<Resource>(r.Resource);
+                            mr.Contained.Add(resource);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError($"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.", ex);
+                        }
+                    });
                 }
 
                 // ensure we have an id to reference

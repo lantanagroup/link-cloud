@@ -1,6 +1,5 @@
 ﻿
 using LantanaGroup.Link.Tenant.Repository.Context;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Tenant.Services

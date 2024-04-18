@@ -73,7 +73,9 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
         {
             var fhirResult = await _fhirRepo.GetPatient(
                 fhirConfig.FhirServerBaseUrl, 
-                string.IsNullOrWhiteSpace(request?.PatientId) ? request?.PatientIdentifier : request?.PatientId, 
+                string.IsNullOrWhiteSpace(request?.PatientId) ? request?.PatientIdentifier : request?.PatientId,
+                string.Empty,
+                request.FacilityId,
                 fhirConfig?.Authentication, 
                 cancellationToken);
 

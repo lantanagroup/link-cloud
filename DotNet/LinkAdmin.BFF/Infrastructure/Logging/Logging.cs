@@ -24,9 +24,33 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
 
         [LoggerMessage(
             LinkAdminLoggingIds.RequestRecievedException,
-            LogLevel.Critical,
+            LogLevel.Error,
             "Request Recieved for {api} at {timestamp}.")]
         public static partial void LogRequestRecievedException(this ILogger logger, string api, DateTime timestamp);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkAdminTokenGenerated,
+            LogLevel.Information,
+            "Link Admin Token was generated at {timestamp} for user {userId}.")]
+        public static partial void LogLinkAdminTokenGenerated(this ILogger logger, DateTime timestamp, string userId);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkAdminTokenGenerationException,
+            LogLevel.Error,
+            "An exception occured while generating the Link Admin Token: {exception}")]
+        public static partial void LogLinkAdminTokenGenerationException(this ILogger logger, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkAdminTokenKeyRefreshed,
+            LogLevel.Information,
+            "Link Admin Token Key was refreshed at {timestamp}.")]
+        public static partial void LogLinkAdminTokenKeyRefreshed(this ILogger logger, DateTime timestamp);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkAdminTokenKeyRefreshException,
+            LogLevel.Error,
+            "An exception occured while refreshing the Link Admin Token Key: {exception}")]
+        public static partial void LogLinkAdminTokenKeyRefreshException(this ILogger logger, string exception);
 
         [LoggerMessage(
             LinkAdminLoggingIds.KafkaProducerCreated,
@@ -58,5 +82,34 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
             "New Data Acquisition Requested event with a correlation id of {correlationId} was created.")]
         public static partial void LogKafkaProducerDataAcquisitionRequested(this ILogger logger, string correlationId);
 
+        [LoggerMessage(
+            LinkAdminLoggingIds.GatewayServiceUriException,
+            LogLevel.Error,
+            "An exception occured while accessing service {service} uri: {exception}")]
+        public static partial void LogGatewayServiceUriException(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestGenerated,
+            LogLevel.Information,
+            "A new request was generated for service {service}.")]
+        public static partial void LogLinkServiceRequestGenerated(this ILogger logger, string service);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestException,
+            LogLevel.Error,
+            "An exception occured while making a request to service {service}: {exception}")]
+        public static partial void LogLinkServiceRequestException(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestWarning,
+            LogLevel.Warning,
+            "While making a request to service {service}: {exception}")]
+        public static partial void LogLinkServiceRequestWarning(this ILogger logger, string service, string exception);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.LinkServiceRequestSuccess,
+            LogLevel.Information,
+            "Request to service {service} was successful.")]
+        public static partial void LogLinkServiceRequestSuccess(this ILogger logger, string service);
     }
 }

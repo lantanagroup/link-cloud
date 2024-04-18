@@ -15,11 +15,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
                 .NotEmpty()
                     .WithMessage("PatientId is required");
 
-            RuleFor(x => x.Reports)
+            RuleFor(x => x.QueryType)
+                .NotEmpty()
+                    .WithMessage("QueryType is required")
+                .Must((x, y) => x.QueryType == "Initial" || x.QueryType == "Supplemental")
+                    .WithMessage("QueryType must be Initial or Supplemental");
+
+            RuleFor(x => x.ScheduledReports)
                 .NotEmpty()
                     .WithMessage("Reports are required");
 
-            RuleForEach(x => x.Reports)
+            RuleForEach(x => x.ScheduledReports)
                 .SetValidator(new ScheduledReportValidator());
            
         }

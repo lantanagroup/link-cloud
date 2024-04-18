@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Census.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("ModifyDate")
+                    b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ScheduledTrigger")
@@ -53,20 +53,16 @@ namespace LantanaGroup.Link.Census.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("AdmitDate")
+                    b.Property<DateTime?>("AdmitDate")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("DischargeDate")
+                    b.Property<DateTime?>("DischargeDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("DisplayName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FacilityId")
@@ -82,9 +78,6 @@ namespace LantanaGroup.Link.Census.Migrations
                     b.Property<string>("PatientId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UpdatedDate")
-                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 

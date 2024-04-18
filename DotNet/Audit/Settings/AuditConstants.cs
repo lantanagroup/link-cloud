@@ -2,18 +2,20 @@
 {
     public class AuditConstants
     {
+        public const string ServiceName = "Audit";
+
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "Link:Audit:ExternalConfigurationSource";
-            public const string ServiceInformation = "Link:Audit:ServiceInformation";
-            public const string Kafka = "Link:Audit:KafkaConnection";
-            public const string DatabaseConnectionString = "Link:Audit:ConnectionStrings:DatabaseConnection";
-            public const string DatabaseProvider = "Link:Audit:DatabaseProvider";            
-            public const string IdentityProvider = "Link:Audit:IdentityProviderConfig";
-            public const string Telemetry = "Link:Audit:TelemetryConfig";
-            public const string Serilog = "Link:Audit:Logging:Serilog";
-            public const string EnableSwagger = "Link:Audit:EnableSwagger";
-            public const string AllowReflection = "Link:Audit:AllowReflection";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string ServiceInformation = "ServiceInformation";
+            public const string Kafka = "KafkaConnection";
+            public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
+            public const string DatabaseProvider = "DatabaseProvider";            
+            public const string IdentityProvider = "IdentityProviderConfig";
+            public const string Telemetry = "TelemetryConfig";
+            public const string Serilog = "Serilog";
+            public const string EnableSwagger = "EnableSwagger";
+            public const string AllowReflection = "AllowReflection";
         }
 
         public static class AuditExceptionMessages 

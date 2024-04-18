@@ -94,7 +94,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         {
             case "SqlServer":
                 options.UseSqlServer(
-                    builder.Configuration.GetConnectionString(CensusConstants.AppSettings.SqlServer))
+                    builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection))
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:

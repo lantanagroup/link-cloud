@@ -1,8 +1,9 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
@@ -69,6 +70,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Summary = "Integration Testing - Produce Data Acquisition Requested Event",
                     Description = "Produces a new data acquisition requested event that will be sent to the broker. Allows for testing processes outside of scheduled events."
                 });
+
+            _logger.LogApiRegistration(nameof(IntegrationTestingEndpoints));
 
         }
 
