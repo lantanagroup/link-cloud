@@ -16,18 +16,14 @@ variables:
   value: 'DotNet/Audit/Audit.csproj'
 - name: testProject
   value: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
-- name: registry-repo-Name
+- name: registry-repo-name
   value: 'link-audit'
 - name: dockerPath
   value: '**/DotNet/Audit/Dockerfile'
 - name: serviceName
   value: 'Audit'  
 - name: containerRegistry
-  value: 'NHSNLink ACR Premium'
+- name: containerRegistryUrl
 
 steps:
   - task: DotNetCoreCLI@2
@@ -48,7 +44,6 @@ steps:
       projects: $(testProject)'
     displayName: 'Run Tests'
   
-
   - task: Docker@2
     displayName: "Build & Push Audit Docker Image"
     condition: always()
@@ -57,9 +52,10 @@ steps:
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
+      arguments: '--cache-from=$(containerRegistryUrl)/$(registry-repo-name):latest'
       tags: |
-        $(tags1)
-        $(tags2)
+        $(Build.BuildId)
+        latest
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
