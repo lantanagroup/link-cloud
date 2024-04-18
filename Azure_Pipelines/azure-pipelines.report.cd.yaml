@@ -7,7 +7,7 @@ trigger:
     - DotNet/Report/*
     - DotNet/Shared/*
     exclude:
-    - *
+    - '*'
     
 pr: none
 

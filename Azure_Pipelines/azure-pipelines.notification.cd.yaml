@@ -7,7 +7,7 @@ trigger:
     - DotNet/Notification/*
     - DotNet/Shared/*
     exclude:
-    - *
+    - '*'
     
 pr: none
 
