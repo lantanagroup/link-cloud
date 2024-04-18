@@ -7,7 +7,7 @@ trigger:
     - DotNet/QueryDispatch/*
     - DotNet/Shared/*
     exclude:
-    - *
+    - '*'
     
 pr: none
 

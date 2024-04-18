@@ -6,7 +6,7 @@ trigger:
     include:
     - Web/DemoApp/*
     exclude:
-    - *
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'

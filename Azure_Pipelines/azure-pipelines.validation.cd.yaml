@@ -6,7 +6,7 @@ trigger:
     include:
     - Java/validation/*
     exclude:
-    - *
+    - '*'
     
 pr: none
 
