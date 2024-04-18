@@ -70,17 +70,18 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            if (facilityId == null && facilityName == null) {
+            if (facilityId == null && facilityName == null)
+            {
                 facilities = await _facilityConfigurationService.GetAllFacilities(cancellationToken);
             }
             else
             {
                 facilities = await _facilityConfigurationService.GetFacilitiesByFilters(facilityId, facilityName, cancellationToken);
             }
-       
+
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
-               facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(facilities);
+                facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(facilities);
             }
             return Ok(facilitiesDtos);
         }
@@ -94,7 +95,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility, CancellationToken cancellationToken)
         {
-            _logger.LogInformation ($"Store Facility with Id: {newFacility.Id} and Facility Name: {newFacility.FacilityName}");
+            _logger.LogInformation($"Store Facility with Id: {newFacility.Id} and Facility Name: {newFacility.FacilityName}");
 
             FacilityConfigModel facilityConfigModel = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(newFacility);
 
@@ -153,58 +154,58 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 dest = _mapperModelToDto.Map<FacilityConfigModel, FacilityConfigDto>(facility);
             }
 
-            return this.Ok(dest);
+            return Ok(dest);
         }
 
 
-    /// <summary>
-    /// Update a facility config.
-    /// </summary>
-    /// <param name="id"></param>
-    /// <param name="updatedFacility"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation($"Update Facility with Id: {updatedFacility.Id} and Facility Name: {updatedFacility.FacilityName}");
-
-        FacilityConfigModel dest = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(updatedFacility);
-
-        FacilityConfigModel existingFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
-
-        // validate id and updatedFacility.id match
-        if (id.ToString() != updatedFacility.Id)
+        /// <summary>
+        /// Update a facility config.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="updatedFacility"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
         {
-            _logger.LogError($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
+            _logger.LogInformation($"Update Facility with Id: {updatedFacility.Id} and Facility Name: {updatedFacility.FacilityName}");
 
-            return BadRequest($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
+            FacilityConfigModel dest = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(updatedFacility);
+
+            FacilityConfigModel existingFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
+
+            // validate id and updatedFacility.id match
+            if (id.ToString() != updatedFacility.Id)
+            {
+                _logger.LogError($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
+
+                return BadRequest($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
+            }
+            try
+            {
+
+                await _facilityConfigurationService.UpdateFacility(id, dest, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                _logger.LogError($"Exception: {ex.Message}");
+
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Exception is: " + ex.Message);
+
+                throw;
+            }
+
+            using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
+            {
+                await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
+            }
+
+            return NoContent();
         }
-        try
-        {
-
-            await _facilityConfigurationService.UpdateFacility(id, dest, cancellationToken);
-        }
-        catch (ApplicationException ex)
-        {
-            _logger.LogError($"Exception: {ex.Message}");
-
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogError("Exception is: " + ex.Message);
-
-            throw;
-        }
-
-        using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
-        {
-            await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
-        }
-
-        return NoContent();
-    }
 
         /// <summary>
         /// Delete a facility by Id.
@@ -213,31 +214,31 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         [HttpDelete("{facilityId}")]
-    public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
-    {
-           
-        _logger.LogInformation($"Delete Facility with Facility Id: {facilityId}");
-
-        FacilityConfigModel existingFacility = _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken).Result;
-
-        try
+        public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
-            await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
-        }
-        catch (ApplicationException ex)
-        {
-            this._logger.LogError("Exception: " + ex.Message);
 
-            return BadRequest(ex.Message);
+            _logger.LogInformation($"Delete Facility with Facility Id: {facilityId}");
+
+            FacilityConfigModel existingFacility = _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken).Result;
+
+            try
+            {
+                await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
+            }
+            catch (ApplicationException ex)
+            {
+                _logger.LogError("Exception: " + ex.Message);
+
+                return BadRequest(ex.Message);
+            }
+
+            using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
+            {
+                await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
+            }
+
+            return NoContent();
         }
 
-        using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
-        {
-            await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
-        }
-
-        return NoContent();
     }
-
-}
 }

@@ -14,9 +14,9 @@ namespace LantanaGroup.Link.Tenant.Jobs
     public class ReportScheduledJob : IJob
     {
         private readonly ILogger<ReportScheduledJob> _logger;
-        private readonly IKafkaProducerFactory<string,object> _kafkaProducerFactory;
+        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
 
-        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string,object> kafkaProducerFactory)
+        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory)
         {
             _logger = logger;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));

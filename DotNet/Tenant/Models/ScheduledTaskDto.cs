@@ -1,5 +1,4 @@
 ﻿using CronExpressionDescriptor;
-using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 
 namespace LantanaGroup.Link.Tenant.Models
 {
@@ -9,14 +8,9 @@ namespace LantanaGroup.Link.Tenant.Models
 
         public List<ReportTypeDtoSchedule> ReportTypeSchedules { get; set; } = new List<ReportTypeDtoSchedule>();
 
-        
-        /* [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
-         public Dictionary<string, string> EventData { get; set; }*/
-
         public class ReportTypeDtoSchedule
         {
-            public string ReportType { get; set; }
-            //public string ScheduledTrigger { get; set; }
+            public string? ReportType { get; set; }
             public List<string> ScheduledTriggers { get; set; } = new List<string>();
 
             public List<string>? ScheduledTriggerDescription
@@ -24,7 +18,7 @@ namespace LantanaGroup.Link.Tenant.Models
                 get
                 {
                     var scheduledTriggersList = new List<string>();
-                    foreach (string scheduledTrigger in ScheduledTriggers) 
+                    foreach (string scheduledTrigger in ScheduledTriggers)
                     {
                         scheduledTriggersList.Add(ExpressionDescriptor.GetDescription(scheduledTrigger));
                     }

@@ -54,6 +54,7 @@ namespace LantanaGroup.Link.PatientsToQuery.Listeners
                 .Merge(
                     //Tag incoming DataAcquisitionRequested patients as 'queried'
                     queriedStream
+                        .Filter((k, v) => v.QueryType == QueryTypes.Initial.ToString())
                         .MapValues(v => {
                             _logger.LogInformation(new EventId(LoggingIds.GenerateItems, "Generating Queried PatientStatus"), "Patient {0} queried", v.PatientId);
                             return new PatientStatus() { PatientId = v.PatientId, Status = Status.Queried }; 

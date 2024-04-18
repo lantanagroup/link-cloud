@@ -2,20 +2,19 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.FhirPath;
-using Hl7.FhirPath.Expressions;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
-using System.Linq;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands;
 
 public class ApplyConceptMapCommand : IRequest<OperationCommandResult>
 {
-    public Bundle Bundle { get; set; }
+    public Base Resource { get; set; }
+
     public ConceptMapOperation Operation { get; set; }
     public List<PropertyChangeModel> PropertyChanges { get; set; }
 }
@@ -31,7 +30,7 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
 
     public async Task<OperationCommandResult> Handle(ApplyConceptMapCommand request, CancellationToken cancellationToken)
     {
-        var bundle = request.Bundle;
+        var resource = request.Resource;
         var propertyChanges = request.PropertyChanges;
 
         ConceptMap conceptMap = null;
@@ -45,10 +44,10 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
         }
 
 
-        bundle = ProcessBundle(bundle, request.Operation.FhirContext, conceptMap, propertyChanges);
+        resource = ProcessResource(resource, request.Operation.FhirContext, conceptMap, propertyChanges);
         return new OperationCommandResult
         {
-            Bundle = bundle,
+            Resource = resource,
             PropertyChanges = propertyChanges,
         };
     }
@@ -58,10 +57,10 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
     /// 2. get code resource by resource path list
     /// 3. apply concept map to resource
     /// </summary>
-    /// <param name="bundle"></param>
+    /// <param name="resource"></param>
     /// <param name="fhirPath"></param>
     /// <returns></returns>
-    private Bundle ProcessBundle(Bundle bundle, string fhirContext, ConceptMap conceptMap, List<PropertyChangeModel> propertyChanges)
+    private Base ProcessResource(Base receivedResource, string fhirContext, ConceptMap conceptMap, List<PropertyChangeModel> propertyChanges)
     {
         var splitContext = fhirContext.Split('.');
 
@@ -69,37 +68,36 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
         {
             var resource = splitContext[0];
             splitContext = splitContext.Skip(1).ToArray();
-            var selectedResources = bundle.Select($"Bundle.entry.resource.ofType({resource})").ToList();
-            
-            if(splitContext.Length > 0)
+
+            if (!((Resource)receivedResource).TypeName.Equals(resource, StringComparison.InvariantCultureIgnoreCase))
             {
-                List<Base?> selectedElements = new List<Base?>();
-                foreach( var element in selectedResources)
-                {
+                return receivedResource;
+            }
+
+            if (splitContext.Length > 0)
+            {
+                List<Base?> selectedElements = new List<Base?>();              
                     
-                    var elements = element.Select($"{fhirContext}");
-                    selectedElements.AddRange(element.Select($"{fhirContext}"));
+                var elements = receivedResource.Select($"{fhirContext}");
+                selectedElements.AddRange(receivedResource.Select($"{fhirContext}"));
                     
-                }
                 selectedElements.ForEach(x => ProcessElement(x, conceptMap, propertyChanges));
             }
             else
             {
-                selectedResources.ForEach(x => ProcessResource((Resource)x, conceptMap, propertyChanges));
+               ProcessResource(receivedResource, conceptMap, propertyChanges);
             }
         }
         else
         {
-            bundle.Entry.ForEach(x => ProcessResource(x.Resource, conceptMap, propertyChanges));
+            ProcessResource(receivedResource, conceptMap, propertyChanges);
         }
 
-
-
-        return bundle;
+        return receivedResource;
     }
 
-    private Resource ProcessResource(
-        Resource resource,
+    private Base ProcessResource(
+        Base resource,
         ConceptMap conceptMap,
         List<PropertyChangeModel> propertyChanges)
     {
@@ -165,8 +163,8 @@ public class ApplyConceptMapHandler : IRequestHandler<ApplyConceptMapCommand, Op
                             var newCoding = new Coding
                             {
                                 System = group.Target,
-                                Display = elements[0].Display,
-                                Code = elements[0].Code,
+                                Display = elements.FirstOrDefault()?.Target?.FirstOrDefault()?.Display,
+                                Code = elements.FirstOrDefault()?.Target?.FirstOrDefault()?.Code,
                                 Extension = new List<Extension>
                                     {
                                         new Extension

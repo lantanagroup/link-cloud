@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/DemoApiGateway/*
@@ -13,8 +13,6 @@ variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
   value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: nugetPath
-  value: 'DotNet/DemoApiGateway/nuget.config'
 - name: tags1
   value: 'latest'
 - name: tags2
@@ -29,15 +27,11 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

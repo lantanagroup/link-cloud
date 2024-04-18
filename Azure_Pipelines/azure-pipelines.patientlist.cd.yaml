@@ -1,10 +1,12 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/PatientList/*
+    - DotNet/Shared/*
+    
 pr: none
 
 pool:

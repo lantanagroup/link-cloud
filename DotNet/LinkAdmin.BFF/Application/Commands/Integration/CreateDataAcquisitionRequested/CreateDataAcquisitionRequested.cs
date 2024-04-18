@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         var message = new Message<string, object>
                         {
                             Key = model.Key,
-                            Value = new DataAcquisitionRequestedMessage { PatientId = model.PatientId, reports = model.Reports },
+                            Value = new DataAcquisitionRequestedMessage { PatientId = model.PatientId, QueryType = model.QueryType, ScheduledReports = model.ScheduledReports },
                             Headers = headers
                         };
 

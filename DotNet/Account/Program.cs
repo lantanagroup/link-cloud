@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -77,8 +78,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
-    builder.Services.AddSingleton(builder.Configuration
-        .GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>());
+    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -94,6 +94,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database");
+
+    // Add tenant API service
+    builder.Services.AddHttpClient();
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     // Add controllers
     builder.Services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
@@ -188,6 +192,12 @@ static void SetupMiddleware(WebApplication app)
     app.MapGrpcService<GroupService>();
     app.MapGrpcService<RoleService>();
     app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+
+    app.MapGet("/api/account/email/{email}", async (AccountRepository accountRepository, string email) =>
+    {
+        AccountModel? account = await accountRepository.GetAccountByEmailAsync(email);
+        return account;
+    });
 
     // Ensure database created
     using (var scope = app.Services.CreateScope())

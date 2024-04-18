@@ -7,11 +7,11 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["DataAcquisition/DataAcquisition.csproj", "DataAcquisition/"]
-COPY ["DataAcquisition/nuget.config", "DataAcquisition/"]
-RUN dotnet restore "DataAcquisition/DataAcquisition.csproj"  --configfile "DataAcquisition/nuget.config"
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
+COPY ["DotNet/DataAcquisition/DataAcquisition.csproj", "DotNet/DataAcquisition/"]
+RUN dotnet restore "DotNet/DataAcquisition/DataAcquisition.csproj" 
 COPY . .
-WORKDIR "/src/DataAcquisition"
+WORKDIR "/src/DotNet/DataAcquisition"
 RUN dotnet build "DataAcquisition.csproj" -c Release -o /app/build
 
 FROM build AS publish

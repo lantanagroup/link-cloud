@@ -13,11 +13,11 @@ RUN apk add --no-cache \
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["Notification/Notification.csproj", "Notification/"]
-COPY ["Notification/nuget.config", "Notification/"]
-RUN dotnet restore "Notification/Notification.csproj" --configfile "Notification/nuget.config"
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
+COPY ["DotNet/Notification/Notification.csproj", "DotNet/Notification/"]
+RUN dotnet restore "DotNet/Notification/Notification.csproj"
 COPY . .
-WORKDIR "/src/Notification"
+WORKDIR "/src/DotNet/Notification"
 RUN dotnet build "Notification.csproj" -c Release -o /app/build
 
 FROM build AS publish

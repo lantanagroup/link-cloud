@@ -2,23 +2,23 @@
 {
     public class NotificationConstants
     {
-        public const string ServiceName = "Notification Service";        
+        public const string ServiceName = "Notification";        
 
         public static class AppSettingsSectionNames
         {
-            public const string ExternalConfigurationSource = "Link:Notification:ExternalConfigurationSource";
-            public const string ServiceInformation = "Link:Notification:ServiceInformation";
-            public const string ServiceRegistry = "Link:Notification:ServiceRegistry";
-            public const string Kafka = "Link:Notification:KafkaConnection";
-            public const string DatabaseConnectionString = "Link:Notification:ConnectionStrings:DatabaseConnection";
-            public const string DatabaseProvider = "Link:Notification:DatabaseProvider";
-            public const string Smtp = "Link:Notification:SmtpConnection";
-            public const string Channels = "Link:Notification:Channels";
-            public const string IdentityProvider = "Link:Notification:IdentityProviderConfig";
-            public const string Telemetry = "Link:Notification:TelemetryConfig";
-            public const string Serilog = "Link:Notification:Logging:Serilog";
-            public const string EnableSwagger = "Link:Notification:EnableSwagger";
-            public const string AllowReflection = "Link:Notification:AllowReflection";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string ServiceInformation = "ServiceInformation";
+            public const string ServiceRegistry = "GatewayConfig";
+            public const string Kafka = "KafkaConnection";
+            public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
+            public const string DatabaseProvider = "DatabaseProvider";
+            public const string Smtp = "SmtpConnection";
+            public const string Channels = "Channels";
+            public const string IdentityProvider = "IdentityProviderConfig";
+            public const string Telemetry = "TelemetryConfig";
+            public const string Serilog = "Serilog";
+            public const string EnableSwagger = "EnableSwagger";
+            public const string AllowReflection = "AllowReflection";
         }
 
         public static class NotificationLoggingIds
