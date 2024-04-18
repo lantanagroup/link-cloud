@@ -6,6 +6,8 @@ trigger:
     include:
     - DotNet/Audit/*
     - DotNet/Shared/*
+    exclude:
+    - *
 
 pool:
   vmImage: 'ubuntu-latest'
