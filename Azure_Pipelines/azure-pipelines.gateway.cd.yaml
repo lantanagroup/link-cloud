@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DotNet/DemoApiGateway/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'
