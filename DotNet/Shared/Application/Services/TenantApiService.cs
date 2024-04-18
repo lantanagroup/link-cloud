@@ -24,6 +24,9 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
         var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimStart('/').TrimEnd('/')}/{facilityId.TrimStart('/').TrimEnd('/')}";
+        _logger.LogInformation("Tenant Base Endpoint: {0}", _settings.TenantServiceBaseEndpoint);
+        _logger.LogInformation("Tenant Relative Endpoint: {0}", _settings.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
         var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)
