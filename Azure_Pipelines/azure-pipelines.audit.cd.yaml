@@ -54,7 +54,6 @@ steps:
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
-      arguments: '--cache-from=$(containerRegistryUrl)/$(registry-repo-name):latest'
       tags: |
         $(Build.BuildId)
         latest
