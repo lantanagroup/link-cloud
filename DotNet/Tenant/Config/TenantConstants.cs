@@ -10,8 +10,8 @@ namespace LantanaGroup.Link.Tenant.Config
             public const string ServiceInformation = "ServiceInformation";
             public const string KafkaConnection = "KafkaConnection";
             public const string Telemetry = "TelemetryConfig";
-            public const string MeasureApiConfig = "MeasureServiceRegistry";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string MeasureConfig = "MeasureConfig";
             public const string EnableSwagger = "EnableSwagger";
             public const string Serilog = "Logging:Serilog";
             public const string DatabaseProvider = "DatabaseProvider";

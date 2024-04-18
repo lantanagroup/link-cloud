@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
@@ -23,12 +24,10 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly HttpClient _httpClient;
         private static List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
-        private readonly IOptions<MeasureApiConfig> _measureApiConfig;
-
-
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
-
         private readonly CreateAuditEventCommand _createAuditEventCommand;
+        private readonly IOptions<MeasureConfig> _measureConfig;
 
         static FacilityConfigurationService()
         {
@@ -37,11 +36,12 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<MeasureApiConfig> measureApiConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
-            _measureApiConfig = measureApiConfig ?? throw new ArgumentNullException(nameof(_measureApiConfig));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+            _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
             _logger = logger;
             _httpClient = httpClient;
             _createAuditEventCommand = createAuditEventCommand;
@@ -349,14 +349,13 @@ namespace LantanaGroup.Link.Tenant.Services
                             throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
                         }
                     // check if the report type was set-up in Measure Evaluation Service
-                    if (_measureApiConfig.Value.CheckIfMeasureExists)
-                    { 
-                        string requestUrl = _measureApiConfig.Value.MeasureServiceApiUrl + $"/{reportTypeSchedule.ReportType}";
+                    if (_measureConfig.Value.CheckIfMeasureExists)
+                    {
+                        if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
+                            throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
-                        if (String.IsNullOrEmpty(_measureApiConfig.Value.MeasureServiceApiUrl))
-                        {
-                            throw new ApplicationException($"MeasureEval service configuration from \"MeasureServiceRegistry.MeasureServiceApiUrl\" is missing");
-                        }
+                        string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measureDef/{reportTypeSchedule.ReportType}";
+
 
                         var response = _httpClient.GetAsync(requestUrl).Result;
 
