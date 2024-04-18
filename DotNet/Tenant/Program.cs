@@ -80,7 +80,6 @@ namespace Tenant
                 }
             }
 
-
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
             {
@@ -97,16 +96,14 @@ namespace Tenant
             builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
+            builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
-
             builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
             builder.Services.AddScoped<FacilityConfigurationService>();
-
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context

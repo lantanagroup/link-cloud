@@ -1,8 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
-using System.Net.Http.Headers;
-using System.Net.Http;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Notification.Application.Models;
+using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.Notification.Presentation.Clients
 {
@@ -28,7 +27,12 @@ namespace LantanaGroup.Link.Notification.Presentation.Clients
 
         private void InitHttpClient()
         {
-            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.TenantServiceApiUrl);
+            if (_serviceRegistry.Value.TenantService is null)
+                throw new Exception("Tenant Service configuration is missing.");
+            else if (_serviceRegistry.Value.TenantService.TenantServiceUrl is null)
+                throw new Exception("Tenant Service URL is missing.");
+
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.TenantService.TenantServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
