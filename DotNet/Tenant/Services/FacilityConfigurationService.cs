@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _createAuditEventCommand = createAuditEventCommand;
         }
 
-        public async Task<PagedFacilityConfigModel> GetFacilities(string facilityId, string facilityName, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
+        public async Task<PagedFacilityConfigModel> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
@@ -391,6 +391,11 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException(schedulingErrors.ToString());
             }
 
+        }
+
+        public Task<PagedFacilityConfigModel> GetFacilities(CancellationToken none)
+        {
+            throw new NotImplementedException();
         }
     }
 }

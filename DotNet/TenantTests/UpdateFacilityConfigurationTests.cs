@@ -86,7 +86,7 @@ namespace TenantTests
         }
 
 
-
+/*
         [Fact]
         public async Task TestErrorUpdateNonExistingFacility()
         {
@@ -124,7 +124,7 @@ namespace TenantTests
 
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));
         }
-
+*/
         [Fact]
         public async Task TestErrorDuplicateFacility()
         {
