@@ -1,11 +1,9 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("queriedFhirResource")]
+[Table("queriedFhirResource")]
 public class QueriedFhirResourceRecord : BaseEntity
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]

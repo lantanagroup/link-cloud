@@ -11,6 +11,4 @@ public class FhirListConfiguration : BaseEntity
     public string FhirBaseServerUrl { get; set; }
     public AuthenticationConfiguration Authentication { get; set; }
     public List<EhrPatientList> EHRPatientLists { get; set; }
-    public DateTime CreateDate { get; set; }
-    public DateTime ModifyDate { get; set; }
 }
