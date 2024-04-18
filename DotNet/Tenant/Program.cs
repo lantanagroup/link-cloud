@@ -96,9 +96,9 @@ namespace Tenant
             builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
+            builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
-            builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
 
             builder.Services.AddScoped<FacilityConfigurationService>();
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
