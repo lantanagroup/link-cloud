@@ -104,7 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
-                throw new InvalidOperationException("Database provider not supported.");
+                throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {CensusConstants.AppSettings.DatabaseProvider}");
         }
     });
 
