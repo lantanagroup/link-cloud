@@ -11,6 +11,7 @@ using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Com
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Listeners;
+using LantanaGroup.Link.QueryDispatch.Persistence;
 using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
 using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
 using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
