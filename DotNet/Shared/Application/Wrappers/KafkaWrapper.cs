@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson.Serialization.Conventions;
 
 namespace LantanaGroup.Link.Shared.Application.Wrappers;
@@ -10,22 +11,22 @@ namespace LantanaGroup.Link.Shared.Application.Wrappers;
 public class KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>
         : IKafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>
 {
-    private readonly ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> logger;
-    protected readonly KafkaConnection kafkaConnectionSettings;
-    private readonly IConsumer<ConsumerKey, ConsumerValue> consumer;
-    private readonly IProducer<ProducerKey, ProducerValue> producer;
+    private readonly ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> _logger;
+    protected readonly IOptions<KafkaConnection> _kafkaConnection;
+    private readonly IConsumer<ConsumerKey, ConsumerValue> _consumer;
+    private readonly IProducer<ProducerKey, ProducerValue> _producer;
 
-    public KafkaWrapper(ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> logger, KafkaConnection kafkaConnectionSettings)
+    public KafkaWrapper(ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> logger, IOptions<KafkaConnection> kafkaConnection)
     {
-        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        this.kafkaConnectionSettings = kafkaConnectionSettings ?? throw new ArgumentNullException(nameof(KafkaConnection));
-        consumer = buildConsumer() ?? throw new ArgumentNullException(nameof(consumer));
-        producer = buildProducer() ?? throw new ArgumentNullException(nameof(producer));
+        this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this._kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(KafkaConnection));
+        _consumer = buildConsumer() ?? throw new ArgumentNullException(nameof(_consumer));
+        _producer = buildProducer() ?? throw new ArgumentNullException(nameof(_producer));
     }
 
     public ConsumerValue ConsumeKafkaMessage(CancellationToken cancellationToken)
     {
-        var consumeResult = consumer.Consume(cancellationToken);
+        var consumeResult = _consumer.Consume(cancellationToken);
         return consumeResult.Message.Value;
     }
 
@@ -33,7 +34,7 @@ public class KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue
     {
         try
         {
-            return consumer.Consume(cancellationToken);
+            return _consumer.Consume(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -43,51 +44,51 @@ public class KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue
 
     public (string topic, ConsumerValue value) ConsumeKafkaMessageWithTopic(CancellationToken cancellationToken)
     {
-        var consumeResult = consumer.Consume(cancellationToken);
+        var consumeResult = _consumer.Consume(cancellationToken);
         return (consumeResult.Topic, consumeResult.Message.Value);
     }
 
     public async Task ProduceKafkaMessageAsync(string topic, Func<Message<ProducerKey, ProducerValue>> messageGenerator)
     {
-        await producer.ProduceAsync(topic, messageGenerator());
-        producer.Flush();
+        await _producer.ProduceAsync(topic, messageGenerator());
+        _producer.Flush();
     }
 
     public void ProduceKafkaMessage(string topic, Func<Message<ProducerKey, ProducerValue>> messageGenerator)
     {
-        producer.Produce(topic, messageGenerator());
-        producer.Flush();
+        _producer.Produce(topic, messageGenerator());
+        _producer.Flush();
     }
 
     public void SubscribeToKafkaTopic(IEnumerable<string> topics)
     {
-        consumer.Subscribe(topics);
+        _consumer.Subscribe(topics);
     }
 
     public void DisposeConsumer()
     {
-        consumer.Dispose();
+        _consumer.Dispose();
     }
 
     public void DisposeProducer()
     {
-        producer.Dispose();
+        _producer.Dispose();
     }
 
     public void CloseConsumer()
     {
-        consumer.Close();
+        _consumer.Close();
     }
 
     protected virtual IConsumer<ConsumerKey, ConsumerValue> buildConsumer()
     {
         if (typeof(ConsumerValue) == typeof(string))
         {
-            return new ConsumerBuilder<ConsumerKey, ConsumerValue>(kafkaConnectionSettings.CreateConsumerConfig())
+            return new ConsumerBuilder<ConsumerKey, ConsumerValue>(_kafkaConnection.Value.CreateConsumerConfig())
             .Build();
         }
 
-        return new ConsumerBuilder<ConsumerKey, ConsumerValue>(kafkaConnectionSettings.CreateConsumerConfig())
+        return new ConsumerBuilder<ConsumerKey, ConsumerValue>(_kafkaConnection.Value.CreateConsumerConfig())
             .SetValueDeserializer(new JsonWithFhirMessageDeserializer<ConsumerValue>())
             .Build();
     }
@@ -96,11 +97,11 @@ public class KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue
     {
         if (typeof(ProducerValue) == typeof(string))
         {
-            return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
+            return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.Value.CreateProducerConfig())
             .Build();
         }
 
-        return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
+        return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.Value.CreateProducerConfig())
             .SetValueSerializer(new JsonWithFhirMessageSerializer<ProducerValue>())
             .Build();
     }

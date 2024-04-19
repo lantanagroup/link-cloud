@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.MeasureEval.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.MeasureEval.Repository

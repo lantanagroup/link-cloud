@@ -22,11 +22,11 @@ public class DataAcquisitionKafkaService<ConsumerKey, ConsumerValue, ProducerKey
     {
         if (typeof(ProducerValue) is string)
         {
-            return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
+            return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.CreateProducerConfig())
             .Build();
         }
 
-        return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
+        return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.CreateProducerConfig())
             .SetValueSerializer(new PatientIDsAcquiredDataSerializer<ProducerValue>())
             .Build();
     }

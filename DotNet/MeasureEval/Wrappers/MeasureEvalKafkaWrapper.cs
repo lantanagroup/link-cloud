@@ -4,6 +4,7 @@ using LantanaGroup.Link.MeasureEval.Serializers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Wrappers;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.MeasureEval.Wrappers;
 
@@ -13,14 +14,14 @@ public class MeasureEvalKafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, Pr
     where ProducerKey : PatientDataEvaluatedKey
     where ProducerValue : PatientDataEvaluatedMessage
 {
-    public MeasureEvalKafkaWrapper(ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> logger, KafkaConnection kafkaConnectionSettings) 
-        : base(logger, kafkaConnectionSettings)
+    public MeasureEvalKafkaWrapper(ILogger<KafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, ProducerValue>> logger, IOptions<KafkaConnection> kafkaConnection)
+        : base(logger, kafkaConnection)
     {
     }
 
     protected override IConsumer<ConsumerKey, ConsumerValue> buildConsumer()
     {
-        return new ConsumerBuilder<ConsumerKey, ConsumerValue>(kafkaConnectionSettings.CreateConsumerConfig())
+        return new ConsumerBuilder<ConsumerKey, ConsumerValue>(_kafkaConnection.Value.CreateConsumerConfig())
             .SetValueDeserializer(new PatientDataNormalizedMessageDeserializer<ConsumerValue>())
             .Build();
     }
@@ -29,12 +30,12 @@ public class MeasureEvalKafkaWrapper<ConsumerKey, ConsumerValue, ProducerKey, Pr
     {
         if (typeof(ProducerValue) is string)
         {
-            return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
+            return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.Value.CreateProducerConfig())
             .Build();
         }
 
-        return new ProducerBuilder<ProducerKey, ProducerValue>(kafkaConnectionSettings.CreateProducerConfig())
-            .SetKeySerializer (new JsonWithFhirMessageSerializer<ProducerKey>())
+        return new ProducerBuilder<ProducerKey, ProducerValue>(_kafkaConnection.Value.CreateProducerConfig())
+            .SetKeySerializer(new JsonWithFhirMessageSerializer<ProducerKey>())
             .SetValueSerializer(new PatientDataEvaluatedMessageSerializer<ProducerValue>())
             .Build();
     }
