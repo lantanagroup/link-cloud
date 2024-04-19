@@ -1,6 +1,7 @@
 using System.Text;
 using AutoMapper;
 using Grpc.Core;
+using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Converters;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
@@ -19,8 +20,9 @@ namespace LantanaGroup.Link.Account.Services
         private readonly IMapper _mapperModelToMessage;
         private readonly IMapper _mapperMessageToModel;
         private readonly ITenantApiService _tenantApiService;
+        private readonly IAccountServiceMetrics _metrics;
 
-        public AccountService(ILogger<AccountService> logger, AccountRepository accountRepository, ITenantApiService tenantApiService)
+        public AccountService(ILogger<AccountService> logger, AccountRepository accountRepository, ITenantApiService tenantApiService, IAccountServiceMetrics metrics)
         {
             _logger = logger;
             _accountRepository = accountRepository;
@@ -28,6 +30,7 @@ namespace LantanaGroup.Link.Account.Services
 
             _mapperModelToMessage = new ProtoMessageMapper<AccountModel, AccountMessage>(new AccountProfile()).CreateMapper();
             _mapperMessageToModel = new ProtoMessageMapper<AccountMessage, AccountModel>(new AccountProfile()).CreateMapper();
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         /*
@@ -114,6 +117,10 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.AlreadyExists, $"Account is already created for {res.Id}"));
             }
 
+            _metrics.IncrementAccountAddedCounter([
+                new KeyValuePair<string, object?>("facility", newAccount.FacilityIds)
+            ]);
+
             return _mapperModelToMessage.Map<AccountModel, AccountMessage>(newAccount);
         }
 
@@ -172,6 +179,8 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.Internal, $"DeleteAccount exception: {ex.Message}"));
             }
 
+            _metrics.IncrementAccountDeactivatedCounter([]);
+
             return new AccountDeletedMessage();
             
         }
@@ -189,6 +198,8 @@ namespace LantanaGroup.Link.Account.Services
                 _logger.LogError($"RestoreAccount exception: {ex.Message}");
                 throw new RpcException(new Status(StatusCode.Internal, $"RestoreAccount exception: {ex.Message}"));
             }
+
+            _metrics.IncrementAccountRestoredCounter([]);
 
             return _mapperModelToMessage.Map<AccountModel, AccountMessage>(restoredAccount);
         }
