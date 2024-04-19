@@ -31,6 +31,11 @@
         public bool EnableRuntimeInstrumentation { get; set; } = false;
 
         /// <summary>
+        /// Whether to enable instrumentation of Entity Framework
+        /// </summary>
+        public bool InstrumentEntityFramework { get; set; } = false;
+
+        /// <summary>
         /// Whether to export to the OTEL collector
         /// </summary>
         public bool EnableOtelCollector = true;
