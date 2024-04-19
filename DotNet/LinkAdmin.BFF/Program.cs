@@ -24,6 +24,10 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,7 +121,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Link Security
-    builder.Services.AddLinkSecurity(builder.Configuration, options =>
+    builder.Services.AddLinkGatewaySecurity(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
     });
@@ -242,15 +246,17 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error); 
 
-    // Add open telemetry
-    var telemetryConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
     {
-        builder.Services.AddOpenTelemetryService(options => {
+        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+        {
             options.Environment = builder.Environment;
-            options.TelemetryCollectorEndpoint = telemetryConfig.TelemetryCollectorEndpoint;
-            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+            options.ServiceName = LinkAdminConstants.ServiceName;
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
         });
+
+        builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();
     }
 }
 
