@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
     - Java/validation/*
+    - Java/shared/*
     exclude:
     - '*'
     
