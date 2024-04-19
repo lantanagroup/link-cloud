@@ -5,6 +5,7 @@ using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Services;
 using LantanaGroup.Link.Shared.Application.Wrappers;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using Moq;
 using RichardSzalay.MockHttp;
@@ -168,7 +169,7 @@ public class MeasureEvalReportServiceTests
         string facilityId = "testFacility";
         string CorrelationId = "57f91b28-7fd4-bec8-aa69-c655e42a7906";
 
-        var reportService = new MeasureEvalReportService(logger, httpClient, measureEvalConfig, kafkaWrapper);
+        var reportService = new MeasureEvalReportService(logger, httpClient, Options.Create(measureEvalConfig), kafkaWrapper);
         var evaluateOutput = await reportService.EvaluateAsync(facilityId, message, CorrelationId);
 
         return evaluateOutput;

@@ -6,7 +6,6 @@ public static class NormalizationConstants
     public static class AppSettingsSectionNames
     {
         public const string ServiceInformation = "ServiceInformation";
-        public const string Kafka = "KafkaConnection";
         public const string Mongo = "MongoDB";
         public const string Redis = "Redis";
         public const string Telemetry = "TelemetryConfig";

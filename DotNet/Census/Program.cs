@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -81,7 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 
