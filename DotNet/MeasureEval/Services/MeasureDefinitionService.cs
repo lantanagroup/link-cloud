@@ -2,7 +2,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.MeasureEval.Entities;
-using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Repository;
 using System.Text.Json;
 
@@ -11,23 +10,21 @@ namespace LantanaGroup.Link.MeasureEval.Services
     public class MeasureDefinitionService
     {
         private readonly ILogger<MeasureDefinitionService> _logger;
-        private readonly MeasureEvalConfig measureEvalConfig;
-        private readonly HttpClient httpClient;
+        private readonly HttpClient _httpClient;
         MeasureDefinitionRepo _measureDefRepo;
 
-        public MeasureDefinitionService(MeasureDefinitionRepo measureDefRepo, ILogger<MeasureDefinitionService> logger, MeasureEvalConfig measureEvalConfig, HttpClient httpClient)
+        public MeasureDefinitionService(MeasureDefinitionRepo measureDefRepo, ILogger<MeasureDefinitionService> logger, HttpClient httpClient)
         {
             _logger = logger;
             _measureDefRepo = measureDefRepo;
-            this.measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
-            this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
+            this._httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
         }
 
         public async Task<Hl7.Fhir.Model.Bundle> getBundleFromUrl(String url)
         {
             Uri uri = new Uri(url);
 
-            var response = await httpClient.GetAsync(uri);
+            var response = await _httpClient.GetAsync(uri);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError($"Retrieval error:  {response.StatusCode}");
