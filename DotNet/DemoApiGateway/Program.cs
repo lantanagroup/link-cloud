@@ -25,6 +25,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
 using Link.Authorization.Policies;
 using Link.Authorization.Requirements;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,7 +99,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         };
     });
 
-    builder.Services.Configure<GatewayConfig>(builder.Configuration.GetSection(GatewayConstants.AppSettingsSectionNames.Gateway));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 
     // Add services to the container
     builder.Services.AddHeaderPropagation(opts => {
