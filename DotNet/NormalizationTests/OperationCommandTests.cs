@@ -42,7 +42,7 @@ public class OperationCommandTests
     {
         var logger = new Mock<ILogger<ConditionalTransformationHandler>>();
 
-        var resource = LoadTestResource("TestBundle.json");
+        var resource = LoadTestResource("TestResource.json");
         var conditionalTransformationOperation = new ConditionalTransformationOperation
         {
             FacilityId = "TestFacility",
@@ -74,7 +74,7 @@ public class OperationCommandTests
     {
         var logger = new Mock<ILogger<CopyLocationIdentifierToTypeHandler>>();
 
-        var resource = LoadTestResource("TestBundle.json");
+        var resource = LoadTestResource("TestResource.json");
         var copyLocationIdentifierToTypeOperation = new CopyLocationIdentifierToTypeOperation
         {
             Name = "CopyLocationIdentifierToType",
@@ -90,12 +90,12 @@ public class OperationCommandTests
         Assert.NotNull(result);
     }
 
-    private Base LoadTestResource(string fileName)
+    private Resource LoadTestResource(string fileName)
     {
         //var path = Path.Combine("TestFiles", fileName);
         //var json = File.ReadAllText(path);
         var json = File.ReadAllText(fileName);
-        return JsonSerializer.Deserialize<Base>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+        return JsonSerializer.Deserialize<Resource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
     }
 
     private string LoadTestConceptMap(string fileName)
