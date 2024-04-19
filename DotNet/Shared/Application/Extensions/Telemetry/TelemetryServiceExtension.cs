@@ -15,6 +15,14 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
 {
     public static class TelemetryServiceExtension
     {
+        /// <summary>
+        /// Convenience method to add OpenTelemetry services to the service
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="configuration"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        /// <exception cref="NullReferenceException"></exception>
         public static IServiceCollection AddLinkTelemetry(this IServiceCollection services, IConfiguration configuration, Action<TelemetryServiceOptions> options)
         {
             var initTelemetryOptions = new TelemetryServiceOptions();
@@ -25,9 +33,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
 
             services.AddOpenTelemetryService(options => {
                 options.Environment = initTelemetryOptions.Environment;
-                options.EnableMetrics = telemetryConfig.EnableMetrics;
-                options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";
+                options.ServiceName = initTelemetryOptions.ServiceName;
+                options.ServiceVersion = initTelemetryOptions.ServiceVersion;
                 options.EnableTracing = telemetryConfig.EnableTracing;
+                options.EnableMetrics = telemetryConfig.EnableMetrics;
+                options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";                
                 options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
 
                 //configure OTEL Collector
@@ -44,6 +54,13 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             return services;
         }
 
+        /// <summary>
+        /// Configure open telemetry for the requesting service
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        /// <exception cref="NullReferenceException"></exception>
         public static IServiceCollection AddOpenTelemetryService(this IServiceCollection services, Action<TelemetryServiceOptions> options)
         {
             var telemetryServiceOptions = new TelemetryServiceOptions();
@@ -125,7 +142,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
 
                 if (telemetryServiceOptions.Environment.IsDevelopment())
                 {
-                    otel.WithTracing(tracerProviderBuilder =>
+                    otel.WithMetrics(tracerProviderBuilder =>
                         tracerProviderBuilder
                          .AddConsoleExporter());
 

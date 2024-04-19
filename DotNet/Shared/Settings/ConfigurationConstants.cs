@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Shared.Settings
     {
         public static class AppSettings
         {
-            public const string Telemetry = "TelemetrySettings";
+            public const string Telemetry = "Telemetry";
         }
     }
 }
