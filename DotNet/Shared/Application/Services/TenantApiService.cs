@@ -33,7 +33,7 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/facility/{facilityId.TrimStart('/').TrimEnd('/')}";
+        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint}{facilityId.TrimStart('/').TrimEnd('/')}";
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceApiUrl);
         _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
         _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
