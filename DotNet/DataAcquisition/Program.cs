@@ -20,6 +20,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Wrappers;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
@@ -85,7 +86,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
 
     builder.Services.AddHttpClient("FhirHttpClient")

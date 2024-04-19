@@ -8,6 +8,7 @@ using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -74,7 +75,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddDbContext<DataContext>();
