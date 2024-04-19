@@ -1,10 +1,11 @@
 ﻿using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-
+using System.Linq.Expressions;
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
 public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
@@ -16,7 +17,7 @@ public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfig
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async Task<List<FacilityConfigModel>> SearchAsync(string? facilityName, string? facilityId, CancellationToken cancellationToken)
+    public async Task<(List<FacilityConfigModel>, PaginationMetadata)> SearchAsync(string? facilityName, string? facilityId, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
     {
 
         var query = _dbContext.Facilities.AsNoTracking().AsQueryable();
@@ -31,9 +32,48 @@ public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfig
             query = query.Where(x => x.FacilityName == facilityName);
         }
 
-        var facilities = await query.ToListAsync(cancellationToken);
+        var count = await query.CountAsync(cancellationToken);
 
-        return facilities;
+        query = sortOrder switch
+        {
+            SortOrder.Ascending => query.OrderBy(SetSortBy<FacilityConfigModel>(sortBy)),
+            SortOrder.Descending => query.OrderByDescending(SetSortBy<FacilityConfigModel>(sortBy)),
+            _ => query.OrderBy(x => x.CreateDate)
+        };
+
+        var facilities = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+        var result = (facilities, metadata);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Creates a sort expression for the given sortBy parameter
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="sortBy"></param>
+    /// <returns></returns>
+    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+    {
+        var sortKey = sortBy?.ToLower()??"" switch
+        {
+            "facilityid" => "FacilityId",
+            "facilityname" => "FacilityName",
+            "createdate" => "CreateDate",
+            "modifydate" => "ModifyDate",
+            _ => "createDate"
+        };
+
+        var parameter = Expression.Parameter(typeof(T), "p");
+        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+        return sortExpression;
     }
 
     public async Task<List<FacilityConfigModel>> GetAsync(CancellationToken cancellationToken)

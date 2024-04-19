@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DemoApiGateway.Application.models;
 using LantanaGroup.Link.DemoApiGateway.Application.models.census;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -9,12 +10,12 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
     {
         //create a census service to handle the census api calls
         private readonly HttpClient _httpClient;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
-        public CensusService(HttpClient httpClient, IOptions<GatewayConfig> gatewayConfig)
+        public CensusService(HttpClient httpClient, IOptions<ServiceRegistry> serviceRegistry)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(_serviceRegistry));
         }
 
         // * Create a new census
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
         // * @returns {Promise<HttpResponseMessage>}
         public async Task<HttpResponseMessage> CreateCensus(CensusConfigModel model)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.CensusServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.CensusServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -36,7 +37,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
         // * @returns {Promise<HttpResponseMessage>}
         public async Task<HttpResponseMessage> DeleteCensus(string censusId)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.CensusServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.CensusServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -50,7 +51,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
         // * @returns {Promise<HttpResponseMessage>}
         public async Task<HttpResponseMessage> GetCensus(string censusId)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.CensusServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.CensusServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -65,7 +66,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
         // * @returns {Promise<HttpResponseMessage>}
         public async Task<HttpResponseMessage> UpdateCensus(string censusId, CensusConfigModel model)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.CensusServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.CensusServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

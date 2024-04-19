@@ -21,7 +21,7 @@ namespace QueryDispatchUnitTests
         {
             _mocker = new AutoMocker();
 
-            var settings = _mocker.CreateInstance<TenantApiSettings>();
+            var settings = _mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             _mocker.Use(settings);
 
