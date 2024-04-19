@@ -3,6 +3,7 @@ using LantanaGroup.Link.DemoApiGateway.Application.Commands.CreateDataAcquisitio
 using LantanaGroup.Link.DemoApiGateway.Application.Commands.CreatePatientEvent;
 using LantanaGroup.Link.DemoApiGateway.Application.models;
 using LantanaGroup.Link.DemoApiGateway.Application.models.testing;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -15,18 +16,18 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
     public class TestingGatewayController : ControllerBase
     {
         private readonly ILogger<TestingGatewayController> _logger;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly ICreateReportScheduledCommand _createReportScheduledCommand;
         private readonly ICreatePatientEventCommand _createPatientEventCommand;
         private readonly ICreateDataAcquisitionRequestedEventCommand _createDataAcquisitionRequestedEventCommand;
 
-        public TestingGatewayController(ILogger<TestingGatewayController> logger, IOptions<GatewayConfig> gatewayConfig, 
+        public TestingGatewayController(ILogger<TestingGatewayController> logger, IOptions<ServiceRegistry> serviceRegistry, 
             ICreateReportScheduledCommand createReportScheduledCommand,
             ICreatePatientEventCommand createPatientEventCommand, 
             ICreateDataAcquisitionRequestedEventCommand createDataAcquisitionRequestedEventCommand) 
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(_serviceRegistry));
             _createReportScheduledCommand = createReportScheduledCommand ?? throw new ArgumentNullException(nameof(_createReportScheduledCommand));
             _createPatientEventCommand = createPatientEventCommand ?? throw new ArgumentNullException(nameof(createPatientEventCommand));
             _createDataAcquisitionRequestedEventCommand = createDataAcquisitionRequestedEventCommand ?? throw new ArgumentNullException(nameof(createDataAcquisitionRequestedEventCommand));

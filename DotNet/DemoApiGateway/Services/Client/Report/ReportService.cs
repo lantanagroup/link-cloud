@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DemoApiGateway.Application.models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -8,17 +9,17 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
     {
         //create a census service to handle the census api calls
         private readonly HttpClient _httpClient;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
-        public ReportService(HttpClient httpClient, IOptions<GatewayConfig> gatewayConfig)
+        public ReportService(HttpClient httpClient, IOptions<ServiceRegistry> serviceRegistry)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(_serviceRegistry));
         }
 
         private void InitHttpClient()
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.ReportServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.ReportServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
