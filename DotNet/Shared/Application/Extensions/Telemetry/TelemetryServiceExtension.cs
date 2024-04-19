@@ -180,8 +180,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
             public string ServiceName { get; set; } = null!;
-            public string? ServiceVersion { get; set; }
-            public bool InstrumentEntityFramework { get; set; } = false;
+            public string? ServiceVersion { get; set; }            
         }
     }
 }
