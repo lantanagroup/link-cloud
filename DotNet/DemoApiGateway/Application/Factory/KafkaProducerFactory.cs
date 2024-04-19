@@ -12,18 +12,18 @@ namespace LantanaGroup.Link.DemoApiGateway.Application.Factory
     public class KafkaProducerFactory : IKafkaProducerFactory
     {
         private readonly ILogger<KafkaProducerFactory> _logger;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<KafkaConnection> _kafkaConnection;
 
-        public KafkaProducerFactory(ILogger<KafkaProducerFactory> logger, IOptions<GatewayConfig> gatewayConfig)
+        public KafkaProducerFactory(ILogger<KafkaProducerFactory> logger, IOptions<KafkaConnection> kafkaConnection)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));
+            _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
         }
 
         public IProducer<ReportScheduledKey, ReportScheduledMessage> CreateReportScheduledProducer(string clientId)
         {
             KafkaConnection kafkaConnection = new KafkaConnection();
-            kafkaConnection.BootstrapServers = _gatewayConfig.Value.KafkaBootstrapServers;
+            kafkaConnection.BootstrapServers = _kafkaConnection.Value.BootstrapServers;
             kafkaConnection.ClientId = clientId;
 
             try
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Application.Factory
         public IProducer<string, PatientEventMessage> CreatePatientEventProducer(string clientId)
         {
             KafkaConnection patientEventKafkaConnection = new KafkaConnection();
-            patientEventKafkaConnection.BootstrapServers = _gatewayConfig.Value.KafkaBootstrapServers;
+            patientEventKafkaConnection.BootstrapServers = _kafkaConnection.Value.BootstrapServers;
             patientEventKafkaConnection.ClientId = clientId;
 
             try 
@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Application.Factory
         public IProducer<string, DataAcquisitionRequestedMessage> CreateDataAcquisitionRequestedProducer(string clientId)
         {
             KafkaConnection patientEventKafkaConnection = new KafkaConnection();
-            patientEventKafkaConnection.BootstrapServers = _gatewayConfig.Value.KafkaBootstrapServers;
+            patientEventKafkaConnection.BootstrapServers = _kafkaConnection.Value.BootstrapServers;
             patientEventKafkaConnection.ClientId = clientId;
 
             try
