@@ -8,7 +8,6 @@
         {
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string ServiceInformation = "ServiceInformation";
-            public const string ServiceRegistry = "GatewayConfig";
             public const string Kafka = "KafkaConnection";
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
             public const string DatabaseProvider = "DatabaseProvider";

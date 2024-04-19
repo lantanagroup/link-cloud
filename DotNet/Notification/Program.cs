@@ -21,6 +21,7 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -106,10 +107,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
-    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceRegistry));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
 
     // Add HttpClients
     builder.Services.AddHttpClient<IFacilityClient, FacilityClient>();

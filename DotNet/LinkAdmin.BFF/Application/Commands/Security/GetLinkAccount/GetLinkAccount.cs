@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Link.Authorization.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
@@ -14,11 +15,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
     {
         private readonly ILogger<GetLinkAccount> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IOptions<LinkServiceDiscovery> _serviceRegistry;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<LinkBearerServiceConfig> _bearerServiceConfig;
         private readonly ICreateLinkBearerToken _createLinkBearerToken;
 
-        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<LinkServiceDiscovery> serviceRegistry, IOptions<LinkBearerServiceConfig> bearerServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
+        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry, IOptions<LinkBearerServiceConfig> bearerServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             if (accountId == null) { return null; }
 
             //check if the account service uri is set
-            if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceApiUrl)) 
+            if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl)) 
             {
                 _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
                 return null; 
@@ -45,7 +46,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             //create a http client
             var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceApiUrl);
+            client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -73,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
 
             //send the request to the account service
-            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceApiUrl}/api/account/email/{accountId}", cancellationToken);
+            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/email/{accountId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

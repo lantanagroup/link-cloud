@@ -28,6 +28,7 @@ using LantanaGroup.Link.Audit.Persistance.Repositories;
 using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,6 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
