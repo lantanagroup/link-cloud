@@ -28,6 +28,7 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -292,7 +293,7 @@ static void SetupMiddleware(WebApplication app)
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
     app.UseAuthentication();
-    //app.UseMiddleware<UserScopeMiddleware>();
+    app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization(); 
 
     // Register endpoints
