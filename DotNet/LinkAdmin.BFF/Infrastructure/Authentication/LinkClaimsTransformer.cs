@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
@@ -16,15 +17,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
     public class LinkClaimsTransformer : IClaimsTransformation
     {
         private readonly ILogger<LinkClaimsTransformer> _logger;
-        private readonly IOptions<LinkServiceDiscovery> _serviceDiscovery;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IGetLinkAccount _getLinkAccount;
         private readonly IDistributedCache _cache;
         private readonly IDataProtectionProvider _dataProtectionProvider;
 
-        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IOptions<LinkServiceDiscovery> serviceDiscovery, IGetLinkAccount getLinkAccount, IDistributedCache cache, IDataProtectionProvider dataProtectionProvider)
+        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IOptions<ServiceRegistry> serviceRegistry, IGetLinkAccount getLinkAccount, IDistributedCache cache, IDataProtectionProvider dataProtectionProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _serviceDiscovery = serviceDiscovery ?? throw new ArgumentNullException(nameof(serviceDiscovery));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));

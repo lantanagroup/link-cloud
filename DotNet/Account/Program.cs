@@ -76,9 +76,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.

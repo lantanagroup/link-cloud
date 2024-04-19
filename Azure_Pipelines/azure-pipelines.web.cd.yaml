@@ -5,6 +5,8 @@ trigger:
   paths:
     include:
     - DemoApp/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'

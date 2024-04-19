@@ -80,10 +80,16 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka));
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.TenantApiSettings).Get<TenantApiSettings>() ?? new TenantApiSettings());
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+
+    var test1 = builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection);
+    var test2 = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
+
+    Console.WriteLine($"Connection String: {test1}");
+    Console.WriteLine($"Database Provider: {test2}");
 
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
@@ -98,7 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
-                throw new InvalidOperationException("Database provider not supported.");
+                throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {CensusConstants.AppSettings.DatabaseProvider}");
         }
     });
 

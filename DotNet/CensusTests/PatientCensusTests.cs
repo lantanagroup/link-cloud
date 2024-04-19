@@ -26,7 +26,7 @@ public class PatientCensusTests
                 IsDischarged = false
             }
         };
-        mockRepo.Setup(x => x.GetAllPatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(mockPatientList);
+        mockRepo.Setup(x => x.GetAllPatientsForFacility(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(mockPatientList);
         var handler = new GetAllPatientsForFacilityQueryHandler(mockLogger.Object, mockRepo.Object);
         var query = new GetAllPatientsForFacilityQuery { FacilityId = "123" };
 
@@ -47,7 +47,7 @@ public class PatientCensusTests
         // Arrange
         var mockLogger = new Mock<ILogger<GetAllPatientsForFacilityQueryHandler>>();
         var mockRepo = new Mock<ICensusPatientListRepository>();
-        mockRepo.Setup(x => x.GetAllPatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Mongo failed."));
+        mockRepo.Setup(x => x.GetAllPatientsForFacility(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Mongo failed."));
         var handler = new GetAllPatientsForFacilityQueryHandler(mockLogger.Object, mockRepo.Object);
         var query = new GetAllPatientsForFacilityQuery { FacilityId = "123" };
 

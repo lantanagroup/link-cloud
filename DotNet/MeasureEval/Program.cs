@@ -86,7 +86,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureDefinitionRepo>();
     builder.Services.AddSingleton<MeasureEvalService>();
     builder.Services.AddSingleton<MeasureDefinitionService>();
-
+    
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(nameof(MongoConnection)));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(nameof(KafkaConnection)));
 
