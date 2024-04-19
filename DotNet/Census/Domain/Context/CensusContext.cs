@@ -21,5 +21,9 @@ public class CensusContext : DbContext
         //modelBuilder.Entity<CensusConfigEntity>().HasKey(x => x.Id);
         //modelBuilder.Entity<CensusPatientListEntity>().HasKey(x => x.Id);
         //modelBuilder.Entity<PatientCensusHistoricEntity>().HasKey(x => x.Id);
+
+        modelBuilder.Entity<PatientCensusHistoricEntity>()
+            .Property(x => x.ReportId)
+            .HasComputedColumnSql("CONCAT(FacilityId, '-', CensusDateTime)");
     }
 }
