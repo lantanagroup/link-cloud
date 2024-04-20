@@ -106,6 +106,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             throw new NullReferenceException("Redis Connection String is required.");
 
         options.ConnectionString = redisConnection;
+        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
     });
 
     // Add Secret Manager
