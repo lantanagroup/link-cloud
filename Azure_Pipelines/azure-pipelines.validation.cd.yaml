@@ -41,7 +41,7 @@ steps:
     env:
       SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      mavenPomFile: 'Java/validation/pom.xml'
+      mavenPomFile: 'Java/pom.xml'
       goals: install
       options: '-pl validation -am'
 
