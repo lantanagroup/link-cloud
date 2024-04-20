@@ -43,7 +43,7 @@ steps:
     inputs:
       mavenPomFile: 'Java/validation/pom.xml'
       goals: install
-      options: '-s Java/validation/.m2/settings.xml'
+      options: '-pl validation -am'
 
   - task: Docker@2
     displayName: "Build Docker Image"
