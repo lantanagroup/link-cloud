@@ -15,7 +15,7 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DotNet/LinkAdmin.BFF/DemoApiGateway.csproj'
+  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
 
 steps:
   - task: DotNetCoreCLI@2
