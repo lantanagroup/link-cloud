@@ -21,14 +21,16 @@ public class FhirApiRepository : IFhirApiRepository
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
     private readonly IMediator _mediator;
     private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
+    private readonly IDataAcquisitionServiceMetrics _metrics;
 
-    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository)
+    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository, IDataAcquisitionServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     public async Task<Bundle> GetPagedBundledResultsAsync(
@@ -150,6 +152,11 @@ public class FhirApiRepository : IFhirApiRepository
         AuthenticationConfiguration authConfig, 
         CancellationToken cancellationToken = default)
     {
+        using var _ = _metrics.MeasureDataRequestDuration([
+            new KeyValuePair<string, object?>("facility", facilityId),           
+            new KeyValuePair<string, object?>("resource", "Patient")
+        ]);
+
         var fhirClient = GenerateFhirClient(baseUrl);
 
         var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
@@ -186,6 +193,12 @@ public class FhirApiRepository : IFhirApiRepository
     {
         try
         {
+            using var _ = _metrics.MeasureDataRequestDuration([
+                new KeyValuePair<string, object?>("facility", facilityId),
+                new KeyValuePair<string, object?>("query.type", queryType),
+                new KeyValuePair<string, object?>("resource", resourceType)
+            ]);
+
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
             await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
             {
@@ -216,6 +229,11 @@ public class FhirApiRepository : IFhirApiRepository
         string? queryType = default,
         CancellationToken cancellationToken = default)
     {
+        using var _ = _metrics.MeasureDataRequestDuration([
+            new KeyValuePair<string, object?>("facility", facilityId),
+            new KeyValuePair<string, object?>("query.type", queryType),
+            new KeyValuePair<string, object?>("resource", resourceType)
+        ]);
 
         DomainResource? readResource = resourceType switch
         {
