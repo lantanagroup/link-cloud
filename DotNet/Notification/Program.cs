@@ -13,6 +13,7 @@ using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
@@ -20,8 +21,10 @@ using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -237,14 +240,17 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
+        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+        {
+            options.Environment = builder.Environment;
+            options.ServiceName = NotificationConstants.ServiceName;
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        });
+
+        builder.Services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();
     }
 
 }
