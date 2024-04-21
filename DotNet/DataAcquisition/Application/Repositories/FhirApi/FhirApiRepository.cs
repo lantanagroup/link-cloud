@@ -136,8 +136,17 @@ public class FhirApiRepository : IFhirApiRepository
             var resourceBundle = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, patientIdReference, correlationId, facilityId, queryType);
             resourceBundle.Entry.ForEach(x => 
             {
-                if(!(x.Resource.TypeName == nameof(OperationOutcome)))
+                if (!(x.Resource.TypeName == nameof(OperationOutcome)))
+                {
                     bundle.AddResourceEntry(x.Resource, x.FullUrl);
+
+                    _metrics.IncrementResourceAcquiredCounter([
+                    new KeyValuePair<string, object?>("facility", facilityId),
+                        new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
+                        new KeyValuePair<string, object?>("query.type", queryType),
+                        new KeyValuePair<string, object?>("resource", x.Resource.TypeName)
+                    ]);
+                }
             });
         }
 
@@ -195,6 +204,7 @@ public class FhirApiRepository : IFhirApiRepository
         {
             using var _ = _metrics.MeasureDataRequestDuration([
                 new KeyValuePair<string, object?>("facility", facilityId),
+                new KeyValuePair<string, object?>("patient", patientId),
                 new KeyValuePair<string, object?>("query.type", queryType),
                 new KeyValuePair<string, object?>("resource", resourceType)
             ]);
@@ -209,7 +219,8 @@ public class FhirApiRepository : IFhirApiRepository
                 FacilityId = facilityId,
                 QueryType = queryType,
                 IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName != nameof(OperationOutcome)),
-            }, cancellationToken);
+            }, cancellationToken);           
+            
             return resultBundle;
         }
         catch(FhirOperationException ex)
@@ -231,6 +242,7 @@ public class FhirApiRepository : IFhirApiRepository
     {
         using var _ = _metrics.MeasureDataRequestDuration([
             new KeyValuePair<string, object?>("facility", facilityId),
+            new KeyValuePair<string, object?>("patient", patientId),
             new KeyValuePair<string, object?>("query.type", queryType),
             new KeyValuePair<string, object?>("resource", resourceType)
         ]);
@@ -262,6 +274,17 @@ public class FhirApiRepository : IFhirApiRepository
             QueryType = queryType,
             IsSuccessful = readResource is not OperationOutcome,
         }, cancellationToken);
+
+        if (readResource is not OperationOutcome)
+        {
+            _metrics.IncrementResourceAcquiredCounter([
+                new KeyValuePair<string, object?>("facility", facilityId),
+                new KeyValuePair<string, object?>("patient", patientId), //TODO: Can we keep this?
+                new KeyValuePair<string, object?>("query.type", queryType),
+                new KeyValuePair<string, object?>("resource", resourceType)
+            ]);
+        }
+        
 
         return readResource;
     }
