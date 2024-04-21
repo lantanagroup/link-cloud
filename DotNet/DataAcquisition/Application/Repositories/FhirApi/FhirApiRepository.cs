@@ -139,19 +139,13 @@ public class FhirApiRepository : IFhirApiRepository
                 if (!(x.Resource.TypeName == nameof(OperationOutcome)))
                 {
                     bundle.AddResourceEntry(x.Resource, x.FullUrl);
-
-                    _metrics.IncrementResourceAcquiredCounter([
-                    new KeyValuePair<string, object?>("facility", facilityId),
-                        new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
-                        new KeyValuePair<string, object?>("query.type", queryType),
-                        new KeyValuePair<string, object?>("resource", x.Resource.TypeName)
-                    ]);
+                    IncrementResourceAcquiredMetric(patientIdReference, facilityId, queryType, x.Resource.TypeName);
                 }
             });
         }
 
         return bundle;
-    }
+    }    
 
     public async Task<Patient> GetPatient(
         string baseUrl, 
@@ -277,12 +271,7 @@ public class FhirApiRepository : IFhirApiRepository
 
         if (readResource is not OperationOutcome)
         {
-            _metrics.IncrementResourceAcquiredCounter([
-                new KeyValuePair<string, object?>("facility", facilityId),
-                new KeyValuePair<string, object?>("patient", patientId), //TODO: Can we keep this?
-                new KeyValuePair<string, object?>("query.type", queryType),
-                new KeyValuePair<string, object?>("resource", resourceType)
-            ]);
+            IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
         }
         
 
@@ -395,5 +384,15 @@ public class FhirApiRepository : IFhirApiRepository
             nameof(Location) => string.IsNullOrWhiteSpace(reference.Url?.ToString()) ? (false, null) : (true, reference.Url.ToString()),
             _ => string.IsNullOrWhiteSpace(reference.Url.ToString()) ? (false, null) : (true, reference.Url.ToString()),
         };
+    }
+
+    private void IncrementResourceAcquiredMetric(string? patientIdReference, string? facilityId, string? queryType, string resourceType)
+    {
+        _metrics.IncrementResourceAcquiredCounter([
+            new KeyValuePair<string, object?>("facility", facilityId),
+            new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
+            new KeyValuePair<string, object?>("query.type", queryType),
+            new KeyValuePair<string, object?>("resource", resourceType)
+        ]);
     }
 }
