@@ -29,7 +29,6 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 

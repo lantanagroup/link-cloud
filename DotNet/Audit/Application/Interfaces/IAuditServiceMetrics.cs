@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
-using LantanaGroup.Link.Shared.Application.Services.Telemetry;
+﻿using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 
 namespace LantanaGroup.Link.Audit.Application.Interfaces
 {
