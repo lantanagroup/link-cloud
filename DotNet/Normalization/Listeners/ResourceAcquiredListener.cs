@@ -3,6 +3,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Commands;
 using LantanaGroup.Link.Normalization.Application.Commands.Config;
+using LantanaGroup.Link.Normalization.Application.Interfaces;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
@@ -32,6 +33,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> _deadLetterExceptionHandler;
     private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
+    private readonly INormalizationServiceMetrics _metrics;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
@@ -41,7 +43,8 @@ public class ResourceAcquiredListener : BackgroundService
         IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
         IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler)
+        ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler,
+        INormalizationServiceMetrics metrics)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -56,6 +59,7 @@ public class ResourceAcquiredListener : BackgroundService
         _transientExceptionHandler = transientExceptionHandler;
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     ~ResourceAcquiredListener()
@@ -194,7 +198,7 @@ public class ResourceAcquiredListener : BackgroundService
                                 ModelInfo.ModelInspector, 
                                 new FhirJsonPocoDeserializerSettings{ Validator = null }));
                     }
-
+                
                     operationCommandResult = op.Value switch
                     {
                         ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
@@ -231,6 +235,15 @@ public class ResourceAcquiredListener : BackgroundService
                             PropertyChanges = operationCommandResult.PropertyChanges
                         }),
                     };
+
+                    _metrics.IncrementResourceNormalizedCounter([
+                        new KeyValuePair<string, object?>("facility", messageMetaData.facilityId),
+                        new KeyValuePair<string, object?>("correlation.id", messageMetaData.correlationId),
+                        new KeyValuePair<string, object?>("patient", message.Message.Value.PatientId),
+                        new KeyValuePair<string, object?>("resource", operationCommandResult.Resource.TypeName),
+                        new KeyValuePair<string, object?>("query.type", message.Message.Value.QueryType),
+                        new KeyValuePair<string, object?>("normalization.operation", op.Value.GetType().Name)
+                    ]);
                 }
             }
             catch(Exception ex )
@@ -273,7 +286,8 @@ public class ResourceAcquiredListener : BackgroundService
                     Headers = headers,
                     Value = resourceNormalizedMessage
                 };
-                await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);                
+
             }
             catch(Exception ex)
             {
