@@ -4,9 +4,13 @@ trigger:
     - dev
   paths:
     include:
-    - DotNet/DemoApiGateway/*
+    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
     exclude:
     - '*'
+
+pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -14,15 +18,11 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
-- name: registry-repo-Name
-  value: 'link-api-gw'
+  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
+- name: registryRepositoryName
+  value: 'link-bff'
 - name: dockerPath
-  value: '**/DotNet/DemoApiGateway/Dockerfile'
+  value: '**/DotNet/LinkAdmin.BFF/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
@@ -40,16 +40,16 @@ steps:
       projects: '$(project)'
   
   - task: Docker@2
-    displayName: "Build & Push DemoApiGateway Docker Image"
+    displayName: "Build & Push Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
+      repository: $(registryRepositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        $(Build.BuildId)
+        latest
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1

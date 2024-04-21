@@ -1,8 +1,8 @@
 ﻿using Confluent.Kafka;
-using Microsoft.Extensions.Options;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.MeasureEval.Auditing
 {

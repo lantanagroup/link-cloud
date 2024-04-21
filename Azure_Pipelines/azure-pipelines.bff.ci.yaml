@@ -1,10 +1,13 @@
 trigger:
   paths:
     include:
-    - DotNet/DemoApiGateway/*
+    - DotNet/LinkAdmin.BFF/*
     - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
+    exclude:
+    - '*'
 
-name: Demo API Gateway CI
+name: Admin Backend-for-Frontend
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -12,7 +15,7 @@ pool:
 variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
+  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
 
 steps:
   - task: DotNetCoreCLI@2

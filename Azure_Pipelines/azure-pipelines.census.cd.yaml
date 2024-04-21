@@ -80,13 +80,13 @@ steps:
      -c CensusContext \
      -s $(build.sourcesdirectory)/$(project) \
      -p $(build.sourcesdirectory)/$(project) \
-     -o $(build.sourcesdirectory)/DotNet/Census/Scripts/censusDb.sql
+     -o $(build.artifactstagingdirectory)/DotNet/Census/Scripts/censusDb.sql
     displayName: Generate SQL Script
 
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifact: 'manifest'
+  # - task: PublishPipelineArtifact@1
+  #   inputs:
+  #     targetPath: '$(Build.ArtifactStagingDirectory)'
+  #     artifact: 'manifest'
 
   - task: PublishBuildArtifacts@1
     inputs:

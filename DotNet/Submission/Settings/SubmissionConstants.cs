@@ -9,7 +9,6 @@ namespace LantanaGroup.Link.Submission.Settings
 
         public static class AppSettingsSectionNames
         {
-            public const string Kafka = "KafkaConnection";
             public const string Mongo = "MongoDB";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
