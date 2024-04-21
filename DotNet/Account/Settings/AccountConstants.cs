@@ -7,7 +7,6 @@
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string Kafka = "KafkaConnection";
             public const string Postgres = "Postgres";
             public const string Telemetry = "Telemetry";
             public const string TenantApiSettings = "TenantApiSettings";

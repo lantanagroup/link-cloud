@@ -84,7 +84,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(CensusConstants.AppSettings.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 

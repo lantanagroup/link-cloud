@@ -13,8 +13,6 @@ variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
   value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: serviceName
-  value: 'DemoApiGateway'
 
 steps:
   - task: DotNetCoreCLI@2

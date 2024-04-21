@@ -7,7 +7,6 @@
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string Kafka = "KafkaConnection";
             public const string Mongo = "MongoDB";
             public const string Smtp = "SmtpConnection";
             public const string IdentityProvider = "IdentityProviderConfig";

@@ -29,6 +29,7 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,7 +74,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add IOptions
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
@@ -110,6 +111,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             throw new NullReferenceException("Redis Connection String is required.");
 
         options.ConnectionString = redisConnection;
+        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
     });
 
     // Add Secret Manager

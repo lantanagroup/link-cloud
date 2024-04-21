@@ -185,3 +185,35 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20240419191012_ComputedColumnPatientHistoryReportId'
+)
+BEGIN
+    DECLARE @var6 sysname;
+    SELECT @var6 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[PatientCensusHistory]') AND [c].[name] = N'ReportId');
+    IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [PatientCensusHistory] DROP CONSTRAINT [' + @var6 + '];');
+    ALTER TABLE [PatientCensusHistory] DROP COLUMN [ReportId];
+    EXEC(N'ALTER TABLE [PatientCensusHistory] ADD [ReportId] AS CONCAT(FacilityId, ''-'', CensusDateTime)');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20240419191012_ComputedColumnPatientHistoryReportId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20240419191012_ComputedColumnPatientHistoryReportId', N'8.0.3');
+END;
+GO
+
+COMMIT;
+GO
+

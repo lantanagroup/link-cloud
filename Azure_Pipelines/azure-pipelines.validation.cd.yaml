@@ -5,6 +5,7 @@ trigger:
   paths:
     include:
     - Java/validation/*
+    - Java/shared/*
     exclude:
     - '*'
     
@@ -37,12 +38,10 @@ steps:
 
   - task: Maven@2
     displayName: Maven Install
-    env:
-      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      mavenPomFile: 'Java/validation/pom.xml'
+      mavenPomFile: 'Java/pom.xml'
       goals: install
-      options: '-s Java/validation/.m2/settings.xml'
+      options: '-pl validation -am'
 
   - task: Docker@2
     displayName: "Build Docker Image"
@@ -51,11 +50,9 @@ steps:
       repository: $(registry-repo-name)
       command: build
       Dockerfile: $(dockerPath)
-      arguments: '--build-arg SHARED_BOTW_FEED_TOKEN_ARG=$(SHARED_BOTW_FEED_TOKEN)'
       tags: |
         $(tags1)
         $(tags2)
-      buildContext: 'Java/validation'
 
   - task: Docker@2
     displayName: "Push Docker Image"

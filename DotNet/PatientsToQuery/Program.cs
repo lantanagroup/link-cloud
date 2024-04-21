@@ -14,6 +14,7 @@ using Serilog;
 using PatientsToQuery.Settings;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using LantanaGroup.Link.Shared.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,7 +61,7 @@ else
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
+builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
 
 // Add services to the container.
 builder.Services.AddGrpc();

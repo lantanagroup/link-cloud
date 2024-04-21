@@ -1,23 +1,23 @@
+using Azure.Identity;
 using Confluent.Kafka;
+using Confluent.Kafka.Extensions.OpenTelemetry;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.MeasureEval.Auditing;
 using LantanaGroup.Link.MeasureEval.Listeners;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Repository;
 using LantanaGroup.Link.MeasureEval.Services;
+using LantanaGroup.Link.MeasureEval.Settings;
 using LantanaGroup.Link.MeasureEval.Wrappers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Wrappers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-using Serilog;
-using System.Reflection;
-using LantanaGroup.Link.MeasureEval.Settings;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Confluent.Kafka.Extensions.OpenTelemetry;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Azure.Identity;
+using Serilog;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,10 +73,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
-    //Add Settings
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(nameof(MeasureEvalConfig)).Get<MeasureEvalConfig>());
-    builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(nameof(KafkaConnection)).Get<KafkaConnection>());
-
     // Add services to the container.
     builder.Services.AddHttpClient();
     builder.Services.AddControllers();
@@ -86,18 +82,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureDefinitionRepo>();
     builder.Services.AddSingleton<MeasureEvalService>();
     builder.Services.AddSingleton<MeasureDefinitionService>();
-    
+
+    // Load Configurations
+    builder.Services.Configure<MeasureEvalConfig>(builder.Configuration.GetSection(nameof(MeasureEvalConfig)));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(nameof(MongoConnection)));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(nameof(KafkaConnection)));
 
-    //Add Kafka factories
+    // Add Kafka factories
     builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
 
     // Add custom services to the container.
     builder.Services.AddSingleton<IKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage>, MeasureEvalKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage>>();
-    builder.Services.AddSingleton<IMeasureEvalReportService,MeasureEvalReportService>();
+    builder.Services.AddSingleton<IMeasureEvalReportService, MeasureEvalReportService>();
     builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, Null, MeasureChanged>, KafkaWrapper<Ignore, Null, Null, MeasureChanged>>();
     builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, string, NotificationMessage>, KafkaWrapper<Ignore, Null, string, NotificationMessage>>();
     builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, string, AuditEventMessage>, KafkaWrapper<Ignore, Null, string, AuditEventMessage>>();

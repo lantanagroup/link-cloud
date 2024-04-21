@@ -8,7 +8,6 @@ public static class DataAcquisitionConstants
 
     public static class AppSettingsSectionNames
     {
-        public const string Kafka = "KafkaConnection";
         public const string Mongo = "MongoDB";
         public const string Redis = "Redis";
         public const string ServiceInformation = "ServiceInformation";
