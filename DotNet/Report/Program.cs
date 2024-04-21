@@ -1,7 +1,7 @@
 using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Report.Application.Factory;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Jobs;
@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -21,9 +22,6 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -77,7 +75,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
     }
     else
     {
@@ -190,6 +187,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
+        .Filter.ByExcluding("RequestPath like '/health%'")
+        .Filter.ByExcluding("RequestPath like '/swagger%'")
         .Enrich.WithExceptionDetails()
         .Enrich.FromLogContext()
         .Enrich.WithSpan()
@@ -198,43 +197,17 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
     {
-        var otel = builder.Services.AddOpenTelemetry();
-
-        //configure OpenTelemetry resources with application name
-        otel.ConfigureResource(resource => resource
-            .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
-
-        otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                    .AddSource(ServiceActivitySource.Instance.Name)
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                    })
-                    .AddConfluentKafkaInstrumentation()
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        otel.WithMetrics(metricsProviderBuilder =>
-                metricsProviderBuilder
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddMeter(Counters.meter.Name)
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        if (builder.Environment.IsDevelopment())
+        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
         {
-            otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                .AddConsoleExporter());
+            options.Environment = builder.Environment;
+            options.ServiceName = ReportConstants.ServiceName;
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        });
 
-            //metrics are very verbose, only enable console exporter if you really want to see metric details
-            //otel.WithMetrics(metricsProviderBuilder =>
-            //    metricsProviderBuilder
-            //        .AddConsoleExporter());                
-        }
+        builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
     }
 }
 
