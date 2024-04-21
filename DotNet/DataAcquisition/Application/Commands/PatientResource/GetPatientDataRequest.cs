@@ -37,7 +37,6 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
     private readonly IReferenceResourcesRepository _referenceResourcesRepository;
     private readonly IMediator _mediator;
     private readonly IFhirApiRepository _fhirRepo;
-    private readonly IDataAcquisitionServiceMetrics _metrics;
 
     public GetPatientDataRequestHandler(
         ILogger<GetPatientDataRequestHandler> logger,
@@ -46,8 +45,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         IMediator mediator,
         IFhirApiRepository fhirRepo,
         IReferenceResourcesRepository referenceResourcesRepository,
-        IQueriedFhirResourceRepository queriedFhirResourceRepository,
-        IDataAcquisitionServiceMetrics metrics)
+        IQueriedFhirResourceRepository queriedFhirResourceRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryRepo = fhirQueryRepo ?? throw new ArgumentNullException(nameof(fhirQueryRepo));
@@ -55,7 +53,6 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _referenceResourcesRepository = referenceResourcesRepository ?? throw new ArgumentNullException(nameof(referenceResourcesRepository));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     public async Task<List<IBaseMessage>> Handle(GetPatientDataRequest request, CancellationToken cancellationToken)
@@ -132,15 +129,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                                     PatientId = patientId,
                                     QueryType = processedBundle.queryPlanType
                                 });
-
-                                _metrics.IncrementResourceAcquiredCounter([                                   
-                                    new KeyValuePair<string, object?>("facility", request.FacilityId),
-                                    new KeyValuePair<string, object?>("query.type", request.Message.QueryType),
-                                    new KeyValuePair<string, object?>("resource", childResource.TypeName),
-                                    new KeyValuePair<string, object?>("measure.report", scheduledReport.ReportType),
-                                    new KeyValuePair<string, object?>("period.start", scheduledReport.StartDate),
-                                    new KeyValuePair<string, object?>("period.end", scheduledReport.EndDate)
-                                ]);
+ 
                             }
                         }
 
@@ -151,15 +140,6 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                             PatientId = patientId,
                             QueryType = processedBundle.queryPlanType
                         });
-
-                        _metrics.IncrementResourceAcquiredCounter([
-                            new KeyValuePair<string, object?>("facility", request.FacilityId),
-                            new KeyValuePair<string, object?>("query.type", request.Message.QueryType),
-                            new KeyValuePair<string, object?>("resource", entry.Resource.TypeName),
-                            new KeyValuePair<string, object?>("measure.report", scheduledReport.ReportType),
-                            new KeyValuePair<string, object?>("period.start", scheduledReport.StartDate),
-                            new KeyValuePair<string, object?>("period.end", scheduledReport.EndDate)
-                        ]);
                     }
 
                 }
@@ -288,6 +268,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                     }; 
                     _referenceResourcesRepository.Add(refResource);
                     bundle.AddResourceEntry(resource, $"{resource.TypeName}/{resource.Id}");
+
                 }
             }
 
