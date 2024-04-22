@@ -3,6 +3,7 @@ using HealthChecks.UI.Client;
 using Hellang.Middleware.ProblemDetails;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -17,6 +18,7 @@ using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Application.Queries;
+using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -67,6 +69,17 @@ static void RegisterServices(WebApplicationBuilder builder)
                 });
                 break;
         }
+    }
+
+    // Add service information
+    var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
+    if (serviceInformation != null)
+    {
+        ServiceActivitySource.Initialize(serviceInformation);
+    }
+    else
+    {
+        throw new NullReferenceException("Service Information was null.");
     }
 
     //Add problem details
@@ -149,14 +162,26 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    // Telemetry Configuration
-    // TODO
+    //Add telemetry if enabled
+    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+    {
+        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+        {
+            options.Environment = builder.Environment;
+            options.ServiceName = SubmissionConstants.ServiceName;
+            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        });
+
+        builder.Services.AddSingleton<ISubmissionServiceMetrics, SubmissionServiceMetrics>();
+    }
 }
 
 #endregion
