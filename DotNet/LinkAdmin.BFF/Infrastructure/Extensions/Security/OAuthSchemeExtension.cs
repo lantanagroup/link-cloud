@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -38,16 +40,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
 
                     var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-                    response.EnsureSuccessStatusCode();
+                    response.EnsureSuccessStatusCode();                    
 
-                    var user = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-                    //TODO: Store token in bff associated with the user
-                    //var db = context.HttpContext.RequestServices.GetRequiredService<IDbContext>();
-
-                    //TODO: add application specific claims            
+                    var user = await response.Content.ReadFromJsonAsync<JsonElement>();                     
 
                     context.RunClaimActions(user);
+
+                    //increment login counter
+                    var metrics = context.HttpContext.RequestServices.GetRequiredService<ILinkAdminMetrics>();
+                    metrics.IncrementUserLoginCounter([
+                        new KeyValuePair<string, object?>("auth.scheme", LinkAdminConstants.AuthenticationSchemes.Oauth2)
+                    ]);
                 };
 
             });

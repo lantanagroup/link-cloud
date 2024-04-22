@@ -12,6 +12,7 @@ using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Listeners;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -29,6 +30,8 @@ using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
 using Serilog;
+using Serilog.Enrichers.Span;
+using Serilog.Exceptions;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -74,7 +77,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (serviceInformation != null)
     {
         ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
     }
     else
     {
@@ -147,8 +149,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
+                    .Enrich.WithExceptionDetails()
+                    .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
+                    .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
+
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     builder.Services.AddTransient<IJobFactory, JobFactory>();
@@ -158,44 +167,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<CensusListener>();
     builder.Services.AddHostedService<ScheduleService>();
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(CensusConstants.AppSettings.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        var otel = builder.Services.AddOpenTelemetry();
+        options.Environment = builder.Environment;
+        options.ServiceName = CensusConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        //configure OpenTelemetry resources with application name
-        otel.ConfigureResource(resource => resource
-            .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
+    builder.Services.AddSingleton<ICensusServiceMetrics, CensusServiceMetrics>();
 
-        otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                    .AddSource(ServiceActivitySource.Instance.Name)
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                    })
-                    .AddConfluentKafkaInstrumentation()
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        otel.WithMetrics(metricsProviderBuilder =>
-                metricsProviderBuilder
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddMeter(Counters.meter.Name)
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        if (builder.Environment.IsDevelopment())
-        {
-            otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                .AddConsoleExporter());
-
-            //metrics are very verbose, only enable console exporter if you really want to see metric details
-            //otel.WithMetrics(metricsProviderBuilder =>
-            //    metricsProviderBuilder
-            //        .AddConsoleExporter());                
-        }
-    }
 }
 
 static void SetupMiddleware(WebApplication app)

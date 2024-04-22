@@ -19,13 +19,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// The start date for the report period
         /// </summary>
-        /// <example>2024-01-01</example>
+        /// <example>2024-01-01T00:00:00Z</example>
         public DateTime? StartDate { get; set; }
 
         /// <summary>
         /// The end date for the report period
         /// </summary>
-        /// <example>2024-01-31</example>
+        /// <example>2024-01-31T23:59:59Z</example>
         public DateTime? EndDate { get; set; }
     }
 
@@ -56,13 +56,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// The start date for the reporting period
         /// </summary>
-        /// <example>2024-01-01</example>
+        /// <example>2024-01-01T00:00:00Z</example>
         public DateTime StartDate { get; set; } = DateTime.Now;
 
         /// <summary>
         /// The end date for the reporting period
         /// </summary>
-        /// <example>2024-01-31</example>
+        /// <example>2024-01-31T23:59:59Z</example>
         public DateTime EndDate { get; set; } = DateTime.Now;
     }
 }

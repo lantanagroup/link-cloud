@@ -129,6 +129,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                                     PatientId = patientId,
                                     QueryType = processedBundle.queryPlanType
                                 });
+ 
                             }
                         }
 
@@ -267,6 +268,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                     }; 
                     _referenceResourcesRepository.Add(refResource);
                     bundle.AddResourceEntry(resource, $"{resource.TypeName}/{resource.Id}");
+
                 }
             }
 

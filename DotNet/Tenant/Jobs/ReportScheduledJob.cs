@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models.Messages;
 using Quartz;
 using System.Text.Json;
@@ -15,11 +16,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
     {
         private readonly ILogger<ReportScheduledJob> _logger;
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        private readonly ITenantServiceMetrics _metrics;
 
-        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory)
+        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, ITenantServiceMetrics metrics)
         {
             _logger = logger;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -81,6 +84,14 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 var producer = _kafkaProducerFactory.CreateProducer(producerConfig);
 
                 await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+
+                _metrics.IncrementReportScheduledCounter([
+                    new KeyValuePair<string, object?>("facility", facility.FacilityId),
+                    new KeyValuePair<string, object?>("reportType", reportType),
+                    new KeyValuePair<string, object?>("period.start", startDate),
+                    new KeyValuePair<string, object?>("period.end", endDate)
+                ]);
+
             }
             catch (Exception ex)
             {

@@ -1,7 +1,7 @@
 using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using Hellang.Middleware.ProblemDetails;
+using LantanaGroup.Link.Normalization.Application.Interfaces;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -18,9 +19,6 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -56,9 +54,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                          // Load configuration values with no label
                          .Select("*", LabelFilter.Null)
                          // Load configuration values for service name
-                         .Select("*", NormalizationConstants.AppSettingsSectionNames.ServiceName)
+                         .Select("*", NormalizationConstants.ServiceName)
                          // Load configuration values for service name and environment
-                         .Select("*", NormalizationConstants.AppSettingsSectionNames.ServiceName + ":" + builder.Environment.EnvironmentName);
+                         .Select("*", NormalizationConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
 
                     options.ConfigureKeyVault(kv =>
                     {
@@ -75,8 +73,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var serviceInformation = serviceInformationSection.Get<ServiceInformation>();
     if (serviceInformation != null)
     {
-        ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
+        ServiceActivitySource.Initialize(serviceInformation);;
     }
     else
     {
@@ -116,8 +113,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
@@ -162,45 +162,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //builder.Services.AddSwaggerGen();
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        var otel = builder.Services.AddOpenTelemetry();
+        options.Environment = builder.Environment;
+        options.ServiceName = NormalizationConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        //configure OpenTelemetry resources with application name
-        otel.ConfigureResource(resource => resource
-            .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
-
-        otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                    .AddSource(ServiceActivitySource.Instance.Name)
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                    })
-                    .AddConfluentKafkaInstrumentation()
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        otel.WithMetrics(metricsProviderBuilder =>
-                metricsProviderBuilder
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddMeter(Counters.meter.Name)
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        if (builder.Environment.IsDevelopment())
-        {
-            otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                .AddConsoleExporter());
-
-            //metrics are very verbose, only enable console exporter if you really want to see metric details
-            //otel.WithMetrics(metricsProviderBuilder =>
-            //    metricsProviderBuilder
-            //        .AddConsoleExporter());                
-        }
-    }
-
+    builder.Services.AddSingleton<INormalizationServiceMetrics, NormalizationServiceMetrics>();
 }
 
 #endregion

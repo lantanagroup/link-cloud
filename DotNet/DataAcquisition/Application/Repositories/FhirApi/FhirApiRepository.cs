@@ -21,14 +21,16 @@ public class FhirApiRepository : IFhirApiRepository
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
     private readonly IMediator _mediator;
     private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
+    private readonly IDataAcquisitionServiceMetrics _metrics;
 
-    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository)
+    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository, IDataAcquisitionServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     public async Task<Bundle> GetPagedBundledResultsAsync(
@@ -134,13 +136,16 @@ public class FhirApiRepository : IFhirApiRepository
             var resourceBundle = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, patientIdReference, correlationId, facilityId, queryType);
             resourceBundle.Entry.ForEach(x => 
             {
-                if(!(x.Resource.TypeName == nameof(OperationOutcome)))
+                if (!(x.Resource.TypeName == nameof(OperationOutcome)))
+                {
                     bundle.AddResourceEntry(x.Resource, x.FullUrl);
+                    IncrementResourceAcquiredMetric(patientIdReference, facilityId, queryType, x.Resource.TypeName);
+                }
             });
         }
 
         return bundle;
-    }
+    }    
 
     public async Task<Patient> GetPatient(
         string baseUrl, 
@@ -150,6 +155,11 @@ public class FhirApiRepository : IFhirApiRepository
         AuthenticationConfiguration authConfig, 
         CancellationToken cancellationToken = default)
     {
+        using var _ = _metrics.MeasureDataRequestDuration([
+            new KeyValuePair<string, object?>("facility", facilityId),           
+            new KeyValuePair<string, object?>("resource", "Patient")
+        ]);
+
         var fhirClient = GenerateFhirClient(baseUrl);
 
         var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
@@ -186,6 +196,13 @@ public class FhirApiRepository : IFhirApiRepository
     {
         try
         {
+            using var _ = _metrics.MeasureDataRequestDuration([
+                new KeyValuePair<string, object?>("facility", facilityId),
+                new KeyValuePair<string, object?>("patient", patientId),
+                new KeyValuePair<string, object?>("query.type", queryType),
+                new KeyValuePair<string, object?>("resource", resourceType)
+            ]);
+
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
             await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
             {
@@ -196,7 +213,8 @@ public class FhirApiRepository : IFhirApiRepository
                 FacilityId = facilityId,
                 QueryType = queryType,
                 IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName != nameof(OperationOutcome)),
-            }, cancellationToken);
+            }, cancellationToken);           
+            
             return resultBundle;
         }
         catch(FhirOperationException ex)
@@ -216,6 +234,12 @@ public class FhirApiRepository : IFhirApiRepository
         string? queryType = default,
         CancellationToken cancellationToken = default)
     {
+        using var _ = _metrics.MeasureDataRequestDuration([
+            new KeyValuePair<string, object?>("facility", facilityId),
+            new KeyValuePair<string, object?>("patient", patientId),
+            new KeyValuePair<string, object?>("query.type", queryType),
+            new KeyValuePair<string, object?>("resource", resourceType)
+        ]);
 
         DomainResource? readResource = resourceType switch
         {
@@ -244,6 +268,12 @@ public class FhirApiRepository : IFhirApiRepository
             QueryType = queryType,
             IsSuccessful = readResource is not OperationOutcome,
         }, cancellationToken);
+
+        if (readResource is not OperationOutcome)
+        {
+            IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+        }
+        
 
         return readResource;
     }
@@ -354,5 +384,15 @@ public class FhirApiRepository : IFhirApiRepository
             nameof(Location) => string.IsNullOrWhiteSpace(reference.Url?.ToString()) ? (false, null) : (true, reference.Url.ToString()),
             _ => string.IsNullOrWhiteSpace(reference.Url.ToString()) ? (false, null) : (true, reference.Url.ToString()),
         };
+    }
+
+    private void IncrementResourceAcquiredMetric(string? patientIdReference, string? facilityId, string? queryType, string resourceType)
+    {
+        _metrics.IncrementResourceAcquiredCounter([
+            new KeyValuePair<string, object?>("facility", facilityId),
+            new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
+            new KeyValuePair<string, object?>("query.type", queryType),
+            new KeyValuePair<string, object?>("resource", resourceType)
+        ]);
     }
 }
