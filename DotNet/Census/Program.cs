@@ -168,18 +168,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ScheduleService>();
 
     //Add telemetry if enabled
-    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-        {
-            options.Environment = builder.Environment;
-            options.ServiceName = CensusConstants.ServiceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?
-            options.InstrumentEntityFramework = true;
-        });
+        options.Environment = builder.Environment;
+        options.ServiceName = CensusConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        builder.Services.AddSingleton<ICensusServiceMetrics, CensusServiceMetrics>();
-    }
+    builder.Services.AddSingleton<ICensusServiceMetrics, CensusServiceMetrics>();
+
 }
 
 static void SetupMiddleware(WebApplication app)

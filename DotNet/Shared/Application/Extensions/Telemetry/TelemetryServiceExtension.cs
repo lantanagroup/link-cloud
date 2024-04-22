@@ -28,28 +28,36 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var initTelemetryOptions = new TelemetryServiceOptions();
             options.Invoke(initTelemetryOptions);
 
-            var telemetryConfig = configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry).Get<TelemetrySettings>()
-            ?? throw new NullReferenceException("Telemetry Configuration was null.");
+            var telemetryConfig = configuration.GetSection(ConfigurationConstants.AppSettings.Telemetry).Get<TelemetrySettings>();
 
-            services.AddOpenTelemetryService(options => {
-                options.Environment = initTelemetryOptions.Environment;
-                options.ServiceName = initTelemetryOptions.ServiceName;
-                options.ServiceVersion = initTelemetryOptions.ServiceVersion;
-                options.EnableTracing = telemetryConfig.EnableTracing;
-                options.EnableMetrics = telemetryConfig.EnableMetrics;
-                options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";                
-                options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+            if (telemetryConfig is not null && telemetryConfig.EnableTelemetry)
+            {
+                //ensure required telemetry options are provided
+                if (initTelemetryOptions.Environment is null || string.IsNullOrEmpty(initTelemetryOptions.ServiceName))
+                { 
+                    throw new NullReferenceException("Environment and ServiceName must be provided to configure telemetry.");
+                }
+                
+                services.AddOpenTelemetryService(options => {
+                    options.Environment = initTelemetryOptions.Environment;
+                    options.ServiceName = initTelemetryOptions.ServiceName;
+                    options.ServiceVersion = initTelemetryOptions.ServiceVersion;
+                    options.EnableTracing = telemetryConfig.EnableTracing;
+                    options.EnableMetrics = telemetryConfig.EnableMetrics;
+                    options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";
+                    options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
 
-                //configure OTEL Collector
-                options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
-                options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ?
-                    telemetryConfig.OtelCollectorEndpoint : null;
+                    //configure OTEL Collector
+                    options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;
+                    options.OtelCollectorEndpoint = telemetryConfig.EnableOtelCollector ?
+                        telemetryConfig.OtelCollectorEndpoint : null;
 
-                //configure Azure Monitor
-                options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
-                options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
-                    configuration.GetConnectionString("AzureMonitor") : null;
-            });
+                    //configure Azure Monitor
+                    options.EnableAzureMonitor = telemetryConfig.EnableAzureMonitor;
+                    options.AzureMonitorConnectionString = telemetryConfig.EnableAzureMonitor ?
+                        configuration.GetConnectionString("AzureMonitor") : null;
+                });
+            }           
 
             return services;
         }

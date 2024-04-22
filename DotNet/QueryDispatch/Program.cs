@@ -24,7 +24,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Quartz;
@@ -182,17 +181,14 @@ Log.Logger = new LoggerConfiguration()
                 .CreateLogger();
 
 //Add telemetry if enabled
-if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+builder.Services.AddLinkTelemetry(builder.Configuration, options =>
 {
-    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-    {
-        options.Environment = builder.Environment;
-        options.ServiceName = QueryDispatchConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-    });
+    options.Environment = builder.Environment;
+    options.ServiceName = QueryDispatchConstants.ServiceName;
+    options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+});
 
-    builder.Services.AddSingleton<IQueryDispatchServiceMetrics, QueryDispatchServiceMetrics>();
-}
+builder.Services.AddSingleton<IQueryDispatchServiceMetrics, QueryDispatchServiceMetrics>();
 
 var app = builder.Build();
 

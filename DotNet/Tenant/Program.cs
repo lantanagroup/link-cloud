@@ -200,17 +200,14 @@ namespace Tenant
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
             //Add telemetry if enabled
-            if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+            builder.Services.AddLinkTelemetry(builder.Configuration, options =>
             {
-                builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-                {
-                    options.Environment = builder.Environment;
-                    options.ServiceName = TenantConstants.ServiceName;
-                    options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-                });
+                options.Environment = builder.Environment;
+                options.ServiceName = TenantConstants.ServiceName;
+                options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+            });
 
-                builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
-            }
+            builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
         }
 
         #endregion
