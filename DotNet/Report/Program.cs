@@ -198,17 +198,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Add telemetry if enabled
-    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-        {
-            options.Environment = builder.Environment;
-            options.ServiceName = ReportConstants.ServiceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-        });
+        options.Environment = builder.Environment;
+        options.ServiceName = ReportConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
-    }
+    builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();    
 }
 
 #endregion

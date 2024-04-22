@@ -61,7 +61,7 @@ namespace TenantTests
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _mocker.GetMock<IOptions<MeasureConfig>>()
@@ -118,7 +118,7 @@ namespace TenantTests
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-                .Setup(p => p.CreateAuditEventProducer())
+                .Setup(p => p.CreateAuditEventProducer(false))
                 .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _mocker.GetMock<IOptions<MeasureConfig>>()

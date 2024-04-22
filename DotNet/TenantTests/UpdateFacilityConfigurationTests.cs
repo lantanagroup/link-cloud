@@ -69,7 +69,7 @@ namespace TenantTests
             .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _mocker.GetMock<IOptions<MeasureConfig>>()
@@ -173,7 +173,7 @@ namespace TenantTests
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_modelFound));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));

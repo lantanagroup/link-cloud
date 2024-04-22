@@ -171,17 +171,14 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
 
     //Add telemetry if enabled
-    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-        {
-            options.Environment = builder.Environment;
-            options.ServiceName = SubmissionConstants.ServiceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-        });
+        options.Environment = builder.Environment;
+        options.ServiceName = SubmissionConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        builder.Services.AddSingleton<ISubmissionServiceMetrics, SubmissionServiceMetrics>();
-    }
+    builder.Services.AddSingleton<ISubmissionServiceMetrics, SubmissionServiceMetrics>();
 }
 
 #endregion

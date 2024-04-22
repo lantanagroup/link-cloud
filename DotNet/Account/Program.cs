@@ -1,5 +1,4 @@
 using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Domain.Entities;
@@ -16,9 +15,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Serilog;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -128,17 +124,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Add telemetry if enabled
-    if (builder.Configuration.GetValue<bool>($"{ConfigurationConstants.AppSettings.Telemetry}:EnableTelemetry"))
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddLinkTelemetry(builder.Configuration, options =>
-        {
-            options.Environment = builder.Environment;
-            options.ServiceName = AccountConstants.ServiceName;
-            options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-        });
+        options.Environment = builder.Environment;
+        options.ServiceName = AccountConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
-        builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
-    }
+    builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
 }
 
 #endregion
