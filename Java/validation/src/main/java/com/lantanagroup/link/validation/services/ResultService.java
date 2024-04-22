@@ -1,13 +1,13 @@
 package com.lantanagroup.link.validation.services;
 
-import com.lantanagroup.link.validation.repositories.ValidationResultRepository;
+import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ValidationResultService {
-    private final ValidationResultRepository repository;
+public class ResultService {
+    private final ResultRepository repository;
 
-    public ValidationResultService(ValidationResultRepository repository) {
+    public ResultService(ResultRepository repository) {
         this.repository = repository;
     }
 

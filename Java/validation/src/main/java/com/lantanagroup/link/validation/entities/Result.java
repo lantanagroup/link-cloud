@@ -11,7 +11,7 @@ import org.hl7.fhir.r4.model.OperationOutcome;
 @Entity
 @Getter
 @Setter
-public class ValidationResult {
+public class Result {
     @Id
     @GeneratedValue
     private Long id;
