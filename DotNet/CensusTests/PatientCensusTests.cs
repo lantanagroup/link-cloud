@@ -172,6 +172,7 @@ public class PatientCensusTests
         var mockLogger = new Mock<ILogger<ConsumePaitentIdsAcquiredEventHandler>>();
         var mockPatientListRepo = new Mock<ICensusPatientListRepository>();
         var mockHistoryRepo = new Mock<ICensusHistoryRepository>();
+        var mockMetrics = new Mock<ICensusServiceMetrics>();
 
         var existingPatientList = new List<CensusPatientListEntity>
         {
@@ -203,7 +204,7 @@ public class PatientCensusTests
         mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(new CensusPatientListEntity()));
         mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
 
-        var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object);
+        var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object, mockMetrics.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand
         {
             FacilityId = "123",
@@ -220,6 +221,7 @@ public class PatientCensusTests
         var mockLogger = new Mock<ILogger<ConsumePaitentIdsAcquiredEventHandler>>();
         var mockPatientListRepo = new Mock<ICensusPatientListRepository>();
         var mockHistoryRepo = new Mock<ICensusHistoryRepository>();
+        var mockMetrics = new Mock<ICensusServiceMetrics>();
 
         var existingPatientList = new List<CensusPatientListEntity>
         {
@@ -250,8 +252,8 @@ public class PatientCensusTests
         mockPatientListRepo.Setup(x => x.GetActivePatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingPatientList);
         mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusPatientListEntity());
         mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
-
-        var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object);
+        
+        var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object, mockMetrics.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand
         {
             FacilityId = "123",

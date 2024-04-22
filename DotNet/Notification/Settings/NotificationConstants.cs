@@ -14,7 +14,7 @@
             public const string Smtp = "SmtpConnection";
             public const string Channels = "Channels";
             public const string IdentityProvider = "IdentityProviderConfig";
-            public const string Telemetry = "TelemetryConfig";
+            public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";
             public const string EnableSwagger = "EnableSwagger";
             public const string AllowReflection = "AllowReflection";
