@@ -77,7 +77,6 @@ namespace TenantTests
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
         }
 
-        //TODO: Fix this, because as of now the create step appears to be mocked and we can't actually detect duplicate creations in unit testing
         [Fact]
         public async Task TestErrorCreateDuplicateFacility()
         {
@@ -129,9 +128,6 @@ namespace TenantTests
                 .Setup(p => p.Value)
                 .Returns(_serviceRegistry);
 
-            //  var createResult = await _service.CreateFacility(_model, CancellationToken.None);
-
-            // Assert.True(createResult);
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(_model, CancellationToken.None));
         }
     }
