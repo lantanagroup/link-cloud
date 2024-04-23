@@ -1,11 +1,13 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/DataAcquisition/*
     - DotNet/Shared/*
+    exclude:
+    - '*'
     
 pr: none
 

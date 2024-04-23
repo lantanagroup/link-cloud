@@ -1,10 +1,12 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/DemoApiGateway/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -21,8 +23,6 @@ variables:
   value: 'link-api-gw'
 - name: dockerPath
   value: '**/DotNet/DemoApiGateway/Dockerfile'
-- name: serviceName
-  value: 'DemoApiGateway'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 

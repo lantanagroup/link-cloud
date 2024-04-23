@@ -1,0 +1,35 @@
+trigger:
+  paths:
+    include:
+    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
+    exclude:
+    - '*'
+
+name: Admin Backend-for-Frontend
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: Link_BOTW_Build_Package_Variables
+- name: project
+  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      verbosityRestore: Diagnostic
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+
+

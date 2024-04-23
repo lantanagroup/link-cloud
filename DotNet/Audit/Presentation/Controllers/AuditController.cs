@@ -62,7 +62,9 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1)
         {           
             //capture audit search duration metric
-            using var _ = _auditServiceMetrics.MeasureAuditSearchDuration();
+            using var _ = _auditServiceMetrics.MeasureAuditSearchDuration([
+                new KeyValuePair<string, object?>("pageSize", pageSize)
+            ]);
 
             try
             {

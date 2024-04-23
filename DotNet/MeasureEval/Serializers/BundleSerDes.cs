@@ -11,7 +11,7 @@ public class BundleSerDes : SerializerBase<Bundle>
 {
     public Type ValueType
     {
-        get { return typeof(Bundle) ; }
+        get { return typeof(Bundle); }
     }
 
     public override Bundle Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)

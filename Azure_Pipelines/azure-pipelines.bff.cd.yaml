@@ -1,0 +1,58 @@
+trigger:
+  branches:
+    include:
+    - dev
+  paths:
+    include:
+    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
+    exclude:
+    - '*'
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: Link_BOTW_Build_Package_Variables
+- name: project
+  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
+- name: registryRepositoryName
+  value: 'link-bff'
+- name: dockerPath
+  value: '**/DotNet/LinkAdmin.BFF/Dockerfile'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+  
+  - task: Docker@2
+    displayName: "Build & Push Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registryRepositoryName)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        $(Build.BuildId)
+        latest
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

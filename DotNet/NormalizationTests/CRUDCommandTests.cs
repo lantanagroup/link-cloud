@@ -186,7 +186,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -229,7 +229,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -271,7 +271,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -314,7 +314,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -350,7 +350,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -393,7 +393,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -433,7 +433,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -473,7 +473,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 
@@ -518,7 +518,7 @@ public class CRUDCommandTests
         var configRepo = new Mock<IConfigRepository>();
 
         var _mocker = new AutoMocker();
-        var settings = _mocker.CreateInstance<TenantApiSettings>();
+        var settings = _mocker.CreateInstance<TenantServiceRegistration>();
         settings.CheckIfTenantExists = false;
         _mocker.Use(settings);
 

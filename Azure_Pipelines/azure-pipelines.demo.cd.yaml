@@ -1,10 +1,12 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - Web/DemoApp/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'

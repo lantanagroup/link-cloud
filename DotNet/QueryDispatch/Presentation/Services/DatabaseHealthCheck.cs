@@ -1,14 +1,13 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace QueryDispatch.Presentation.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IBaseRepository<QueryDispatchConfiguration> _datastore;
+        private readonly IQueryDispatchConfigurationRepository _datastore;
 
-        public DatabaseHealthCheck(IBaseRepository<QueryDispatchConfiguration> datastore)
+        public DatabaseHealthCheck(IQueryDispatchConfigurationRepository datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }

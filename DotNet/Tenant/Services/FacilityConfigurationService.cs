@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
@@ -23,12 +24,10 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly HttpClient _httpClient;
         private static List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
-        private readonly IOptions<MeasureApiConfig> _measureApiConfig;
-
-
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
-
         private readonly CreateAuditEventCommand _createAuditEventCommand;
+        private readonly IOptions<MeasureConfig> _measureConfig;
 
         static FacilityConfigurationService()
         {
@@ -37,28 +36,26 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<MeasureApiConfig> measureApiConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
-            _measureApiConfig = measureApiConfig ?? throw new ArgumentNullException(nameof(_measureApiConfig));
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+            _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
             _logger = logger;
             _httpClient = httpClient;
             _createAuditEventCommand = createAuditEventCommand;
         }
 
-        public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken)
-        {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Facilities Query");
-
-            return await _facilityConfigurationRepo.GetAsync(cancellationToken);
-        }
-
-        public async Task<List<FacilityConfigModel>> GetFacilitiesByFilters(string? facilityId, string? facilityName, CancellationToken cancellationToken)
+        public async Task<PagedFacilityConfigModel> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
-            return await _facilityConfigurationRepo.SearchAsync(facilityId, facilityName, cancellationToken);
+            var (facilities, metadata) = await _facilityConfigurationRepo.SearchAsync(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+
+            var pagedNotificationConfigurations = new PagedFacilityConfigModel(facilities, metadata);
+
+            return pagedNotificationConfigurations;
         }
 
         public async Task<FacilityConfigModel> GetFacilityById(Guid id, CancellationToken cancellationToken)
@@ -140,16 +137,10 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-                ValidateFacility(newFacility);
-
+             
                 existingFacility = GetFacilityById(id, cancellationToken).Result;
 
-                if (existingFacility is null)
-                {
-                    _logger.LogError($"Facility with Id: {id} Not Found");
-
-                    throw new ApplicationException($"Facility with Id: {id} Not Found");
-                }
+                ValidateFacility(newFacility);
 
                 FacilityConfigModel foundFacility = GetFacilityByFacilityId(newFacility.FacilityId, cancellationToken).Result;
 
@@ -157,7 +148,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     _logger.LogError($"Facility {newFacility.FacilityId} already exists");
 
-                    throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
+                    throw new ApplicationException($"Facility {newFacility.FacilityId} already exists under another ID: {foundFacility.Id}");
                 }
 
                 ValidateSchedules(newFacility);
@@ -169,12 +160,21 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 using (ServiceActivitySource.Instance.StartActivity("Update the Facility Command"))
                 {
-                    existingFacility.FacilityId = newFacility.FacilityId;
-                    existingFacility.FacilityName = newFacility.FacilityName;
-                    existingFacility.ScheduledTasks = newFacility.ScheduledTasks;
-                    existingFacility.MonthlyReportingPlans = newFacility.MonthlyReportingPlans;
+                    if (existingFacility is not null)
+                    {
+                        existingFacility.FacilityId = newFacility.FacilityId;
+                        existingFacility.FacilityName = newFacility.FacilityName;
+                        existingFacility.ScheduledTasks = newFacility.ScheduledTasks;
+                        existingFacility.MonthlyReportingPlans = newFacility.MonthlyReportingPlans;
 
-                    await _facilityConfigurationRepo.UpdateAsync(existingFacility, cancellationToken);
+                        await _facilityConfigurationRepo.UpdateAsync(existingFacility, cancellationToken);
+                    }
+                    else
+                    {
+                        newFacility.MRPCreatedDate = DateTime.UtcNow;
+                        newFacility.Id = id;
+                        await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
+                    }
 
                 }
             }
@@ -345,24 +345,25 @@ namespace LantanaGroup.Link.Tenant.Services
 
                     // validate the reportype is one of the known values
                     if (!MeasureDefinitionTypeValidation.Validate(reportTypeSchedule.ReportType))
-                    {
-                        throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
-                    }
+                        {
+                            throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
+                        }
                     // check if the report type was set-up in Measure Evaluation Service
-
-                    string requestUrl = _measureApiConfig.Value.MeasureServiceApiUrl + $"/{reportTypeSchedule.ReportType}";
-
-                    if (String.IsNullOrEmpty(_measureApiConfig.Value.MeasureServiceApiUrl))
+                    if (_measureConfig.Value.CheckIfMeasureExists)
                     {
-                        throw new ApplicationException($"MeasureEval service configuration from \"MeasureServiceRegistry.MeasureServiceApiUrl\" is missing");
-                    }
+                        if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
+                            throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
-                    var response = _httpClient.GetAsync(requestUrl).Result;
+                        string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measureDef/{reportTypeSchedule.ReportType}";
 
-                    // check respone status code
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
+
+                        var response = _httpClient.GetAsync(requestUrl).Result;
+
+                        // check respone status code
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
+                        }
                     }
 
                     if (reportTypeSchedule.ScheduledTriggers.Count == 0)

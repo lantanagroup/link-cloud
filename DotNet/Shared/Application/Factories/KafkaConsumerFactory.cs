@@ -58,7 +58,8 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to create " + config.GroupId + " Kafka consumer.", ex);
+            string configOutput = $"\nBootstrap Server: {config.BootstrapServers}\nClient ID: {config.ClientId}\nGroup ID: {config.GroupId}\nSecurity Protocol: {config.SecurityProtocol.ToString()}";
+            _logger.LogError($"Failed to create Kafka consumer: {ex.Message}{configOutput}", ex);
             throw new Exception("Failed to create " + config.GroupId + " Kafka consumer.");
         }
     }

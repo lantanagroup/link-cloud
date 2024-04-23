@@ -19,16 +19,18 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
     private readonly ILogger<ConsumePaitentIdsAcquiredEventHandler> _logger;
     private readonly ICensusPatientListRepository _patientListRepository;
     private readonly ICensusHistoryRepository _historyRepository;
+    private readonly ICensusServiceMetrics _metrics;
 
     public ConsumePaitentIdsAcquiredEventHandler(
         ILogger<ConsumePaitentIdsAcquiredEventHandler> logger,
         ICensusPatientListRepository patientListRepository,
-        ICensusHistoryRepository historyRepository
-        )
+        ICensusHistoryRepository historyRepository,
+        ICensusServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _patientListRepository = patientListRepository ?? throw new ArgumentNullException(nameof(patientListRepository));
         _historyRepository = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     public async Task<IEnumerable<BaseResponse>> Handle(ConsumePatientIdsAcquiredEventCommand request, CancellationToken cancellationToken)
@@ -50,9 +52,13 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             if (!activePatients.Any(x => x.PatientId == patient.PatientId))
             {
                 patient.AdmitDate = DateTime.UtcNow;
-                patient.CreatedDate = DateTime.UtcNow;
-                patient.UpdatedDate = DateTime.UtcNow;
+                patient.CreateDate = DateTime.UtcNow;
+                patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
+
+                _metrics.IncrementPatientIdentifiedCounter([ 
+                    new KeyValuePair<string, object?>("facility", request.FacilityId)                     
+                ]);
             }
         }
 
@@ -63,7 +69,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             {
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
-                patient.UpdatedDate = DateTime.UtcNow;
+                patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
             }
         }
