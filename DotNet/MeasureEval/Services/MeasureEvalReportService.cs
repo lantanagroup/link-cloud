@@ -2,27 +2,27 @@
 using Flurl;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using Hl7.Fhir.Support;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Wrappers;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace LantanaGroup.Link.MeasureEval.Services;
 
 public class MeasureEvalReportService : IMeasureEvalReportService
 {
-    private readonly ILogger<MeasureEvalReportService> logger;
-    private readonly HttpClient httpClient;
-    private readonly MeasureEvalConfig measureEvalConfig;
-    private readonly IKafkaWrapper<Ignore, Null, string, NotificationMessage> kafkaWrapper;
+    private readonly ILogger<MeasureEvalReportService> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly IOptions<MeasureEvalConfig> _measureEvalConfig;
+    private readonly IKafkaWrapper<Ignore, Null, string, NotificationMessage> _kafkaWrapper;
 
-    public MeasureEvalReportService(ILogger<MeasureEvalReportService> logger, HttpClient httpClient, MeasureEvalConfig measureEvalConfig, IKafkaWrapper<Ignore, Null, string, NotificationMessage> kafkaWrapper)
+    public MeasureEvalReportService(ILogger<MeasureEvalReportService> logger, HttpClient httpClient, IOptions<MeasureEvalConfig> measureEvalConfig, IKafkaWrapper<Ignore, Null, string, NotificationMessage> kafkaWrapper)
     {
-        this.logger = logger ?? throw new ArgumentNullException(nameof(ILogger<MeasureEvalReportService>));
-        this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
-        this.measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
-        this.kafkaWrapper = kafkaWrapper ?? throw new ArgumentNullException(nameof(kafkaWrapper));
+        this._logger = logger ?? throw new ArgumentNullException(nameof(ILogger<MeasureEvalReportService>));
+        this._httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
+        this._measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
+        this._kafkaWrapper = kafkaWrapper ?? throw new ArgumentNullException(nameof(kafkaWrapper));
     }
 
     public MeasureReport? Evaluate(PatientDataNormalizedMessage message)
@@ -33,9 +33,9 @@ public class MeasureEvalReportService : IMeasureEvalReportService
     public async Task<MeasureReport?> EvaluateAsync(string Key, PatientDataNormalizedMessage message, string CorrelationId, CancellationToken cancellationToken = default)
     {
 
-        if (string.IsNullOrWhiteSpace(measureEvalConfig.EvaluationServiceUrl))
+        if (string.IsNullOrWhiteSpace(_measureEvalConfig.Value.EvaluationServiceUrl))
         {
-            this.logger.LogError("CqfRulerEndpointConfigProperty is not configured. Cannot evaluate measure.");
+            this._logger.LogError("CqfRulerEndpointConfigProperty is not configured. Cannot evaluate measure.");
             return null;
         }
 
@@ -47,27 +47,27 @@ public class MeasureEvalReportService : IMeasureEvalReportService
 
         if (string.IsNullOrWhiteSpace(reportType))
         {
-            this.logger.LogError("Report type is empty. Unable to call CQRF Ruler Endpoint.");
+            this._logger.LogError("Report type is empty. Unable to call CQRF Ruler Endpoint.");
             return null;
         }
 
-        string requestUrl = measureEvalConfig.EvaluationServiceUrl.AppendPathSegments("Measure", reportType, "$evaluate-measure");
+        string requestUrl = _measureEvalConfig.Value.EvaluationServiceUrl.AppendPathSegments("Measure", reportType, "$evaluate-measure");
         HttpResponseMessage response = null;
         string responseContent = null;
         string responseMessage = "";
 
-        for (int x = 0; x < measureEvalConfig.MaxRetry; x++)
+        for (int x = 0; x < _measureEvalConfig.Value.MaxRetry; x++)
         {
             try
             {
-                response = await httpClient.PostAsync(requestUrl, requestBody);
+                response = await _httpClient.PostAsync(requestUrl, requestBody);
                 responseContent = await response.Content.ReadAsStringAsync();
                 break;
             }
             catch (Exception ex)
             {
                 //Don't sleep on the last iteration since it won't do the request again if it fails anyway
-                if (x != measureEvalConfig.MaxRetry - 1) Thread.Sleep(measureEvalConfig.RetryWait);
+                if (x != _measureEvalConfig.Value.MaxRetry - 1) Thread.Sleep(_measureEvalConfig.Value.RetryWait);
             }
         }
 
@@ -103,14 +103,14 @@ public class MeasureEvalReportService : IMeasureEvalReportService
                 responseMessage = "CQF-Ruler couldn't be reached and no response was given";
             }
 
-            logger.LogError($"Response Message: {responseMessage}");
+            _logger.LogError($"Response Message: {responseMessage}");
 
             var headers = new Headers();
             string correlationId = (!string.IsNullOrEmpty(CorrelationId) ? new Guid(CorrelationId).ToString() : Guid.NewGuid().ToString());
 
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(correlationId));
 
-            await kafkaWrapper.ProduceKafkaMessageAsync(KafkaTopic.NotificationRequested.ToString(), () =>
+            await _kafkaWrapper.ProduceKafkaMessageAsync(KafkaTopic.NotificationRequested.ToString(), () =>
                 new Message<string, NotificationMessage>
                 {
                     Key = Key,
@@ -147,7 +147,7 @@ public class MeasureEvalReportService : IMeasureEvalReportService
         {
             Name = "subject",
             Value = new FhirString($"Patient/{message.PatientId.Replace("Patient/", "")}")
-        }); 
+        });
         parameters.Parameter.Add(new Parameters.ParameterComponent()
         {
             Name = "additionalData",

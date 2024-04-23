@@ -1,18 +1,14 @@
-﻿using Google.Protobuf.WellKnownTypes;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
-using Quartz.Xml.JobSchedulingData20;
-using System.Reflection.Metadata.Ecma335;
-using System.Threading;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -20,6 +16,7 @@ namespace LantanaGroup.Link.Report.Core
     {
         private readonly ILogger<MeasureReportSubmissionBundler> _logger;
         private readonly IMediator _mediator;
+        private readonly IReportServiceMetrics _metrics;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -33,10 +30,11 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IMediator mediator)
+        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IMediator mediator, IReportServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
         }
 
 
@@ -159,10 +157,18 @@ namespace LantanaGroup.Link.Report.Core
                 else
                     BundleDefault(submissionBundle, mr);
 
+                _metrics.IncrementReportGeneratedCounter([
+                    new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
+                    new KeyValuePair<string, object?>("measure.schedule.id", measureReportScheduleId),
+                    new KeyValuePair<string, object?>("submitting.organization", orgId),
+                    new KeyValuePair<string, object?>("measure", mr.Measure),
+                    new KeyValuePair<string, object?>("bundling.type", config?.BundlingType)
+                ]);
+
             }
 
             // create or update the submission bundle to storage
-            submission.SubmissionBundle = submissionBundle;
+            submission.SubmissionBundle = submissionBundle;            
 
             //Disabled saving the bundle to the DB
             //if (string.IsNullOrEmpty(submission.Id))

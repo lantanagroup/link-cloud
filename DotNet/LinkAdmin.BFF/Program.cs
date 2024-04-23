@@ -24,6 +24,11 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,9 +73,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add IOptions
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
-    builder.Services.Configure<LinkServiceDiscovery>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkServiceDiscovery));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
 
     // Add Kafka Producer Factories
@@ -105,6 +110,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             throw new NullReferenceException("Redis Connection String is required.");
 
         options.ConnectionString = redisConnection;
+        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
     });
 
     // Add Secret Manager
@@ -117,7 +123,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Link Security
-    builder.Services.AddLinkSecurity(builder.Configuration, options =>
+    builder.Services.AddLinkGatewaySecurity(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
     });
@@ -242,16 +248,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error); 
 
-    // Add open telemetry
-    var telemetryConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddOpenTelemetryService(options => {
-            options.Environment = builder.Environment;
-            options.TelemetryCollectorEndpoint = telemetryConfig.TelemetryCollectorEndpoint;
-            options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
-        });
-    }
+        options.Environment = builder.Environment;
+        options.ServiceName = LinkAdminConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
+
+    builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
 }
 
 #endregion
@@ -286,7 +291,7 @@ static void SetupMiddleware(WebApplication app)
     var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
     app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
     app.UseAuthentication();
-    //app.UseMiddleware<UserScopeMiddleware>();
+    app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization(); 
 
     // Register endpoints

@@ -2,7 +2,7 @@
 {
     public static class QueryDispatchConstants
     {
-        public const string ServiceName = "Query Dispatch Service";
+        public const string ServiceName = "QueryDispatch";
 
         /// <summary>
         /// The type of event that the dispatch should be triggered after.
@@ -27,7 +27,6 @@
         {
             public const string ServiceInformation = "ServiceInformation";
             public const string Telemetry = "TelemetryConfig";
-            public const string TenantApiSettings = "TenantApiSettings";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
 

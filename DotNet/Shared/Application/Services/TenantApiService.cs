@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace LantanaGroup.Link.Shared.Application.Services;
@@ -8,22 +9,34 @@ public class TenantApiService : ITenantApiService
 {
     private readonly ILogger<TenantApiService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly TenantApiSettings _settings;
+    private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
-    public TenantApiService(ILogger<TenantApiService> logger, IHttpClientFactory httpClientFactory, TenantApiSettings settings)
+    public TenantApiService(ILogger<TenantApiService> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
     }
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
-        if (!_settings.CheckIfTenantExists)
+        if (_serviceRegistry.Value.TenantService == null)
+            throw new Exception("Tenant Service configuration is missing.");
+
+        if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
+        var tenantServiceApiUrl = _serviceRegistry.Value.TenantService.TenantServiceApiUrl;
+
+        if (string.IsNullOrWhiteSpace(tenantServiceApiUrl))
+            throw new Exception("Tenant Service URL is missing.");
+
         var httpClient = _httpClientFactory.CreateClient();
-        var endpoint = $"{_settings.TenantServiceBaseEndpoint.TrimEnd('/')}/{_settings.GetTenantRelativeEndpoint.TrimEnd('/')}/{facilityId}";
+
+        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint}{facilityId.TrimStart('/').TrimEnd('/')}";
+        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceApiUrl);
+        _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
+        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
         var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)

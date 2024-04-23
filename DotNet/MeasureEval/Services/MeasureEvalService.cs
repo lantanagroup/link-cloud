@@ -1,22 +1,19 @@
-using Flurl;
-using Grpc.Core;
-using LantanaGroup.Link.MeasureEval.Models;
-using System.Text;
 using Confluent.Kafka;
-using System.Net;
+using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.Shared.Application.Wrappers;
-using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace LantanaGroup.Link.MeasureEval.Services
 {
-    public class MeasureEvalService 
+    public class MeasureEvalService
     {
         private readonly ILogger<MeasureEvalService> _logger;
-        private readonly MeasureEvalConfig _measureEvalConfig;
+        private readonly IOptions<MeasureEvalConfig> _measureEvalConfig;
         private readonly HttpClient httpClient;
         private readonly IKafkaWrapper<Ignore, Null, Null, MeasureChanged> kafkaWrapper;
 
-        public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient httpClient, IKafkaWrapper<Ignore, Null, Null, MeasureChanged> kafkaWrapper, MeasureEvalConfig measureEvalConfig)
+        public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient httpClient, IKafkaWrapper<Ignore, Null, Null, MeasureChanged> kafkaWrapper, IOptions<MeasureEvalConfig> measureEvalConfig)
         {
             _logger = logger;
             this._measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
@@ -28,19 +25,20 @@ namespace LantanaGroup.Link.MeasureEval.Services
         public async Task<HttpResponseMessage> UpdateMeasure(string measureId, string measure)
         {
             HttpContent requestBody = GenerateBody(measure, "application/json");
-            
-            if (_measureEvalConfig.EvaluationServiceUrl != null && requestBody != null)
+
+            if (_measureEvalConfig.Value.EvaluationServiceUrl != null && requestBody != null)
             {
                 try
                 {
-                    var response = await httpClient.PostAsync(_measureEvalConfig.EvaluationServiceUrl, requestBody);
+                    var response = await httpClient.PostAsync(_measureEvalConfig.Value.EvaluationServiceUrl, requestBody);
                     return response;
-                }catch(Exception ex)
+                }
+                catch (Exception ex)
                 {
                     _logger.LogError($"Error occurred during Update: {ex.Message}");
                     return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
                 }
-                
+
             }
             return null;
 

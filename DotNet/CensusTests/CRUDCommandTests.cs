@@ -45,7 +45,7 @@ namespace CensusUnitTests
             var mediator = new Mock<IMediator>();
 
             var mocker = new AutoMocker();
-            var settings = mocker.CreateInstance<TenantApiSettings>();
+            var settings = mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             mocker.Use(settings);
             var tenantApiService = (ITenantApiService)mocker.CreateInstance<TenantApiService>();
@@ -92,7 +92,7 @@ namespace CensusUnitTests
             var mediator = new Mock<IMediator>();
 
             var mocker = new AutoMocker();
-            var settings = mocker.CreateInstance<TenantApiSettings>();
+            var settings = mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             mocker.Use(settings);
             var tenantApiService = (ITenantApiService)mocker.CreateInstance<TenantApiService>();
@@ -140,7 +140,7 @@ namespace CensusUnitTests
 
 
             var mocker = new AutoMocker();
-            var settings = mocker.CreateInstance<TenantApiSettings>();
+            var settings = mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             mocker.Use(settings);
             var tenantApiService = (ITenantApiService)mocker.CreateInstance<TenantApiService>();
@@ -187,7 +187,7 @@ namespace CensusUnitTests
             var mediator = new Mock<IMediator>();
 
             var mocker = new AutoMocker();
-            var settings = mocker.CreateInstance<TenantApiSettings>();
+            var settings = mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             mocker.Use(settings);
             var tenantApiService = (ITenantApiService)mocker.CreateInstance<TenantApiService>();
@@ -387,7 +387,7 @@ namespace CensusUnitTests
             var mediatorMock = new Mock<IMediator>();
 
             var mocker = new AutoMocker();
-            var settings = mocker.CreateInstance<TenantApiSettings>();
+            var settings = mocker.CreateInstance<TenantServiceRegistration>();
             settings.CheckIfTenantExists = false;
             mocker.Use(settings);
             var tenantApiService = (ITenantApiService)mocker.CreateInstance<TenantApiService>();

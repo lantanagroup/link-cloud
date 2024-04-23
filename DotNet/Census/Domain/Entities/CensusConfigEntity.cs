@@ -8,7 +8,5 @@ namespace Census.Domain.Entities
     {
         public string FacilityID { get; set; }
         public string ScheduledTrigger { get; set; }
-        public DateTime CreateDate { get; set; }
-        public DateTime ModifyDate { get; set; }
     }
 }
