@@ -108,11 +108,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
                 var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+
                 (string queryPlanType, Bundle bundle) processedBundle = (null, bundle);
                 try
                 {
-                    processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.InitialQueries.ToString());
-                    processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.SupplementalQueries.ToString());
+                    if (request.Message.QueryType == "Initial")
+                    {
+                        processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.InitialQueries.ToString());
+                    }
+                    else
+                    {
+                        processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.SupplementalQueries.ToString());
+                    }
 
                     foreach(var entry in processedBundle.bundle.Entry)
                     {
@@ -127,7 +134,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                                     Resource = childResource,
                                     ScheduledReports = new List<ScheduledReport> { scheduledReport },
                                     PatientId = patientId,
-                                    QueryType = processedBundle.queryPlanType
+                                    QueryType = request.Message.QueryType
                                 });
  
                             }
@@ -138,7 +145,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                             Resource = entry.Resource,
                             ScheduledReports = new List<ScheduledReport> { scheduledReport },
                             PatientId = patientId,
-                            QueryType = processedBundle.queryPlanType
+                            QueryType = request.Message.QueryType
                         });
                     }
 
