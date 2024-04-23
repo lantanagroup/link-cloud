@@ -95,13 +95,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 Value = patientId
             };
 
-            var patient = await _fhirRepo.GetPatient(
-                fhirQueryConfiguration.FhirServerBaseUrl, 
-                patientId, request.CorrelationId, 
-                request.FacilityId, 
+            Patient patient = null;
+
+            if (request.Message.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+            {
+                patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
                 fhirQueryConfiguration.Authentication);
 
-            bundle.AddResourceEntry(patient, patientId);
+                bundle.AddResourceEntry(patient, patientId);
+            }
 
             var queryPlan = queryPlans.Where(x => x.ReportType == scheduledReport.ReportType).FirstOrDefault();
             if(queryPlan != null)
@@ -143,7 +148,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                         {
                             Resource = entry.Resource,
                             ScheduledReports = new List<ScheduledReport> { scheduledReport },
-                            PatientId = patientId,
+                            PatientId = RemovePatientId(entry.Resource) ? string.Empty : patientId,
                             QueryType = request.Message.QueryType
                         });
                     }
@@ -160,6 +165,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         }
 
         return messages;
+    }
+
+    private bool RemovePatientId(Resource resource)
+    {
+        return resource switch
+        {
+            Device => true,
+            Medication => true,
+            Location => true,
+            Specimen => true,
+            _ => false,
+        };
     }
 
     private async Task<(string queryPlanType, Bundle bundle)> ProcessIQueryList(
