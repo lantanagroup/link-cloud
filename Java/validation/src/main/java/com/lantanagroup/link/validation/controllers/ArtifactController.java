@@ -1,6 +1,6 @@
 package com.lantanagroup.link.validation.controllers;
 
-import com.lantanagroup.link.validation.entities.Artifact;
+import com.lantanagroup.link.validation.entities.ArtifactEntity;
 import com.lantanagroup.link.validation.services.ArtifactService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +23,7 @@ public class ArtifactController {
             operationId = "createOrUpdateArtifact"
     )
     @PutMapping("/{type}")
-    public void createOrUpdateArtifact(@PathVariable("type") Artifact.Types type, @RequestBody byte[] content) {
+    public void createOrUpdateArtifact(@PathVariable("type") ArtifactEntity.Types type, @RequestBody byte[] content) {
         this.artifactService.createOrUpdateArtifact(type, content);
     }
 
@@ -34,7 +34,7 @@ public class ArtifactController {
             operationId = "deleteArtifact"
     )
     @DeleteMapping("/{type}/{name}")
-    public void deleteArtifact(@PathVariable("type") Artifact.Types type, @PathVariable("name") String name) {
+    public void deleteArtifact(@PathVariable("type") ArtifactEntity.Types type, @PathVariable("name") String name) {
         this.artifactService.deleteArtifact(type, name);
     }
 
@@ -45,7 +45,7 @@ public class ArtifactController {
             operationId = "listArtifacts"
     )
     @GetMapping
-    public List<Artifact> listArtifacts() {
+    public List<ArtifactEntity> listArtifacts() {
         return this.artifactService.listArtifacts();
     }
 }
