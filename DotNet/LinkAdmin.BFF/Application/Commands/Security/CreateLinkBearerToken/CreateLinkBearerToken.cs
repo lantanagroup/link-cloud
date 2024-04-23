@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -18,13 +19,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
+        private readonly ILinkAdminMetrics _metrics;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
         //TODO: Add back data protection once key persience is implemented
@@ -59,7 +62,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);
                 activity?.AddTag("link.token", jwt);
 
-                _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, user.Claims.First(c => c.Type == "sub").Value);
+                var userId = user.Claims.First(c => c.Type == "sub").Value;
+                _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, userId);
+                _metrics.IncrementTokenGeneratedCounter([
+                    new KeyValuePair<string, object?>("subject", userId),
+                    new KeyValuePair<string, object?>("timespan", timespan)
+                ]);
 
                 return jwt;
 
