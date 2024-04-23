@@ -1,13 +1,18 @@
 package com.lantanagroup.link.validation.controllers;
 
+import com.lantanagroup.link.validation.model.ResultModel;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/validation")
@@ -22,16 +27,26 @@ public class ValidationController {
 
     @Operation(
             summary = "Reload validation artifacts",
-            description = "Reload the artifacts from the database into validation so that the next validation will use the latest artifacts"
+            description = "Reload the artifacts from the database into validation so that the next validation will use the latest artifacts",
+            tags = {"Validation"},
+            operationId = "reloadArtifacts"
     )
     @PostMapping("/reload")
     public void reloadArtifacts() {
         log.info("Reloading artifacts in validation service");
-        this.validationService.initialize();
+        this.validationService.initArtifacts();
     }
 
-    @GetMapping
-    public String getValidationResults() {
-        return "test";
+    @Operation(
+            summary = "Validate a resource",
+            description = "Validate a FHIR resource provided in the request against the FHIR conformance resources loaded in the validation service",
+            tags = {"Validation"},
+            operationId = "validateResource"
+    )
+    @PostMapping("/validate")
+    public OperationOutcome validate(@RequestBody Bundle bundle) {
+        log.info("Validating bundle with ID {}", bundle.hasId() ? bundle.getIdElement().getIdPart() : "UNKNOWN");
+        List<ResultModel> results = this.validationService.validate(bundle);
+        return this.validationService.convertToOperationOutcome(results);
     }
 }
