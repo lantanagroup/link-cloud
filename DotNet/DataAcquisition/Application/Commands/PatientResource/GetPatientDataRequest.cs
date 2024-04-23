@@ -200,8 +200,13 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
 
+            _logger.LogInformation("Processing Query for:");
+
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetSingularBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.Message.PatientId,
@@ -217,6 +222,9 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetPagedBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.Message.PatientId,
@@ -234,7 +242,10 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
-                if(referenceQueryFactoryResult.ReferenceIds?.Count == 0)
+                var queryInfo = ((ReferenceQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
                 {
                     break;
                 }
