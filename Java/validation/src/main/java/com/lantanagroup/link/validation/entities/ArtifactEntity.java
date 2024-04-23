@@ -5,10 +5,10 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-@Entity
+@Entity(name = "artifact")
 @Getter @Setter
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class Artifact {
+public class ArtifactEntity {
     @Id
     @GeneratedValue
     private Long id;
