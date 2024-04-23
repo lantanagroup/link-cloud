@@ -12,12 +12,22 @@ public class CheckIfTenantExistsQuery : IRequest<bool>
 public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExistsQuery, bool>
 {
     private readonly HttpClient _httpClient;
-    private readonly TenantApiSettings _tenantConfig;
+    private readonly TenantServiceRegistration _tenantConfig;
 
-    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<TenantApiSettings> tenantConfig)
+    public CheckIfTenantExistsQueryHandler(HttpClient httpClient, IOptions<ServiceRegistry> serviceRegistry)
     {
         _httpClient = httpClient;
-        _tenantConfig = tenantConfig.Value;
+
+        if (serviceRegistry.Value is null)
+            throw new ArgumentNullException(nameof(serviceRegistry));
+        else if (serviceRegistry.Value.TenantService is null)
+            throw new ArgumentNullException(nameof(serviceRegistry.Value.TenantService));
+        else if (serviceRegistry.Value.TenantService.TenantServiceUrl is null)
+            throw new ArgumentNullException(nameof(serviceRegistry.Value.TenantService.TenantServiceUrl));
+        else if (serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint is null)
+            throw new ArgumentNullException(nameof(serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint));
+
+        _tenantConfig = serviceRegistry.Value.TenantService;
     }
 
     public async Task<bool> Handle(CheckIfTenantExistsQuery request, CancellationToken cancellationToken)
@@ -25,7 +35,7 @@ public class CheckIfTenantExistsQueryHandler : IRequestHandler<CheckIfTenantExis
         if (!_tenantConfig.CheckIfTenantExists)
             return true;
 
-        var url = $"{_tenantConfig.TenantServiceBaseEndpoint.TrimEnd('/')}/{_tenantConfig.GetTenantRelativeEndpoint.TrimEnd('/').TrimStart('/')}/{request.TenantId}";
+        var url = $"{_tenantConfig.TenantServiceApiUrl.TrimEnd('/')}/{_tenantConfig.GetTenantRelativeEndpoint.TrimEnd('/').TrimStart('/')}/{request.TenantId}";
         var response = await _httpClient.GetAsync(url, cancellationToken);
         return response.IsSuccessStatusCode;
     }

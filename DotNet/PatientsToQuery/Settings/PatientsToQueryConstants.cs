@@ -2,11 +2,13 @@
 {
     public class PatientsToQueryConstants
     {
-        public static string ServiceName = "PatientsToQuery";
+        public const string ServiceName = "PatientsToQuery";
 
         public static class AppSettingsSectionNames
         {
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string ServiceInformation = "ServiceInformation";
+            public const string Telemetry = "TelemetryConfig";
         }
 
         public static class LoggingIds

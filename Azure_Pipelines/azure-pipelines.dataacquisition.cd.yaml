@@ -6,6 +6,8 @@ trigger:
     include:
     - DotNet/DataAcquisition/*
     - DotNet/Shared/*
+    exclude:
+    - '*'
     
 pr: none
 
@@ -18,10 +20,6 @@ variables:
   value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
 - name: testProject
   value: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
 - name: registry-repo-Name
   value: 'link-dataacquisition'
 - name: dockerPath
@@ -60,8 +58,8 @@ steps:
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1

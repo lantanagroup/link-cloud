@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Model;
-
-namespace LantanaGroup.Link.MeasureEval.Models;
+﻿namespace LantanaGroup.Link.MeasureEval.Models;
 
 public class PatientDataNormalizedMessage
 {

@@ -6,6 +6,8 @@ trigger:
     include:
     - DotNet/Audit/*
     - DotNet/Shared/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -16,16 +18,12 @@ variables:
   value: 'DotNet/Audit/Audit.csproj'
 - name: testProject
   value: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
-- name: registry-repo-Name
+- name: repositoryName
   value: 'link-audit'
 - name: dockerPath
   value: '**/DotNet/Audit/Dockerfile'
 - name: serviceName
-  value: 'Audit'  
+  value: 'Audit'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
@@ -48,18 +46,17 @@ steps:
       projects: $(testProject)'
     displayName: 'Run Tests'
   
-
   - task: Docker@2
     displayName: "Build & Push Audit Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
+      repository: $(repositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1

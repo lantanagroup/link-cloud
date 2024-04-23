@@ -39,12 +39,14 @@ public class QueryPlanRepository : MongoDbRepository<QueryPlan>, IQueryPlanRepos
     {
         var existingQueryPlan = await GetAsync(Entity.FacilityId, cancellationToken);
 
-        if(existingQueryPlan != null && existingQueryPlan?.CreateDate != null)
+        if(existingQueryPlan != null)
         {
+            Entity.Id = existingQueryPlan.Id;
             Entity.CreateDate = existingQueryPlan.CreateDate;
         }
         else
         {
+            Entity.Id = Guid.NewGuid().ToString();
             Entity.CreateDate = DateTime.UtcNow;
         }
 

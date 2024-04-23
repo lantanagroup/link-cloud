@@ -8,14 +8,13 @@
         {
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string ServiceInformation = "ServiceInformation";
-            public const string ServiceRegistry = "GatewayConfig";
             public const string Kafka = "KafkaConnection";
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
             public const string DatabaseProvider = "DatabaseProvider";
             public const string Smtp = "SmtpConnection";
             public const string Channels = "Channels";
             public const string IdentityProvider = "IdentityProviderConfig";
-            public const string Telemetry = "TelemetryConfig";
+            public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";
             public const string EnableSwagger = "EnableSwagger";
             public const string AllowReflection = "AllowReflection";
