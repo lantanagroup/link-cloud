@@ -22,10 +22,6 @@ variables:
   value: 'DotNet/PatientListUnitTests/PatientListUnitTests.csproj'
 - name: nugetPath
   value: 'DotNet/PatientList/nuget.config'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
 - name: registry-repo-Name
   value: 'link-patientlist'
 - name: dockerPath
@@ -68,8 +64,8 @@ steps:
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
