@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Submission.Settings
     public static class SubmissionConstants
     {
 
-        public const string ServiceName = "Submission Service";
+        public const string ServiceName = "Submission";
 
         public static class AppSettingsSectionNames
         {

@@ -1,11 +1,8 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using MediatR;
-using Newtonsoft.Json;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
@@ -39,7 +36,7 @@ public class TriggerAuditEventCommandHandler : IRequestHandler<TriggerAuditEvent
             Value = request.AuditableEvent
         };
 
-        await _kafkaProducerFactory.CreateAuditEventProducer().ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), message, cancellationToken);
+        await _kafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: true).ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), message, cancellationToken);
         return new Unit();
     }
 }

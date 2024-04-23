@@ -18,14 +18,14 @@ variables:
   value: 'DotNet/Audit/Audit.csproj'
 - name: testProject
   value: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
-- name: registry-repo-name
+- name: repositoryName
   value: 'link-audit'
 - name: dockerPath
   value: '**/DotNet/Audit/Dockerfile'
 - name: serviceName
-  value: 'Audit'  
+  value: 'Audit'
 - name: containerRegistry
-- name: containerRegistryUrl
+  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -51,7 +51,7 @@ steps:
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
+      repository: $(repositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
