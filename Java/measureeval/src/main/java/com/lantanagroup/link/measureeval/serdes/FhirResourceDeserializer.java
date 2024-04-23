@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.parser.IParser;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -10,7 +11,6 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.springframework.core.convert.converter.Converter;
 
 import java.io.IOException;
-import java.lang.reflect.Modifier;
 
 public class FhirResourceDeserializer<T extends IBaseResource>
         extends JsonDeserializer<T>
@@ -24,8 +24,11 @@ public class FhirResourceDeserializer<T extends IBaseResource>
     }
 
     private T parse(String json) {
-        Class<T> parseType = Modifier.isAbstract(resourceType.getModifiers()) ? null : resourceType;
-        return fhirContext.newJsonParser().parseResource(parseType, json);
+        IParser parser = fhirContext.newJsonParser();
+        if (resourceType == IBaseResource.class) {
+            return resourceType.cast(parser.parseResource(json));
+        }
+        return parser.parseResource(resourceType, json);
     }
 
     @Override
