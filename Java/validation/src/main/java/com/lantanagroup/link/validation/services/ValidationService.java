@@ -1,12 +1,18 @@
 package com.lantanagroup.link.validation.services;
 
+import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
+import ca.uhn.fhir.validation.ValidationResult;
 import com.lantanagroup.link.shared.fhir.FhirHelper;
-import com.lantanagroup.link.validation.entities.Artifact;
+import com.lantanagroup.link.validation.entities.ArtifactEntity;
+import com.lantanagroup.link.validation.entities.ResultEntity;
+import com.lantanagroup.link.validation.model.ResultModel;
+import com.lantanagroup.link.validation.repositories.ResultRepository;
+import net.sourceforge.plantuml.StringUtils;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.PrePopulatedValidationSupport;
@@ -14,6 +20,7 @@ import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 
 @Service
@@ -31,24 +39,28 @@ public class ValidationService {
 
     private final List<String> allowedResourceTypes = List.of("StructureDefinition", "ValueSet", "CodeSystem", "ImplementationGuide", "Measure", "Library");
     private final ArtifactService artifactService;
+    private final ResultRepository resultRepository;
     private FhirValidator validator;
     private PrePopulatedValidationSupport prePopulatedValidationSupport;
 
-    public ValidationService(ArtifactService artifactService) {
+    public ValidationService(ArtifactService artifactService, ResultRepository resultRepository) {
         this.artifactService = artifactService;
-        this.initialize();
+        this.resultRepository = resultRepository;
+
+        Executors.newSingleThreadExecutor().submit(this::initArtifacts);
     }
 
-    public void initialize() {
+    public void initArtifacts() {
         log.info("Loading artifacts");
 
-        this.prePopulatedValidationSupport = new PrePopulatedValidationSupport(FhirHelper.getContext());
+        FhirContext fhirContext = FhirHelper.getContext();
+        this.prePopulatedValidationSupport = new PrePopulatedValidationSupport(fhirContext);
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
-                new DefaultProfileValidationSupport(FhirHelper.getContext()),
-                new InMemoryTerminologyServerValidationSupport(FhirHelper.getContext()),
+                new DefaultProfileValidationSupport(fhirContext),
+                new InMemoryTerminologyServerValidationSupport(fhirContext),
                 this.prePopulatedValidationSupport
         );
-        this.validator = FhirHelper.getContext().newValidator();
+        this.validator = fhirContext.newValidator();
         this.validator.setExecutorService(ForkJoinPool.commonPool());
         IValidatorModule module = new FhirInstanceValidator(new CachingValidationSupport(validationSupportChain));
         this.validator.registerValidatorModule(module);
@@ -62,26 +74,69 @@ public class ValidationService {
         });
     }
 
-    private void loadPackage(Artifact artifact) {
-        if (artifact.getType() != Artifact.Types.PACKAGE) {
+    public List<ResultModel> validate(Resource resource) {
+        log.info("Validating resource");
+
+        ValidationResult validationResult = this.validator.validateWithResult(resource);
+        return validationResult.getMessages().stream().map(issue -> {
+            ResultModel result = new ResultModel();
+            result.setMessage(issue.getMessage());
+            result.setExpression(issue.getLocationString());
+            result.setSeverity(getIssueSeverity(issue.getSeverity()));
+            result.setType(getIssueCode(issue.getMessageId()));
+
+            if (issue.getLocationLine() != null && issue.getLocationCol() != null) {
+                result.setLocation(String.format("%d:%d", issue.getLocationLine(), issue.getLocationCol()));
+            }
+
+            return result;
+        }).toList();
+    }
+
+    public OperationOutcome convertToOperationOutcome(List<ResultModel> results) {
+        OperationOutcome operationOutcome = new OperationOutcome();
+
+        results.forEach(result -> {
+            OperationOutcome.OperationOutcomeIssueComponent issue = operationOutcome.addIssue();
+            issue.setDiagnostics(result.getMessage());
+            issue.getExpression().add(new StringType(result.getExpression()));
+            issue.setSeverity(result.getSeverity());
+            issue.setCode(result.getType());
+
+            if (StringUtils.isNotEmpty(result.getLocation())) {
+                issue.addLocation(result.getLocation());
+            }
+        });
+
+        return operationOutcome;
+    }
+
+    public void saveResults(List<ResultModel> results, String tenantId, String reportId) {
+        this.resultRepository.deleteByTenantIdAndReportId(tenantId, reportId);
+        List<ResultEntity> entities = results.stream().map(r -> new ResultEntity(r, tenantId, reportId)).toList();
+        this.resultRepository.saveAll(entities);
+    }
+
+    private void loadPackage(ArtifactEntity artifactEntity) {
+        if (artifactEntity.getType() != ArtifactEntity.Types.PACKAGE) {
             throw new RuntimeException("Artifact is not an NPM package");
         }
 
-        log.info("Loading package {}", artifact.getName());
+        log.info("Loading package {}", artifactEntity.getName());
 
         try {
-            InputStream stream = new ByteArrayInputStream(artifact.getContent());
+            InputStream stream = new ByteArrayInputStream(artifactEntity.getContent());
             NpmPackage npmPackage = NpmPackage.fromPackage(stream);
             List<String> resourceNames = npmPackage.listResources(allowedResourceTypes);
 
             for (int i = 0; i < resourceNames.size(); i++) {
-                log.trace("Loading resource from package {}: {}", artifact.getName(), resourceNames.get(i));
+                log.trace("Loading resource from package {}: {}", artifactEntity.getName(), resourceNames.get(i));
                 InputStream resourceContent = npmPackage.loadResource(resourceNames.get(i));
 
                 try {
-                    this.loadResource(resourceContent);
+                    this.loadResource(resourceContent, resourceNames.get(i));
                 } catch (DataFormatException e) {
-                    log.warn("Error loading resource from package {}: {}", artifact.getName(), resourceNames.get(i), e);
+                    log.warn("Error loading resource from package {}: {}", artifactEntity.getName(), resourceNames.get(i), e);
                 }
             }
         } catch (IOException e) {
@@ -89,32 +144,43 @@ public class ValidationService {
         }
     }
 
-    private void loadResource(InputStream stream) {
+    private void loadResource(InputStream stream, String name) {
+        byte[] content;
+
         try {
-            byte[] content = stream.readAllBytes();
-            // replace all "\\-------" with "" otherwise it is invalid JSON
-            String json = new String(content).replaceAll("\\/\\/\\-+", "");
+            content = stream.readAllBytes();
+        } catch (IOException e) {
+            log.error("Error reading resource {}", name, e);
+            return;
+        }
+
+        String json = new String(content)
+                // replace all "\\-------" with "" otherwise it is invalid JSON
+                // have seen this pattern several times in libraries to separate sections of the cql
+                .replaceAll("\\/\\/\\-+", "")
+                // replace all "&copy;" with "" otherwise it is invalid JSON
+                .replaceAll("&copy;", "");
+
+        try {
             Resource resource = FhirHelper.deserialize(json);
             this.prePopulatedValidationSupport.addResource(resource);
         } catch (DataFormatException e) {
-            log.warn("Error loading resource", e);
-        } catch (IOException e) {
-            log.error("Error reading resource", e);
+            log.warn("Error loading resource {} with starting content {}", name, json.substring(0, 100), e);
         }
     }
 
-    private void loadResource(Artifact artifact) {
-        if (artifact.getType() != Artifact.Types.RESOURCE) {
+    private void loadResource(ArtifactEntity artifactEntity) {
+        if (artifactEntity.getType() != ArtifactEntity.Types.RESOURCE) {
             throw new RuntimeException("Artifact is not a resource");
         }
 
-        log.info("Loading resource {}", artifact.getName());
+        log.info("Loading resource {}", artifactEntity.getName());
 
         try {
-            InputStream stream = new ByteArrayInputStream(artifact.getContent());
-            this.loadResource(stream);
+            InputStream stream = new ByteArrayInputStream(artifactEntity.getContent());
+            this.loadResource(stream, artifactEntity.getName());
         } catch (DataFormatException e) {
-            log.warn("Error loading resource {}", artifact.getName(), e);
+            log.warn("Error loading resource {}", artifactEntity.getName(), e);
         }
     }
 
