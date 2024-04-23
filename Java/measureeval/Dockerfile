@@ -12,7 +12,7 @@ RUN mvn dependency:go-offline
 
 COPY Java/ ./
 RUN mvn package -pl measureeval -am
-RUN mv measureeval/target/measureeval-*.jar measureeval/target/measureeval.jar
+RUN mv measureeval/target/measureeval-*-jar-with-dependencies.jar measureeval/target/measureeval.jar
 
 # Stage 2: Run the Spring Boot application
 FROM openjdk:17-jdk-alpine
