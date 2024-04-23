@@ -9,6 +9,10 @@ spring:
     mongodb:
       database: ${spring.application.name}
 
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+
   kafka:
     consumer:
       group-id: ${spring.application.name}
