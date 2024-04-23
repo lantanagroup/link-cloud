@@ -95,13 +95,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 Value = patientId
             };
 
-            var patient = await _fhirRepo.GetPatient(
-                fhirQueryConfiguration.FhirServerBaseUrl, 
-                patientId, request.CorrelationId, 
-                request.FacilityId, 
+            Patient patient = null;
+
+            if (request.Message.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+            {
+                patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
                 fhirQueryConfiguration.Authentication);
 
-            bundle.AddResourceEntry(patient, patientId);
+                bundle.AddResourceEntry(patient, patientId);
+            }
 
             var queryPlan = queryPlans.Where(x => x.ReportType == scheduledReport.ReportType).FirstOrDefault();
             if(queryPlan != null)
