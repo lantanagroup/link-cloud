@@ -1,9 +1,11 @@
-﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
@@ -57,8 +59,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to retrieve the query dispatch configuration of a facility with an id of {facilityId}", ex);
-                return StatusCode(500, "An error occurred while attempting to retrieve the facility query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GetItem, "Get QueryDispatch configuration"), ex, "An exception occurred while attempting to retrieve a QueryDispatch configuration for facility {facilityId}", facilityId);
+
+                throw;
             }
         }
 
@@ -93,27 +96,20 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             try
             {
                 var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-                    if (!facilityCheckResult)
-                        return BadRequest($"Facility {model.FacilityId} does not exist.");
+                if (!facilityCheckResult)
+                    return BadRequest($"Facility {model.FacilityId} does not exist.");
 
-                var config =
-                    _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId,
-                        model.DispatchSchedules);
+                var config = _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId, model.DispatchSchedules);
 
                 await _createQueryDispatchConfigurationCommand.Execute(config);
 
-                var response = new RequestResponse
-                {
-                    Id = config.Id,
-                    Message = "The query dispatch configuration was created successfully."
-                };
-
-                return Ok(response);
+                return Created(config.Id, config);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to create a new query dispatch configuration - {model}", ex);
-                return StatusCode(500, "An error occurred while attempting to create a new query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + model.FacilityId);
+
+                throw;
             }
         }
 
@@ -145,8 +141,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to delete the query dispatch configuration for facility id {facilityId}", ex);
-                return StatusCode(500, "An error occurred while attempting to delete the facility query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + facilityId);
+
+                throw;
             }
         }
 
@@ -169,34 +166,36 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                 _logger.LogError($"Facility Id was not provided in the update query dispatch configuration: {model}.");
                 return BadRequest("Facility Id is required in order to update a query dispatch configuration.");
             }
-
-            var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
-            if (existingConfig == null)
-            {
-                _logger.LogError($"Query dispatch configuration for Facility Id {model.FacilityId} does not exist.");
-                return BadRequest($"FacilityID {model.FacilityId} configuration does not exist.");
-            }
-
+            
             try
             {
                 var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+
                 if (!facilityCheckResult)
-                    return BadRequest($"Facility {model.FacilityId} does not exist.");
-
-                await _updateQueryDispatchConfigurationCommand.Execute(existingConfig, model.DispatchSchedules);
-
-                var response = new RequestResponse
                 {
-                    Id = existingConfig.Id,
-                    Message = "The query dispatch configuration was updated successfully."
-                };
+                    return BadRequest($"Facility {model.FacilityId} does not exist.");
+                }
 
-                return Ok(response);
+                var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
+
+                if (existingConfig == null)
+                {
+                    var config = _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId, model.DispatchSchedules);
+                    await _createQueryDispatchConfigurationCommand.Execute(config);
+
+                    return Created(config.Id, config);
+                }
+                else
+                {
+                    await _updateQueryDispatchConfigurationCommand.Execute(existingConfig, model.DispatchSchedules);
+                    return NoContent();
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to update the query dispatch configuration - {model}", ex);
-                return StatusCode(500, "An error occurred while attempting to update the query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + model.FacilityId);
+
+                throw;
             }
         }
     }
