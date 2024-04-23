@@ -2,7 +2,7 @@ package com.lantanagroup.link.measureeval.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.Topics;
-import com.lantanagroup.link.measureeval.models.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.springframework.beans.factory.ObjectProvider;
@@ -21,7 +21,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.Map;
 
 @Configuration
-public class KafkaConfiguration {
+public class KafkaConfig {
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         JsonDeserializer<?> jsonDeserializer = new JsonDeserializer<>(objectMapper);

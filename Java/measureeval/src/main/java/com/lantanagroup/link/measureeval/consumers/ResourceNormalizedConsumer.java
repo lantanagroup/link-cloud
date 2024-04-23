@@ -4,7 +4,7 @@ import com.lantanagroup.link.measureeval.Topics;
 import com.lantanagroup.link.measureeval.entities.AbstractResource;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
-import com.lantanagroup.link.measureeval.models.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.instance.model.api.IBaseResource;

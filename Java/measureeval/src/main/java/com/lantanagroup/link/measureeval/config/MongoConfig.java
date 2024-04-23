@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class MongoConfiguration {
+public class MongoConfig {
     @Bean
     public FhirMongoCustomConversions fhirMongoCustomConversions(FhirContext fhirContext) {
         return new FhirMongoCustomConversions(fhirContext);

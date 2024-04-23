@@ -19,3 +19,9 @@ spring:
 
     producer:
       client-id: ${spring.application.name}
+
+link:
+  data-acquisition:
+    base-url: http://localhost:5194
+    routes:
+      query-result: /api/{facilityId}/QueryResult/{patientId}

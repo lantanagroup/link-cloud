@@ -1,25 +1,29 @@
 package com.lantanagroup.link.measureeval.entities;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.util.Date;
+import java.util.List;
 
 @Getter
 @Setter
-public abstract class AbstractResource {
+public class ScheduledReport {
     @Id
     private String id;
 
     private String facilityId;
-    private String resourceId;
-    private ResourceType resourceType;
-    private IBaseResource resource;
+
+    @JsonSetter(nulls = Nulls.AS_EMPTY)
+    private List<String> reportTypes;
+
+    private Date periodStart;
+    private Date periodEnd;
 
     @CreatedDate
     private Date createdDate;

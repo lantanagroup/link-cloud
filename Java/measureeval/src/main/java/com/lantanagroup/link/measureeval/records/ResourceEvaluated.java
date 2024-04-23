@@ -1,23 +1,22 @@
-package com.lantanagroup.link.measureeval.models;
+package com.lantanagroup.link.measureeval.records;
 
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import java.util.Date;
-import java.util.List;
 
 @Getter
 @Setter
-public class ResourceNormalized {
+public class ResourceEvaluated {
+    private String measureReportId;
     private String patientId;
-    private QueryType queryType;
     private IBaseResource resource;
-    private List<ScheduledReport> scheduledReports;
 
     @Getter
     @Setter
-    public static class ScheduledReport {
+    public static class Key {
+        private String facilityId;
         private String reportType;
         private Date startDate;
         private Date endDate;
