@@ -23,19 +23,19 @@ import java.util.Map;
 @Configuration
 public class KafkaConfiguration {
     @Bean
-    public Deserializer<?> valueDeserializer(ObjectMapper fhirAwareObjectMapper) {
-        JsonDeserializer<?> jsonDeserializer = new JsonDeserializer<>(fhirAwareObjectMapper);
+    public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
+        JsonDeserializer<?> jsonDeserializer = new JsonDeserializer<>(objectMapper);
         jsonDeserializer.setTypeResolver((topic, data, headers) ->
                 switch (topic) {
-                    case Topics.RESOURCE_NORMALIZED -> fhirAwareObjectMapper.constructType(ResourceNormalized.class);
-                    default -> throw new IllegalArgumentException(String.format("Unknown topic: %s", topic));
+                    case Topics.RESOURCE_NORMALIZED -> objectMapper.constructType(ResourceNormalized.class);
+                    default -> throw new IllegalArgumentException("Unknown topic: " + topic);
                 });
         return new ErrorHandlingDeserializer<>(jsonDeserializer);
     }
 
     @Bean
-    public Serializer<?> valueSerializer(ObjectMapper fhirAwareObjectMapper) {
-        return new JsonSerializer<>(fhirAwareObjectMapper);
+    public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
+        return new JsonSerializer<>(objectMapper);
     }
 
     @Bean
