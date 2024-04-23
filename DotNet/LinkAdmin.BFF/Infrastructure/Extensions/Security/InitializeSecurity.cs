@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
     public static class InitializeSecurity
     {
-        public static IServiceCollection AddLinkSecurity(this IServiceCollection services, IConfiguration configuration, Action<SecurityServiceOptions>? options = null)
+        public static IServiceCollection AddLinkGatewaySecurity(this IServiceCollection services, IConfiguration configuration, Action<SecurityServiceOptions>? options = null)
         { 
             var securityServiceOptions = new SecurityServiceOptions();
             options?.Invoke(securityServiceOptions);

@@ -105,7 +105,9 @@ namespace LantanaGroup.Link.Census.Migrations
 
                     b.Property<string>("ReportId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("nvarchar(max)")
+                        .HasComputedColumnSql("CONCAT(FacilityId, '-', CensusDateTime)");
 
                     b.HasKey("Id");
 

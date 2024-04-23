@@ -1,10 +1,13 @@
 using Azure.Identity;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
+using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -80,12 +83,10 @@ namespace Tenant
                 }
             }
 
-
             var serviceInformation = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
             if (serviceInformation != null)
             {
-                ServiceActivitySource.Initialize(serviceInformation);
-                Counters.Initialize(serviceInformation);
+                ServiceActivitySource.Initialize(serviceInformation);                
             }
             else
             {
@@ -97,16 +98,14 @@ namespace Tenant
             builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
-            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.KafkaConnection));
-
-            builder.Services.Configure<MeasureApiConfig>(builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.MeasureApiConfig));
+            builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
+            builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
 
             builder.Services.AddScoped<FacilityConfigurationService>();
-
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
             builder.Services.AddSingleton<CreateAuditEventCommand>();
 
             //Add database context
@@ -200,51 +199,15 @@ namespace Tenant
 
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
-            var telemetryConfig = builder.Configuration.GetRequiredSection(TenantConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-            if (telemetryConfig != null)
+            //Add telemetry if enabled
+            builder.Services.AddLinkTelemetry(builder.Configuration, options =>
             {
-                var otel = builder.Services.AddOpenTelemetry();
+                options.Environment = builder.Environment;
+                options.ServiceName = TenantConstants.ServiceName;
+                options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+            });
 
-                //configure OpenTelemetry resources with application name
-                otel.ConfigureResource(resource => resource
-                    .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
-
-                otel.WithTracing(tracerProviderBuilder =>
-                        tracerProviderBuilder
-                            .AddSource(ServiceActivitySource.Instance.Name)
-                            .AddAspNetCoreInstrumentation(options =>
-                            {
-                                options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                            })
-                            .AddConfluentKafkaInstrumentation()
-                            .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-
-                otel.WithMetrics(metricsProviderBuilder =>
-                        metricsProviderBuilder
-                            .AddAspNetCoreInstrumentation()
-                            .AddMeter(Counters.meter.Name)
-                            .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-                if (telemetryConfig.EnableRuntimeInstrumentation)
-                {
-                    otel.WithMetrics(metricsProviderBuilder =>
-                        metricsProviderBuilder
-                            .AddRuntimeInstrumentation());
-                }
-
-                if (builder.Environment.IsDevelopment())
-                {
-                    otel.WithTracing(tracerProviderBuilder =>
-                        tracerProviderBuilder
-                        .AddConsoleExporter());
-
-                    //metrics are very verbose, only enable console exporter if you really want to see metric details
-                    //otel.WithMetrics(metricsProviderBuilder =>
-                    //    metricsProviderBuilder
-                    //        .AddConsoleExporter());                
-                }
-            }
+            builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
         }
 
         #endregion

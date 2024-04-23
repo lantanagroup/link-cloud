@@ -8,6 +8,8 @@ public class PatientCensusHistoricEntity : BaseEntity
     public string FacilityId { get; set; }
     public DateTime CensusDateTime { get; set; }
     private string reportId;
+
+    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
     public string ReportId
     {
         get { return reportId; }

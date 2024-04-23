@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
@@ -18,7 +19,7 @@ namespace TenantTests
     public class UpdateFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private MeasureApiConfig? _measureApiConfig;
+        private ServiceRegistry? _serviceRegistry;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45333";
@@ -33,7 +34,6 @@ namespace TenantTests
         [Fact]
         public void TestUpdateFacility()
         {
-
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
             scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
             List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
@@ -48,11 +48,10 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _measureApiConfig = new MeasureApiConfig()
+            _serviceRegistry = new ServiceRegistry()
             {
-                MeasureServiceApiUrl = "test"
+                MeasureServiceUrl = "test"
             };
-
 
             _model.ScheduledTasks.AddRange(scheduledTaskModels);
 
@@ -70,12 +69,16 @@ namespace TenantTests
             .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<MeasureApiConfig>>()
-            .Setup(p => p.Value)
-            .Returns(_measureApiConfig);
+            _mocker.GetMock<IOptions<MeasureConfig>>()
+              .Setup(p => p.Value)
+              .Returns(new MeasureConfig());
+
+            _mocker.GetMock<IOptions<ServiceRegistry>>()
+                .Setup(p => p.Value)
+                .Returns(_serviceRegistry);
 
             Task<string> _updatedFacilityId = _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None);
 
@@ -85,9 +88,7 @@ namespace TenantTests
 
         }
 
-
-
-        [Fact]
+       [Fact]
         public async Task TestErrorUpdateNonExistingFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -122,7 +123,10 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));
+            Task<string> _updatedFacilityId = _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None);
+
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
+
         }
 
         [Fact]
@@ -170,7 +174,7 @@ namespace TenantTests
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_modelFound));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));

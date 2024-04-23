@@ -2,6 +2,8 @@
 {
     public class KafkaConstants
     {
+        public static string SectionName = "KafkaConnection";
+
         public static class HeaderConstants
         {
             public const string CorrelationId = "X-Correlation-Id";

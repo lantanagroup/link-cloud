@@ -62,18 +62,22 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
 
         var existingEntity = await GetAsync(Entity.FacilityId, cancellationToken);
 
-        if(existingEntity != null && existingEntity.CreateDate != null) 
+        if(existingEntity != null)
         {
-            Entity.Id = existingEntity.Id;
-            Entity.CreateDate = existingEntity.CreateDate;   
+            existingEntity.Authentication = Entity.Authentication;
+            existingEntity.QueryPlanIds = Entity.QueryPlanIds;
+            existingEntity.FhirServerBaseUrl = Entity.FhirServerBaseUrl;
+            existingEntity.ModifyDate = DateTime.UtcNow;
         }
         else
         {
+            Entity.Id = Guid.NewGuid().ToString();
             Entity.CreateDate = DateTime.UtcNow;
+            Entity.ModifyDate = DateTime.UtcNow;
         }
 
         var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, Entity.FacilityId);
-        var result = await _collection.ReplaceOneAsync(filter, Entity, new ReplaceOptions { IsUpsert = true });
+        var result = await _collection.ReplaceOneAsync(filter, existingEntity ?? Entity, new ReplaceOptions { IsUpsert = true });
 
         try
         {
@@ -87,7 +91,7 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
             //just returning the entity. Getting upsertedId can cause an exception.
         }
 
-        return Entity;
+        return existingEntity ?? Entity;
     }
 
     public override async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
