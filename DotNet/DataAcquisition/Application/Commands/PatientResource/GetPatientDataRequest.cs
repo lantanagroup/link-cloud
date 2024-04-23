@@ -143,7 +143,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                         {
                             Resource = entry.Resource,
                             ScheduledReports = new List<ScheduledReport> { scheduledReport },
-                            PatientId = patientId,
+                            PatientId = RemovePatientId(entry.Resource) ? string.Empty : patientId,
                             QueryType = request.Message.QueryType
                         });
                     }
@@ -160,6 +160,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         }
 
         return messages;
+    }
+
+    private bool RemovePatientId(Resource resource)
+    {
+        return resource switch
+        {
+            Device => true,
+            Medication => true,
+            Location => true,
+            Specimen => true,
+            _ => false,
+        };
     }
 
     private async Task<(string queryPlanType, Bundle bundle)> ProcessIQueryList(
