@@ -391,10 +391,5 @@ namespace LantanaGroup.Link.Tenant.Services
             }
 
         }
-
-        public Task<PagedFacilityConfigModel> GetFacilities(CancellationToken none)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

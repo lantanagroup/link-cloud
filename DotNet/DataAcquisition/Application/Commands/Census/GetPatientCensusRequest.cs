@@ -78,7 +78,7 @@ public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRe
         {
             finalList.Entry.AddRange(x.Entry);
         });
-
+        
         result.PatientIds = finalList;
 
         return new List<IBaseMessage> { result };

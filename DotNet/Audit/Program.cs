@@ -28,6 +28,9 @@ using LantanaGroup.Link.Audit.Persistance.Repositories;
 using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -215,15 +218,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);        
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
-    }     
+        options.Environment = builder.Environment;
+        options.ServiceName = AuditConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
+
+    builder.Services.AddSingleton<IAuditServiceMetrics, AuditServiceMetrics>();
 }
 
 #endregion
