@@ -36,8 +36,10 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
                         {
                             ReportType = "testReport"
                         }
-                    }
+                    },
+                    QueryType = "Initial"
                 },
+                QueryPlanType = LantanaGroup.Link.DataAcquisition.Application.Models.QueryPlanType.InitialQueries,
                 CorrelationId = "testCorrelation"
             };
 
