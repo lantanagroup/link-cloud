@@ -81,6 +81,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         }
                         catch (ConsumeException e)
                         {
+                            if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                            {
+                                throw new OperationCanceledException(e.Error.Reason, e);
+                            }
+
                             var converted_record = new ConsumeResult<string, string>()
                             {
                                 Message = new Message<string, string>()

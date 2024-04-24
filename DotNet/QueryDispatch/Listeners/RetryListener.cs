@@ -74,6 +74,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     }
                     catch (ConsumeException ex)
                     {
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
                         var facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
                         var exceptionConsumerResult = new ConsumeResult<string, string>()
                         {
