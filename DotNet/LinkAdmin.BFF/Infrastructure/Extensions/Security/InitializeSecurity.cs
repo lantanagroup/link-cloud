@@ -150,6 +150,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
                     options.AllowedMethods = corsConfig.AllowedMethods;
                     options.AllowedOrigins = corsConfig.AllowedOrigins;
+                    options.AllowCredentials = corsConfig.AllowCredentials;
                 });
             }
             else

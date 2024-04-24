@@ -19,6 +19,7 @@
     <Folder Include="src\app\interfaces\tenant\" />
     <Folder Include="src\app\models\notification\" />
     <Folder Include="src\app\interceptors\" />
+    <Folder Include="src\app\services\security\" />
     <Folder Include="src\assets\img\" />
   </ItemGroup>
 </Project>
