@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                    ReportType = key.ReportType
                                                }, cancellationToken)
                                            ?? throw new TransactionException(
-                                               $"{Name}: report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
+                                               $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
 
                             var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand() { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId });
 
