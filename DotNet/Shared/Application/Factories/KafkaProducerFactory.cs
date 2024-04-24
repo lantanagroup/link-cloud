@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Linq;
 
 namespace LantanaGroup.Link.Shared.Application.Factories;
 public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducerFactory<TProducerKey, TProducerValue>
@@ -21,16 +20,18 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
     }
 
-    public IProducer<string, AuditEventMessage> CreateAuditEventProducer()
+    public IProducer<string, AuditEventMessage> CreateAuditEventProducer(bool useOpenTelemetry = true)
     {
         try
         {
-            return new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).Build();
+            return useOpenTelemetry ?
+                new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).BuildWithInstrumentation() :
+                new ProducerBuilder<string, AuditEventMessage>(_kafkaConnection.Value.CreateProducerConfig()).SetValueSerializer(new JsonWithFhirMessageSerializer<AuditEventMessage>()).Build();
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to create AuditEvent Kafka producer.", ex);
-            throw new Exception("Failed to create AuditEvent Kafka producer.");
+            _logger.LogError(ex, "Failed to create AuditEvent Kafka producer.");
+            throw;
         }
     }
 
@@ -67,8 +68,8 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to create Kafka producer.", ex);
-            throw new Exception("Failed to create Kafka producer.");
+            _logger.LogError(ex, "Failed to create Kafka producer.");
+            throw;
         }
     }
 }

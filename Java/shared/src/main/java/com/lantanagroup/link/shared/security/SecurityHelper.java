@@ -19,7 +19,10 @@ public class SecurityHelper {
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").access(customAuthorizationManager());
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").hasRole("ROLE_USER");
 
-                    authorizeRequests.requestMatchers(HttpMethod.GET, "/health").permitAll();
+                    authorizeRequests
+                            .requestMatchers(HttpMethod.GET, "/health").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api-docs/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll();
                     authorizeRequests.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(resourceServer -> {

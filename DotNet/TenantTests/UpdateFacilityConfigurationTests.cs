@@ -69,7 +69,7 @@ namespace TenantTests
             .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _mocker.GetMock<IOptions<MeasureConfig>>()
@@ -88,9 +88,7 @@ namespace TenantTests
 
         }
 
-
-/*
-        [Fact]
+       [Fact]
         public async Task TestErrorUpdateNonExistingFacility()
         {
             List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -125,9 +123,12 @@ namespace TenantTests
             .Setup(p => p.CreateAuditEventProducer())
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));
+            Task<string> _updatedFacilityId = _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None);
+
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
+
         }
-*/
+
         [Fact]
         public async Task TestErrorDuplicateFacility()
         {
@@ -173,7 +174,7 @@ namespace TenantTests
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_modelFound));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None));

@@ -19,7 +19,7 @@ spring:
   #  password: link-password
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     properties:
       show_sql: true
       hibernate:

@@ -56,7 +56,7 @@ namespace TenantTests
                 .Setup(p => p.RemoveAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             _mocker.GetMock<IOptions<MeasureConfig>>()
