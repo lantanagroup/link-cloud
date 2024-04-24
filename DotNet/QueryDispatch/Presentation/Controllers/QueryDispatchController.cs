@@ -1,8 +1,8 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using QueryDispatch.Application.Settings;
@@ -32,12 +32,20 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             _tenantApiService = tenantApiService;
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
-        /// Gets a facility configuration by facilityId
+        /// Gets a Query Dispatch facility configuration by facilityId
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// Success: 200 
+        /// Bad Request: 400
+        /// Not Found: 404
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("configuration/facility/{facilityid}")]
         public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId) 
         {
@@ -65,12 +73,18 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Creates a QueryDispatch configuration record.
         /// </summary>
         /// <param name="model"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// Created: 201
+        /// Bad Request: 400
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("configuration")]
         public async Task<ActionResult<RequestResponse>> CreateQueryDispatchConfigurationAsync(QueryDispatchConfiguration model)
         {
@@ -113,12 +127,16 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Deletes a QueryDispatch configuration record.
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// No Content: 204
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("configuration/facility/{facilityid}")]
         public async Task<ActionResult<RequestResponse>> DeleteQueryDispatchConfiguration(string facilityId)
         {
@@ -130,14 +148,8 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             try
             {
                 bool result = await _deleteQueryDispatchConfigurationCommand.Execute(facilityId);
-
-                RequestResponse response = new RequestResponse()
-                {
-                    Id = facilityId,
-                    Message = result ? $"Query Dispatch configuration {facilityId} was deleted succesfully." : $"Failed to delete Query Dispatch configuration {facilityId}, check log for details."
-                };
                 
-                return Ok(response);
+                return NoContent();
             }
             catch (Exception ex)
             {
@@ -147,12 +159,20 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Updates a QueryDispatch configuration record.
         /// </summary>
         /// <param name="model"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// Created: 201
+        /// No Content: 204
+        /// Bad Request: 400
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("configuration")]
         public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(QueryDispatchConfiguration model)
         {
