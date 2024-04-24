@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.HealthChecks;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
@@ -19,9 +20,11 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Wrappers;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -84,6 +87,26 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
+
+    builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
+
+    builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) =>
+    {
+
+        var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
+
+        switch (builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider))
+        {
+            case "SqlServer":
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseConnection))
+                   .AddInterceptors(updateBaseEntityInterceptor);
+                break;
+            default:
+                throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider}");
+        }
+    });
+
 
     builder.Services.AddHttpClient("FhirHttpClient")
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()

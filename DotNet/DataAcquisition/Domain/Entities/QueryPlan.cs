@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
-using LantanaGroup.Link.Shared.Domain.Attributes;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
