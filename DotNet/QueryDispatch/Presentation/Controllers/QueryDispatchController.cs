@@ -110,6 +110,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             try
             {
                 var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+
                 if (!facilityCheckResult)
                     return BadRequest($"Facility {model.FacilityId} does not exist.");
 
@@ -162,6 +163,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         /// <summary>
         /// Updates a QueryDispatch configuration record.
         /// </summary>
+        /// <param name="facilityId"></param>
         /// <param name="model"></param>
         /// <returns>
         /// Created: 201
@@ -173,15 +175,15 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPut("configuration")]
-        public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(QueryDispatchConfiguration model)
+        [HttpPut("configuration/facility/{facilityId}")]
+        public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(string facilityId, QueryDispatchConfiguration model)
         {
             if (model == null)
             {
                 return BadRequest("No query dispatch configuration provided.");
             }
 
-            if (string.IsNullOrWhiteSpace(model.FacilityId))
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
                 _logger.LogError($"Facility Id was not provided in the update query dispatch configuration: {model}.");
                 return BadRequest("Facility Id is required in order to update a query dispatch configuration.");
@@ -189,18 +191,18 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             
             try
             {
-                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(facilityId);
 
                 if (!facilityCheckResult)
                 {
-                    return BadRequest($"Facility {model.FacilityId} does not exist.");
+                    return BadRequest($"Facility {facilityId} does not exist.");
                 }
 
-                var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
+                var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(facilityId);
 
                 if (existingConfig == null)
                 {
-                    var config = _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId, model.DispatchSchedules);
+                    var config = _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
                     await _createQueryDispatchConfigurationCommand.Execute(config);
 
                     return Created(config.Id, config);
@@ -213,7 +215,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + model.FacilityId);
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + facilityId);
 
                 throw;
             }
