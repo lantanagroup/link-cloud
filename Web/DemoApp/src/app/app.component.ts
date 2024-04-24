@@ -2,7 +2,6 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { Component, OnInit } from '@angular/core';
 import { map, Observable, shareReplay } from 'rxjs';
 import { UserProfile } from './models/user-pofile.model';
-import { AuthService } from './services/auth.service';
 import { AuthenticationService } from './services/security/authentication.service';
 import { UserProfileService } from './services/user-profile.service';
 
