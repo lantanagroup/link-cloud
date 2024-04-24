@@ -9,6 +9,6 @@ public class FhirListConfiguration : BaseEntity
 {
     public string FacilityId { get; set; }
     public string FhirBaseServerUrl { get; set; }
-    public AuthenticationConfiguration Authentication { get; set; }
+    public AuthenticationConfiguration? Authentication { get; set; }
     public List<EhrPatientList> EHRPatientLists { get; set; }
 }

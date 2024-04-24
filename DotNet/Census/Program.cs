@@ -1,6 +1,5 @@
 using Azure.Identity;
 using Confluent.Kafka;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Census.Application.Errors;
 using LantanaGroup.Link.Census.Application.HealthChecks;
@@ -23,9 +22,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -87,12 +83,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-
-    var test1 = builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection);
-    var test2 = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
-
-    Console.WriteLine($"Connection String: {test1}");
-    Console.WriteLine($"Database Provider: {test2}");
 
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {

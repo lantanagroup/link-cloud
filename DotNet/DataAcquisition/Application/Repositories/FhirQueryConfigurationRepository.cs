@@ -1,8 +1,9 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Domain.Context;
+using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
@@ -21,14 +22,14 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
 
     public async Task<AuthenticationConfiguration> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
-        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
+        var queryResult = await (_dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId)).FirstOrDefaultAsync();
 
         return queryResult?.Authentication;
     }
 
     public async Task SaveAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
-        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
+        var queryResult = await (_dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId)).FirstOrDefaultAsync();
 
         if (queryResult != null)
         {
@@ -40,20 +41,17 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, facilityId);
+        var entity = await _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefaultAsync();
 
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-
-        if (queryResult != null)
-        {
-            queryResult.Authentication = null;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+        if (entity != null) {
+            entity.Authentication = null;
+            _dbContext.FhirQueryConfigurations.Update(entity);
         }
     }
 
     public override async Task<FhirQueryConfiguration> GetAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var queryResult = _dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId).FirstOrDefault();
+        var queryResult = await (_dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId)).FirstOrDefaultAsync();
         return queryResult;
     }
 
@@ -68,35 +66,28 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
             existingEntity.QueryPlanIds = Entity.QueryPlanIds;
             existingEntity.FhirServerBaseUrl = Entity.FhirServerBaseUrl;
             existingEntity.ModifyDate = DateTime.UtcNow;
+
+            _dbContext.FhirQueryConfigurations.Update(existingEntity);
         }
         else
         {
-            Entity.Id = Guid.NewGuid().ToString();
+            Entity.Id = Guid.NewGuid();
             Entity.CreateDate = DateTime.UtcNow;
             Entity.ModifyDate = DateTime.UtcNow;
+            _dbContext.FhirQueryConfigurations.Add(Entity);
         }
 
-        var filter = Builders<FhirQueryConfiguration>.Filter.Eq(x => x.FacilityId, Entity.FacilityId);
-        var result = await _collection.ReplaceOneAsync(filter, existingEntity ?? Entity, new ReplaceOptions { IsUpsert = true });
-
-        try
-        {
-            if(result.UpsertedId != null && string.IsNullOrWhiteSpace(Entity.Id))
-            {
-                Entity.Id = result.UpsertedId.AsString;
-            }
-        }
-        catch(Exception ex)
-        {
-            //just returning the entity. Getting upsertedId can cause an exception.
-        }
+        await _dbContext.SaveChangesAsync();
 
         return existingEntity ?? Entity;
     }
 
     public override async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        await _collection.DeleteOneAsync(x => x.FacilityId == facilityId, cancellationToken);
+        var entity = await (_dbContext.FhirQueryConfigurations.Where(x => x.FacilityId == facilityId)).FirstOrDefaultAsync();
+
+        if(entity != null)
+            _dbContext.FhirQueryConfigurations.Remove(entity);
     }
 
     public void Dispose()
