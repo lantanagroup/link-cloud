@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { map, Observable, shareReplay } from 'rxjs';
 import { UserProfile } from './models/user-pofile.model';
 import { AuthService } from './services/auth.service';
+import { AuthenticationService } from './services/security/authentication.service';
 import { UserProfileService } from './services/user-profile.service';
 
 
@@ -22,7 +23,7 @@ export class AppComponent implements OnInit {
       shareReplay()
     );
 
-  constructor(private breakpointObserver: BreakpointObserver, private authService: AuthService, private profileService: UserProfileService) {
+  constructor(private breakpointObserver: BreakpointObserver, private authService: AuthenticationService, private profileService: UserProfileService) {
 
     this.profileService.userProfileUpdated.subscribe(profile => {
       this.userProfile = profile;
@@ -31,7 +32,10 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.userProfile = this.profileService.getProfile(); 
+    this.userProfile = this.profileService.getProfile();
+    if(this.userProfile.username === '') {
+      this.authService.login();
+    }
   }
 
   logout() {

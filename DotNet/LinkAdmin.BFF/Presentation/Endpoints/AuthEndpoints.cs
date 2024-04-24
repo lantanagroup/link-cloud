@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             //TODO: DI authentication schema options from settings
             return Results.Challenge(
                 properties: new AuthenticationProperties { 
-                    RedirectUri = "/" 
+                    RedirectUri = "/",
                 },                
                 authenticationSchemes: [ _authSchemaOptions.Value.DefaultChallengeScheme ]);
         }

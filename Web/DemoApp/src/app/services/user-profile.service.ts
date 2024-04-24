@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import { OAuthService } from 'angular-oauth2-oidc';
 import { Subject } from 'rxjs';
 import { IUserProfile } from '../interfaces/user-profile.interface';
 import { UserProfile } from '../models/user-pofile.model';
@@ -13,7 +12,7 @@ export class UserProfileService {
   private _userProfileUpdatedSubject = new Subject<UserProfile>();
   userProfileUpdated = this._userProfileUpdatedSubject.asObservable();
 
-  constructor(private sessionStorageSrv: SessionStorageService, private oauthService: OAuthService) { }
+  constructor(private sessionStorageSrv: SessionStorageService) { }
 
   setProfile(profile: IUserProfile) {
     this.sessionStorageSrv.storeItem(this.profileKey, JSON.stringify(profile));
@@ -29,7 +28,10 @@ export class UserProfileService {
     else {
       return new UserProfile('', '', '', [''], [''], ['']); 
     } 
+  }
 
+  clearProfile() {
+    this.sessionStorageSrv.removeItem(this.profileKey);
   }
 
 }

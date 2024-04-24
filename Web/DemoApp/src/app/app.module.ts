@@ -25,6 +25,7 @@ import { LoadingIndicatorComponent } from './components/core/loading-indicator/l
 import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
+import { AuthenticationService } from './services/security/authentication.service';
 
 export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
@@ -35,12 +36,12 @@ export function initConfig(appConfig: AppConfigService) {
     AppComponent
   ],
   imports: [
-    OAuthModule.forRoot({
-      resourceServer: {
-        // allowedUrls: [`${environment.baseApiUrl}/api`], TODO: Not sure how to get this from a run-time config
-        sendAccessToken: true
-      }
-    }),
+    //OAuthModule.forRoot({
+    //  resourceServer: {
+    //    // allowedUrls: [`${environment.baseApiUrl}/api`], TODO: Not sure how to get this from a run-time config
+    //    sendAccessToken: true
+    //  }
+    //}),
     BrowserModule,
     HttpClientModule,
     BrowserAnimationsModule,
@@ -66,7 +67,8 @@ export function initConfig(appConfig: AppConfigService) {
       multi: true,
     },
     StyleManagerService,
-    HttpInterceptorProviders
+    HttpInterceptorProviders,
+    AuthenticationService
   ],
   bootstrap: [AppComponent]
 })
