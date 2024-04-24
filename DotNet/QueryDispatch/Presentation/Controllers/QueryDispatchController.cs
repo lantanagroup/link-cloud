@@ -138,7 +138,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         /// </returns>
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpDelete("configuration/facility/{facilityid}")]
+        [HttpDelete("configuration/facility/{facilityId}")]
         public async Task<ActionResult<RequestResponse>> DeleteQueryDispatchConfiguration(string facilityId)
         {
             if (string.IsNullOrEmpty(facilityId)) 
