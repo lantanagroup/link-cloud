@@ -78,6 +78,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         }
                         catch (ConsumeException e)
                         {
+                            if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                            {
+                                throw new OperationCanceledException(e.Error.Reason, e);
+                            }
+
                             var facilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
                             var converted_record = new ConsumeResult<string, string>()
                             {
@@ -92,7 +97,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
 
                             _patientEventConsumer.Commit();
-
                             continue;
                         }
 
