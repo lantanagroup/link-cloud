@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using QueryDispatch.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using Confluent.Kafka.Extensions.Diagnostics;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -71,13 +72,96 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        ConsumeResult<string, PatientEventValue> consumeResult;
+                        ConsumeResult<string, PatientEventValue>? consumeResult;
                         try
                         {
-                            consumeResult = _patientEventConsumer.Consume(cancellationToken);
+                            await _patientEventConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                            {
+                                consumeResult = result;
+
+                                try
+                                {
+                                    PatientEventValue value = consumeResult.Message.Value;
+                                    string correlationId = string.Empty;
+
+                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                                    {
+                                        correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
+                                    }
+                                    else
+                                    {
+                                        throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
+                                    }
+
+                                    _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
+
+                                    ScheduledReportEntity scheduledReport = _getScheduledReportQuery.Execute(consumeResult.Message.Key);
+
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await _getQueryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
+
+                                    if (dispatchSchedule == null)
+                                    {
+                                        throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                    }
+
+                                    DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
+
+                                    if (dischargeDispatchSchedule == null)
+                                    {
+                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                    }
+
+                                    PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
+
+                                    if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
+                                    {
+                                        throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                    }
+
+                                    await _createPatientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
+
+                                    _patientEventConsumer.Commit(consumeResult);
+                                }
+                                catch (DeadLetterException ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _patientEventConsumer.Commit(consumeResult);
+                                }
+                                catch (TransientException ex)
+                                {
+                                    _transientExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _patientEventConsumer.Commit(consumeResult);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, $"Failed to process Patient Event.");
+
+                                    var auditValue = new AuditEventMessage
+                                    {
+                                        FacilityId = consumeResult.Message.Key,
+                                        Action = AuditEventType.Query,
+                                        ServiceName = "QueryDispatch",
+                                        EventDate = DateTime.UtcNow,
+                                        Notes = $"Patient Event processing failure \nException Message: {ex}",
+                                    };
+
+                                    ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key);
+                                    _patientEventConsumer.Commit();
+
+                                    //continue;
+                                }
+
+                            }, cancellationToken);
                         }
                         catch (ConsumeException e)
                         {
+                            if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                            {
+                                throw new OperationCanceledException(e.Error.Reason, e);
+                            }
+
                             var facilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
                             var converted_record = new ConsumeResult<string, string>()
                             {
@@ -92,90 +176,15 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
 
                             _patientEventConsumer.Commit();
-
                             continue;
-                        }
-
-                        try
-                        {
-                            PatientEventValue value = consumeResult.Message.Value;
-                            string correlationId = string.Empty;
-
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                            {
-                                correlationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                            }
-                            else
-                            {
-                                throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
-                            }
-
-                            _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
-
-                            ScheduledReportEntity scheduledReport = _getScheduledReportQuery.Execute(consumeResult.Message.Key);
-
-                            QueryDispatchConfigurationEntity dispatchSchedule = await _getQueryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
-
-                            if (dispatchSchedule == null)
-                            {
-                                throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
-                            }
-                                
-                            DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
-
-                            if (dischargeDispatchSchedule == null)
-                            {
-                                throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
-                            }
-                                
-                            PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
-
-                            if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
-                            {
-                                throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}", AuditEventType.Query);
-                            }
-                                
-                            await _createPatientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
-
-                            _patientEventConsumer.Commit(consumeResult);
-                        }
-                        catch (DeadLetterException ex)
-                        {
-                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
-                            _patientEventConsumer.Commit(consumeResult);
-                        }
-                        catch (TransientException ex)
-                        {
-                            _transientExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
-                            _patientEventConsumer.Commit(consumeResult);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError($"Failed to process Patient Event.", ex);
-
-                            var auditValue = new AuditEventMessage
-                            {
-                                FacilityId = consumeResult.Message.Key,
-                                Action = AuditEventType.Query,
-                                ServiceName = "QueryDispatch",
-                                EventDate = DateTime.UtcNow,
-                                Notes = $"Patient Event processing failure \nException Message: {ex}",
-                            };
-
-                            ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
-                            _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key);
-                            _patientEventConsumer.Commit();
-
-                            continue;
-                        }
+                        }                        
                     }
                     _patientEventConsumer.Close();
                     _patientEventConsumer.Dispose();
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                    _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                     _patientEventConsumer.Close();
                     _patientEventConsumer.Dispose();
                 }
