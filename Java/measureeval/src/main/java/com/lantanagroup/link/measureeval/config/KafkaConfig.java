@@ -28,7 +28,7 @@ public class KafkaConfig {
         jsonDeserializer.setTypeResolver((topic, data, headers) ->
                 switch (topic) {
                     case Topics.RESOURCE_NORMALIZED -> objectMapper.constructType(ResourceNormalized.class);
-                    default -> throw new IllegalArgumentException("Unknown topic: " + topic);
+                    default -> throw new IllegalArgumentException(String.format("Unknown topic: %s", topic));
                 });
         return new ErrorHandlingDeserializer<>(jsonDeserializer);
     }

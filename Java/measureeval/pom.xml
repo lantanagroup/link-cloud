@@ -16,8 +16,8 @@
     <version>0.4.1-SNAPSHOT</version>
 
     <properties>
-        <cqf-fhir.version>3.4.0</cqf-fhir.version>
-        <hapi-fhir.version>7.0.2</hapi-fhir.version>
+        <cqf-fhir.version>3.0.0</cqf-fhir.version>
+        <hapi-fhir.version>7.0.0</hapi-fhir.version>
     </properties>
 
     <dependencyManagement>
