@@ -1,19 +1,40 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace LantanaGroup.Link.Shared.Application.Models.Configs
 {
     /// <summary>
     /// CORS configuration options
     /// </summary>
-    public class CorsConfig
+    public class CorsSettings
     {
+        /// <summary>
+        /// Whether to enable CORS
+        /// </summary>
+        public bool EnableCors { get; set; } = true;
+
         /// <summary>
         /// Default CORS policy name
         /// </summary>
-        public const string DefaultCorsPolicyName = "LinkAdminCorsPolicy";
+        public const string DefaultCorsPolicyName = "LinkCorsPolicy";
+
+        /// <summary>
+        /// Whether to allow all headers
+        /// </summary>
+        public bool AllowAllHeaders { get; set; } = false;
 
         /// <summary>
         /// Default allowed headers
         /// </summary>
         public string[] DefaultAllowedHeaders { get; } = ["Authorization", "Content-Type", "Accept", "Origin", "Access-Control-Allow-Origin", "User-Agent", "X-Requested-With"];
+
+        /// <summary>
+        /// Whether to allow all methods
+        /// </summary>
+        public bool AllowAllMethods { get; set; } = false;
 
         /// <summary>
         /// Default allowed methods
@@ -49,6 +70,11 @@
         /// The allowed HTTP methods
         /// </summary>
         public string[]? AllowedMethods { get; set; }
+
+        /// <summary>
+        /// Whether to allow all origins
+        /// </summary>
+        public bool AllowAllOrigins { get; set; } = false;
 
         /// <summary>
         /// The allowed origins
