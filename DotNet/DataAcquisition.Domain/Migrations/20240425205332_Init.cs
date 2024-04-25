@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace LantanaGroup.Link.DataAcquisition.Migrations
+namespace DataAcquisition.Domain.Migrations
 {
     /// <inheritdoc />
     public partial class Init : Migration

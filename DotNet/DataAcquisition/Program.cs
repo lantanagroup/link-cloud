@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Confluent.Kafka;
+using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
@@ -90,22 +91,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 
-    builder.Services.AddDbContext<DataAcquisitionDbContext>((sp, options) =>
-    {
-
-        var updateBaseEntityInterceptor = sp.GetService<UpdateBaseEntityInterceptor>()!;
-
-        switch (builder.Configuration.GetValue<string>(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider))
-        {
-            case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetConnectionString(DataAcquisitionConstants.AppSettingsSectionNames.DatabaseConnection))
-                   .AddInterceptors(updateBaseEntityInterceptor);
-                break;
-            default:
-                throw new InvalidOperationException($"Database provider not supported. Attempting to find section named: {DataAcquisitionConstants.AppSettingsSectionNames.DatabaseProvider}");
-        }
-    });
+    SQLServerEFExtension.AddSQLServerEF_DataAcq(builder);
 
 
     builder.Services.AddHttpClient("FhirHttpClient")
