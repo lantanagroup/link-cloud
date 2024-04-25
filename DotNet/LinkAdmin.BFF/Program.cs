@@ -281,9 +281,10 @@ static void SetupMiddleware(WebApplication app)
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
     {
         var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API");
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API");
+            opts.RoutePrefix = "api/swagger";
         });
     }
 
@@ -295,7 +296,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization(); 
 
     // Register endpoints
-    app.MapGet("/", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+    app.MapGet("/api/info", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
@@ -314,7 +315,7 @@ static void SetupMiddleware(WebApplication app)
     }    
 
     // Map health check middleware
-    app.MapHealthChecks("/health", new HealthCheckOptions
+    app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");    

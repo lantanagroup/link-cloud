@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public void RegisterEndpoints(WebApplication app)
         {
-            var authEndpoints = app.MapGroup("/")
+            var authEndpoints = app.MapGroup("/api")
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {                    
                     Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             //TODO: DI authentication schema options from settings
             return Results.Challenge(
                 properties: new AuthenticationProperties { 
-                    RedirectUri = "/",
+                    RedirectUri = "/api/info",
                 },                
                 authenticationSchemes: [ _authSchemaOptions.Value.DefaultChallengeScheme ]);
         }
