@@ -12,7 +12,7 @@ import { AppConfigService } from '../../app-config.service';
 export class TenantService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}/api`;
+  baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}`;
 
   createFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {

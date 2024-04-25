@@ -12,7 +12,7 @@ import { AppConfigService } from '../app-config.service';
 export class AuditService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}/api`;
+  baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}`;
 
   list(searchText: string, filterFacilityBy: string, filterCorrelationBy: string, filterServiceBy: string,
     filterActionBy: string, filterUserBy: string, sortBy: string, pageSize: number, pageNumber: number): Observable<PagedAuditModel> {
