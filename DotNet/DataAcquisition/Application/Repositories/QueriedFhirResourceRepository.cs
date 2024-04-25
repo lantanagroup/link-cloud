@@ -1,35 +1,42 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class QueriedFhirResourceRepository : MongoDbRepository<QueriedFhirResourceRecord>, IQueriedFhirResourceRepository
+public class QueriedFhirResourceRepository : BaseSqlConfigurationRepo<QueriedFhirResourceRecord>, IQueriedFhirResourceRepository
 {
-    public QueriedFhirResourceRepository(IOptions<MongoConnection> mongoSettings) 
-        : base(mongoSettings)
+    private readonly ILogger<QueriedFhirResourceRepository> _logger;
+    private readonly DataAcquisitionDbContext _dbContext;
+
+    public QueriedFhirResourceRepository(ILogger<QueriedFhirResourceRepository> logger, DataAcquisitionDbContext dbContext)
+        : base(logger, dbContext)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string facilityId, string? patientId = default, string? correlationId = default, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<QueriedFhirResourceRecord>.Filter.Eq(x => x.FacilityId, facilityId);
-
-        if(!string.IsNullOrWhiteSpace(patientId))
+        if (!string.IsNullOrWhiteSpace(patientId) && !string.IsNullOrWhiteSpace(correlationId))
         {
-            filter = filter & Builders<QueriedFhirResourceRecord>.Filter.Eq(x => x.PatientId, patientId);
+            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.PatientId == patientId && x.CorrelationId == correlationId).ToListAsync();
         }
 
-        if(!string.IsNullOrWhiteSpace(correlationId))
+        if (!string.IsNullOrWhiteSpace(patientId) && string.IsNullOrWhiteSpace(correlationId))
         {
-            filter = filter & Builders<QueriedFhirResourceRecord>.Filter.Eq(x => x.CorrelationId, correlationId);
+            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.PatientId == patientId).ToListAsync();
         }
 
-        var queryResult = await _collection.Find(filter).ToListAsync();
+        if (string.IsNullOrWhiteSpace(patientId) && !string.IsNullOrWhiteSpace(correlationId))
+        {
+            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.CorrelationId == correlationId).ToListAsync();
+        }
 
-        return queryResult;
+        _logger.LogWarning("Parameters passed to GetQueryResultsAsync are invalid. Please provide at least one valid parameter.\n facilityId: {1} \n patientId: {2} \n correlationId: {3}", facilityId, patientId, correlationId);
+        return null;
     }
 }
