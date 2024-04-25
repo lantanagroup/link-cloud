@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace LantanaGroup.Link.DataAcquisition.Migrations
+namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
     partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
