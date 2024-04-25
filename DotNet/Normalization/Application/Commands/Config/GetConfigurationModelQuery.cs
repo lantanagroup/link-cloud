@@ -1,8 +1,8 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands.Config
 {
@@ -14,17 +14,17 @@ namespace LantanaGroup.Link.Normalization.Application.Commands.Config
     public class GetConfigurationModelQueryHandler : IRequestHandler<GetConfigurationModelQuery, NormalizationConfigModel>
     {
         private readonly ILogger<GetConfigurationModelQueryHandler> _logger;
-        private readonly IConfigRepository _tenantNormalizationConfigService;
+        private readonly NormalizationDbContext _dbContext;
 
-        public GetConfigurationModelQueryHandler(IConfigRepository tenantNormalizationConfigService, ILogger<GetConfigurationModelQueryHandler> logger)
+        public GetConfigurationModelQueryHandler(NormalizationDbContext dbContext, ILogger<GetConfigurationModelQueryHandler> logger)
         {
-            _tenantNormalizationConfigService = tenantNormalizationConfigService;
+            _dbContext = dbContext;
             _logger = logger;
         }
 
         public async Task<NormalizationConfigModel> Handle(GetConfigurationModelQuery request, CancellationToken cancellationToken)
         {
-            NormalizationConfigEntity config = await _tenantNormalizationConfigService.GetAsync(request.FacilityId);
+            NormalizationConfig config = await _dbContext.NormalizationConfigs.FirstAsync(c => c.FacilityId == request.FacilityId);
 
             if (config == null)
             {

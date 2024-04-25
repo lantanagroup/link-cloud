@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Services;
+using LantanaGroup.Link.Normalization.Domain.Entities;
 using MediatR;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands.Config;
@@ -12,12 +12,12 @@ public class DeleteConfigCommand : IRequest
 public class DeleteConfigCommandHandler : IRequestHandler<DeleteConfigCommand>
 {
     private readonly ILogger<DeleteConfigCommandHandler> _logger;
-    private readonly IConfigRepository _configRepository;
+    private readonly NormalizationDbContext _dbContext;
 
-    public DeleteConfigCommandHandler(ILogger<DeleteConfigCommandHandler> logger, IConfigRepository configRepository)
+    public DeleteConfigCommandHandler(ILogger<DeleteConfigCommandHandler> logger, NormalizationDbContext configRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configRepository = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
+        _dbContext = configRepository ?? throw new ArgumentNullException(nameof(configRepository));
     }
 
     public async Task Handle(DeleteConfigCommand request, CancellationToken cancellationToken)
@@ -27,6 +27,7 @@ public class DeleteConfigCommandHandler : IRequestHandler<DeleteConfigCommand>
             throw new ConfigOperationNullException();
         }
 
-        await _configRepository.DeleteAsync(request.FacilityId);
+        _dbContext.Remove(request.FacilityId);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
