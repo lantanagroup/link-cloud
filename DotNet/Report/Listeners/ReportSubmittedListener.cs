@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
@@ -78,64 +79,64 @@ namespace LantanaGroup.Link.Report.Listeners
                     string facilityId = string.Empty;
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
-
-                        if (consumeResult == null)
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                         {
-                            throw new DeadLetterException(
-                                $"{Name}: consumeResult is null", AuditEventType.Create);
-                        }
+                            consumeResult = result;
 
-                        var key = consumeResult.Message.Key;
-                        var value = consumeResult.Message.Value;
-                        facilityId = key.FacilityId;
-
-                        if (string.IsNullOrEmpty(facilityId) || string.IsNullOrEmpty(value.ReportBundleId))
-                        {
-                            throw new DeadLetterException(
-                                $"{Name}: Missing FacilityID or ReportBundleId {value.ReportBundleId}", AuditEventType.Query);
-                        }
-
-                        // find existing report schedule
-                        MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
-
-                        if (schedule is null)
-                        {
-                            throw new TransientException(
-                                $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}", AuditEventType.Query);
-                        }
-
-                        // update report schedule with submitted date
-                        schedule.SubmittedDate = DateTime.UtcNow;
-                        await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
-
-                        // produce audit message signalling the report service acknowledged the report has been submitted
-                        using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-                        string notes =
-                            $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
-                        var val = new AuditEventMessage
-                        {
-                            FacilityId = schedule.FacilityId,
-                            ServiceName = ReportConstants.ServiceName,
-                            Action = AuditEventType.Submit,
-                            EventDate = DateTime.UtcNow,
-                            Resource = typeof(MeasureReportScheduleModel).Name,
-                            Notes = notes
-                        };
-                        var headers = new Headers
-                                        {
-                                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                                        };
-
-                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                            new Message<string, AuditEventMessage>
+                            if (consumeResult == null)
                             {
-                                Value = val,
-                                Headers = headers
-                            });
-                        producer.Flush();
-                        _logger.LogInformation(notes);
+                                throw new DeadLetterException(
+                                    $"{Name}: consumeResult is null", AuditEventType.Create);
+                            }
+
+                            var key = consumeResult.Message.Key;
+                            var value = consumeResult.Message.Value;
+                            facilityId = key.FacilityId;
+
+                            // find existing report schedule
+                            MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
+
+                            if (schedule is null)
+                            {
+                                throw new TransientException(
+                                    $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}", AuditEventType.Query);
+                            }
+
+                            // update report schedule with submitted date
+                            schedule.SubmittedDate = DateTime.UtcNow;
+                            await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
+
+                            // produce audit message signalling the report service acknowledged the report has been submitted
+                            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+
+                            string notes =
+                                $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
+                            var val = new AuditEventMessage
+                            {
+                                FacilityId = schedule.FacilityId,
+                                ServiceName = ReportConstants.ServiceName,
+                                Action = AuditEventType.Submit,
+                                EventDate = DateTime.UtcNow,
+                                Resource = typeof(MeasureReportScheduleModel).Name,
+                                Notes = notes
+                            };
+                            var headers = new Headers
+                            {
+                                { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                            };
+
+                            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                                new Message<string, AuditEventMessage>
+                                {
+                                    Value = val,
+                                    Headers = headers
+                                });
+                            producer.Flush();
+
+                            _logger.LogInformation(notes);
+
+                        }, cancellationToken);
+                        
                     }
                     catch (ConsumeException ex)
                     {
@@ -170,7 +171,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
                 consumer.Dispose();
             }

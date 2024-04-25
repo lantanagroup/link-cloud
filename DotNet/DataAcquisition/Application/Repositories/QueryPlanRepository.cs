@@ -1,127 +1,116 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class QueryPlanRepository : MongoDbRepository<QueryPlan>, IQueryPlanRepository
+public class QueryPlanRepository : BaseSqlConfigurationRepo<QueryPlan>, IQueryPlanRepository
 {
-    public QueryPlanRepository(IOptions<MongoConnection> mongoSettings) : base(mongoSettings)
+    private readonly ILogger<QueryPlanRepository> _logger;
+    private readonly DataAcquisitionDbContext _dbContext;
+
+    public QueryPlanRepository(ILogger<QueryPlanRepository> logger, DataAcquisitionDbContext dbContext) : base(logger, dbContext)
     {
+        _logger = logger;
+        _dbContext = dbContext;
     }
 
     public override async Task<QueryPlan> GetAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-        var queryResult = await(await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-        return queryResult;
+        return await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
     }
 
     public async Task<List<QueryPlan>> GetQueryPlansByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-        var queryResult = await (await _collection.FindAsync(filter)).ToListAsync();
-        return queryResult;
+        return await _dbContext.QueryPlan.Where(x => x.FacilityId == facilityId).ToListAsync();
     }
 
     public async Task<QueryPlan> GetByFacilityAndReportAsync(string facilityId, string reportType, CancellationToken cancellationToken = default)
-    {
-        var filter = (Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId) & Builders<QueryPlan>.Filter.Eq(x => x.ReportType, reportType));
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-        return queryResult;
+    {       
+        return await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ReportType == reportType);
     }
 
     public override async Task<QueryPlan> UpdateAsync(QueryPlan Entity, CancellationToken cancellationToken = default)
     {
         var existingQueryPlan = await GetAsync(Entity.FacilityId, cancellationToken);
 
-        if(existingQueryPlan != null && existingQueryPlan?.CreateDate != null)
+        Entity.ModifyDate = DateTime.UtcNow;
+
+        if (existingQueryPlan != null)
         {
+            Entity.Id = existingQueryPlan.Id;
             Entity.CreateDate = existingQueryPlan.CreateDate;
+            _dbContext.QueryPlan.Update(Entity);
         }
         else
         {
+            Entity.Id = Guid.NewGuid();
             Entity.CreateDate = DateTime.UtcNow;
+            await _dbContext.QueryPlan.AddAsync(Entity);
         }
 
-        Entity.ModifyDate = DateTime.UtcNow;
-
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, Entity.FacilityId);
-        var result = await _collection.ReplaceOneAsync(filter, Entity, new ReplaceOptions { IsUpsert = true });
-
-        try
-        {
-            if (result.UpsertedId != null && string.IsNullOrWhiteSpace(Entity.Id))
-            {
-                Entity.Id = result.UpsertedId.ToString();
-            }
-        }
-        catch (Exception ex)
-        {
-            //just returning the entity. Getting upsertedId can cause an exception.
-        }
+        await _dbContext.SaveChangesAsync();
 
         return Entity;
     }
 
     public override async Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-        await _collection.DeleteOneAsync(filter);
+        var entity = await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+        if (entity != null)
+        {
+            _dbContext.QueryPlan.Remove(entity);
+            await _dbContext.SaveChangesAsync();
+        }
     }
 
     public async Task DeleteSupplementalQueriesForFacility(string facilityId, CancellationToken cancellationToken = default) 
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-
-        if (queryResult != null)
+        var entity = await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+        if (entity != null)
         {
-            queryResult.SupplementalQueries = null;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+            entity.SupplementalQueries = null;
+            _dbContext.QueryPlan.Update(entity);
+            await _dbContext.SaveChangesAsync();
         }
     }
     public async Task DeleteInitialQueriesForFacility(string facilityId, CancellationToken cancellationToken = default) 
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-
-        if (queryResult != null)
+        var entity = await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+        if (entity != null)
         {
-            queryResult.InitialQueries = null;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+            entity.InitialQueries = null;
+            _dbContext.QueryPlan.Update(entity);
+            await _dbContext.SaveChangesAsync();
         }
     }
 
     public async Task SaveInitialQueries(string facilityId, Dictionary<string, IQueryConfig> config, CancellationToken cancellationToken)
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-
+        var queryResult = await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
         if (queryResult != null)
         {
             queryResult.InitialQueries = config;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+            _dbContext.QueryPlan.Update(queryResult);
+            await _dbContext.SaveChangesAsync();
         }
     }
 
     public async Task SaveSupplementalQueries(string facilityId, Dictionary<string, IQueryConfig> config, CancellationToken cancellationToken)
     {
-        var filter = Builders<QueryPlan>.Filter.Eq(x => x.FacilityId, facilityId);
-
-        var queryResult = await (await _collection.FindAsync(filter)).FirstOrDefaultAsync();
-
+        var queryResult = await _dbContext.QueryPlan.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+        
         if (queryResult != null)
         {
             queryResult.SupplementalQueries = config;
-            await _collection.ReplaceOneAsync(filter, queryResult);
+            _dbContext.QueryPlan.Update(queryResult);
+            await _dbContext.SaveChangesAsync();
         }
     }
+
+    public void Dispose() { }
 }
