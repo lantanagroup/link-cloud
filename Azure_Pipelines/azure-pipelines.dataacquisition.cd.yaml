@@ -1,6 +1,7 @@
 trigger:
   branches:
     include:
+    - main
     - dev
   paths:
     include:
@@ -30,6 +31,8 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
+  # - template: ../azure-nuget-package-source.yml
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
