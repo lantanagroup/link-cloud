@@ -4,8 +4,11 @@ import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
+import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.r4.model.Parameters;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -55,5 +58,18 @@ public class MeasureDefinitionController {
         mongoOperations.save(entity);
         measureEvaluatorCache.remove(id);
         return entity;
+    }
+
+    @PostMapping("/{id}/$evaluate")
+    public MeasureReport evaluate(@PathVariable String id, @RequestBody Parameters parameters) {
+        MeasureEvaluator measureEvaluator = measureEvaluatorCache.getOrFind(id);
+        if (measureEvaluator == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        try {
+            return measureEvaluator.evaluate(parameters);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+        }
     }
 }

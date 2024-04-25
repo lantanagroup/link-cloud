@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.hl7.fhir.r4.model.*;
 import org.opencds.cqf.fhir.api.Repository;
@@ -81,5 +82,13 @@ public class MeasureEvaluator {
                 null,
                 null,
                 null);
+    }
+
+    public MeasureReport evaluate(Parameters parameters) {
+        DateType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateType.class);
+        DateType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateType.class);
+        StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
+        Bundle additionalData = ParametersUtils.getResource(parameters, "additionalData", Bundle.class);
+        return evaluate(periodStart, periodEnd, subject, additionalData);
     }
 }
