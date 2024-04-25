@@ -74,15 +74,15 @@ steps:
   #     custom: 'tool'
   #     arguments: 'install --global dotnet-ef'
 
-  # - script: |
-  #    dotnet ef migrations script \
-  #    --idempotent \
-  #    --verbose \
-  #    -c DataAcquisitionDbContext \
-  #    -s $(build.sourcesdirectory)/$(project) \
-  #    -p $(build.sourcesdirectory)/$(project) \
-  #    -o $(build.artifactstagingdirectory)/DotNet/$(serviceName)/Scripts/dataAcqDb.sql
-  #   displayName: Generate SQL Script
+  - script: |
+     dotnet ef migrations script \
+     --idempotent \
+     --verbose \
+     -c DataAcquisitionDbContext \
+     -s $(build.sourcesdirectory)/$(project) \
+     -p $(build.sourcesdirectory)/$(project) \
+     -o $(build.artifactstagingdirectory)/DotNet/$(serviceName)/Scripts/dataAcqDb.sql
+    displayName: Generate SQL Script
 
   # - task: PublishPipelineArtifact@1
   #   inputs:
