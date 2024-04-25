@@ -11,7 +11,10 @@ import { UserProfileService } from "../user-profile.service";
 
 export class AuthenticationService {
   userProfile!: UserProfile;
-  
+
+  private baseURL = "/api/login"
+
+
   constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   loadUser() {    
@@ -30,7 +33,7 @@ export class AuthenticationService {
   }
 
   login() {
-    return this.http.get('/api/login')
+    return this.http.get(`${this.baseURL}`)
       .subscribe((response) => {
         console.log(response);
       });
