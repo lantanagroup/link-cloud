@@ -198,6 +198,7 @@ namespace Tenant
 
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
+            //Add CORS
             builder.Services.AddLinkCorsService(options => { 
                 options.Environment = builder.Environment;
             });            
