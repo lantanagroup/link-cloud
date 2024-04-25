@@ -81,6 +81,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                 try
                                 {
+                                    if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
+                                    {
+                                        throw new DeadLetterException("Invalid Patient Event", AuditEventType.Create);
+                                    }
+
                                     PatientEventValue value = consumeResult.Message.Value;
                                     string correlationId = string.Empty;
 
@@ -162,13 +167,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 throw new OperationCanceledException(e.Error.Reason, e);
                             }
 
-                            var facilityId = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key);
+                            var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
+
                             var converted_record = new ConsumeResult<string, string>()
                             {
                                 Message = new Message<string, string>()
                                 {
                                     Key = facilityId,
-                                    Value = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value),
+                                    Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
                                     Headers = e.ConsumerRecord.Message.Headers
                                 }
                             };
