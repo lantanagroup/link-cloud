@@ -42,32 +42,42 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             {
                 CorsPolicyBuilder cpb = new();
 
+                //determine allowed origins
                 if (!corsServiceOptions.AllowAllOrigins)
                 {                    
-                    cpb.WithOrigins(corsServiceOptions.AllowedOrigins ?? []);
-
-                    if (corsServiceOptions.AllowCredentials)
-                    {
-                        cpb.AllowCredentials();
-                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders is not null ? corsServiceOptions.AllowedHeaders : corsServiceOptions.DefaultAllowedHeaders);
-                    }
+                    cpb.WithOrigins(corsServiceOptions.AllowedOrigins ?? []);                   
                 }
                 else
                 {
-                    cpb.SetIsOriginAllowed((Host) => true);
-
-                    if (corsServiceOptions.AllowedHeaders?.Length > 0)
-                    {
-                        cpb.WithHeaders(corsServiceOptions.AllowedHeaders);
-                    }
-                    else
-                    {
-                        cpb.AllowAnyHeader();
-                    }
-
+                    cpb.SetIsOriginAllowed((Host) => true);                   
                 }
 
-                cpb.WithMethods(corsServiceOptions.AllowedMethods is not null ? corsServiceOptions.AllowedMethods : corsServiceOptions.DefaultAllowedMethods);
+                //determine allowed headers
+                if(corsServiceOptions.AllowAllHeaders)
+                {
+                    cpb.AllowAnyHeader();
+                }
+                else
+                {
+                    cpb.WithHeaders(corsServiceOptions.AllowedHeaders is not null ? corsServiceOptions.AllowedHeaders : corsServiceOptions.DefaultAllowedHeaders);
+                }
+
+                //determine allowed methods
+                if(corsServiceOptions.AllowAllMethods)
+                {
+                    cpb.AllowAnyMethod();
+                }
+                else
+                {
+                    cpb.WithMethods(corsServiceOptions.AllowedMethods is not null ? corsServiceOptions.AllowedMethods : corsServiceOptions.DefaultAllowedMethods);
+                }
+
+                //determine if credentials are allowed
+                if(corsServiceOptions.AllowCredentials)
+                {
+                    cpb.AllowCredentials();
+                }
+                
                 cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
                 cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
 
