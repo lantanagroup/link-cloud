@@ -12,6 +12,7 @@ using MediatR;
 using Quartz;
 using System.Threading;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
+using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -34,6 +35,14 @@ namespace LantanaGroup.Link.Report.Jobs
             _schedulerFactory = schedulerFactory;
             _mediator = mediator;
         }
+
+        private async Task<bool> readyForSubmission(string scheduleId)
+        {
+            var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = scheduleId });
+
+            return submissionEntries.All(x => x.ReadyForSubmission);
+        }
+
 
         public async Task Execute(IJobExecutionContext context)
         {
@@ -127,7 +136,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
                 }
-                else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
+                else if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
                 {
                     ProducerConfig producerConfig = new ProducerConfig()
                     {

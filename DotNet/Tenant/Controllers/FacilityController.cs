@@ -36,6 +36,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             var configModelToDto = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<FacilityConfigModel, FacilityConfigDto>();
+                cfg.CreateMap<PagedFacilityConfigModel, PagedFacilityConfigDto>();
                 cfg.CreateMap<ScheduledTaskModel.ReportTypeSchedule, ScheduledTaskDto.ReportTypeDtoSchedule>();
                 cfg.CreateMap<ScheduledTaskModel, ScheduledTaskDto>();
                 cfg.CreateMap<MonthlyReportingPlanModel, MonthlyReportingPlanDto>();
@@ -44,6 +45,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             var configDtoToModel = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<FacilityConfigDto, FacilityConfigModel>();
+                cfg.CreateMap<PagedFacilityConfigDto, PagedFacilityConfigModel>();
                 cfg.CreateMap<ScheduledTaskDto.ReportTypeDtoSchedule, ScheduledTaskModel.ReportTypeSchedule>();
                 cfg.CreateMap<ScheduledTaskDto, ScheduledTaskModel>();
                 cfg.CreateMap<MonthlyReportingPlanDto, MonthlyReportingPlanModel>();
@@ -54,36 +56,44 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         /// <summary>
-        /// Get all facilities
+        /// Get facilities
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <param name="facilityId"></param>
         /// <param name="facilityName"></param>
+        /// <param name="sortBy"></param>
+        /// <param name="sortOrder"></param>
+        /// <param name="pageSize"></param>
+        /// <param name="pageNumber"></param>
         /// <returns></returns>
-        [HttpGet(Name = "GetAllFacilities")]
-        public async Task<ActionResult<List<FacilityConfigDto>>> GetAllFacilities(string? facilityId, string? facilityName, CancellationToken cancellationToken)
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityConfigModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpGet(Name = "GetFacilities")]
+        public async Task<ActionResult<PagedFacilityConfigModel>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             List<FacilityConfigDto> facilitiesDtos;
-            List<FacilityConfigModel> facilities;
-
+            PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
             _logger.LogInformation($"Get Facilities");
 
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
+            if (pageNumber < 1) { pageNumber = 1; }
 
-            if (facilityId == null && facilityName == null)
-            {
-                facilities = await _facilityConfigurationService.GetAllFacilities(cancellationToken);
-            }
-            else
-            {
-                facilities = await _facilityConfigurationService.GetFacilitiesByFilters(facilityId, facilityName, cancellationToken);
-            }
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
+            PagedFacilityConfigModel pagedFacilityConfigModel = await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
 
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
-                facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(facilities);
+                facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(pagedFacilityConfigModel.Records);
+                pagedFacilityConfigModelDto.Records = facilitiesDtos;
+                pagedFacilityConfigModelDto.Metadata = pagedFacilityConfigModel.Metadata;
             }
-            return Ok(facilitiesDtos);
+            if (pagedFacilityConfigModelDto.Records.Count == 0)
+            {
+                _logger.LogError("No Facilities Found");
+
+                return NoContent();
+            }
+            return Ok(pagedFacilityConfigModelDto);
         }
 
         /// <summary>
@@ -92,6 +102,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="newFacility"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility, CancellationToken cancellationToken)
         {
@@ -123,7 +136,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 await ScheduleService.AddJobsForFacility(facilityConfigModel, _scheduler);
             }
 
-            return CreatedAtAction(nameof(GetAllFacilities), new { id = facilityConfigModel.Id }, facilityConfigModel);
+            return CreatedAtAction(nameof(StoreFacility), new { id = facilityConfigModel.Id }, facilityConfigModel);
         }
 
         /// <summary>
@@ -132,6 +145,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{facilityId}")]
         public async Task<ActionResult<FacilityConfigDto>> LookupFacilityById(string facilityId, CancellationToken cancellationToken)
         {
@@ -165,6 +182,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="updatedFacility"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
         {
@@ -199,9 +220,25 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 throw;
             }
 
-            using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
+            // if existingFacility is not null, then update the jobs, else add new jobs
+            if (existingFacility != null)
             {
-                await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
+                using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
+                {
+                    await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
+                }
+            }
+            else
+            {
+                using (ServiceActivitySource.Instance.StartActivity("Create Jobs for Facility"))
+                {
+                    await ScheduleService.AddJobsForFacility(dest, _scheduler);
+                }
+            }
+
+            if (existingFacility == null)
+            {
+                return CreatedAtAction(nameof(StoreFacility), new { id = dest.Id }, dest);
             }
 
             return NoContent();
@@ -213,6 +250,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {

@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
 {
     public class CopyElementCommand : IRequest<OperationCommandResult>
     {
-        public Bundle Bundle { get; set; }
+        public Base Resource { get; set; }
         public CopyElementOperation Operation { get; set; }
         public List<PropertyChangeModel> PropertyChanges { get; set; }
     }
@@ -19,40 +19,35 @@ namespace LantanaGroup.Link.Normalization.Application.Commands
     {
         public async Task<OperationCommandResult> Handle(CopyElementCommand request, CancellationToken cancellationToken)
         {
-            var bundle = request.Bundle;
+            var resource = request.Resource;
             var propertyChanges = request.PropertyChanges;
-
-            
-            foreach (var entry in bundle.Entry)
+ 
+            var resourceType = GetFhirResourceType(resource.TypeName);
+            var fromFhirPath = request.Operation.FromFhirPath;
+            var toFhirPath = request.Operation.ToFhirPath;
+            var fromElement = resource.Select(fromFhirPath).FirstOrDefault();
+            var toElement = resource.Select(toFhirPath).FirstOrDefault();
+            if (fromElement != null && toElement != null)
             {
-                var resource = entry.Resource;
-                var resourceType = GetFhirResourceType(resource.TypeName);
-                var fromFhirPath = request.Operation.FromFhirPath;
-                var toFhirPath = request.Operation.ToFhirPath;
-                var fromElement = resource.Select(fromFhirPath).FirstOrDefault();
-                var toElement = resource.Select(toFhirPath).FirstOrDefault();
-                if (fromElement != null && toElement != null)
+                if (toElement is Code)
                 {
-                    if (toElement is Code)
-                    {
-                        assignElement(fromElement, (Code)toElement);
-                    }
-                    else
-                    {
-                        toElement = new FhirString(fromElement.ToString());
-                    }
-                    propertyChanges.Add(new PropertyChangeModel
-                    {
-                        InitialPropertyValue = toElement?.ToString(),
-                        NewPropertyValue = fromElement?.ToString(),
-                        PropertyName = $"{resourceType}.{toFhirPath}"
-                    });
+                    assignElement(fromElement, (Code)toElement);
                 }
+                else
+                {
+                    toElement = new FhirString(fromElement.ToString());
+                }
+                propertyChanges.Add(new PropertyChangeModel
+                {
+                    InitialPropertyValue = toElement?.ToString(),
+                    NewPropertyValue = fromElement?.ToString(),
+                    PropertyName = $"{resourceType}.{toFhirPath}"
+                });
             }
 
             return new OperationCommandResult
             {
-                Bundle = bundle,
+                Resource = resource,
                 PropertyChanges = propertyChanges
             };
         }

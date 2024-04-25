@@ -2,6 +2,7 @@ trigger:
   paths:
     include:
     - DotNet/Tenant/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -9,19 +10,14 @@ pool:
 variables:
   project: 'DotNet/Tenant/Tenant.csproj'
   testProject: 'DotNet/TenantUnitTests/TenantUnitTests.csproj'
-  nugetPath: 'DotNet/Tenant/nuget.config'
   serviceName: 'Tenant'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build

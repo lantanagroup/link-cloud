@@ -1,6 +1,7 @@
 
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
@@ -16,7 +17,7 @@ namespace TenantTests
     public class RemoveFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private MeasureApiConfig? _measureApiConfig;
+        private ServiceRegistry? _serviceRegistry;
         private AutoMocker? _mocker;
         private FacilityConfigurationService? _service;
 
@@ -43,9 +44,9 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _measureApiConfig = new MeasureApiConfig()
+            _serviceRegistry = new ServiceRegistry()
             {
-                MeasureServiceApiUrl = "test"
+                MeasureServiceUrl = "test"
             };
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
@@ -55,12 +56,16 @@ namespace TenantTests
                 .Setup(p => p.RemoveAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<MeasureApiConfig>>()
-            .Setup(p => p.Value)
-            .Returns(_measureApiConfig);
+            _mocker.GetMock<IOptions<MeasureConfig>>()
+              .Setup(p => p.Value)
+              .Returns(new MeasureConfig());
+
+            _mocker.GetMock<IOptions<ServiceRegistry>>()
+                .Setup(p => p.Value)
+                .Returns(_serviceRegistry);
 
             Task<string> facility = _service.RemoveFacility(facilityId, CancellationToken.None);
 

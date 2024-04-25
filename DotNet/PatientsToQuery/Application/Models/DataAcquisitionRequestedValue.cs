@@ -4,5 +4,6 @@
     {
         public string PatientId { get; set; }
         public List<ScheduledReport> ScheduledReports { get; set; }
+        public string QueryType { get; set; }
     }
 }

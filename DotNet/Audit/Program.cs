@@ -28,6 +28,12 @@ using LantanaGroup.Link.Audit.Persistance.Repositories;
 using LantanaGroup.Link.Audit.Persistance;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Audit.Persistance.Interceptors;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,6 +109,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -129,9 +137,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
         {          
             case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString))
-                .AddInterceptors(updateBaseEntityInterceptor);
+                string? connectionString = builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);
+
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -147,7 +161,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<DatabaseHealthCheck>("Database");
 
     //configure CORS
-    builder.Services.AddCorsService(builder.Environment);
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
 
     //configure service api security    
     var idpConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
@@ -207,15 +223,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();    
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);        
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
-    }     
+        options.Environment = builder.Environment;
+        options.ServiceName = AuditConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
+
+    builder.Services.AddSingleton<IAuditServiceMetrics, AuditServiceMetrics>();
 }
 
 #endregion
@@ -250,7 +266,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseRouting();
-    app.UseCors("CorsPolicy");
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();

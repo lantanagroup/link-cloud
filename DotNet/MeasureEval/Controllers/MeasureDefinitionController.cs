@@ -1,17 +1,16 @@
-﻿using LantanaGroup.Link.MeasureEval.Models;
-using LantanaGroup.Link.MeasureEval.Services;
-using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.MeasureEval.Entities;
-using Hl7.Fhir.Serialization;
+﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using System.Text.Json;
-using Confluent.Kafka;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.MeasureEval.Auditing;
-using LantanaGroup.Link.Shared.Application.Models;
-using System.Text;
+using LantanaGroup.Link.MeasureEval.Entities;
+using LantanaGroup.Link.MeasureEval.Models;
+using LantanaGroup.Link.MeasureEval.Services;
 using LantanaGroup.Link.MeasureEval.Settings;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
+using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using System.Text;
+using System.Text.Json;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -22,14 +21,14 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
     [ApiController]
     public class MeasureDefinitionController : ControllerBase
     {
-        private readonly MeasureEvalConfig _measureEvalConfig;
+        private readonly IOptions<MeasureEvalConfig> _measureEvalConfig;
         private readonly MeasureDefinitionService _measureDefService;
         private readonly IKafkaProducerFactory _kafkaProducerFactory;
         private readonly ILogger<MeasureDefinitionController> _logger;
         private MeasureEvalService _measureEvalService;
 
 
-        public MeasureDefinitionController(MeasureDefinitionService measureDefService, MeasureEvalConfig measureEvalConfig, MeasureEvalService measureEvalService, ILogger<MeasureDefinitionController> logger, IKafkaProducerFactory kafkaProducerFactory)
+        public MeasureDefinitionController(MeasureDefinitionService measureDefService, IOptions<MeasureEvalConfig> measureEvalConfig, MeasureEvalService measureEvalService, ILogger<MeasureDefinitionController> logger, IKafkaProducerFactory kafkaProducerFactory)
         {
             _measureEvalConfig = measureEvalConfig;
             _measureDefService = measureDefService;
@@ -100,15 +99,15 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
                 {
                     await _measureDefService.CreateMeasureDefinition(measureDefinition, token);
 
-                    await CreateAuditEvent(measureDefinition.measureDefinitionId, AuditEventType.Create, $"Successfully stored measure definition ({measureDefinition.measureDefinitionId}) and sent to {_measureEvalConfig.EvaluationServiceUrl}.", measureDefinition);
+                    await CreateAuditEvent(measureDefinition.measureDefinitionId, AuditEventType.Create, $"Successfully stored measure definition ({measureDefinition.measureDefinitionId}) and sent to {_measureEvalConfig.Value.EvaluationServiceUrl}.", measureDefinition);
 
                     return CreatedAtAction(nameof(StoreMeasureDefinition), new { id = measureDefinition.Id }, measureDefinition);
                 }
                 else
                 {
-                    await CreateAuditEvent(measureDefinition.measureDefinitionId, AuditEventType.Create, $"Error encountered when sent to {_measureEvalConfig.EvaluationServiceUrl}.", measureDefinition);
+                    await CreateAuditEvent(measureDefinition.measureDefinitionId, AuditEventType.Create, $"Error encountered when sent to {_measureEvalConfig.Value.EvaluationServiceUrl}.", measureDefinition);
 
-                    return StatusCode(500, "Error encountered when measure definition is sent to: " + _measureEvalConfig.EvaluationServiceUrl);
+                    return StatusCode(500, "Error encountered when measure definition is sent to: " + _measureEvalConfig.Value.EvaluationServiceUrl);
                 }
             }
             catch (ApplicationException ex)
@@ -201,15 +200,15 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
 
                     await _measureDefService.UpdateMeasureDefinition(measureDefId, measureDefinition, token);
 
-                    await CreateAuditEvent(measureDefId, AuditEventType.Update, $"Successfully updated measure definition ({measureDefId}) and sent to {_measureEvalConfig.EvaluationServiceUrl}.", measureDefinition);
+                    await CreateAuditEvent(measureDefId, AuditEventType.Update, $"Successfully updated measure definition ({measureDefId}) and sent to {_measureEvalConfig.Value.EvaluationServiceUrl}.", measureDefinition);
 
                     return NoContent();
                 }
                 else
                 {
-                    await CreateAuditEvent(measureDefId, AuditEventType.Update, $"Error encountered when sent to {_measureEvalConfig.EvaluationServiceUrl}.", measureDefinition);
+                    await CreateAuditEvent(measureDefId, AuditEventType.Update, $"Error encountered when sent to {_measureEvalConfig.Value.EvaluationServiceUrl}.", measureDefinition);
 
-                    return StatusCode(500, "Error encountered when measure definition is sent to: " + _measureEvalConfig.EvaluationServiceUrl);
+                    return StatusCode(500, "Error encountered when measure definition is sent to: " + _measureEvalConfig.Value.EvaluationServiceUrl);
                 }
             }
             catch (ApplicationException ex)
@@ -260,18 +259,18 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
         }
 
 
-    /// <summary>
-    /// Gets MeasureDefinitions
-    /// </summary>
-    /// <param name="token"></param>
-    /// <returns>
-    ///     Success: 200
-    ///     Server Error: 500
-    /// </returns>
-    [HttpGet("measureDefinitions")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        /// <summary>
+        /// Gets MeasureDefinitions
+        /// </summary>
+        /// <param name="token"></param>
+        /// <returns>
+        ///     Success: 200
+        ///     Server Error: 500
+        /// </returns>
+        [HttpGet("measureDefinitions")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ReportDefinition>>> GetMeasureDefinitions(CancellationToken token)
         {
             List<MeasureDefinition> measureDefinitions = await _measureDefService.GetMeasureDefinitions(token);
@@ -287,65 +286,65 @@ namespace LantanaGroup.Link.MeasureEval.Controllers
 
 
 
-    [HttpDelete("{measureDefId}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Delete(string measureDefId, CancellationToken token)
+        [HttpDelete("{measureDefId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Delete(string measureDefId, CancellationToken token)
 
-    {
-        try
         {
-            await _measureDefService.DeleteMeasureDefinition(measureDefId, token);
-
-            await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Successfully deleted measure definition ({measureDefId}).");
-
-            return Ok();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex.Message);
-
-            await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Error encountered:{ex.Message}");
-
-            return StatusCode(500, ex.Message);
-        }
-
-    }
-
-
-    private async Task<string> CreateAuditEvent(String measureDefId, AuditEventType type, String notes, MeasureDefinition? measureDefinition = null)
-    {
-
-        try
-        {
-            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-            AuditEventMessage auditEvent = new AuditEventMessage();
-            auditEvent.ServiceName = MeasureEvalConstants.AppSettingsSectionNames.ServiceName;
-            auditEvent.Id = measureDefId;
-            auditEvent.EventDate = DateTime.UtcNow;
-            auditEvent.User = "SystemUser";
-            auditEvent.Action = type;
-            auditEvent.Resource = typeof(MeasureDefinition).Name;
-            auditEvent.url = measureDefinition?.url;
-            auditEvent.Notes = notes;
-
-            var headers = new Headers();
-            headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()));
-
-            //write to auditable event occurred topic
-            await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+            try
             {
-                Key = measureDefId,
-                Value = auditEvent,
-                Headers = headers
-            });
+                await _measureDefService.DeleteMeasureDefinition(measureDefId, token);
 
-            return measureDefId;
+                await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Successfully deleted measure definition ({measureDefId}).");
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+
+                await CreateAuditEvent(measureDefId, AuditEventType.Delete, $"Error encountered:{ex.Message}");
+
+                return StatusCode(500, ex.Message);
+            }
+
         }
-        catch (Exception ex)
+
+
+        private async Task<string> CreateAuditEvent(String measureDefId, AuditEventType type, String notes, MeasureDefinition? measureDefinition = null)
         {
-            throw new ApplicationException($"Failed to create audit event for {type} of measure definition {measureDefId}.", ex);
+
+            try
+            {
+                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+                AuditEventMessage auditEvent = new AuditEventMessage();
+                auditEvent.ServiceName = MeasureEvalConstants.AppSettingsSectionNames.ServiceName;
+                auditEvent.Id = measureDefId;
+                auditEvent.EventDate = DateTime.UtcNow;
+                auditEvent.User = "SystemUser";
+                auditEvent.Action = type;
+                auditEvent.Resource = typeof(MeasureDefinition).Name;
+                auditEvent.url = measureDefinition?.url;
+                auditEvent.Notes = notes;
+
+                var headers = new Headers();
+                headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()));
+
+                //write to auditable event occurred topic
+                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                {
+                    Key = measureDefId,
+                    Value = auditEvent,
+                    Headers = headers
+                });
+
+                return measureDefId;
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Failed to create audit event for {type} of measure definition {measureDefId}.", ex);
+            }
         }
     }
-}
 }

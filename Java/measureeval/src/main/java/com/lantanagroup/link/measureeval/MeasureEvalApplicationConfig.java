@@ -1,20 +1,10 @@
 package com.lantanagroup.link.measureeval;
 
-import com.lantanagroup.link.shared.kafka.KafkaErrorHandler;
-import com.lantanagroup.link.shared.security.SecurityHelper;
-import org.springframework.context.annotation.Bean;
+import com.lantanagroup.link.shared.BaseSpringConfig;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.listener.CommonErrorHandler;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-public class MeasureEvalApplicationConfig {
-
-    @Bean
-    CommonErrorHandler commonErrorHandler() {
-        return new KafkaErrorHandler();
-    }
+public class MeasureEvalApplicationConfig extends BaseSpringConfig {
 
     /**
      * @Bean ConcurrentKafkaListenerContainerFactory<String, PatientEvaluatedModel> kafkaListenerContainerFactory(
@@ -27,9 +17,4 @@ public class MeasureEvalApplicationConfig {
      * return factory;
      * }
      */
-
-    @Bean
-    SecurityFilterChain web(HttpSecurity http) throws Exception {
-        return SecurityHelper.build(http);
-    }
 }

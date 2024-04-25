@@ -2,6 +2,7 @@ trigger:
   paths:
     include:
     - DotNet/DemoApiGateway/*
+    - DotNet/Shared/*
 
 name: Demo API Gateway CI
 
@@ -12,21 +13,13 @@ variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
   value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: nugetPath
-  value: 'DotNet/DemoApiGateway/nuget.config'
-- name: serviceName
-  value: 'DemoApiGateway'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
       verbosityRestore: Diagnostic
   
   - task: DotNetCoreCLI@2

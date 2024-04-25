@@ -54,7 +54,7 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
             
             if(fhirConfig == null)
             {
-                throw new MissingFacilityConfigurationException("No authentication configuration found for facility.");
+                throw new MissingFacilityConfigurationException("No configuration found for facility.");
             }
         }
         catch(MissingFacilityConfigurationException ex)
@@ -73,7 +73,9 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
         {
             var fhirResult = await _fhirRepo.GetPatient(
                 fhirConfig.FhirServerBaseUrl, 
-                string.IsNullOrWhiteSpace(request?.PatientId) ? request?.PatientIdentifier : request?.PatientId, 
+                string.IsNullOrWhiteSpace(request?.PatientId) ? request?.PatientIdentifier : request?.PatientId,
+                string.Empty,
+                request.FacilityId,
                 fhirConfig?.Authentication, 
                 cancellationToken);
 

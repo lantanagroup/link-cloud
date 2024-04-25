@@ -13,6 +13,7 @@ using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
@@ -20,7 +21,11 @@ using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -106,10 +111,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
-    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceRegistry));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Add HttpClients
     builder.Services.AddHttpClient<IFacilityClient, FacilityClient>();
@@ -177,10 +184,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<NotificationRequestedListener>();
 
     //Add infrastructure
-    builder.Services.AddTransient<IEmailService, EmailService>();    
+    builder.Services.AddTransient<IEmailService, EmailService>();
 
     //configure CORS
-    builder.Services.AddCorsService(builder.Environment);
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
 
     //configure servive api security   
     var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
@@ -235,16 +244,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
-    }
+        options.Environment = builder.Environment;
+        options.ServiceName = NotificationConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
+    builder.Services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();   
 }
 
 #endregion

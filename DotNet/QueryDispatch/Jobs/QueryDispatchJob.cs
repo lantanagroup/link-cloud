@@ -46,7 +46,8 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                     {
                         PatientId = patientDispatchEntity.PatientId,
-                        ScheduledReports = new List<ScheduledReport>()
+                        ScheduledReports = new List<ScheduledReport>(),
+                        QueryType = QueryTypes.Initial.ToString()
                     };
 
                     foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
