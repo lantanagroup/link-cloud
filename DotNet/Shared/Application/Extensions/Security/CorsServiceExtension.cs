@@ -1,8 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -10,10 +8,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 {
     public static class CorsServiceExtension
     {
-        public static IServiceCollection AddLinkCorsService(this IServiceCollection services, IOptions<CorsSettings> corsSettings, Action<CorsServiceOptions>? options = null)
+        public static IServiceCollection AddLinkCorsService(this IServiceCollection services, Action<CorsServiceOptions>? options = null)
         {
             var corsServiceOptions = new CorsServiceOptions();
-            options?.Invoke(corsServiceOptions);            
+            options?.Invoke(corsServiceOptions);
+
+            var corsSettings = services.BuildServiceProvider().GetService<IOptions<CorsSettings>>();
 
             if(corsSettings is not null && corsSettings.Value.EnableCors)
             {
@@ -27,7 +27,6 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     options.AllowedMethods = corsSettings.Value.AllowedMethods;
                     options.AllowedExposedHeaders = corsSettings.Value.AllowedExposedHeaders;
                     options.MaxAge = corsSettings.Value.MaxAge;
-                    options.PolicyName = corsSettings.Value.PolicyName;
                 });
             }            
 
@@ -72,7 +71,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
                 cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
 
-                options.AddPolicy(corsServiceOptions?.PolicyName ?? CorsSettings.DefaultCorsPolicyName, cpb.Build());
+                options.AddPolicy(CorsSettings.DefaultCorsPolicyName, cpb.Build());
 
                 //add health check endpoint to cors policy
                 options.AddPolicy("HealthCheckPolicy", policy =>

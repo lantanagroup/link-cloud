@@ -5,24 +5,7 @@ using System.IdentityModel.Tokens.Jwt;
 namespace LantanaGroup.Link.Audit.Infrastructure.Extensions
 {
     public static class ServiceCollectionExtensions
-    {      
-
-        public static IServiceCollection AddCorsService(this IServiceCollection services, IWebHostEnvironment env)
-        {
-            //TODO: Use env variable to control strictness of CORS policy
-            services.AddCors(options =>
-            {
-                options.AddPolicy("CorsPolicy",
-                    builder => builder
-                        .AllowAnyMethod()
-                        .AllowCredentials()
-                        .SetIsOriginAllowed((host) => true) //lock this down, allows all atm
-                        .AllowAnyHeader());
-            });
-
-            return services;
-        }
-
+    {    
         public static IServiceCollection AddAuthenticationService(this IServiceCollection services, IdentityProviderConfig idpConfig, IWebHostEnvironment env)
         {
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
