@@ -12,6 +12,7 @@ using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -81,6 +82,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 
@@ -157,6 +159,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<CensusListener>();
     builder.Services.AddHostedService<ScheduleService>();
 
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -181,6 +188,8 @@ static void SetupMiddleware(WebApplication app)
     {
         app.MapGrpcReflectionService();
     }
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

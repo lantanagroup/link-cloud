@@ -4,6 +4,7 @@ using Hellang.Middleware.ProblemDetails;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -101,6 +102,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<FileSystemConfig>(builder.Configuration.GetRequiredSection(nameof(FileSystemConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -170,6 +172,11 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -205,7 +212,7 @@ static void SetupMiddleware(WebApplication app)
     });
 
     app.UseRouting();
-    app.UseCors("CorsPolicy");
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
     //app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     //app.UseAuthorization();

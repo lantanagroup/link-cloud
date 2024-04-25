@@ -66,6 +66,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityConfigModel))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedFacilityConfigModel>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
@@ -99,6 +102,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="newFacility"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility, CancellationToken cancellationToken)
         {
@@ -139,6 +145,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{facilityId}")]
         public async Task<ActionResult<FacilityConfigDto>> LookupFacilityById(string facilityId, CancellationToken cancellationToken)
         {
@@ -172,6 +182,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="updatedFacility"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfigDto))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
         {
@@ -236,6 +250,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {

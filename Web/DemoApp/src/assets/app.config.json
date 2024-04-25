@@ -1,6 +1,6 @@
 {
   "production": false,
-  "baseApiUrl": "/api",
+  "baseApiUrl": "http://localhost:5218",
   "idpIssuer": "",
   "idpClientId": "",
   "idpClientSecret": "",
