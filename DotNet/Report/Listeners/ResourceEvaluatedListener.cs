@@ -14,11 +14,10 @@ using MediatR;
 using System.Text;
 using System.Text.Json;
 using System.Transactions;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
-using static LantanaGroup.Link.Report.Entities.MeasureReportSubmissionEntryModel;
+using Confluent.Kafka.Extensions.Diagnostics;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -94,124 +93,131 @@ namespace LantanaGroup.Link.Report.Listeners
                     var facilityId = string.Empty;
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
-
-                        if (consumeResult == null)
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                         {
-                            throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
-                        }
+                            consumeResult = result;
 
-                        var key = consumeResult.Message.Key;
-                        var value = consumeResult.Message.Value;
-                        facilityId = key.FacilityId;
-
-                        if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                        {
-                            _logger.LogInformation($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
-                        }
-
-                        if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                            string.IsNullOrWhiteSpace(key.ReportType) ||
-                            key.StartDate == DateTime.MinValue ||
-                            key.EndDate == DateTime.MinValue)
-                        {
-                            throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.", AuditEventType.Create);
-                        }
-
-                        // find existing report scheduled for this facility, report type, and date range
-                        var schedule = await _mediator.Send(
-                                           new FindMeasureReportScheduleForReportTypeQuery
-                                           {
-                                               FacilityId = key.FacilityId, ReportStartDate = key.StartDate,
-                                               ReportEndDate = key.EndDate, ReportType = key.ReportType
-                                           }, cancellationToken)
-                                       ?? throw new TransactionException(
-                                           $"{Name}: report schedule found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
-
-                        var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand() { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId  });
-
-                        if (entry == null) 
-                        {
-                            entry = new MeasureReportSubmissionEntryModel
+                            if (consumeResult == null)
                             {
-                                FacilityId = key.FacilityId,
-                                MeasureReportScheduleId = schedule.Id,
-                                PatientId = value.PatientId
-                            };
-                        }
+                                throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
+                            }
 
-                        var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+                            var key = consumeResult.Message.Key;
+                            var value = consumeResult.Message.Value;
+                            facilityId = key.FacilityId;
 
-                        if (resource == null)
-                        {
-                            throw new DeadLetterException($"{Name}: Unable to deserialize event resource", AuditEventType.Create);
-                        }
-                        else if (resource.TypeName == "MeasureReport")
-                        {
-                            entry.AddMeasureReport((MeasureReport)resource);
-                        }
-                        else 
-                        {
-                            entry.AddContainedResource(resource);
-                        }
-
-                        if (entry.Id == null)
-                        {
-                            await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                            if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                             {
-                                MeasureReportSubmissionEntry = entry
-                            }, cancellationToken);
-                        }
-                        else
-                        { 
-                            await _mediator.Send(new UpdateMeasureReportSubmissionEntryCommand
+                                _logger.LogInformation($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
+                            }
+
+                            if (string.IsNullOrWhiteSpace(key.FacilityId) ||
+                                string.IsNullOrWhiteSpace(key.ReportType) ||
+                                key.StartDate == DateTime.MinValue ||
+                                key.EndDate == DateTime.MinValue)
                             {
-                                MeasureReportSubmissionEntry = entry
-                            }, cancellationToken);
-                        }
+                                throw new DeadLetterException(
+                                    $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.", AuditEventType.Create);
+                            }
 
-                        #region Patients To Query & Submision Report Handling
+                            // find existing report scheduled for this facility, report type, and date range
+                            var schedule = await _mediator.Send(
+                                               new FindMeasureReportScheduleForReportTypeQuery
+                                               {
+                                                   FacilityId = key.FacilityId,
+                                                   ReportStartDate = key.StartDate,
+                                                   ReportEndDate = key.EndDate,
+                                                   ReportType = key.ReportType
+                                               }, cancellationToken)
+                                           ?? throw new TransactionException(
+                                               $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
 
-                       
+                            var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand() { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId });
 
-                        if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
-                        {
-                            if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
+                            if (entry == null)
                             {
-                                schedule.PatientsToQuery.Remove(value.PatientId);
-
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand
+                                entry = new MeasureReportSubmissionEntryModel
                                 {
-                                    ReportSchedule = schedule
+                                    FacilityId = key.FacilityId,
+                                    MeasureReportScheduleId = schedule.Id,
+                                    PatientId = value.PatientId
+                                };
+                            }
+
+                            var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(), new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings { Validator = null }));
+
+                            if (resource == null)
+                            {
+                                throw new DeadLetterException($"{Name}: Unable to deserialize event resource", AuditEventType.Create);
+                            }
+                            else if (resource.TypeName == "MeasureReport")
+                            {
+                                entry.AddMeasureReport((MeasureReport)resource);
+                            }
+                            else
+                            {
+                                entry.AddContainedResource(resource);
+                            }
+
+                            if (entry.Id == null)
+                            {
+                                await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                                {
+                                    MeasureReportSubmissionEntry = entry
+                                }, cancellationToken);
+                            }
+                            else
+                            {
+                                await _mediator.Send(new UpdateMeasureReportSubmissionEntryCommand
+                                {
+                                    MeasureReportSubmissionEntry = entry
                                 }, cancellationToken);
                             }
 
-                            if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
-                            {
-                                using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
-                                prod.Produce(nameof(KafkaTopic.SubmitReport),
-                                    new Message<SubmissionReportKey, SubmissionReportValue>
-                                    {
-                                        Key = new SubmissionReportKey()
-                                        {
-                                            FacilityId = schedule.FacilityId,
-                                            ReportType = schedule.ReportType
-                                        },
-                                        Value = new SubmissionReportValue()
-                                        {
-                                            MeasureReportScheduleId = schedule.Id
-                                        },
-                                        Headers = new Headers
-                                        {
-                                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                                        }
-                                    });
+                            #region Patients To Query & Submision Report Handling
 
-                                prod.Flush(cancellationToken);
+
+
+                            if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
+                            {
+                                if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
+                                {
+                                    schedule.PatientsToQuery.Remove(value.PatientId);
+
+                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand
+                                    {
+                                        ReportSchedule = schedule
+                                    }, cancellationToken);
+                                }
+
+                                if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
+                                {
+                                    using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
+                                    prod.Produce(nameof(KafkaTopic.SubmitReport),
+                                        new Message<SubmissionReportKey, SubmissionReportValue>
+                                        {
+                                            Key = new SubmissionReportKey()
+                                            {
+                                                FacilityId = schedule.FacilityId,
+                                                ReportType = schedule.ReportType
+                                            },
+                                            Value = new SubmissionReportValue()
+                                            {
+                                                MeasureReportScheduleId = schedule.Id
+                                            },
+                                            Headers = new Headers
+                                            {
+                                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                            }
+                                        });
+
+                                    prod.Flush(cancellationToken);
+                                }
                             }
-                        }
-                        #endregion
+                            #endregion
+
+                        }, cancellationToken);
+                        
                     }
                     catch (ConsumeException ex)
                     {
@@ -246,7 +252,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
                 consumer.Dispose();
             }
