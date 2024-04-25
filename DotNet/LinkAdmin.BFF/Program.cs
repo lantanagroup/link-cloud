@@ -288,8 +288,8 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseRouting();
-    var corsConfig = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
-    app.UseCors(corsConfig?.PolicyName ?? CorsConfig.DefaultCorsPolicyName);
+    var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
+    app.UseCors(corsConfig?.PolicyName ?? CorsSettings.DefaultCorsPolicyName);
     app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization(); 
