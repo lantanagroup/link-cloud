@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Normalization.Domain.Entities;
+﻿namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
 public class ConditionElement
 {

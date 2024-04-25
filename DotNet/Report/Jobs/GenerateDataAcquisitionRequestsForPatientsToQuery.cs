@@ -1,18 +1,17 @@
-﻿using System.Text;
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
+using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
+using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Quartz;
-using System.Threading;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Jobs
 {

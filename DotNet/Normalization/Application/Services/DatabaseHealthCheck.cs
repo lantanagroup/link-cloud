@@ -1,22 +1,23 @@
-﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+﻿using LantanaGroup.Link.Normalization.Domain.Entities;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Normalization.Application.Services
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly IConfigRepository _datastore;
+        protected readonly NormalizationDbContext _dataContext;
 
-        public DatabaseHealthCheck(IConfigRepository datastore)
+        public DatabaseHealthCheck(NormalizationDbContext dataContext)
         {
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
         }
 
-        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                bool outcome = await _datastore.HealthCheck();
-
+                bool outcome = await _dataContext.Database.CanConnectAsync();
                 if (outcome)
                 {
                     return HealthCheckResult.Healthy();
@@ -25,7 +26,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services
                 {
                     return HealthCheckResult.Unhealthy();
                 }
-
             }
             catch (Exception ex)
             {

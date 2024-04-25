@@ -1,8 +1,4 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-
-namespace LantanaGroup.Link.Normalization.Domain.Entities;
-
-[BsonDiscriminator("ConditionalTransformationOperation")]
+﻿namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 public class ConditionalTransformationOperation : INormalizationOperation
 {
     public string FacilityId { get; set; }
