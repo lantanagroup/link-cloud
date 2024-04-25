@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace LantanaGroup.Link.DataAcquisition.Migrations
+namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    [Migration("20240424184458_Init")]
+    [Migration("20240425205332_Init")]
     partial class Init
     {
         /// <inheritdoc />
