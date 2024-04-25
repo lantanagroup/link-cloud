@@ -30,9 +30,9 @@ export class AuthenticationService {
   }
 
   login() {
-    return this.http.get(`${this.appConfigService.config?.baseApiUrl}/login`)
-      .subscribe(_ => {
-
+    return this.http.get('/api/login')
+      .subscribe((response) => {
+        console.log(response);
       });
   }
   
