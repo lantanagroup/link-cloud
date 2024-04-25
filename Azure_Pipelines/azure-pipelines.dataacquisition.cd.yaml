@@ -41,7 +41,6 @@ steps:
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
       feedsToUse: config
   
   - task: DotNetCoreCLI@2
