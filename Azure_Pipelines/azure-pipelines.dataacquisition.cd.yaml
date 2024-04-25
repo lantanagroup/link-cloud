@@ -30,8 +30,7 @@ variables:
 - name: serviceName
   value: 'DataAcquisition'
 - name: containerRegistry
-  value: 'Link ACR'
-  #value: 'NHSNLink ACR Premium'
+  value: 'NHSNLink ACR Premium'
 
 steps:
   # - template: ../azure-nuget-package-source.yml
