@@ -84,6 +84,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                 try
                                 {
+                                    if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
+                                    {
+                                        throw new DeadLetterException("Invalid Report Scheduled event", AuditEventType.Create);
+                                    }
+
                                     string correlationId = string.Empty;
 
                                     if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
@@ -173,8 +178,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                             {
                                 Message = new Message<string, string>()
                                 {
-                                    Key = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key),
-                                    Value = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value),
+                                    Key = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "",
+                                    Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
                                     Headers = e.ConsumerRecord.Message.Headers
                                 }
                             };
