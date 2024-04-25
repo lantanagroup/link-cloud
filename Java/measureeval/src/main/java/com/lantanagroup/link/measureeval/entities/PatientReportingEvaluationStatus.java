@@ -19,6 +19,7 @@ import java.util.List;
 public class PatientReportingEvaluationStatus {
     @Id
     private String id;
+
     private String facilityId;
     private String patientId;
     private String correlationId;

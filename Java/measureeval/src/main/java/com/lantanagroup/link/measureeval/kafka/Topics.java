@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval;
+package com.lantanagroup.link.measureeval.kafka;
 
 public class Topics {
     public static final String DATA_ACQUISITION_REQUESTED = "DataAcquisitionRequested";
