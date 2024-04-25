@@ -8,6 +8,7 @@ using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -77,6 +78,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.AddDbContext<DataContext>();
     //builder.Services.AddDbContext<TestDataContext>();
 
@@ -123,6 +125,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -151,6 +158,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseRouting();
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.MapControllers();
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))

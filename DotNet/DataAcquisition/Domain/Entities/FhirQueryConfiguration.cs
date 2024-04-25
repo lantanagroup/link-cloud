@@ -1,11 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Domain.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("fhirQueryConfiguration")]
+[Table("fhirQueryConfiguration")]
 public class FhirQueryConfiguration : BaseEntity
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
@@ -15,14 +17,9 @@ public class FhirQueryConfiguration : BaseEntity
     public string FhirServerBaseUrl { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [BsonIgnoreIfNull]
     public AuthenticationConfiguration? Authentication { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? QueryPlanIds { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public DateTime? CreateDate { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public DateTime? ModifyDate { get; set; }
 }

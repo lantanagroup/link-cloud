@@ -14,6 +14,8 @@ public static class DataAcquisitionConstants
         public const string Telemetry = "Telemetry";
         public const string TenantApiSettings = "TenantApiSettings";
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+        public const string DatabaseProvider = "DatabaseProvider";
+        public const string DatabaseConnection = "SqlServer";
     }
 
     public static class ValidationErrorMessages

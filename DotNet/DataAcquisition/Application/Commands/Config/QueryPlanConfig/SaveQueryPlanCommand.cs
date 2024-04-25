@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using MediatR;
 

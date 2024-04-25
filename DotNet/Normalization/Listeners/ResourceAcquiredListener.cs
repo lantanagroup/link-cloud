@@ -119,6 +119,7 @@ public class ResourceAcquiredListener : BackgroundService
                             FacilityId = messageMetaData.facilityId
                         });
                     }
+ 
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
@@ -247,7 +248,7 @@ public class ResourceAcquiredListener : BackgroundService
                     };
                         var resourceNormalizedMessage = new ResourceNormalizedMessage
                         {
-                            PatientId = message.Value.PatientId,
+                            PatientId = message.Value.PatientId ?? "",
                             Resource = serializedResource,
 
                             QueryType = message.Value.QueryType,
@@ -282,7 +283,13 @@ public class ResourceAcquiredListener : BackgroundService
             }
             catch (ConsumeException ex)
             {
-                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? Array.Empty<byte>());
+                if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                {
+                    new OperationCanceledException(ex.Error.Reason, ex);
+                }
+
+                string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
+                
                 ConsumeResult<string, string> result = new ConsumeResult<string, string>
                 {
                     Message = new Message<string, string>
