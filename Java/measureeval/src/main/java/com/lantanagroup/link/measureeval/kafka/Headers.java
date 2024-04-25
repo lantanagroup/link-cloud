@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval;
+package com.lantanagroup.link.measureeval.kafka;
 
 public class Headers {
     public static final String CORRELATION_ID = "X-Correlation-Id";

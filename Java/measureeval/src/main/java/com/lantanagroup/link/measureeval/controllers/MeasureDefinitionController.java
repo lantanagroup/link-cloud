@@ -1,87 +1,59 @@
 package com.lantanagroup.link.measureeval.controllers;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
-import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
-import com.lantanagroup.link.measureeval.services.MeasureEvaluationCache;
-import org.apache.commons.lang3.StringUtils;
+import com.lantanagroup.link.measureeval.serdes.Views;
+import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
+import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Library;
-import org.hl7.fhir.r4.model.Measure;
-import org.hl7.fhir.r4.model.ResourceType;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Instant;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/measure-definition")
 public class MeasureDefinitionController {
-    private final MeasureEvaluationCache measureEvaluationCache;
-    private final MeasureDefinitionRepository measureDefinitionRepository;
+    private final MongoOperations mongoOperations;
+    private final MeasureDefinitionBundleValidator measureDefinitionBundleValidator;
+    private final MeasureEvaluatorCache measureEvaluatorCache;
 
-    public MeasureDefinitionController(MeasureEvaluationCache measureEvaluationCache, MeasureDefinitionRepository measureDefinitionRepository) {
-        this.measureEvaluationCache = measureEvaluationCache;
-        this.measureDefinitionRepository = measureDefinitionRepository;
+    public MeasureDefinitionController(
+            MongoOperations mongoOperations, MeasureDefinitionBundleValidator measureDefinitionBundleValidator,
+            MeasureEvaluatorCache measureEvaluatorCache) {
+        this.mongoOperations = mongoOperations;
+        this.measureDefinitionBundleValidator = measureDefinitionBundleValidator;
+        this.measureEvaluatorCache = measureEvaluatorCache;
     }
 
     @GetMapping
+    @JsonView(Views.Summary.class)
     public List<MeasureDefinition> getAll() {
-        return this.measureDefinitionRepository.findAll().stream().map(md -> {
-            MeasureDefinition measureDefinition = new MeasureDefinition();
-            measureDefinition.setId(md.getId());
-            measureDefinition.setLastUpdated(md.getLastUpdated());
-            return measureDefinition;
-        }).toList();
+        return mongoOperations.findAll(MeasureDefinition.class);
     }
 
-    private void validateBundle(Bundle bundle) {
-        if (!bundle.hasId()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle must have an id");
+    @GetMapping("/{id}")
+    public MeasureDefinition getOne(@PathVariable String id) {
+        MeasureDefinition entity = mongoOperations.findById(id, MeasureDefinition.class);
+        if (entity == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-
-        Measure foundMeasure = bundle.getEntry().stream()
-                .filter(e -> e.getResource() != null && e.getResource().getResourceType() == ResourceType.Measure)
-                .map(e -> (Measure) e.getResource())
-                .findFirst()
-                .orElse(null);
-
-        if (foundMeasure == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle must contain a Measure resource");
-        }
-
-        if (StringUtils.isEmpty(foundMeasure.getUrl())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Measure resource must have a url");
-        }
-
-        foundMeasure.getLibrary().forEach(libraryReference -> {
-            String libraryUrl = libraryReference.asStringValue();
-
-            boolean foundLibrary = bundle.getEntry().stream()
-                    .filter(e -> e.getResource() != null && e.getResource().getResourceType() == ResourceType.Library)
-                    .map(e -> (Library) e.getResource())
-                    .anyMatch(library -> StringUtils.equals(library.getUrl(), libraryUrl));
-
-            if (!foundLibrary) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Measure resource references a library that is not in the bundle");
-            }
-        });
+        return entity;
     }
 
-    @PutMapping(consumes = {"application/json"})
-    public void createOrUpdate(@RequestBody Bundle bundle) {
-        this.validateBundle(bundle);
-
-        bundle.setId(bundle.getIdElement().getIdPart().replace("-bundle", ""));
-
-        MeasureDefinition measureDefinition = new MeasureDefinition();
-        measureDefinition.setId(bundle.getIdElement().getIdPart());
-        measureDefinition.setBundle(bundle);
-        measureDefinition.setLastUpdated(Instant.now());
-        this.measureDefinitionRepository.save(measureDefinition);
-
-        // Update the cache with the latest measure definition bundle
-        this.measureEvaluationCache.update(measureDefinition);
+    @PutMapping("/{id}")
+    public MeasureDefinition put(@PathVariable String id, @RequestBody Bundle bundle) {
+        measureDefinitionBundleValidator.validate(bundle);
+        MeasureDefinition entity = mongoOperations.findById(id, MeasureDefinition.class);
+        if (entity == null) {
+            entity = new MeasureDefinition();
+            entity.setId(id);
+        }
+        entity.setBundle(bundle);
+        mongoOperations.save(entity);
+        measureEvaluatorCache.remove(id);
+        return entity;
     }
 }

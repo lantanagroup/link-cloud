@@ -14,7 +14,8 @@ import java.util.Map;
 @ConfigurationProperties("link.data-acquisition")
 public class DataAcquisitionConfig {
     private String baseUrl;
-    private Map<String, String> routes;
+    private Map<String, String> routes = Map.of(
+            "query-result", "/api/{facilityId}/QueryResult/{patientId}");
 
     private String getUrl(String key, Map<String, ?> variables) {
         return UriComponentsBuilder.fromHttpUrl(baseUrl)

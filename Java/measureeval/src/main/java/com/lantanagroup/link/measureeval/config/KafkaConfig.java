@@ -1,7 +1,7 @@
 package com.lantanagroup.link.measureeval.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.measureeval.Topics;
+import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
@@ -34,17 +34,17 @@ public class KafkaConfig {
     }
 
     @Bean
-    public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
-        return new JsonSerializer<>(objectMapper);
-    }
-
-    @Bean
     public ConsumerFactory<?, ?> consumerFactory(
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
             Deserializer<?> valueDeserializer) {
         Map<String, Object> consumerProperties = properties.buildConsumerProperties(sslBundles.getIfAvailable());
         return new DefaultKafkaConsumerFactory<>(consumerProperties, null, valueDeserializer);
+    }
+
+    @Bean
+    public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
+        return new JsonSerializer<>(objectMapper);
     }
 
     @Bean
