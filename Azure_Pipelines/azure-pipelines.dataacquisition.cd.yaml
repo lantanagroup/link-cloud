@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
     - main
+    - dev
   paths:
     include:
     - DotNet/DataAcquisition/*
@@ -32,7 +33,7 @@ variables:
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
+  # - template: ../azure-nuget-package-source.yml
 
   - task: DotNetCoreCLI@2
     displayName: Restore
