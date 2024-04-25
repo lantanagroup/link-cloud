@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -7,7 +8,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -64,17 +64,20 @@ namespace LantanaGroup.Link.Normalization.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
-                consumer.Subscribe(KafkaTopic.PatientAcquiredRetry.GetStringValue());
+                consumer.Subscribe(KafkaTopic.ResourceAcquired + "-Retry"); // fixed this later
 
                 _logger.LogInformation($"Started Normalization Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<string, string> consumeResult;
+                    ConsumeResult<string, string>? consumeResult;
 
                     try
-                    {
-                        consumeResult = consumer.Consume(cancellationToken);
+                    {                        
+                        consumeResult = await consumer.ConsumeWithInstrumentation((result, CancellationToken) =>
+                        {
+                            return Task.FromResult(result);
+                        }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {

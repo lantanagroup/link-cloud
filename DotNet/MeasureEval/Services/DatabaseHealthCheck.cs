@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.MeasureEval.Entities;
-using LantanaGroup.Link.MeasureEval.Repository;
+﻿using LantanaGroup.Link.MeasureEval.Repository;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.MeasureEval.Services

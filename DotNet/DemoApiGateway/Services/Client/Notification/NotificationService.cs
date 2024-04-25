@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DemoApiGateway.Application.models;
 using LantanaGroup.Link.DemoApiGateway.Application.models.notification;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
@@ -8,17 +9,17 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
     public class NotificationService : INotificationService
     {
         private readonly HttpClient _httpClient;
-        private readonly IOptions<GatewayConfig> _gatewayConfig;
+        private readonly IOptions<ServiceRegistry> _serviceRegistry;
 
-        public NotificationService(HttpClient httpClient, IOptions<GatewayConfig> gatewayConfig)
+        public NotificationService(HttpClient httpClient, IOptions<ServiceRegistry> serviceRegistry)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _gatewayConfig = gatewayConfig ?? throw new ArgumentNullException(nameof(_gatewayConfig));           
+            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(_serviceRegistry));           
         }
 
         public async Task<HttpResponseMessage> CreateNotification(NotificationMessage model)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -30,7 +31,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 
         public async Task<HttpResponseMessage> CreateNotificationConfiguration(NotificationConfigurationModel model)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -41,7 +42,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 
         public async Task<HttpResponseMessage> DeleteNotificationConfiguration(Guid id)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -52,7 +53,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 
         public async Task<HttpResponseMessage> ListConfigurations(string? searchText, string? filterFacilityBy, string? sortBy, int pageSize = 10, int pageNumber = 1)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -65,7 +66,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 
         public async Task<HttpResponseMessage> ListNotifications(string? searchText, string? filterFacilityBy, string? filterNotificationTypeBy, DateTime? createdOnStart, DateTime? createdOnEnd, DateTime? sentOnStart, DateTime? sentOnEnd, string? sortBy, int pageSize = 10, int pageNumber = 1)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -79,7 +80,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 
         public async Task<HttpResponseMessage> UpdateNotificationConfiguration(NotificationConfigurationModel model)
         {
-            _httpClient.BaseAddress = new Uri(_gatewayConfig.Value.NotificationServiceApiUrl);
+            _httpClient.BaseAddress = new Uri(_serviceRegistry.Value.NotificationServiceUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 

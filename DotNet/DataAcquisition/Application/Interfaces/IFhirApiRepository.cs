@@ -10,6 +10,10 @@ public interface IFhirApiRepository
 {
     Task<Bundle> GetPagedBundledResultsAsync(
         string baseUrl,
+        string patientIdReference,
+        string correlationId,
+        string facilityId,
+        string queryType,
         Bundle bundle,
         PagedParameterQueryFactoryResult pagedQuery,
         ParameterQueryConfig config,
@@ -18,19 +22,37 @@ public interface IFhirApiRepository
 
     Task<Bundle> GetSingularBundledResultsAsync(
         string baseUrl,
+        string patientIdReference,
+        string correlationId,
+        string facilityId,
+        string queryType,
         Bundle bundle,
         SingularParameterQueryFactoryResult query,
         ParameterQueryConfig config,
         ScheduledReport report,
         AuthenticationConfiguration authConfig);
 
-    Task<Patient> GetPatient(string baseUrl, string patientId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default);
+    Task<Patient> GetPatient(
+        string baseUrl,
+        string patientId,
+        string correlationId,
+        string facilityId,
+        AuthenticationConfiguration authConfig,
+        CancellationToken cancellationToken = default);
 
-    Task<List> GetPatientList(string baseUrl, string listId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default);
+    Task<List> GetPatientList(
+        string baseUrl, 
+        string listId, 
+        AuthenticationConfiguration authConfig, 
+        CancellationToken cancellationToken = default);
 
     Task<List<DomainResource>> GetReferenceResource(
         string baseUrl,
         string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
         List<ResourceReference> referenceIds,
         ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig);

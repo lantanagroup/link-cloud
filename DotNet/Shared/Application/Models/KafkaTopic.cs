@@ -7,6 +7,9 @@ public enum KafkaTopic
     DataAcquired,
     PatientIDsAcquired,
     PatientAcquired,
+    ResourceAcquired,
+    [StringValue("ResourceAcquired-Retry")]
+    ResourceAcquiredRetry,
     [StringValue("PatientAcquired-Retry")]
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
@@ -14,13 +17,13 @@ public enum KafkaTopic
     DataAcquisitionFailed,
     PatientDataEvaluated,
     PatientNormalized,
+    ResourceNormalized,
     PatientDischarged,
     PatientDataAcquired,
     ReportBundled,
     ReportFailed,
     ReportRequestRejected,
     ReportScheduled,
-    ResourceAcquired,
     RetentionCheckScheduled,
     PatientResourcesNormalized,
     MeasureChanged,
@@ -32,13 +35,13 @@ public enum KafkaTopic
     PatientEvent,
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
-    MeasureEvaluated,
+    ResourceEvaluated,
     ReportSubmitted,
     BundleEvalRequested,
     PatientsToQuery,
     SubmitReport,
-    [StringValue("MeasureEvaluated-Retry")]
-    MeasureEvaluatedRetry,
+    [StringValue("ResourceEvaluated-Retry")]
+    ResourceEvaluatedRetry,
     [StringValue("ReportSubmitted-Retry")]
     ReportSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
@@ -48,6 +51,6 @@ public enum KafkaTopic
     [StringValue("SubmitReport-Retry")]
     SubmitReportRetry,
     [StringValue("ReportScheduled-Retry")]
-    ReportScheduledRetry
-
+    ReportScheduledRetry,
+    MeasureEvaluated
 }

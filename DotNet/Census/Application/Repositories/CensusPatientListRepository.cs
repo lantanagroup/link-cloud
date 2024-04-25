@@ -24,11 +24,17 @@ public class CensusPatientListRepository : BaseSqlConfigurationRepo<CensusPatien
         return activePatients;
     }
 
-    public async Task<List<CensusPatientListEntity>> GetAllPatientsForFacility(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<List<CensusPatientListEntity>> GetAllPatientsForFacility(string facilityId, DateTime startDate = default, DateTime endDate = default, CancellationToken cancellationToken = default)
     {
         CheckIfNullOrString(facilityId, nameof(facilityId));
 
         var allPatients = _context.CensusPatientLists.Where(x => x.FacilityId == facilityId).ToList();
+
+        if (startDate != default && endDate != default)
+        {
+            allPatients = allPatients.Where(x => x.AdmitDate >= startDate && x.AdmitDate <= endDate).ToList();
+        }
+
         return allPatients;
     }
 

@@ -6,6 +6,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models
     {
         string Key { get; set; }
         string PatientId { get; set; }
-        List<ScheduledReport> Reports { get; set; }
+        string QueryType { get; set; }
+        List<ScheduledReport> ScheduledReports { get; set; }
     }
 }

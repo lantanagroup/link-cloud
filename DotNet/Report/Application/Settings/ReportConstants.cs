@@ -4,12 +4,10 @@ namespace LantanaGroup.Link.Report.Settings
 {
     public static class ReportConstants
     {
-
-        public const string ServiceName = "Report Service";
+        public const string ServiceName = "Report";
 
         public static class AppSettingsSectionNames
         {
-            public const string Kafka = "KafkaConnection";
             public const string Mongo = "MongoDB";
             public const string ServiceInformation = "ServiceInformation";
             public const string Telemetry = "TelemetryConfig";

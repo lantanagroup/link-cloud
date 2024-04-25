@@ -2,24 +2,24 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
-using LantanaGroup.Link.Tenant.Services;
 using LantanaGroup.Link.Tenant.Models;
+using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
+using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Moq.AutoMock;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
-using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
-using System.Threading;
 
 namespace TenantTests
 {
     public class CreateFacilityConfigurationTests
     {
         private FacilityConfigModel? _model;
-        private MeasureApiConfig? _measureApiConfig;
+        private ServiceRegistry? _serviceRegistry;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -45,9 +45,9 @@ namespace TenantTests
                 ModifyDate = DateTime.Now
             };
 
-            _measureApiConfig = new MeasureApiConfig()
+            _serviceRegistry = new ServiceRegistry()
             {
-                MeasureServiceApiUrl = "test" 
+                MeasureServiceUrl = "test"
             };
 
             _model.ScheduledTasks.AddRange(scheduledTaskModels);
@@ -61,19 +61,22 @@ namespace TenantTests
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<MeasureApiConfig>>()
+            _mocker.GetMock<IOptions<MeasureConfig>>()
               .Setup(p => p.Value)
-              .Returns(_measureApiConfig);
+              .Returns(new MeasureConfig());
+
+            _mocker.GetMock<IOptions<ServiceRegistry>>()
+                .Setup(p => p.Value)
+                .Returns(_serviceRegistry);
 
              await _service.CreateFacility(_model,CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
         }
 
-        //TODO: Fix this, because as of now the create step appears to be mocked and we can't actually detect duplicate creations in unit testing
         [Fact]
         public async Task TestErrorCreateDuplicateFacility()
         {
@@ -92,11 +95,10 @@ namespace TenantTests
                 MRPModifyDate = DateTime.Now
             };
 
-            _measureApiConfig = new MeasureApiConfig()
+            _serviceRegistry = new ServiceRegistry()
             {
-                MeasureServiceApiUrl = "test"
+                MeasureServiceUrl = "test"
             };
-
 
             facilities.Add(_model);
 
@@ -115,16 +117,17 @@ namespace TenantTests
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-                .Setup(p => p.CreateAuditEventProducer())
+                .Setup(p => p.CreateAuditEventProducer(false))
                 .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
-            _mocker.GetMock<IOptions<MeasureApiConfig>>()
-             .Setup(p => p.Value)
-             .Returns(_measureApiConfig);
+            _mocker.GetMock<IOptions<MeasureConfig>>()
+              .Setup(p => p.Value)
+              .Returns(new MeasureConfig());
 
-          //  var createResult = await _service.CreateFacility(_model, CancellationToken.None);
+            _mocker.GetMock<IOptions<ServiceRegistry>>()
+                .Setup(p => p.Value)
+                .Returns(_serviceRegistry);
 
-           // Assert.True(createResult);
             _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.CreateFacility(_model, CancellationToken.None));
         }
     }

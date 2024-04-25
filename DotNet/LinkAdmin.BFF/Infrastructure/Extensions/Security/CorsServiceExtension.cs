@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
                 cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
 
-                options.AddPolicy(corsServiceOptions?.PolicyName ?? CorsConfig.DefaultCorsPolicyName, cpb.Build());
+                options.AddPolicy(CorsConfig.DefaultCorsPolicyName, cpb.Build());
 
                 //add health check endpoint to cors policy
                 options.AddPolicy("HealthCheckPolicy", policy =>

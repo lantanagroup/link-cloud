@@ -1,33 +1,36 @@
+using Azure.Identity;
+using HealthChecks.UI.Client;
 using Hellang.Middleware.ProblemDetails;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Submission.Application.Factories;
+using LantanaGroup.Link.Submission.Application.Interfaces;
+using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Models;
+using LantanaGroup.Link.Submission.Application.Queries;
+using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Managers;
-using LantanaGroup.Link.Submission.Application.Queries;
-using LantanaGroup.Link.Submission.Application.Repositories;
-using HealthChecks.UI.Client;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using Azure.Identity;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using Quartz.Spi;
-using LantanaGroup.Link.Submission.Application.Factories;
-using Quartz.Impl;
-using Quartz;
-using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,6 +72,17 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    // Add service information
+    var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
+    if (serviceInformation != null)
+    {
+        ServiceActivitySource.Initialize(serviceInformation);
+    }
+    else
+    {
+        throw new NullReferenceException("Service Information was null.");
+    }
+
     //Add problem details
     builder.Services.AddProblemDetails(opts => {
         opts.IncludeExceptionDetails = (ctx, ex) => false;
@@ -82,18 +96,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add Settings
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(SubmissionConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<FileSystemConfig>(builder.Configuration.GetRequiredSection(nameof(FileSystemConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
     builder.Services.AddGrpc().AddJsonTranscoding();
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<TenantSubmissionRepository>();
     builder.Services.AddSingleton<RetryRepository>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
@@ -149,14 +164,28 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(builder.Configuration)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
                     .Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    // Telemetry Configuration
-    // TODO
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = SubmissionConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
+
+    builder.Services.AddSingleton<ISubmissionServiceMetrics, SubmissionServiceMetrics>();
 }
 
 #endregion
@@ -183,7 +212,7 @@ static void SetupMiddleware(WebApplication app)
     });
 
     app.UseRouting();
-    app.UseCors("CorsPolicy");
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
     //app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     //app.UseAuthorization();

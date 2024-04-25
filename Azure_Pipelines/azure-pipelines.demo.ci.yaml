@@ -10,12 +10,8 @@ pool:
 
 variables:
 - group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: nugetPath
-  value: 'DotNet/DemoApiGateway/nuget.config'
 - name: workingDir
-  value: 'DotNet/DemoApp/'
+  value: 'Web/DemoApp/'
 - name: serviceName
   value: 'DemoApiGateway'
 

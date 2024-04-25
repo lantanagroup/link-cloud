@@ -6,6 +6,10 @@ trigger:
   paths:
     include:
     - DotNet/DataAcquisition/*
+    - DotNet/Shared/*
+    exclude:
+    - '*'
+    
 pr: none
 
 pool:
@@ -17,12 +21,6 @@ variables:
   value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
 - name: testProject
   value: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
-- name: nugetPath
-  value: 'DotNet/DataAcquisition/nuget.config'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
 - name: registry-repo-Name
   value: 'link-dataacquisition'
 - name: dockerPath
@@ -40,8 +38,6 @@ steps:
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -65,8 +61,8 @@ steps:
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1

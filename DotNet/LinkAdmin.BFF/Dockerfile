@@ -9,15 +9,19 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["LinkAdmin.BFF/LinkAdmin.BFF.csproj", "LinkAdmin.BFF/"]
+COPY ["DotNet/Shared/Shared.csproj", "Shared/"]
+COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "Link.Authorization/"]
+COPY ["DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj", "LinkAdmin.BFF/"]
 RUN dotnet restore "./LinkAdmin.BFF/./LinkAdmin.BFF.csproj"
-COPY . .
-WORKDIR "/src/LinkAdmin.BFF"
-RUN dotnet build "./LinkAdmin.BFF.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+COPY ["DotNet/Shared/", "Shared/"]
+COPY ["DotNet/Link.Authorization/", "Link.Authorization/"]
+COPY ["DotNet/LinkAdmin.BFF/", "LinkAdmin.BFF/"]
+
+RUN dotnet build "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/build
 
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./LinkAdmin.BFF.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

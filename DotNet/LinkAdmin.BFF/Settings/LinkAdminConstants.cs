@@ -10,12 +10,10 @@
             public const string ServiceInformation = "ServiceInformation";
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string CORS = "CORS";
-            public const string Telemetry = "TelemetryConfig";
+            public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";
-            public const string Kafka = "KafkaConnection";
             public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
-            public const string LinkServiceDiscovery = "GatewayConfig";
             public const string LinkBearerService = "LinkBearerServiceConfig";
         }
 

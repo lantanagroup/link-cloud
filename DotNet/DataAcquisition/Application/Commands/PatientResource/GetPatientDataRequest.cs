@@ -4,12 +4,11 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
@@ -27,6 +26,7 @@ public class GetPatientDataRequest : IRequest<List<IBaseMessage>>
     public string FacilityId { get; set; }
     public DataAcquisitionRequestedMessage Message { get; set; }
     public string CorrelationId { get; set; }
+    public QueryPlanType QueryPlanType { get; set; }
 }
 
 public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataRequest, List<IBaseMessage>>
@@ -44,7 +44,8 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         IQueryPlanRepository queryPlanRepository,
         IMediator mediator,
         IFhirApiRepository fhirRepo,
-        IReferenceResourcesRepository referenceResourcesRepository)
+        IReferenceResourcesRepository referenceResourcesRepository,
+        IQueriedFhirResourceRepository queriedFhirResourceRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryRepo = fhirQueryRepo ?? throw new ArgumentNullException(nameof(fhirQueryRepo));
@@ -87,35 +88,71 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         foreach(var scheduledReport in request.Message.ScheduledReports)
         {
             var patientId = TEMPORARYPatientIdPart(request.Message.PatientId);
-            Hl7.Fhir.Model.Bundle bundle = new Hl7.Fhir.Model.Bundle();
+            Bundle bundle = new Bundle();
             bundle.Type = Bundle.BundleType.Transaction;
             bundle.Identifier = new Identifier 
             {
                 Value = patientId
             };
 
-            var patient = await _fhirRepo.GetPatient(fhirQueryConfiguration.FhirServerBaseUrl, patientId, fhirQueryConfiguration.Authentication);
+            Patient patient = null;
 
-            bundle.AddResourceEntry(patient, patientId);
+            if (request.Message.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+            {
+                patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
+                fhirQueryConfiguration.Authentication);
+
+                bundle.AddResourceEntry(patient, patientId);
+            }
 
             var queryPlan = queryPlans.Where(x => x.ReportType == scheduledReport.ReportType).FirstOrDefault();
             if(queryPlan != null)
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
                 var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
-
+                (string queryPlanType, Bundle bundle) processedBundle = (null, bundle);
                 try
                 {
-                    bundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle);
-                    bundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, bundle);
-
-                    var bundleEle = System.Text.Json.JsonSerializer.SerializeToElement(bundle, new JsonSerializerOptions().ForFhir());
-                    messages.Add(new PatientAcquiredMessage
+                    if (request.Message.QueryType == "Initial")
                     {
-                        PatientId = patientId,
-                        PatientBundle = bundleEle,
-                        ScheduledReports = new List<ScheduledReport> { scheduledReport }
-                    });
+                        processedBundle = await ProcessIQueryList(initialQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.InitialQueries.ToString());
+                    }
+                    else
+                    {
+                        processedBundle = await ProcessIQueryList(supplementalQueries, request, fhirQueryConfiguration, scheduledReport, queryPlan, processedBundle.bundle, QueryPlanType.SupplementalQueries.ToString());
+                    }
+
+                    foreach (var entry in processedBundle.bundle.Entry)
+                    {
+
+                        foreach (var child in entry.Resource.Children)
+                        {
+                            if (child is Resource)
+                            {
+                                var childResource = (Resource)child;
+                                messages.Add(new ResourceAcquired
+                                {
+                                    Resource = childResource,
+                                    ScheduledReports = new List<ScheduledReport> { scheduledReport },
+                                    PatientId = patientId,
+                                    QueryType = request.Message.QueryType
+                                });
+ 
+                            }
+                        }
+
+                        messages.Add(new ResourceAcquired
+                        {
+                            Resource = entry.Resource,
+                            ScheduledReports = new List<ScheduledReport> { scheduledReport },
+                            PatientId = RemovePatientId(entry.Resource) ? string.Empty : patientId,
+                            QueryType = request.Message.QueryType
+                        });
+                    }
+
                 }
                 catch(Exception ex)
                 {
@@ -130,13 +167,26 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         return messages;
     }
 
-    private async Task<Bundle> ProcessIQueryList(
+    private bool RemovePatientId(Resource resource)
+    {
+        return resource switch
+        {
+            Device => true,
+            Medication => true,
+            Location => true,
+            Specimen => true,
+            _ => false,
+        };
+    }
+
+    private async Task<(string queryPlanType, Bundle bundle)> ProcessIQueryList(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ScheduledReport scheduledReport,
         QueryPlan queryPlan,
-        Bundle bundle
+        Bundle bundle,
+        string queryPlanType
         )
     {
         foreach (var query in queryList)
@@ -150,10 +200,19 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
 
+            _logger.LogInformation("Processing Query for:");
+
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetSingularBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.Message.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
                     bundle,
                     (SingularParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
@@ -163,8 +222,15 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetPagedBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.Message.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
                     bundle,
                     (PagedParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
@@ -176,7 +242,10 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
-                if(referenceQueryFactoryResult.ReferenceIds?.Count == 0)
+                var queryInfo = ((ReferenceQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
                 {
                     break;
                 }
@@ -189,6 +258,10 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 var fullMissingResources = await _fhirRepo.GetReferenceResource(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     referenceQueryFactoryResult.ResourceType,
+                    request.Message.PatientId,
+                    request.FacilityId,
+                    request.CorrelationId,
+                    queryPlanType,
                     missingReferences,
                     (ReferenceQueryConfig)queryConfig,
                     fhirQueryConfiguration.Authentication);
@@ -229,11 +302,12 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                     }; 
                     _referenceResourcesRepository.Add(refResource);
                     bundle.AddResourceEntry(resource, $"{resource.TypeName}/{resource.Id}");
+
                 }
             }
 
         }
-        return bundle;
+        return (queryPlanType, bundle);
     }
 
     private Bundle AddExisitngReferenceListToBundle(List<ReferenceResources> resources, Bundle bundle)

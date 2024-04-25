@@ -11,7 +11,8 @@ namespace LantanaGroup.Link.Normalization.Application.Commands;
 
 public class FixResourceIDCommand : IRequest<OperationCommandResult>
 {
-    public Bundle Bundle { get; set; }
+    public Base Resource { get; set; }
+
     public List<PropertyChangeModel> PropertyChanges { get; set; }
 }
 
@@ -26,22 +27,26 @@ public class FixResourceIDHandler : IRequestHandler<FixResourceIDCommand, Operat
 
     public async Task<OperationCommandResult> Handle(FixResourceIDCommand request, CancellationToken cancellationToken)
     {
-        var bundle = request.Bundle;
+        var resource = (Resource)request.Resource;
         var propertyChanges = request.PropertyChanges;
         string oldId = string.Empty;
         string newId = string.Empty;
         string newIdRef = string.Empty;
 
         List<Bundle.EntryComponent> invalidEntries = new List<Bundle.EntryComponent>();
-        foreach (var entry in bundle.Entry)
+
+
+        if (resource != null
+        && resource.Id != null
+        && (resource.Id.Length > 64 || resource.Id.StartsWith(NormalizationConstants.FixResourceIDCommand.UuidPrefix)))
         {
-            if (entry.Resource != null
-            && entry.Resource.Id != null
-            && (entry.Resource.Id.Length > 64 || entry.Resource.Id.StartsWith(NormalizationConstants.FixResourceIDCommand.UuidPrefix)))
+            Bundle.EntryComponent bundleEntryComponent = new Bundle.EntryComponent
             {
-                invalidEntries.Add(entry);
-            }
+                Resource = resource
+            };
+            invalidEntries.Add(bundleEntryComponent);
         }
+
 
         // Create a dictionary where key = old id, value = new id (a hash of the old id)
         Dictionary<string, (string idOnly, string rTypePlusId)?> newIds = new Dictionary<string, (string, string)?>();
@@ -82,12 +87,12 @@ public class FixResourceIDHandler : IRequestHandler<FixResourceIDCommand, Operat
                 invalidEntry.Request.Url = newIdEntry.Value.rTypePlusId;
             }
 
-            FindReferencesAndUpdate(bundle, oldId, newId, invalidEntry.Resource.TypeName);
+            FindReferencesAndUpdate(resource, oldId, newId, invalidEntry.Resource.TypeName);
         }
 
         return new OperationCommandResult
         {
-            Bundle = bundle,
+            Resource = resource,
             PropertyChanges = propertyChanges,
         };
     }

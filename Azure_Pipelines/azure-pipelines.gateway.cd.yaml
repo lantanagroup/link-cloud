@@ -1,10 +1,12 @@
 trigger:
   branches:
     include:
-    - main
+    - dev
   paths:
     include:
     - DotNet/DemoApiGateway/*
+    exclude:
+    - '*'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -13,31 +15,19 @@ variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
   value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
-- name: nugetPath
-  value: 'DotNet/DemoApiGateway/nuget.config'
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
 - name: registry-repo-Name
   value: 'link-api-gw'
 - name: dockerPath
   value: '**/DotNet/DemoApiGateway/Dockerfile'
-- name: serviceName
-  value: 'DemoApiGateway'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - template: ../azure-nuget-package-source.yml
-
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
-      nugetConfigPath: '$(nugetPath)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -54,8 +44,8 @@ steps:
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1

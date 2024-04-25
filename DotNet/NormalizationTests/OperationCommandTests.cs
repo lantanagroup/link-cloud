@@ -6,7 +6,6 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.IO;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
@@ -19,7 +18,7 @@ public class OperationCommandTests
     {
         var logger = new Mock<ILogger<ApplyConceptMapHandler>>();
 
-        var bundle = LoadTestBundle("TestBundle.json");
+        var resource = LoadTestResource("TestResource.json");
         var conceptMapStr = LoadTestConceptMap("TestConceptMap.json");
         var conceptMap = JsonSerializer.Deserialize<ConceptMap>(conceptMapStr, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
         var conceptMapOperation = new ConceptMapOperation
@@ -31,7 +30,7 @@ public class OperationCommandTests
         var command = new ApplyConceptMapHandler(logger.Object);
         var result = await command.Handle(new ApplyConceptMapCommand 
         {
-            Bundle = bundle,
+            Resource = resource,
             Operation = conceptMapOperation
         }, default);
 
@@ -43,7 +42,7 @@ public class OperationCommandTests
     {
         var logger = new Mock<ILogger<ConditionalTransformationHandler>>();
 
-        var bundle = LoadTestBundle("TestBundle.json");
+        var resource = LoadTestResource("TestResource.json");
         var conditionalTransformationOperation = new ConditionalTransformationOperation
         {
             FacilityId = "TestFacility",
@@ -56,7 +55,7 @@ public class OperationCommandTests
         var command = new ConditionalTransformationHandler(logger.Object, new ConditionalTransformationEvaluationService());
         var result = await command.Handle(new ConditionalTransformationCommand
         {
-            Bundle = bundle,
+            Resource = resource,
             Operation = conditionalTransformationOperation,
             PropertyChanges = new List<PropertyChangeModel>()
         }, default);
@@ -75,7 +74,7 @@ public class OperationCommandTests
     {
         var logger = new Mock<ILogger<CopyLocationIdentifierToTypeHandler>>();
 
-        var bundle = LoadTestBundle("TestBundle.json");
+        var resource = LoadTestResource("TestResource.json");
         var copyLocationIdentifierToTypeOperation = new CopyLocationIdentifierToTypeOperation
         {
             Name = "CopyLocationIdentifierToType",
@@ -84,19 +83,19 @@ public class OperationCommandTests
         var command = new CopyLocationIdentifierToTypeHandler();
         var result = await command.Handle(new CopyLocationIdentifierToTypeCommand
         {
-            Bundle = bundle,
+            Resource = resource,
             PropertyChanges = new List<PropertyChangeModel>()
         }, default);
 
         Assert.NotNull(result);
     }
 
-    private Bundle LoadTestBundle(string fileName)
+    private Resource LoadTestResource(string fileName)
     {
         //var path = Path.Combine("TestFiles", fileName);
         //var json = File.ReadAllText(path);
         var json = File.ReadAllText(fileName);
-        return JsonSerializer.Deserialize<Bundle>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+        return JsonSerializer.Deserialize<Resource>(json, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
     }
 
     private string LoadTestConceptMap(string fileName)
