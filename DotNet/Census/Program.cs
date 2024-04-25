@@ -86,12 +86,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 
-    var test1 = builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection);
-    var test2 = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
-
-    Console.WriteLine($"Connection String: {test1}");
-    Console.WriteLine($"Database Provider: {test2}");
-
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
 
