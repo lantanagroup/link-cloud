@@ -79,7 +79,7 @@ steps:
      dotnet ef migrations script \
      --idempotent \
      --verbose \
-     -c CensusContext \
+     -c DataAcquisitionDbContext \
      -s $(build.sourcesdirectory)/$(project) \
      -p $(build.sourcesdirectory)/$(project) \
      -o $(build.artifactstagingdirectory)/DotNet/$(serviceName)/Scripts/dataAcqDb.sql
