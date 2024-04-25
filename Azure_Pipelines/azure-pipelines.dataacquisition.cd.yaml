@@ -15,6 +15,8 @@ variables:
 - group: Link_BOTW_Build_Package_Variables
 - name: project
   value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
+- name: domainProject
+  value: 'DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj'
 - name: testProject
   value: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
 - name: nugetPath
@@ -79,8 +81,8 @@ steps:
      --verbose \
      -c DataAcquisitionDbContext \
      -s $(build.sourcesdirectory)/$(project) \
-     -p $(build.sourcesdirectory)/$(project) \
-     -o $(build.artifactstagingdirectory)/DotNet/$(serviceName)/Scripts/dataAcqDb.sql
+     -p $(build.sourcesdirectory)/$(domainProject) \
+     -o $(build.artifactstagingdirectory)/sqlMigrations/Scripts/dataAcqDb.sql
     displayName: Generate SQL Script
 
   # - task: PublishPipelineArtifact@1

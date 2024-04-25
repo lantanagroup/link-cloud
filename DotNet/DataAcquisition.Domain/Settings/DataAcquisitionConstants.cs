@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-
+﻿
 namespace LantanaGroup.Link.DataAcquisition.Application.Settings;
 
 public static class DataAcquisitionConstants

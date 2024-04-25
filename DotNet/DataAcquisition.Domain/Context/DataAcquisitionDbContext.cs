@@ -2,6 +2,8 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain;
@@ -59,5 +61,26 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
         );
+    }
+
+    public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>
+    {
+        public DataAcquisitionDbContext CreateDbContext(string[] args)
+        {
+            string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+            IConfiguration config = new ConfigurationBuilder()
+                .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "DataAcquisition"))
+                .AddJsonFile("appsettings.json")
+                .AddJsonFile($"appsettings.{env}.json", optional: true)
+                //.AddEnvironmentVariables()
+                .Build();
+
+            var optionsBuilder = new DbContextOptionsBuilder<DataAcquisitionDbContext>();
+            var connectionString = config.GetConnectionString("SqlServer");
+            optionsBuilder.UseSqlServer(connectionString);
+
+            return new DataAcquisitionDbContext(optionsBuilder.Options);
+        }
     }
 }
