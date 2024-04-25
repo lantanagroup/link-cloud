@@ -41,7 +41,6 @@ steps:
     inputs:
       command: restore
       projects: '$(project)'
-      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
