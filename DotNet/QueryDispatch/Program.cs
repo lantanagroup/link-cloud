@@ -257,11 +257,13 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
-    app.UseAuthentication();
+
+    app.UseEndpoints(endpoints => endpoints.MapControllers());    
     
+
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
         //app.MapGrpcReflectionService();
