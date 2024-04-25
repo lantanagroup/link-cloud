@@ -10,6 +10,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
 public partial class NormalizationDbContext : DbContext
 {
+    public NormalizationDbContext()
+    {
+
+    }
+
     public NormalizationDbContext(DbContextOptions<NormalizationDbContext> options)
         : base(options)
     {
