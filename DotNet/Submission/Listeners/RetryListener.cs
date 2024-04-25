@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.Model;
-using Hl7.FhirPath.Sprache;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -11,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
 using Quartz;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -70,11 +68,60 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<string, string> consumeResult;
+                    ConsumeResult<string, string>? consumeResult;
 
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) => 
+                        {
+                            consumeResult = result;
+
+                            try
+                            {
+                                if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
+                                {
+                                    //If retry event is not from the Submission service, disregard the retry event
+                                    if (Encoding.UTF8.GetString(exceptionService) != "Submission")
+                                    {
+                                        consumer.Commit(consumeResult);
+                                        //continue;
+                                    }
+                                }
+
+                                if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryCount))
+                                {
+                                    int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
+
+                                    //Dead letter if the retry count exceeds the configured retry duration count
+                                    if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
+                                    {
+                                        throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
+                                    }
+                                }
+
+                                var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
+
+                                await _retryRepository.AddAsync(retryEntity, cancellationToken);
+
+                                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+                                await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
+
+                                consumer.Commit(consumeResult);
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                var facilityId = GetFacilityIdFromHeader(consumeResult.Message.Headers);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
+                                consumer.Commit(consumeResult);
+                                //continue;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error in Submission Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                            }
+
+                        }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {
@@ -90,59 +137,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                         };
 
                         _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, AuditEventType.Create, facilityId);
-                        _logger.LogError($"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
+                        _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
                         continue;
-                    }
-
-                    try
-                    {
-                        if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService)) 
-                        { 
-                            //If retry event is not from the Submission service, disregard the retry event
-                            if (Encoding.UTF8.GetString(exceptionService) != "Submission")
-                            {
-                                consumer.Commit(consumeResult);
-                                continue;
-                            }
-                        }
-
-                        if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryCount))
-                        {
-                            int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
-
-                            //Dead letter if the retry count exceeds the configured retry duration count
-                            if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
-                            {
-                                throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
-                            }
-                        }
-
-                        var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
-
-                        await _retryRepository.AddAsync(retryEntity, cancellationToken);
-
-                        var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-
-                        await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
-
-                        consumer.Commit(consumeResult);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        var facilityId = GetFacilityIdFromHeader(consumeResult.Message.Headers);
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
-                        consumer.Commit(consumeResult);
-                        continue;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Error in Submission Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}", ex);
-                    }
+                    }                    
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Cancelled: {oce.Message}", oce);
+                _logger.LogError(oce, $"Operation Cancelled: {oce.Message}");
                 consumer.Close();
                 consumer.Dispose();
             }

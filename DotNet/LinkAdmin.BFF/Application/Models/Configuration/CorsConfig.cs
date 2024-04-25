@@ -8,12 +8,12 @@
         /// <summary>
         /// Default CORS policy name
         /// </summary>
-        public const string DefaultCorsPolicyName = "DefaultCorsPolicy";
+        public const string DefaultCorsPolicyName = "LinkAdminCorsPolicy";
 
         /// <summary>
         /// Default allowed headers
         /// </summary>
-        public string[] DefaultAllowedHeaders { get; } = ["Authorization", "Content-Type", "Accept", "Origin", "User-Agent", "X-Requested-With"];
+        public string[] DefaultAllowedHeaders { get; } = ["Authorization", "Content-Type", "Accept", "Origin", "Access-Control-Allow-Origin", "User-Agent", "X-Requested-With"];
 
         /// <summary>
         /// Default allowed methods

@@ -17,13 +17,16 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Quartz;
@@ -35,6 +38,7 @@ using QueryDispatch.Application.Services;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Presentation.Services;
 using Serilog;
+using System.Diagnostics;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
@@ -88,6 +92,7 @@ builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSec
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
 // Add services to the container.
 builder.Services.AddGrpc();
@@ -154,6 +159,29 @@ builder.Services.AddSingleton<RetryJob>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 builder.Services.AddSingleton<QueryDispatchJob>();
 
+//Add problem details
+builder.Services.AddProblemDetails(options => {
+    options.CustomizeProblemDetails = ctx =>
+    {
+        ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+        if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+        {
+            string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+            ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+        }
+
+        if (builder.Environment.IsDevelopment())
+        {
+            ctx.ProblemDetails.Extensions.Add("service", "QueryDispatch");
+        }
+        else
+        {
+            ctx.ProblemDetails.Extensions.Remove("exception");
+        }
+
+    };
+});
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -179,6 +207,11 @@ Log.Logger = new LoggerConfiguration()
                 .Enrich.WithSpan()
                 .Enrich.With<ActivityEnricher>()
                 .CreateLogger();
+
+//Add CORS
+builder.Services.AddLinkCorsService(options => {
+    options.Environment = builder.Environment;
+});
 
 //Add telemetry if enabled
 builder.Services.AddLinkTelemetry(builder.Configuration, options =>
@@ -207,6 +240,15 @@ static void SetupMiddleware(WebApplication app)
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "QueryDispatch Service v1"));
     }
 
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
+
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
@@ -214,7 +256,13 @@ static void SetupMiddleware(WebApplication app)
     });
 
     app.UseRouting();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    app.UseAuthentication();
+    app.UseMiddleware<UserScopeMiddleware>();
+    app.UseAuthorization();
+
+    app.UseEndpoints(endpoints => endpoints.MapControllers());    
+    
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
