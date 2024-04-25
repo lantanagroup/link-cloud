@@ -17,6 +17,7 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -25,6 +26,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Quartz;
@@ -90,6 +92,7 @@ builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSec
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
 // Add services to the container.
 builder.Services.AddGrpc();
@@ -205,6 +208,11 @@ Log.Logger = new LoggerConfiguration()
                 .Enrich.With<ActivityEnricher>()
                 .CreateLogger();
 
+//Add CORS
+builder.Services.AddLinkCorsService(options => {
+    options.Environment = builder.Environment;
+});
+
 //Add telemetry if enabled
 builder.Services.AddLinkTelemetry(builder.Configuration, options =>
 {
@@ -248,12 +256,14 @@ static void SetupMiddleware(WebApplication app)
     });
 
     app.UseRouting();
-    app.UseCors("CorsPolicy");
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
     app.UseAuthorization();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
-    app.UseAuthentication();
+
+    app.UseEndpoints(endpoints => endpoints.MapControllers());    
     
+
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
         //app.MapGrpcReflectionService();
