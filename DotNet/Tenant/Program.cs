@@ -198,8 +198,7 @@ namespace Tenant
 
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
-            builder.Services.AddLinkCorsService(
-                builder.Services.BuildServiceProvider().GetRequiredService<IOptions<CorsSettings>>(), options => { 
+            builder.Services.AddLinkCorsService(options => { 
                 options.Environment = builder.Environment;
             });            
 
@@ -227,9 +226,8 @@ namespace Tenant
                 app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Tenant Service v1"));
             }
 
-            app.UseRouting();
-            var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
-            app.UseCors(corsConfig?.PolicyName ?? CorsSettings.DefaultCorsPolicyName);
+            app.UseRouting();            
+            app.UseCors(CorsSettings.DefaultCorsPolicyName);
             app.MapControllers();
 
             //map health check middleware
