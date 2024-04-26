@@ -102,7 +102,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
         public virtual void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
         {
-            using var producer = AuditProducerFactory.CreateAuditEventProducer();
+            using var producer = AuditProducerFactory.CreateAuditEventProducer(useOpenTelemetry:false);
             producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
                 Value = auditValue,
@@ -129,13 +129,14 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionFacilityId, Encoding.UTF8.GetBytes(facilityId));
             }
 
-            using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
+            using var producer = ProducerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: false);
             producer.Produce(Topic, new Message<K, V>
             {
                 Key = key,
                 Value = value,
                 Headers = headers
             });
+
             producer.Flush();
         }
     }
