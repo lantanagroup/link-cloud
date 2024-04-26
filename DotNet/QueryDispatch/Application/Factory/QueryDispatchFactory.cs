@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Factory
@@ -31,9 +32,8 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Factory
         public PatientDispatchEntity CreatePatientDispatch(string facilityId, string patientId, string eventType, string correlationId, ScheduledReportEntity scheduledReportEntity, DispatchSchedule dispatchSchedule)
         {
             DateTime currentDate = DateTime.Now;
-
-            DateTime triggerDate = GetTriggerDate(currentDate, dispatchSchedule);
-            List<ReportPeriodEntity> activeReportPeriods = GetActiveReportPeriods(currentDate, scheduledReportEntity.ReportPeriods);
+            var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(dispatchSchedule.Duration);
+            var triggerDate = DateTime.Now.Add(triggerDuration);
 
             return new PatientDispatchEntity()
             {
@@ -42,31 +42,9 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Factory
                 PatientId = patientId,
                 FacilityId = facilityId,
                 TriggerDate = triggerDate,
-                ScheduledReportPeriods = activeReportPeriods,
+                ScheduledReportPeriods = scheduledReportEntity.ReportPeriods,
                 CorrelationId = correlationId
             };
-        }
-
-        private DateTime GetTriggerDate(DateTime currentDate, DispatchSchedule dispatchSchedule) 
-        {
-            switch (dispatchSchedule.DurationType)
-            {
-                case QueryDispatchConstants.DurationType.Days:
-                    return currentDate.AddDays(dispatchSchedule.Duration);
-                case QueryDispatchConstants.DurationType.Hours:
-                    return currentDate.AddHours(dispatchSchedule.Duration);
-                case QueryDispatchConstants.DurationType.Minutes:
-                    return currentDate.AddMinutes(dispatchSchedule.Duration);
-                case QueryDispatchConstants.DurationType.Seconds:
-                    return currentDate.AddSeconds(dispatchSchedule.Duration);
-                default:
-                    return currentDate;
-            }
-        }
-
-        private List<ReportPeriodEntity> GetActiveReportPeriods(DateTime currentDate, List<ReportPeriodEntity> reportPeriods)
-        {
-            return reportPeriods.Where(x => currentDate >= x.StartDate && currentDate <= x.EndDate).ToList();
         }
     }
 }

@@ -3,6 +3,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using QueryDispatch.Application.Settings;
@@ -100,6 +101,15 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                 return BadRequest("Facility Id is required in order to create a query dispatch configuration.");
             }
 
+            foreach (var schedule in model.DispatchSchedules)
+            {
+                if (!IsDurationFormatValid(schedule.Duration))
+                {
+                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
+                    return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
+                }
+            }
+
             var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
             if (existingConfig != null)
             {
@@ -188,7 +198,16 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                 _logger.LogError($"Facility Id was not provided in the update query dispatch configuration: {model}.");
                 return BadRequest("Facility Id is required in order to update a query dispatch configuration.");
             }
-            
+
+            foreach (var schedule in model.DispatchSchedules)
+            {
+                if (!IsDurationFormatValid(schedule.Duration))
+                {
+                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
+                    return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
+                }
+            }
+
             try
             {
                 var facilityCheckResult = await _tenantApiService.CheckFacilityExists(facilityId);
@@ -219,6 +238,19 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
                 throw;
             }
+        }
+
+        private bool IsDurationFormatValid(string duration)
+        {
+            try
+            {
+                System.Xml.XmlConvert.ToTimeSpan(duration);
+            }
+            catch             {
+                return false;
+            }
+
+            return true;
         }
     }
 }
