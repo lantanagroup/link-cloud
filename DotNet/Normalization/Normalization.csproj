@@ -16,10 +16,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="efpt.config.json.user" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Protobuf Include="Protos\normalization.proto" GrpcServices="Server" />
   </ItemGroup>
 
