@@ -28,9 +28,9 @@
     <PackageReference Include="Hellang.Middleware.ProblemDetails" Version="6.*" />
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="MongoDB.Bson" Version="2.*" />
-    <PackageReference Include="MongoDB.Driver" Version="2.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.11" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
     <PackageReference Include="Serilog.Exceptions" Version="8.*" />
@@ -48,5 +48,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Data\" />
+	  <Folder Include="Persistence\Configurations\" />
+	</ItemGroup>
 
 </Project>

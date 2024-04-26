@@ -1,6 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models;
-using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
 namespace LantanaGroup.Link.Normalization.Application.Services;
 

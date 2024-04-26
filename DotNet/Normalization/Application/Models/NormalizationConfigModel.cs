@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Domain.Entities;
+﻿using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
 namespace LantanaGroup.Link.Normalization.Application.Models;
 
