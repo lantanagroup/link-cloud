@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// The type of measure report to be generated
         /// </summary>
-        /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
+        /// <example>NHSNdQMAcuteCareHospitalInitialPopulation</example>
         public string ReportType { get; set; } = string.Empty;
 
         /// <summary>
