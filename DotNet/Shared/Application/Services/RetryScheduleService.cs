@@ -15,11 +15,11 @@ namespace LantanaGroup.Link.Shared.Application.Services
         private readonly ILogger<RetryScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository _retryRepository;
+        private readonly RetryRepository_Mongo _retryRepository;
 
         public IScheduler Scheduler { get; set; } = default!;
 
-        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository repository)
+        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository_Mongo repository)
         {
             _logger = logger;
             _jobFactory = jobFactory;
