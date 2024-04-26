@@ -10,6 +10,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -17,12 +18,8 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using Microsoft.Extensions.Options;
-using MongoDB.Driver.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using static Confluent.Kafka.ConfigPropertyNames;
-using ConsumerTask = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -114,7 +111,7 @@ public class ResourceAcquiredListener : BackgroundService
                         //continue;
                     }
 
-                    NormalizationConfigEntity? config = null;
+                    NormalizationConfig? config = null;
                     try
                     {
                         config = await _mediator.Send(new GetConfigurationEntityQuery
@@ -167,7 +164,7 @@ public class ResourceAcquiredListener : BackgroundService
                             ConceptMapOperation conceptMapOperation = null;
                             if (op.Value is ConceptMapOperation)
                             {
-                                conceptMapOperation = System.Text.Json.JsonSerializer.Deserialize<ConceptMapOperation>(JsonSerializer.SerializeToElement(op.Value));
+                                conceptMapOperation = JsonSerializer.Deserialize<ConceptMapOperation>(JsonSerializer.SerializeToElement(op.Value));
                                 JsonElement conceptMapJsonEle = (JsonElement)conceptMapOperation.FhirConceptMap;
                                 conceptMapOperation.FhirConceptMap = JsonSerializer.Deserialize<ConceptMap>(
                                     conceptMapJsonEle,
@@ -213,14 +210,14 @@ public class ResourceAcquiredListener : BackgroundService
                                 }),
                             };
 
-                            _metrics.IncrementResourceNormalizedCounter([
+                            _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
                                 new KeyValuePair<string, object?>("facility", messageMetaData.facilityId),
                                 new KeyValuePair<string, object?>("correlation.id", messageMetaData.correlationId),
                                 new KeyValuePair<string, object?>("patient", message.Message.Value.PatientId),
                                 new KeyValuePair<string, object?>("resource", operationCommandResult.Resource.TypeName),
                                 new KeyValuePair<string, object?>("query.type", message.Message.Value.QueryType),
                                 new KeyValuePair<string, object?>("normalization.operation", op.Value.GetType().Name)
-                            ]);
+                            });
                         }
                     }
                     catch (Exception ex)
@@ -292,13 +289,14 @@ public class ResourceAcquiredListener : BackgroundService
                 }
 
                 string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
+                
                 ConsumeResult<string, string> result = new ConsumeResult<string, string>
                 {
                     Message = new Message<string, string>
                     {
                         Headers = ex.ConsumerRecord?.Message?.Headers,
                         Key = facilityId,
-                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? [])
+                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? Array.Empty<byte>())
                     }
                 };
                 _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
@@ -309,7 +307,9 @@ public class ResourceAcquiredListener : BackgroundService
                 }
                 else
                 {
-                    kafkaConsumer.Commit([offset]);
+                    kafkaConsumer.Commit( new List<TopicPartitionOffset> {
+                        offset
+                    });
                 }
                 continue;
             }            

@@ -12,11 +12,8 @@ namespace LantanaGroup.Link.QueryDispatch.Domain.Entities
         public QueryDispatchConstants.EventType Event { get; set; }
         
         /// <summary>
-        /// The duration of time before a DataAcquisitionRequested event is triggered.
+        /// The ISO-8601 formatted trigger time to generate a DataAcquisitionRequested event.
         /// </summary>
-        public int Duration { get; set; }
-
-        [BsonRepresentation(BsonType.String)]
-        public QueryDispatchConstants.DurationType DurationType { get; set; }
+        public string Duration { get; set; }
     }
 }
