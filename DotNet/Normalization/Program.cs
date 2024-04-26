@@ -126,7 +126,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddSingleton<RetryRepository>();
+    builder.Services.AddSingleton<RetryRepository_Mongo>();
 
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
