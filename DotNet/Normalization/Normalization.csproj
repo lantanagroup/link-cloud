@@ -28,6 +28,10 @@
     <PackageReference Include="Hellang.Middleware.ProblemDetails" Version="6.*" />
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.11" />
@@ -51,7 +55,6 @@
 
 	<ItemGroup>
 	  <Folder Include="Data\" />
-	  <Folder Include="Persistence\Configurations\" />
 	</ItemGroup>
 
 </Project>
