@@ -84,8 +84,8 @@ public class SaveConfigEntityCommandHandler : IRequestHandler<SaveConfigEntityCo
                 ModifiedDate = utcDate,
             };
 
-            await dbContext.AddAsync(entity);
-            await dbContext.SaveChangesAsync();
+            await dbContext.AddAsync(entity, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
         else
         {

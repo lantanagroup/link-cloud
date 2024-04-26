@@ -27,7 +27,13 @@ public class DeleteConfigCommandHandler : IRequestHandler<DeleteConfigCommand>
             throw new ConfigOperationNullException();
         }
 
-        _dbContext.Remove(request.FacilityId);
+        var config = _dbContext.NormalizationConfigs.FirstOrDefault(c => c.FacilityId == request.FacilityId);
+        if (config == null)
+        {
+            throw new NoEntityFoundException();
+        }
+
+        _dbContext.Remove(config);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -23,7 +23,7 @@ public class GetConfigurationEntityQueryHandler : IRequestHandler<GetConfigurati
 
     public async Task<NormalizationConfig> Handle(GetConfigurationEntityQuery request, CancellationToken cancellationToken)
     {
-        NormalizationConfig config = await _dbContext.NormalizationConfigs.FirstAsync(c => c.FacilityId == request.FacilityId);   
+        NormalizationConfig? config = await _dbContext.NormalizationConfigs.FirstOrDefaultAsync(c => c.FacilityId == request.FacilityId, cancellationToken);   
 
         if (config == null)
         {
