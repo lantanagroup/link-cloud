@@ -24,6 +24,7 @@ public class QueryListener : BackgroundService
     private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
 
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterConsumerHandler;
+    private readonly ITransientExceptionHandler<string, string> _transientExceptionHandler;
 
     private readonly ILogger<QueryListener> _logger;
     private readonly IMediator _mediator;
@@ -33,7 +34,8 @@ public class QueryListener : BackgroundService
         IMediator mediator,
         IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
         IKafkaProducerFactory<string, object> kafkaProducerFactory,
-        IDeadLetterExceptionHandler<string, string> deadLetterConsumerHandler)
+        IDeadLetterExceptionHandler<string, string> deadLetterConsumerHandler,
+        ITransientExceptionHandler<string, string> transientExceptionHandler)
     {
         _logger = logger;
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
@@ -41,6 +43,7 @@ public class QueryListener : BackgroundService
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
         _deadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
         _deadLetterConsumerHandler.ServiceName = DataAcquisitionConstants.ServiceName;
+        _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
