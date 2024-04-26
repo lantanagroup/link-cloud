@@ -1,13 +1,18 @@
 ﻿
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.Extensions.Options;
+using Quartz;
 using System.Text;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
@@ -18,14 +23,18 @@ public class RetryListener : BackgroundService
     private readonly IRetryEntityFactory _retryEntityFactory;
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
     private readonly IRetryRepository _retryRepository;
+    private readonly IOptions<ConsumerSettings> _consumerSettings;
+    private readonly ISchedulerFactory _schedulerFactory;
 
-    public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IRetryRepository retryRepository)
+    public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IRetryRepository retryRepository, IOptions<ConsumerSettings> consumerSettings, ISchedulerFactory schedulerFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _retryEntityFactory = retryEntityFactory ?? throw new ArgumentNullException(nameof(retryEntityFactory));
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
         _retryRepository = retryRepository ?? throw new ArgumentNullException(nameof(retryRepository));
+        _consumerSettings = consumerSettings ?? throw new ArgumentNullException(nameof(consumerSettings));
+        _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -35,19 +44,18 @@ public class RetryListener : BackgroundService
 
     private async void StartConsumerLoop(CancellationToken cancellationToken)
     {
-        var config = new ConsumerConfig
+        var config = new ConsumerConfig()
         {
             GroupId = "DataAcquisitionRetry",
-            EnableAutoCommit = false,
+            EnableAutoCommit = false
         };
 
-        using var _consumer = _kafkaConsumerFactory.CreateConsumer(config);
-
+        using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
         try
         {
-            _consumer.Subscribe(new List<string> { KafkaTopic.DataAcquisitionRequestedRetry.ToString(), KafkaTopic.PatientCensusScheduledRetry.ToString() });
+            consumer.Subscribe(new List<string>() { KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() });
 
-            _logger.LogInformation("Started Data Acquisition Service Retry consumer for topics: [{1}] {2}", string.Join(", ", _consumer.Subscription), DateTime.UtcNow);
+            _logger.LogInformation("Started Data Acquisition Service Retry consumer for topics: [{1}] {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -55,15 +63,56 @@ public class RetryListener : BackgroundService
 
                 try
                 {
-                    await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                    await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                     {
                         consumeResult = result;
 
-                        if (consumeResult is not null)
+                        try
                         {
-                            var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult.Message.Value, consumeResult.Topic);
-                            await _retryRepository.AddAsync(retryEntity);
+                            if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
+                            {
+                                //If retry event is not from the Query Dispatch service, disregard the retry event
+                                if (Encoding.UTF8.GetString(exceptionService) != "QueryDispatch")
+                                {
+                                    consumer.Commit(consumeResult);
+                                    //continue;
+                                }
+                            }
+
+                            if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryCount))
+                            {
+                                int countValue = int.Parse(Encoding.UTF8.GetString(retryCount));
+
+                                //Dead letter if the retry count exceeds the configured retry duration count
+                                if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
+                                {
+                                    throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
+                                }
+                            }
+
+                            var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
+
+                            await _retryRepository.AddAsync(retryEntity, cancellationToken);
+
+                            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+                            await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
+
+                            consumer.Commit(consumeResult);
                         }
+                        catch (DeadLetterException ex)
+                        {
+                            var facilityId = GetFacilityIdFromHeader(consumeResult.Message.Headers);
+                            _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
+                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
+                            consumer.Commit(consumeResult);
+                            //continue;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error in Query Dispatch Service Retry consumer for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        }
+
                     }, cancellationToken);
                 }
                 catch (ConsumeException ex)
@@ -86,22 +135,16 @@ public class RetryListener : BackgroundService
 
                     _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
                     _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, AuditEventType.Create, facilityId);
-                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", _consumer.Subscription), DateTime.UtcNow );
+                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                     continue;
-                }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.LogError(oce, "Operation Cancelled: {1}", oce.Message);
-                    _consumer.Close();
-                    _consumer.Dispose();
                 }
             }
         }
         catch (OperationCanceledException oce)
         {
-            _logger.LogError(oce, "Operation Cancelled: {1}", oce.Message);
-            _consumer.Close();
-            _consumer.Dispose();
+            _logger.LogError(oce, $"Operation Cancelled: {oce.Message}");
+            consumer.Close();
+            consumer.Dispose();
         }
     }
 

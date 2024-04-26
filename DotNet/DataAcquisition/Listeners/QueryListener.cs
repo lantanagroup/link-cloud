@@ -6,6 +6,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -44,6 +46,7 @@ public class QueryListener : BackgroundService
         _deadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
         _deadLetterConsumerHandler.ServiceName = DataAcquisitionConstants.ServiceName;
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
+        _transientExceptionHandler.ServiceName = DataAcquisitionConstants.ServiceName;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -68,168 +71,228 @@ public class QueryListener : BackgroundService
 
         using var consumer = _kafkaConsumerFactory.CreateConsumer(settings);
 
-        List<IBaseMessage>? responseMessages = new List<IBaseMessage>();
-        consumer.Subscribe(new string[] { nameof(KafkaTopic.PatientCensusScheduled), nameof(KafkaTopic.DataAcquisitionRequested) });
-        ConsumeResult<string, string>? rawmessage = null;
-
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            try
+            List<IBaseMessage>? responseMessages = new List<IBaseMessage>();
+            consumer.Subscribe(new string[] { nameof(KafkaTopic.PatientCensusScheduled), nameof(KafkaTopic.DataAcquisitionRequested) });
+            ConsumeResult<string, string>? rawmessage = null;
+
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                try
                 {
-                    rawmessage = result;
-
-                    IBaseMessage deserializedMessage = null;
-                    (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
-
-                    if (rawmessage != null)
+                    await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                     {
-                        IBaseMessage? message = null;
-                        try
-                        {
-                            message = MessageDeserializer.DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error deserializing message: {1}", ex.Message);
-
-                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
-                            //continue;
-                        }
-
-                        deserializedMessage = message;
+                        rawmessage = result;
 
                         try
                         {
-                            messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error extracting facility id and correlation id from message");
-                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
-                            //continue;
-                        }
+                            IBaseMessage deserializedMessage = null;
+                            (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
 
-                        if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
-                        {
-                            var errorMessage = "No Facility ID provided. Unable to process message: {1}";
-                            _logger.LogWarning(errorMessage, message);
-                            _deadLetterConsumerHandler.HandleException(rawmessage, new Exception($"No Facility ID provided. Unable to process message: {message}"), AuditEventType.Query, "");
-                            //continue;
-                        }
-
-                        try
-                        {
-                            responseMessages = message switch
+                            if (rawmessage != null)
                             {
-                                DataAcquisitionRequestedMessage => await _mediator.Send(new GetPatientDataRequest
+                                IBaseMessage? message = null;
+                                try
                                 {
-                                    Message = (DataAcquisitionRequestedMessage)message,
-                                    FacilityId = messageMetaData.facilityId,
-                                    CorrelationId = messageMetaData.correlationId,
-                                }, cancellationToken),
-                                PatientCensusScheduledMessage => await _mediator.Send(new GetPatientCensusRequest
+                                    message = MessageDeserializer.DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                                }
+                                catch (Exception ex)
                                 {
-                                    FacilityId = messageMetaData.facilityId
-                                }, cancellationToken),
-                                _ => null
-                            };
-                        }
-                        catch (Exception ex)
-                        {
-                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
-                            _logger.LogError(ex, "Error producing message: {1}", ex.Message);
-                            responseMessages = null;
-                            //continue;
-                        }
+                                    throw new DeadLetterException("Error deserializing message: " + ex.Message, AuditEventType.Query, ex);
+                                }
 
-                    }
+                                deserializedMessage = message;
 
-                    if (responseMessages?.Count > 0)
-                    {
-                        var producerSettings = new ProducerConfig();
-                        using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
+                                try
+                                {
+                                    messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+                                }
+                                catch (Exception ex)
+                                {
+                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                }
 
-                        try
-                        {
-                            if (rawmessage.Topic == KafkaTopic.PatientCensusScheduled.ToString())
+                                if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
+                                {
+                                    throw new TransientException("Facility ID is null or empty", AuditEventType.Query);
+                                }
+
+                                try
+                                {
+                                    responseMessages = message switch
+                                    {
+                                        DataAcquisitionRequestedMessage => await _mediator.Send(new GetPatientDataRequest
+                                        {
+                                            Message = (DataAcquisitionRequestedMessage)message,
+                                            FacilityId = messageMetaData.facilityId,
+                                            CorrelationId = messageMetaData.correlationId,
+                                        }, cancellationToken),
+                                        PatientCensusScheduledMessage => await _mediator.Send(new GetPatientCensusRequest
+                                        {
+                                            FacilityId = messageMetaData.facilityId
+                                        }, cancellationToken),
+                                        _ => null
+                                    };
+                                }
+                                catch (Exception ex)
+                                {
+                                    throw new DeadLetterException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                }
+
+                            }
+
+                            if (responseMessages?.Count > 0)
                             {
-                                var produceMessage = new Message<string, object>
-                                {
-                                    Key = messageMetaData.facilityId,
-                                    Value = (PatientIDsAcquiredMessage)responseMessages[0]
-                                };
+                                var producerSettings = new ProducerConfig();
+                                using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
 
-                                await producer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
+                                try
+                                {
+                                    if (rawmessage.Topic == KafkaTopic.PatientCensusScheduled.ToString())
+                                    {
+                                        var produceMessage = new Message<string, object>
+                                        {
+                                            Key = messageMetaData.facilityId,
+                                            Value = (PatientIDsAcquiredMessage)responseMessages[0]
+                                        };
+
+                                        await producer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
+                                    }
+                                    else
+                                    {
+
+                                        foreach (var responseMessage in responseMessages)
+                                        {
+                                            var headers = new Headers
+                                            {
+                                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
+                                            };
+                                            var produceMessage = new Message<string, object>
+                                            {
+                                                Key = messageMetaData.facilityId,
+                                                Headers = headers,
+                                                Value = (ResourceAcquired)responseMessage
+                                            };
+                                            await producer.ProduceAsync(KafkaTopic.ResourceAcquired.ToString(), produceMessage, cancellationToken);
+
+                                            ProduceAuditMessage(new AuditEventMessage
+                                            {
+                                                CorrelationId = messageMetaData.correlationId,
+                                                FacilityId = messageMetaData.facilityId,
+                                                Action = AuditEventType.Query,
+                                                //Resource = string.Join(',', deserializedMessage.),
+                                                EventDate = DateTime.UtcNow,
+                                                ServiceName = DataAcquisitionConstants.ServiceName,
+                                                Notes = $"Raw Kafka Message: {rawmessage}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
+                                            });
+                                        }
+                                    }
+                                }
+                                catch(ProduceException<string, object> ex)
+                                {
+                                    throw new TransientException($"Failed to produce message to {_transientExceptionHandler.Topic} for {messageMetaData.facilityId}", AuditEventType.Query, ex);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
+                                    _logger.LogError(ex, "Failed to produce message");
+                                }
+                                consumer.Commit(rawmessage);
                             }
                             else
                             {
-
-                                foreach (var responseMessage in responseMessages)
+                                ProduceAuditMessage(new AuditEventMessage
                                 {
-                                    var headers = new Headers
-                            {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
-                            };
-                                    var produceMessage = new Message<string, object>
-                                    {
-                                        Key = messageMetaData.facilityId,
-                                        Headers = headers,
-                                        Value = (ResourceAcquired)responseMessage
-                                    };
-                                    await producer.ProduceAsync(KafkaTopic.ResourceAcquired.ToString(), produceMessage, cancellationToken);
+                                    CorrelationId = messageMetaData.correlationId,
+                                    FacilityId = messageMetaData.facilityId,
+                                    Action = AuditEventType.Query,
+                                    //Resource = string.Join(',', deserializedMessage.Type),
+                                    ServiceName = DataAcquisitionConstants.ServiceName,
+                                    EventDate = DateTime.UtcNow,
+                                    Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
+                                });
+                                _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
 
-                                    ProduceAuditMessage(new AuditEventMessage
-                                    {
-                                        CorrelationId = messageMetaData.correlationId,
-                                        FacilityId = messageMetaData.facilityId,
-                                        Action = AuditEventType.Query,
-                                        //Resource = string.Join(',', deserializedMessage.),
-                                        EventDate = DateTime.UtcNow,
-                                        ServiceName = DataAcquisitionConstants.ServiceName,
-                                        Notes = $"Raw Kafka Message: {rawmessage}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
-                                    });
-                                }
+                                throw new DeadLetterException("Message meets no condition for processing", AuditEventType.Query);
                             }
+                        }
+                        catch (DeadLetterException ex)
+                        {
+                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            consumer.Commit(rawmessage);
+                        }
+                        catch (TransientException ex)
+                        {
+                            _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
+                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
+                            consumer.Commit(rawmessage);
                         }
                         catch (Exception ex)
                         {
-                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
-                            _logger.LogError(ex, "Failed to produce message");
+                            _logger.LogError(ex, $"Failed to process Patient Event.");
+
+                            var auditValue = new AuditEventMessage
+                            {
+                                FacilityId = rawmessage.Message.Key,
+                                Action = AuditEventType.Query,
+                                ServiceName = DataAcquisitionConstants.ServiceName,
+                                EventDate = DateTime.UtcNow,
+                                Notes = $"Data Acquisition processing failure \nException Message: {ex}",
+                            };
+
+                            ProduceAuditMessage(auditValue);
+
+                            _deadLetterConsumerHandler.HandleException(rawmessage, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
+                            consumer.Commit(rawmessage);
+
                             //continue;
                         }
-                        consumer.Commit(rawmessage);
-                    }
-                    else
+                    }, cancellationToken);
+                }
+                catch (ConsumeException e)
+                {
+                    if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
-                        ProduceAuditMessage(new AuditEventMessage
-                        {
-                            CorrelationId = messageMetaData.correlationId,
-                            FacilityId = messageMetaData.facilityId,
-                            Action = AuditEventType.Query,
-                            //Resource = string.Join(',', deserializedMessage.Type),
-                            ServiceName = DataAcquisitionConstants.ServiceName,
-                            EventDate = DateTime.UtcNow,
-                            Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
-                        });
-                        _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
-
-                        _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                        _deadLetterConsumerHandler.HandleException(rawmessage, new Exception("Message meets no condition for processing"), AuditEventType.Query, messageMetaData.facilityId);
+                        throw new OperationCanceledException(e.Error.Reason, e);
                     }
-                }, cancellationToken);
+
+                    var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
+
+                    var converted_record = new ConsumeResult<string, string>()
+                    {
+                        Message = new Message<string, string>()
+                        {
+                            Key = facilityId,
+                            Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
+                            Headers = e.ConsumerRecord.Message.Headers
+                        }
+                    };
+
+                    _deadLetterConsumerHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
+
+                    consumer.Commit();
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
+                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
+                    continue;
+                }
             }
-            catch (Exception ex)
-            {
-                _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
-                continue;
-            }            
+        }
+        catch (OperationCanceledException oce)
+        {
+            _logger.LogError(oce, "Operation Canceled: {1}", oce.Message);
+            consumer.Close();
+            consumer.Dispose();
+        }
+        catch (Exception ex)
+        {
+            throw;
         }
     }
 
