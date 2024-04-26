@@ -12,17 +12,6 @@
             Discharge
         }
 
-        /// <summary>
-        /// The type of duration (Example: minutes, hours, days) that the dispatch should be triggered after the event.
-        /// </summary>
-        public enum DurationType
-        {
-            Seconds,
-            Minutes,
-            Hours,
-            Days
-        }
-
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
