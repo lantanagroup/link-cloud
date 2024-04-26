@@ -1,9 +1,7 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace LantanaGroup.Link.Normalization.Domain.Entities;
+namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
-[BsonKnownTypes(typeof(CopyLocationIdentifierToTypeOperation), typeof(CopyElementOperation), typeof(ConceptMapOperation), typeof(ConditionalTransformationOperation), typeof(PeriodDateFixerOperation))]
 [JsonDerivedType(typeof(ConceptMapOperation), nameof(ConceptMapOperation))]
 [JsonDerivedType(typeof(CopyElementOperation), nameof(CopyElementOperation))]
 [JsonDerivedType(typeof(CopyLocationIdentifierToTypeOperation), nameof(CopyLocationIdentifierToTypeOperation))]

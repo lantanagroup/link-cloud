@@ -1,12 +1,11 @@
-﻿using Amazon.Runtime.Internal.Util;
-using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Jobs;
-using MediatR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using Quartz.Spi;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services
 {
@@ -17,9 +16,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly RetryRepository_Mongo _retryRepository;
 
-        public IScheduler Scheduler { get; set; } = default!;
-
-        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository_Mongo repository)
+        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository repository)
         {
             _logger = logger;
             _jobFactory = jobFactory;
@@ -53,7 +50,6 @@ namespace LantanaGroup.Link.Shared.Application.Services
 
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            await Scheduler.Shutdown(cancellationToken);
             await base.StopAsync(cancellationToken);
         }
 

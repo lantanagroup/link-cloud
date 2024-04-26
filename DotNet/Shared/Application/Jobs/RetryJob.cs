@@ -51,24 +51,25 @@ namespace LantanaGroup.Link.Shared.Jobs
                     headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
                 }
 
-                using (var prod = _retryKafkaProducerFactory.CreateProducer(config))
+
+                using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
                 {
 
                     var darKey = retryEntity.Key;
                     var darValue = retryEntity.Value;
 
-                    prod.Produce(retryEntity.Topic,
+                    producer.Produce(retryEntity.Topic,
                         new Message<string, string>
                         {
-                            Key = darKey, 
-                            Value = darValue, 
+                            Key = darKey,
+                            Value = darValue,
                             Headers = headers
                         });
 
-                    prod.Flush();
+                    producer.Flush();
                 }
 
-                using (var producer = _retryKafkaProducerFactory.CreateAuditEventProducer())
+                using (var producer = _retryKafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: false))
                 {
                     try
                     {
