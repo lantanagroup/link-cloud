@@ -4,7 +4,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Settings;
-using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using System.Text.Json;

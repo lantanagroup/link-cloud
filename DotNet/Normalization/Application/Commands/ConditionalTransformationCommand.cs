@@ -3,10 +3,9 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Services;
-using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
-using System.Collections.Generic;
 using static Hl7.Fhir.Model.Encounter;
 
 namespace LantanaGroup.Link.Normalization.Application.Commands
