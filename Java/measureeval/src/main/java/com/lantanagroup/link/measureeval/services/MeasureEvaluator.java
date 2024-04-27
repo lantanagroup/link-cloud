@@ -21,18 +21,7 @@ public class MeasureEvaluator {
 
     private MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
         this.fhirContext = fhirContext;
-        options = getOptions();
-        this.bundle = bundle;
-        measure = bundle.getEntry().stream()
-                .map(Bundle.BundleEntryComponent::getResource)
-                .filter(Measure.class::isInstance)
-                .map(Measure.class::cast)
-                .reduce(StreamUtils::toOnlyElement)
-                .orElseThrow();
-    }
-
-    private static MeasureEvaluationOptions getOptions() {
-        MeasureEvaluationOptions options = MeasureEvaluationOptions.defaultOptions();
+        options = MeasureEvaluationOptions.defaultOptions();
         EvaluationSettings evaluationSettings = options.getEvaluationSettings();
         evaluationSettings.getTerminologySettings()
                 .setValuesetPreExpansionMode(TerminologySettings.VALUESET_PRE_EXPANSION_MODE.USE_IF_PRESENT)
@@ -43,7 +32,13 @@ public class MeasureEvaluator {
                 .setTerminologyParameterMode(RetrieveSettings.TERMINOLOGY_FILTER_MODE.FILTER_IN_MEMORY)
                 .setSearchParameterMode(RetrieveSettings.SEARCH_FILTER_MODE.FILTER_IN_MEMORY)
                 .setProfileMode(RetrieveSettings.PROFILE_MODE.DECLARED);
-        return options;
+        this.bundle = bundle;
+        measure = bundle.getEntry().stream()
+                .map(Bundle.BundleEntryComponent::getResource)
+                .filter(Measure.class::isInstance)
+                .map(Measure.class::cast)
+                .reduce(StreamUtils::toOnlyElement)
+                .orElseThrow();
     }
 
     public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle) {
