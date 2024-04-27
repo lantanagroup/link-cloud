@@ -26,9 +26,10 @@ public class MeasureEvaluatorCache {
     public MeasureEvaluator getOrFind(String id) {
         return instancesById.computeIfAbsent(id, _id -> {
             MeasureDefinition measureDefinition = mongoOperations.findById(_id, MeasureDefinition.class);
-            return measureDefinition == null
-                    ? null
-                    : MeasureEvaluator.compile(fhirContext, measureDefinition.getBundle());
+            if (measureDefinition == null) {
+                return null;
+            }
+            return MeasureEvaluator.compile(fhirContext, measureDefinition.getBundle());
         });
     }
 
