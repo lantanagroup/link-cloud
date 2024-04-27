@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.config;
+package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.kafka.Topics;
