@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.config;
+package com.lantanagroup.link.measureeval.configs;
 
 import ca.uhn.fhir.context.FhirContext;
 import org.springframework.context.annotation.Bean;
