@@ -2,9 +2,9 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.common.serialization.Serializer;
+import com.lantanagroup.link.measureeval.records.*;
+import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
@@ -14,45 +14,82 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.support.serializer.*;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Configuration
 public class KafkaConfig {
+    private static Pattern getPattern(String topic) {
+        return Pattern.compile(Pattern.quote(topic));
+    }
+
+    @Bean
+    public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
+        Map<String, Deserializer<?>> deserializers = Map.of(
+                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.Key.class, objectMapper),
+                Topics.error(Topics.RESOURCE_ACQUIRED), new StringDeserializer(),
+                Topics.RESOURCE_NORMALIZED, new StringDeserializer());
+        return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(
+                StreamUtils.mapKeys(deserializers, KafkaConfig::getPattern),
+                new VoidDeserializer()));
+    }
+
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
-        JsonDeserializer<?> jsonDeserializer = new JsonDeserializer<>(objectMapper);
-        jsonDeserializer.setTypeResolver((topic, data, headers) ->
-                switch (topic) {
-                    case Topics.RESOURCE_NORMALIZED -> objectMapper.constructType(ResourceNormalized.class);
-                    default -> throw new IllegalArgumentException(String.format("Unknown topic: %s", topic));
-                });
-        return new ErrorHandlingDeserializer<>(jsonDeserializer);
+        Map<String, Deserializer<?>> deserializers = Map.of(
+                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.class, objectMapper),
+                Topics.error(Topics.RESOURCE_ACQUIRED), new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper));
+        return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(
+                StreamUtils.mapKeys(deserializers, KafkaConfig::getPattern),
+                new VoidDeserializer()));
     }
 
     @Bean
     public ConsumerFactory<?, ?> consumerFactory(
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
+            Deserializer<?> keyDeserializer,
             Deserializer<?> valueDeserializer) {
         Map<String, Object> consumerProperties = properties.buildConsumerProperties(sslBundles.getIfAvailable());
-        return new DefaultKafkaConsumerFactory<>(consumerProperties, null, valueDeserializer);
+        return new DefaultKafkaConsumerFactory<>(consumerProperties, keyDeserializer, valueDeserializer);
+    }
+
+    @Bean
+    public Serializer<?> keySerializer(ObjectMapper objectMapper) {
+        Map<String, Serializer<?>> serializers = Map.of(
+                Topics.DATA_ACQUISITION_REQUESTED, new StringSerializer(),
+                Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
+                        objectMapper.constructType(ResourceEvaluated.Key.class),
+                        objectMapper));
+        return new DelegatingByTopicSerializer(
+                StreamUtils.mapKeys(serializers, KafkaConfig::getPattern),
+                new VoidSerializer());
     }
 
     @Bean
     public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
-        return new JsonSerializer<>(objectMapper);
+        Map<String, Serializer<?>> serializers = Map.of(
+                Topics.DATA_ACQUISITION_REQUESTED, new JsonSerializer<>(
+                        objectMapper.constructType(DataAcquisitionRequested.class),
+                        objectMapper),
+                Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
+                        objectMapper.constructType(ResourceEvaluated.class),
+                        objectMapper));
+        return new DelegatingByTopicSerializer(
+                StreamUtils.mapKeys(serializers, KafkaConfig::getPattern),
+                new VoidSerializer());
     }
 
     @Bean
     public ProducerFactory<?, ?> producerFactory(
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
+            Serializer<?> keySerializer,
             Serializer<?> valueSerializer) {
         Map<String, Object> producerProperties = properties.buildProducerProperties(sslBundles.getIfAvailable());
-        return new DefaultKafkaProducerFactory<>(producerProperties, null, valueSerializer);
+        return new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
     }
 }
