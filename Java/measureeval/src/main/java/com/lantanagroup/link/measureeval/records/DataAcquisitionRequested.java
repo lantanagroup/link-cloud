@@ -6,6 +6,7 @@ import com.lantanagroup.link.measureeval.models.QueryType;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -15,7 +16,7 @@ public class DataAcquisitionRequested {
     private String patientId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<ResourceAcquired.ScheduledReport> scheduledReports;
+    private List<ResourceAcquired.ScheduledReport> scheduledReports = new ArrayList<>();
 
     private QueryType queryType;
 

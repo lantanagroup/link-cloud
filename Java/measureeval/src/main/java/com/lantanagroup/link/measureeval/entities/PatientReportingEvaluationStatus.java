@@ -11,6 +11,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -25,10 +26,10 @@ public class PatientReportingEvaluationStatus {
     private String correlationId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<Report> reports;
+    private List<Report> reports = new ArrayList<>();
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<Resource> resources;
+    private List<Resource> resources = new ArrayList<>();
 
     @CreatedDate
     private Date createdDate;

@@ -6,13 +6,14 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.ResourceType;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @Setter
 public class QueryResults {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<QueryResult> queryResults;
+    private List<QueryResult> queryResults = new ArrayList<>();
 
     @Getter
     @Setter
