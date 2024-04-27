@@ -12,8 +12,14 @@ import org.opencds.cqf.fhir.cr.measure.MeasureEvaluationOptions;
 import org.opencds.cqf.fhir.cr.measure.r4.R4MeasureService;
 import org.opencds.cqf.fhir.utility.monad.Eithers;
 import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 public class MeasureEvaluator {
+    private static final Logger logger = LoggerFactory.getLogger(MeasureEvaluator.class);
+
     private final FhirContext fhirContext;
     private final MeasureEvaluationOptions options;
     private final Bundle bundle;
@@ -48,15 +54,16 @@ public class MeasureEvaluator {
     }
 
     private void compile() {
+        logger.debug("Compiling measure: {}", measure.getUrl());
         String subject = "Patient/the-patient";
         Patient patient = new Patient();
         patient.setId(subject);
         Bundle additionalData = new Bundle();
         additionalData.addEntry().setResource(patient);
-        evaluate(null, null, new StringType(subject), additionalData);
+        doEvaluate(null, null, new StringType(subject), additionalData);
     }
 
-    public MeasureReport evaluate(
+    private MeasureReport doEvaluate(
             DateType periodStart,
             DateType periodEnd,
             StringType subject,
@@ -77,6 +84,24 @@ public class MeasureEvaluator {
                 null,
                 null,
                 null);
+    }
+
+    public MeasureReport evaluate(
+            DateType periodStart,
+            DateType periodEnd,
+            StringType subject,
+            Bundle additionalData) {
+        List<Bundle.BundleEntryComponent> entries = additionalData.getEntry();
+        logger.debug(
+                "Evaluating {} from {} to {} with {} additional resources",
+                subject, periodStart, periodEnd, entries.size());
+        if (logger.isTraceEnabled()) {
+            for (int entryIndex = 0; entryIndex < entries.size(); entryIndex++) {
+                Resource resource = entries.get(entryIndex).getResource();
+                logger.trace("Resource {}: {}", entryIndex, resource.getId());
+            }
+        }
+        return doEvaluate(periodStart, periodEnd, subject, additionalData);
     }
 
     public MeasureReport evaluate(Parameters parameters) {
