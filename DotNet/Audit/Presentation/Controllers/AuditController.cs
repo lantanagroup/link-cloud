@@ -3,6 +3,7 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Text.Json;
@@ -63,7 +64,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         {           
             //capture audit search duration metric
             using var _ = _auditServiceMetrics.MeasureAuditSearchDuration([
-                new KeyValuePair<string, object?>("pageSize", pageSize)
+                new KeyValuePair<string, object?>(DiagnosticNames.PageSize, pageSize)
             ]);
 
             try
@@ -88,6 +89,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
@@ -131,6 +133,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 ex.Data.Add("audit-log.id", id);
                 _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
                 throw;
@@ -182,6 +185,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogGetFacilityAuditEventsQueryException(facilityId, ex.Message);
                 throw;
             }

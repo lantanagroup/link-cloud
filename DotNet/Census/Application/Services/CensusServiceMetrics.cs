@@ -11,13 +11,20 @@ namespace LantanaGroup.Link.Census.Application.Services
         public CensusServiceMetrics(IMeterFactory meterFactory)
         {
             Meter meter = meterFactory.Create(MeterName);
-            PatientIdentifiedCounter = meter.CreateCounter<long>("link_census_service.patient_identified.count");
+            PatientAdmittedCounter = meter.CreateCounter<long>("link_census_service.patient_admitted.count");
+            PatientDischargedCounter = meter.CreateCounter<long>("link_census_service.patient_discharged.count");
         }
 
-        public Counter<long> PatientIdentifiedCounter { get; private set; }
-        public void IncrementPatientIdentifiedCounter(List<KeyValuePair<string, object?>> tags)
+        public Counter<long> PatientAdmittedCounter { get; private set; }
+        public void IncrementPatientAdmittedCounter(List<KeyValuePair<string, object?>> tags)
         {
-            PatientIdentifiedCounter.Add(1, tags.ToArray());
+            PatientAdmittedCounter.Add(1, tags.ToArray());
+        }
+
+        public Counter<long> PatientDischargedCounter { get; private set; }
+        public void IncrementPatientDischargedCounter(List<KeyValuePair<string, object?>> tags)
+        {
+            PatientDischargedCounter.Add(1, tags.ToArray());
         }
     }
 }
