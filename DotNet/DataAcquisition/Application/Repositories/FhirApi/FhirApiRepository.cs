@@ -157,8 +157,9 @@ public class FhirApiRepository : IFhirApiRepository
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),           
-            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, "Patient")
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),  
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
         ]);
 
         var fhirClient = GenerateFhirClient(baseUrl);
