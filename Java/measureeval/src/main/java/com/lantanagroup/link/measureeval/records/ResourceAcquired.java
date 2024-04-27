@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -18,7 +19,7 @@ public class ResourceAcquired {
     private IBaseResource resource;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<ScheduledReport> scheduledReports;
+    private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
     @Getter
     @Setter

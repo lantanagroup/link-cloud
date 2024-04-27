@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -20,7 +21,7 @@ public class ScheduledReport {
     private String facilityId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<String> reportTypes;
+    private List<String> reportTypes = new ArrayList<>();
 
     private Date periodStart;
     private Date periodEnd;

@@ -5,13 +5,14 @@ import com.fasterxml.jackson.annotation.Nulls;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @Setter
 public class ReportScheduled {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<Parameter> parameters;
+    private List<Parameter> parameters = new ArrayList<Parameter>();
 
     @Getter
     @Setter
