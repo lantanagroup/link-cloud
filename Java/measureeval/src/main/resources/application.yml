@@ -12,6 +12,7 @@ spring:
   jackson:
     mapper:
       accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
       default-view-inclusion: false
 
   kafka:
@@ -24,3 +25,5 @@ spring:
 link:
   data-acquisition:
     base-url: http://localhost:5194
+    routes:
+      query-result: /api/{facilityId}/QueryResult/{patientId}
