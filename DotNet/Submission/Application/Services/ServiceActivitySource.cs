@@ -12,7 +12,6 @@ namespace LantanaGroup.Link.Submission.Application.Services
 
         public static void Initialize(ServiceInformation serviceInfo)
         {
-            ServiceName = serviceInfo.Name;
             _version = serviceInfo.Version;
             Instance = new ActivitySource(ServiceName, _version);
         }
