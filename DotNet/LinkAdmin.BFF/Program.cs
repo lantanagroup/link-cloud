@@ -44,7 +44,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
 
     //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
+    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     ServiceActivitySource.Initialize(version);
 
     // load external configuration source if specified
