@@ -42,6 +42,11 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
+
+    //Initialize activity source
+    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0";
+    ServiceActivitySource.Initialize(version);
+
     // load external configuration source if specified
     var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
     if (!string.IsNullOrEmpty(externalConfigurationSource))
@@ -52,18 +57,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
             options.Environment = builder.Environment;
         });
-    }
-
-    // Add service information
-    var serviceInformation = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }      
+    }     
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -253,7 +247,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
     });
 
     builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
@@ -280,10 +274,10 @@ static void SetupMiddleware(WebApplication app)
     // Configure swagger
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
     {
-        var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+        //var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
         app.UseSwagger();
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API");
+            opts.SwaggerEndpoint("/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
         });
     }
 
@@ -295,7 +289,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization(); 
 
     // Register endpoints
-    app.MapGet("/", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+    app.MapGet("/", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
