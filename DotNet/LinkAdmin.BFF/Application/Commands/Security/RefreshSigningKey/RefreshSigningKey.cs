@@ -1,9 +1,14 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Diagnostics;
+using System.Security.Claims;
 using System.Security.Cryptography;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
@@ -26,8 +31,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         }
 
         //TODO: Add back data protection once key persience is implemented
-        public async Task<bool> ExecuteAsync()
+        public async Task<bool> ExecuteAsync(ClaimsPrincipal user)
         {
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Refresh Link Bearer Service Signing Key",
+            [
+                new KeyValuePair<string, object?>(DiagnosticNames.UserId, user.Claims.First(c => c.Type == "sub").Value)
+            ]);
+
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
 
             //update secret manager

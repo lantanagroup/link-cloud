@@ -3,6 +3,8 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
@@ -38,7 +40,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Generates a bearer token for the current user to use with Link Services."
                 });
 
-            tokenEndpoints.MapGet("/refresh-key", RefreshKey)
+            tokenEndpoints.MapGet("/refresh-key", (Delegate)RefreshKey)
                 .RequireAuthorization("AuthenticatedUser")
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -65,17 +67,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }
             
         }
 
-        public async Task<IResult> RefreshKey()
+        public async Task<IResult> RefreshKey(HttpContext context)
         {
             try 
             {
-                var result = await _refreshSigningKey.ExecuteAsync();
+                var result = await _refreshSigningKey.ExecuteAsync(context.User);
                 _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
 
                 return Results.Ok(new KeyRefreshedResponse
@@ -86,6 +90,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             }
             catch (Exception ex)
             {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
                 _logger.LogLinkAdminTokenGenerationException(ex.Message);
                 throw;
             }
