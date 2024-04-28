@@ -20,6 +20,7 @@
         public const string PeriodStart = "period.start";
         public const string PeriodEnd = "period.end";
         public const string PageSize = "page.size";
+        public const string UserId = "user.id";
 
         //Diagnostic activity names
         public const string CreateAuditEvent = "Create Audit Event";
