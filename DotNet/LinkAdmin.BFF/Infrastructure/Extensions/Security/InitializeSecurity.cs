@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             }
 
             // Add Link Bearer Token authorization schema if feature is enabled
-            if (configuration.GetValue<bool>("EnableBearerTokenFeature"))
+            if (configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
             {
                 if (!LinkAdminConstants.AuthenticationSchemes.LinkBearerToken.Equals(defaultChallengeScheme))
                     authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken);
