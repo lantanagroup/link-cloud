@@ -64,8 +64,8 @@ public class MeasureEvaluator {
     }
 
     private MeasureReport doEvaluate(
-            DateType periodStart,
-            DateType periodEnd,
+            DateTimeType periodStart,
+            DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
         Repository repository = new InMemoryFhirRepository(fhirContext, bundle);
@@ -87,8 +87,8 @@ public class MeasureEvaluator {
     }
 
     public MeasureReport evaluate(
-            DateType periodStart,
-            DateType periodEnd,
+            DateTimeType periodStart,
+            DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
         List<Bundle.BundleEntryComponent> entries = additionalData.getEntry();
@@ -105,8 +105,8 @@ public class MeasureEvaluator {
     }
 
     public MeasureReport evaluate(Parameters parameters) {
-        DateType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateType.class);
-        DateType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateType.class);
+        DateTimeType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateTimeType.class);
+        DateTimeType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateTimeType.class);
         StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
         Bundle additionalData = ParametersUtils.getResource(parameters, "additionalData", Bundle.class);
         return evaluate(periodStart, periodEnd, subject, additionalData);
