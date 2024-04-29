@@ -40,7 +40,9 @@ public class PatientReportingEvaluationStatus {
     @Getter
     @Setter
     public static class Report {
-        private String reportId;
+        private String reportType;
+        private Date startDate;
+        private Date endDate;
         private Boolean reportable;
     }
 
