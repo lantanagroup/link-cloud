@@ -4,9 +4,8 @@ using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
@@ -17,9 +16,9 @@ namespace LantanaGroup.Link.Audit.Listeners
         private readonly ILogger<AuditEventListener> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IAuditFactory _auditFactory;
-        private readonly IKafkaConsumerFactory _kafkaConsumerFactory;      
+        private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
       
-        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory kafkaConsumerFactory, IOptions<KafkaConnection> kafkaConnection) 
+        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory<string, AuditEventMessage> kafkaConsumerFactory) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
@@ -34,7 +33,12 @@ namespace LantanaGroup.Link.Audit.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateAuditableEventConsumer(enableAutoCommit: false))
+            var config = new ConsumerConfig()
+            {
+                GroupId = "AuditAuditableEventOccurred",
+                EnableAutoCommit = false
+            };
+            using (var _consumer = _kafkaConsumerFactory.CreateConsumer(config))
             {
                 try 
                 {                
