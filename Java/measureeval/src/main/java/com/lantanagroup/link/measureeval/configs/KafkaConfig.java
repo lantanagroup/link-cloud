@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
@@ -14,6 +15,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.support.serializer.*;
 
 import java.util.Map;
@@ -23,6 +25,11 @@ import java.util.regex.Pattern;
 public class KafkaConfig {
     private static Pattern getPattern(String topic) {
         return Pattern.compile(Pattern.quote(topic));
+    }
+
+    @Bean
+    public CommonErrorHandler errorHandler() {
+        return new ErrorHandler();
     }
 
     @Bean
