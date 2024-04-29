@@ -12,7 +12,6 @@ import { UserProfileService } from "../user-profile.service";
 export class AuthenticationService {
   userProfile!: UserProfile;
 
-  private baseURL = "/api/login"
 
 
   constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
@@ -33,17 +32,20 @@ export class AuthenticationService {
   }
 
   login() {
-    return this.http.get(`${this.baseURL}`)
+    window.location.href = "/api/login";
+ /*   return this.http.get(`${this.appConfigService.config?.baseApiUrl}/login`)
       .subscribe((response) => {
         console.log(response);
-      });
+      });*/
   }
   
   logout() {
-    return this.http.get(`${this.appConfigService.config?.baseApiUrl}/logout`)
+    window.location.href = "/api/logout";
+   /* return this.http.get(`${this.appConfigService.config?.baseApiUrl}/logout`)
       .subscribe(_ => {
         this.profileService.clearProfile();
-      });
+       // window.location.href = "/logout";
+      });*/
   }
 
 }

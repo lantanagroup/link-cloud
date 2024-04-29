@@ -59,8 +59,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-                options.LoginPath = "/login";
-                options.LogoutPath = "/logout";
+                options.LoginPath = "/api/login";
+                options.LogoutPath = "/api/logout";
             });
 
             //Add Oauth authorization scheme if enabled

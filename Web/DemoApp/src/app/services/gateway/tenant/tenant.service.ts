@@ -12,7 +12,6 @@ import { AppConfigService } from '../../app-config.service';
 export class TenantService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  private baseUrl: string = "/api/facility";
 
   createFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
@@ -21,7 +20,7 @@ export class TenantService {
       scheduledTasks: scheduledTasks
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.baseUrl}`, facility)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -39,7 +38,7 @@ export class TenantService {
       scheduledTasks: scheduledTasks
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.baseUrl}/${id}`, facility)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
       .pipe(
         tap(_ => console.log(`Request for facility update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -50,7 +49,7 @@ export class TenantService {
   }
 
   getFacilityConfiguration(facilityId: string): Observable<IFacilityConfigModel> {
-    return this.http.get<IFacilityConfigModel>(`${this.baseUrl}/${facilityId}`)
+    return this.http.get<IFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched facility configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -58,7 +57,7 @@ export class TenantService {
   }
 
   listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
-    return this.http.get<PagedFacilityConfigModel>(`${this.baseUrl}?facilityId=${facilityId}&facilityName=${facilityName}`)
+    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {

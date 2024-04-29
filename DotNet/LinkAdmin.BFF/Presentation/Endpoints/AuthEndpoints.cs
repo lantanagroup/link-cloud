@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
@@ -63,14 +64,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             _logger.LogApiRegistration(nameof(AuthEndpoints));
         }
 
-        public IResult Login()
+        public IResult Login(HttpContext context)
         {
             //TODO: DI authentication schema options from settings
+            var referer = context.Request.Headers.Referer.ToString();
+            referer = (referer.ToString().IndexOf("/") > 0) ? referer.Substring(0, referer.LastIndexOf("/")): referer;
             return Results.Challenge(
-                properties: new AuthenticationProperties { 
-                    RedirectUri = "/api/info",
-                },                
-                authenticationSchemes: [ _authSchemaOptions.Value.DefaultChallengeScheme ]);
+                properties: new AuthenticationProperties
+                {
+                    RedirectUri = referer + "/dashboard", 
+                },
+                authenticationSchemes: [_authSchemaOptions.Value.DefaultChallengeScheme]); 
         }
 
         public IResult GetUser(HttpContext context)
@@ -81,8 +85,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public IResult Logout(HttpContext context)
         {
+            var referer = context.Request.Headers.Referer.ToString();
+            referer = (referer.ToString().IndexOf("/") > 0) ? referer.Substring(0, referer.LastIndexOf("/")) : referer;
+
             context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
-            return Results.Ok(new { Message = "Successfully logged out of Link Admin!" });
+            return Results.SignOut(properties: new AuthenticationProperties
+            {
+                RedirectUri = referer + "/logout"
+            },
+             authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]); ; 
+          // return Results.Ok(new { Message = "Successfully logged out of Link Admin!" });
         }
           
         
