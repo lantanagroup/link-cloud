@@ -2,6 +2,7 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -26,7 +27,7 @@ public class NormalizationConfigModelDeserializer
 
     public static NormalizationConfigModel Deserialize(dynamic configdyn)
     {
-        var deserializedConfig = new NormalizationConfigEntity();
+        var deserializedConfig = new NormalizationConfig();
 
         JsonElement configEle = (JsonElement)configdyn;
         var jsonNode = JsonNode.Parse(configEle.ToString());

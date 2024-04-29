@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Settings;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -116,7 +117,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
-            headers.Add("X-Exception-Message", Encoding.UTF8.GetBytes(exceptionMessage));
+            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+            {
+                headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+            }
+
+            headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
             producer.Produce(Topic, new Message<K, V>

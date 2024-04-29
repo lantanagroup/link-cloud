@@ -1,7 +1,7 @@
 using Azure.Identity;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
@@ -17,9 +17,6 @@ using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -101,6 +98,7 @@ namespace Tenant
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
+            builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
             builder.Services.AddScoped<FacilityConfigurationService>();
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
@@ -199,6 +197,11 @@ namespace Tenant
 
             builder.Services.AddSingleton<RetentionCheckScheduledJob>();
 
+            //Add CORS
+            builder.Services.AddLinkCorsService(options => { 
+                options.Environment = builder.Environment;
+            });            
+
             //Add telemetry if enabled
             builder.Services.AddLinkTelemetry(builder.Configuration, options =>
             {
@@ -223,7 +226,8 @@ namespace Tenant
                 app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Tenant Service v1"));
             }
 
-            app.UseRouting();
+            app.UseRouting();            
+            app.UseCors(CorsSettings.DefaultCorsPolicyName);
             app.MapControllers();
 
             //map health check middleware

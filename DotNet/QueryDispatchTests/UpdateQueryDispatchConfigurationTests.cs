@@ -44,7 +44,7 @@ namespace QueryDispatchUnitTests
                 .Setup(factory => factory.Execute(It.IsAny<QueryDispatchConfigurationEntity>(), validModel.DispatchSchedules))
                 .Returns(Task.CompletedTask);
 
-            var result = await _controller.UpdateQueryDispatchConfiguration(validModel);
+            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, validModel);
             Assert.IsType<OkObjectResult>(result.Result);
         }
 
@@ -60,7 +60,7 @@ namespace QueryDispatchUnitTests
                 DispatchSchedules = new List<DispatchSchedule>()
             };
 
-            var result = await _controller.UpdateQueryDispatchConfiguration(invalidModel);
+            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, invalidModel);
             Assert.IsType<BadRequestObjectResult>(result.Result);
         }
     }

@@ -95,13 +95,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 Value = patientId
             };
 
-            var patient = await _fhirRepo.GetPatient(
-                fhirQueryConfiguration.FhirServerBaseUrl, 
-                patientId, request.CorrelationId, 
-                request.FacilityId, 
+            Patient patient = null;
+
+            if (request.Message.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+            {
+                patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
                 fhirQueryConfiguration.Authentication);
 
-            bundle.AddResourceEntry(patient, patientId);
+                bundle.AddResourceEntry(patient, patientId);
+            }
 
             var queryPlan = queryPlans.Where(x => x.ReportType == scheduledReport.ReportType).FirstOrDefault();
             if(queryPlan != null)
@@ -143,7 +148,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                         {
                             Resource = entry.Resource,
                             ScheduledReports = new List<ScheduledReport> { scheduledReport },
-                            PatientId = patientId,
+                            PatientId = RemovePatientId(entry.Resource) ? string.Empty : patientId,
                             QueryType = request.Message.QueryType
                         });
                     }
@@ -160,6 +165,18 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         }
 
         return messages;
+    }
+
+    private bool RemovePatientId(Resource resource)
+    {
+        return resource switch
+        {
+            Device => true,
+            Medication => true,
+            Location => true,
+            Specimen => true,
+            _ => false,
+        };
     }
 
     private async Task<(string queryPlanType, Bundle bundle)> ProcessIQueryList(
@@ -183,8 +200,13 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
 
+            _logger.LogInformation("Processing Query for:");
+
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetSingularBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.Message.PatientId,
@@ -200,6 +222,9 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
             {
+                var queryInfo = ((ParameterQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
                 bundle = await _fhirRepo.GetPagedBundledResultsAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.Message.PatientId,
@@ -217,7 +242,10 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
             {
                 var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
-                if(referenceQueryFactoryResult.ReferenceIds?.Count == 0)
+                var queryInfo = ((ReferenceQueryConfig)queryConfig);
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
                 {
                     break;
                 }

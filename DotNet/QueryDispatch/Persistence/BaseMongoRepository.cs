@@ -158,7 +158,7 @@ namespace LantanaGroup.Link.QueryDispatch.Persistence
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchLoggingIds.HealthCheck, "Query Dispatch Service - Database Health Check"), ex, "Health check failed for database connection.");
+                _logger.LogError(new EventId(LoggingIds.HealthCheck, "Query Dispatch Service - Database Health Check"), ex, "Health check failed for database connection.");
                 return false;
             }
 

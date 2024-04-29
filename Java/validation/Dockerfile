@@ -9,8 +9,8 @@ RUN mvn dependency:go-offline
 
 WORKDIR /app
 COPY Java/ ./
-RUN mvn clean install -pl validation -am
-RUN mv validation/target/validation-*.jar validation/target/validation.jar
+RUN mvn package -pl validation -am
+RUN mv validation/target/validation-*-jar-with-dependencies.jar validation/target/validation.jar
 
 # Stage 2: Run the Spring Boot application
 FROM openjdk:17-jdk-alpine

@@ -1,6 +1,5 @@
 using Azure.Identity;
 using Confluent.Kafka;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Census.Application.Errors;
 using LantanaGroup.Link.Census.Application.HealthChecks;
@@ -13,6 +12,7 @@ using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -23,9 +23,6 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -85,14 +82,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-
-    var test1 = builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection);
-    var test2 = builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider);
-
-    Console.WriteLine($"Connection String: {test1}");
-    Console.WriteLine($"Database Provider: {test2}");
 
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
     {
@@ -167,6 +159,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<CensusListener>();
     builder.Services.AddHostedService<ScheduleService>();
 
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
+
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
@@ -191,6 +188,8 @@ static void SetupMiddleware(WebApplication app)
     {
         app.MapGrpcReflectionService();
     }
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
