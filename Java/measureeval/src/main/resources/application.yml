@@ -1,3 +1,7 @@
+logging:
+  level:
+    com.lantanagroup.link: debug
+
 server:
   port: 5135
 
