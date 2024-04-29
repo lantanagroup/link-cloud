@@ -25,9 +25,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         /// <param name="notes"></param>
         /// <returns></returns>
         public CreateAuditEventModel Create(string? facilityId, string? serviceName, string? correlationId, DateTime? eventDate, string? userId, string? user, AuditEventType? action, string? resource, List<PropertyChangeModel>? propertyChanges, string? notes)
-        {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Event Model");
-
+        {           
             CreateAuditEventModel audit = new CreateAuditEventModel();
             audit.FacilityId = facilityId;
             audit.ServiceName = serviceName;
@@ -69,9 +67,7 @@ namespace LantanaGroup.Link.Audit.Application.Factory
         /// <param name="notes"></param>
         /// <returns></returns>
         public AuditLog Create(string? facilityId, string? serviceName, string? correlationId, DateTime? eventDate, string? userId, string? user, string? action, string? resource, List<PropertyChangeModel>? propertyChanges, string? notes)
-        {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Entity");
-
+        {            
             AuditLog audit = new AuditLog();
             audit.AuditId = AuditId.NewId();
             audit.FacilityId = facilityId;
@@ -104,8 +100,6 @@ namespace LantanaGroup.Link.Audit.Application.Factory
             string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy,
             string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         { 
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Audit Factory - Create Audit Search Filter Record");
-
             AuditSearchFilterRecord auditSearchFilterRecord = new AuditSearchFilterRecord
             {
                 SearchText = searchText,
