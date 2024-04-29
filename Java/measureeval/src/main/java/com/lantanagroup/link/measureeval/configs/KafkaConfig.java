@@ -3,7 +3,10 @@ package com.lantanagroup.link.measureeval.configs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
 import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.records.*;
+import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
+import com.lantanagroup.link.measureeval.records.ResourceAcquired;
+import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
+import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
@@ -35,7 +38,6 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.Key.class, objectMapper),
                 Topics.error(Topics.RESOURCE_ACQUIRED), new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(
@@ -46,7 +48,6 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.class, objectMapper),
                 Topics.error(Topics.RESOURCE_ACQUIRED), new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
                 Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper));
         return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(

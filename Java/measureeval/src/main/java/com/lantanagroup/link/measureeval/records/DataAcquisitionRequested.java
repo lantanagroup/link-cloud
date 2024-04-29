@@ -16,7 +16,7 @@ public class DataAcquisitionRequested {
     private String patientId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<ResourceAcquired.ScheduledReport> scheduledReports = new ArrayList<>();
+    private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
     private QueryType queryType;
 
