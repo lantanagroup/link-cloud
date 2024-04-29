@@ -13,10 +13,9 @@ public class DataAcquisitionClient extends Router {
         this.restClient = restClient;
     }
 
-    public QueryResults getQueryResults(String facilityId, String patientId, String correlationId) {
+    public QueryResults getQueryResults(String facilityId, String correlationId) {
         URI uri = getUri(Routes.QUERY_RESULT, Map.of(
                 "facilityId", facilityId,
-                "patientId", patientId,
                 "correlationId", correlationId));
         return restClient.get()
                 .uri(uri)

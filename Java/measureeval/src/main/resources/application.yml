@@ -31,6 +31,4 @@ link:
     base-url: http://localhost:5194
     routes:
       query-result:
-        path: /api/{facilityId}/QueryResult/{patientId}
-        query:
-          - correlationId={correlationId}
+        path: /api/{facilityId}/QueryResult/{correlationId}
