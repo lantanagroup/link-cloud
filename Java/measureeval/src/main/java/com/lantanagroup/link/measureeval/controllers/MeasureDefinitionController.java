@@ -62,7 +62,7 @@ public class MeasureDefinitionController {
 
     @PostMapping("/{id}/$evaluate")
     public MeasureReport evaluate(@PathVariable String id, @RequestBody Parameters parameters) {
-        MeasureEvaluator measureEvaluator = measureEvaluatorCache.getOrFind(id);
+        MeasureEvaluator measureEvaluator = measureEvaluatorCache.get(id);
         if (measureEvaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
