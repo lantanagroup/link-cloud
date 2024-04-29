@@ -17,8 +17,8 @@ public abstract class AbstractResource {
     private String id;
 
     private String facilityId;
-    private String resourceId;
     private ResourceType resourceType;
+    private String resourceId;
     private IBaseResource resource;
 
     @CreatedDate

@@ -22,8 +22,8 @@ public class PatientReportingEvaluationStatus {
     private String id;
 
     private String facilityId;
-    private String patientId;
     private String correlationId;
+    private String patientId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<Report> reports = new ArrayList<>();
@@ -51,8 +51,8 @@ public class PatientReportingEvaluationStatus {
     public static class Resource {
         private ResourceType resourceType;
         private String resourceId;
-        private NormalizationStatus normalizationStatus;
         private QueryType queryType;
-        private boolean isPatientResource;
+        private Boolean isPatientResource;
+        private NormalizationStatus normalizationStatus;
     }
 }

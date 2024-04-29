@@ -14,11 +14,10 @@ import java.util.List;
 @Setter
 public class DataAcquisitionRequested {
     private String patientId;
+    private QueryType queryType;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
-
-    private QueryType queryType;
 
     @Getter
     @Setter

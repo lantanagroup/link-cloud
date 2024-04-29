@@ -20,8 +20,8 @@ public class QueryResults {
     @Getter
     @Setter
     public static class QueryResult {
-        private String resourceId;
         private ResourceType resourceType;
+        private String resourceId;
         private QueryType queryType;
     }
 }
