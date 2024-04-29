@@ -1,9 +1,11 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.MeasureEval.Auditing;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Services;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Wrappers;
+using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.MeasureEval.Listeners
@@ -11,35 +13,59 @@ namespace LantanaGroup.Link.MeasureEval.Listeners
     public class PatientDataNormalizedListener : BackgroundService
     {
         private readonly ILogger _logger;
-        private readonly IKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage> _kafkaWrapper;
-        private readonly IKafkaWrapper<Ignore, Null, string, AuditEventMessage> _kafkaAuditWrapper;
+        private readonly IKafkaConsumerFactory<string, PatientDataNormalizedMessage> _kafkaConsumerFactory;
+        private readonly IKafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage> _kafkaProducerFactory;
+        private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaAuditProducerFactory;
         private readonly IMeasureEvalReportService _measureEvalReportService;
 
 
         public PatientDataNormalizedListener(ILogger<PatientDataNormalizedListener> logger,
-            IKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage> kafkaWrapper,
-            IKafkaWrapper<Ignore, Null, string, AuditEventMessage> kafkaAuditWrapper,
+            IKafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage> kafkaProducerFactory,
+            IKafkaProducerFactory<string, AuditEventMessage> kafkaAuditProducerFactory,
+            IKafkaConsumerFactory<string, PatientDataNormalizedMessage> kafkaConsumerFactory,
             IMeasureEvalReportService measureEvalReportService)
         {
             this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            this._kafkaWrapper = kafkaWrapper ?? throw new ArgumentNullException(nameof(kafkaWrapper));
-            this._kafkaAuditWrapper = kafkaAuditWrapper ?? throw new ArgumentNullException(nameof(kafkaAuditWrapper));
+            this._kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            this._kafkaAuditProducerFactory = kafkaAuditProducerFactory ?? throw new ArgumentNullException(nameof(kafkaAuditProducerFactory));
+            this._kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
             this._measureEvalReportService = measureEvalReportService ?? throw new ArgumentNullException(nameof(measureEvalReportService));
-        }
-
-        public override void Dispose()
-        {
-            base.Dispose();
-
-            _kafkaWrapper.CloseConsumer();
-            _kafkaWrapper.DisposeConsumer();
-
-            _kafkaWrapper.DisposeProducer();
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _kafkaWrapper.SubscribeToKafkaTopic(new string[] { KafkaTopic.PatientNormalized.ToString() });
+            var config = new ConsumerConfig
+            {
+                GroupId = "measure-eval",              
+                EnableAutoCommit = false,
+            };
+
+            using (var consumer = _kafkaConsumerFactory.CreateConsumer(config)) 
+            {
+                try
+                {
+                    consumer.Subscribe(nameof(KafkaTopic.PatientNormalized));
+                    _logger.LogTrace($"Subscribed to topic {KafkaTopic.PatientNormalized}");
+
+                    while (!stoppingToken.IsCancellationRequested)
+                    {
+
+                    }
+                }
+                catch (Exception ex)
+                {
+
+                }
+
+            }
+
+
+
+
+
+
+                _kafkaWrapper.SubscribeToKafkaTopic(new string[] { KafkaTopic.PatientNormalized.ToString() });
+               
             _logger.LogTrace($"Subscribed to topic {KafkaTopic.PatientNormalized}");
 
             while (true)
