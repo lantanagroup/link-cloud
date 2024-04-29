@@ -1,10 +1,10 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -47,7 +47,6 @@ namespace LantanaGroup.Link.Report.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
@@ -68,33 +67,39 @@ namespace LantanaGroup.Link.Report.Listeners
                     string facilityId = string.Empty;
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
-                        if (consumeResult == null)
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                         {
-                            throw new DeadLetterException(
-                                $"{Name}: consumeResult is null", AuditEventType.Create);
-                        }
+                            consumeResult = result;
 
-                        var key = consumeResult.Message.Key;
-                        var value = consumeResult.Message.Value;
-                        facilityId = key;
-
-                        if (string.IsNullOrWhiteSpace(key))
-                        {
-                            throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
-                        }
-
-                        var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
-                        foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
-                        {
-                            scheduledReport.PatientsToQuery = value.PatientIds;
-
-                            await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                            if (consumeResult == null)
                             {
-                                ReportSchedule = scheduledReport
+                                throw new DeadLetterException(
+                                    $"{Name}: consumeResult is null", AuditEventType.Create);
+                            }
 
-                            }, cancellationToken);
-                        }
+                            var key = consumeResult.Message.Key;
+                            var value = consumeResult.Message.Value;
+                            facilityId = key;
+
+                            if (string.IsNullOrWhiteSpace(key))
+                            {
+                                throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
+                            }
+
+                            var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
+                            foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
+                            {
+                                scheduledReport.PatientsToQuery = value.PatientIds;
+
+                                await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                {
+                                    ReportSchedule = scheduledReport
+
+                                }, cancellationToken);
+                            }
+
+                        }, cancellationToken);
+                        
                     }
                     catch (ConsumeException ex)
                     {
@@ -129,7 +134,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
                 consumer.Dispose();
             }

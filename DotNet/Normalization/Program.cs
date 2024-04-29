@@ -6,18 +6,22 @@ using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Quartz;
 using Quartz.Impl;
@@ -26,6 +30,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore.Storage;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -87,6 +92,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
@@ -108,6 +114,32 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddControllers();
     builder.Services.AddHttpClient();
+
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
+    builder.Services.AddDbContext<NormalizationDbContext>((sp, options) => {
+
+        var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+        var dbProvider =
+            builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
+        switch (dbProvider)
+        {
+            case "SqlServer":
+                string? connectionString = builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseConnectionString);
+
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);
+
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -131,7 +163,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<RetryJob>();
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
-    builder.Services.AddSingleton<IConfigRepository, ConfigRepository>();
 
     if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
@@ -161,6 +192,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpcReflection();
 
     //builder.Services.AddSwaggerGen();
+
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
 
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
@@ -195,6 +231,8 @@ static void SetupMiddleware(WebApplication app)
     {
         app.MapGrpcReflectionService();
     }
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     // Configure the HTTP request pipeline.
     app.MapGrpcService<NormalizationService>();

@@ -2,7 +2,7 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Commands;
 using LantanaGroup.Link.Normalization.Application.Services;
-using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 using Moq;

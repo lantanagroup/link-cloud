@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
-public interface IFhirQueryListConfigurationRepository : IMongoDbRepository<FhirListConfiguration>
+public interface IFhirQueryListConfigurationRepository : IPersistenceRepository<FhirListConfiguration>, IDisposable
 {
     Task<AuthenticationConfiguration> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default);
     Task SaveAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);

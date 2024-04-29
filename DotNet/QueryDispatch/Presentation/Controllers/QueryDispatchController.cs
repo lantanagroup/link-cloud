@@ -2,8 +2,11 @@
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
@@ -30,12 +33,20 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             _tenantApiService = tenantApiService;
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
-        /// Gets a facility configuration by facilityId
+        /// Gets a Query Dispatch facility configuration by facilityId
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// Success: 200 
+        /// Bad Request: 400
+        /// Not Found: 404
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("configuration/facility/{facilityid}")]
         public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId) 
         {
@@ -57,17 +68,24 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to retrieve the query dispatch configuration of a facility with an id of {facilityId}", ex);
-                return StatusCode(500, "An error occurred while attempting to retrieve the facility query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GetItem, "Get QueryDispatch configuration"), ex, "An exception occurred while attempting to retrieve a QueryDispatch configuration for facility {facilityId}", facilityId);
+
+                throw;
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Creates a QueryDispatch configuration record.
         /// </summary>
         /// <param name="model"></param>
-        /// <returns></returns>
+        /// <returns>
+        /// Created: 201
+        /// Bad Request: 400
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("configuration")]
         public async Task<ActionResult<RequestResponse>> CreateQueryDispatchConfigurationAsync(QueryDispatchConfiguration model)
         {
@@ -83,6 +101,15 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                 return BadRequest("Facility Id is required in order to create a query dispatch configuration.");
             }
 
+            foreach (var schedule in model.DispatchSchedules)
+            {
+                if (!IsDurationFormatValid(schedule.Duration))
+                {
+                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
+                    return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
+                }
+            }
+
             var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
             if (existingConfig != null)
             {
@@ -93,37 +120,35 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             try
             {
                 var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
-                    if (!facilityCheckResult)
-                        return BadRequest($"Facility {model.FacilityId} does not exist.");
 
-                var config =
-                    _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId,
-                        model.DispatchSchedules);
+                if (!facilityCheckResult)
+                    return BadRequest($"Facility {model.FacilityId} does not exist.");
+
+                var config = _configurationFactory.CreateQueryDispatchConfiguration(model.FacilityId, model.DispatchSchedules);
 
                 await _createQueryDispatchConfigurationCommand.Execute(config);
 
-                var response = new RequestResponse
-                {
-                    Id = config.Id,
-                    Message = "The query dispatch configuration was created successfully."
-                };
-
-                return Ok(response);
+                return Created(config.Id, config);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to create a new query dispatch configuration - {model}", ex);
-                return StatusCode(500, "An error occurred while attempting to create a new query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + model.FacilityId);
+
+                throw;
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Deletes a QueryDispatch configuration record.
         /// </summary>
         /// <param name="facilityId"></param>
-        /// <returns></returns>
-        [HttpDelete("configuration/facility/{facilityid}")]
+        /// <returns>
+        /// No Content: 204
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpDelete("configuration/facility/{facilityId}")]
         public async Task<ActionResult<RequestResponse>> DeleteQueryDispatchConfiguration(string facilityId)
         {
             if (string.IsNullOrEmpty(facilityId)) 
@@ -134,70 +159,98 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             try
             {
                 bool result = await _deleteQueryDispatchConfigurationCommand.Execute(facilityId);
-
-                RequestResponse response = new RequestResponse()
-                {
-                    Id = facilityId,
-                    Message = result ? $"Query Dispatch configuration {facilityId} was deleted succesfully." : $"Failed to delete Query Dispatch configuration {facilityId}, check log for details."
-                };
                 
-                return Ok(response);
+                return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to delete the query dispatch configuration for facility id {facilityId}", ex);
-                return StatusCode(500, "An error occurred while attempting to delete the facility query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + facilityId);
+
+                throw;
             }
         }
 
-        //TODO: Daniel - Add authorization policies
         /// <summary>
         /// Updates a QueryDispatch configuration record.
         /// </summary>
+        /// <param name="facilityId"></param>
         /// <param name="model"></param>
-        /// <returns></returns>
-        [HttpPut("configuration")]
-        public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(QueryDispatchConfiguration model)
+        /// <returns>
+        /// Created: 201
+        /// No Content: 204
+        /// Bad Request: 400
+        /// Server Error: 500
+        /// </returns>
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryDispatchConfigurationEntity))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpPut("configuration/facility/{facilityId}")]
+        public async Task<ActionResult<RequestResponse>> UpdateQueryDispatchConfiguration(string facilityId, QueryDispatchConfiguration model)
         {
             if (model == null)
             {
                 return BadRequest("No query dispatch configuration provided.");
             }
 
-            if (string.IsNullOrWhiteSpace(model.FacilityId))
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
                 _logger.LogError($"Facility Id was not provided in the update query dispatch configuration: {model}.");
                 return BadRequest("Facility Id is required in order to update a query dispatch configuration.");
             }
 
-            var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(model.FacilityId);
-            if (existingConfig == null)
+            foreach (var schedule in model.DispatchSchedules)
             {
-                _logger.LogError($"Query dispatch configuration for Facility Id {model.FacilityId} does not exist.");
-                return BadRequest($"FacilityID {model.FacilityId} configuration does not exist.");
+                if (!IsDurationFormatValid(schedule.Duration))
+                {
+                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
+                    return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
+                }
             }
 
             try
             {
-                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+                var facilityCheckResult = await _tenantApiService.CheckFacilityExists(facilityId);
+
                 if (!facilityCheckResult)
-                    return BadRequest($"Facility {model.FacilityId} does not exist.");
-
-                await _updateQueryDispatchConfigurationCommand.Execute(existingConfig, model.DispatchSchedules);
-
-                var response = new RequestResponse
                 {
-                    Id = existingConfig.Id,
-                    Message = "The query dispatch configuration was updated successfully."
-                };
+                    return BadRequest($"Facility {facilityId} does not exist.");
+                }
 
-                return Ok(response);
+                var existingConfig = await _getQueryDispatchConfigurationQuery.Execute(facilityId);
+
+                if (existingConfig == null)
+                {
+                    var config = _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
+                    await _createQueryDispatchConfigurationCommand.Execute(config);
+
+                    return Created(config.Id, config);
+                }
+                else
+                {
+                    await _updateQueryDispatchConfigurationCommand.Execute(existingConfig, model.DispatchSchedules);
+                    return NoContent();
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"An exception occurred while attempting to update the query dispatch configuration - {model}", ex);
-                return StatusCode(500, "An error occurred while attempting to update the query dispatch configuration.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + facilityId);
+
+                throw;
             }
+        }
+
+        private bool IsDurationFormatValid(string duration)
+        {
+            try
+            {
+                System.Xml.XmlConvert.ToTimeSpan(duration);
+            }
+            catch             {
+                return false;
+            }
+
+            return true;
         }
     }
 }
