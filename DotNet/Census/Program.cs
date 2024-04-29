@@ -178,11 +178,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    //if (app.Environment.IsDevelopment())
-    //{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    //}
+    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.AutoMigrate))
+    {
+        app.Services.GetService<CensusContext>()?.Database.Migrate();
+    }
+    
+    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
