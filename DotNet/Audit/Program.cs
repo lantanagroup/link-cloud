@@ -34,6 +34,8 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Factories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,7 +110,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
-    builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
@@ -124,7 +126,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
-    builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
+    builder.Services.AddSingleton<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
