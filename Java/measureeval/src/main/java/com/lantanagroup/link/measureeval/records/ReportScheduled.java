@@ -12,7 +12,7 @@ import java.util.List;
 @Setter
 public class ReportScheduled {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
-    private List<Parameter> parameters = new ArrayList<Parameter>();
+    private List<Parameter> parameters = new ArrayList<>();
 
     @Getter
     @Setter
