@@ -43,7 +43,11 @@ export class AuthService {
         });
     }
     else {
-      this.userProfile = this.profileService.getProfile();      
+      this.profileService.getProfile().then(
+        profile => {
+          this.userProfile = profile;
+        }
+      )   
     }
 
   }  
