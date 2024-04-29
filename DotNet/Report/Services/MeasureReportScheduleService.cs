@@ -89,12 +89,14 @@ namespace LantanaGroup.Link.Report.Services
 
             jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
 
+            var offset = DateBuilder.DateOf(reportSchedule.ReportEndDate.Hour, reportSchedule.ReportEndDate.Minute, reportSchedule.ReportEndDate.Second, reportSchedule.ReportEndDate.Day, reportSchedule.ReportEndDate.Month);
+
             return TriggerBuilder
                 .Create()
+                .StartAt(offset)
                 .ForJob(jobKey)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithCronSchedule(reportSchedule.ScheduledTrigger)
-                .WithDescription($"{reportSchedule.Id}-{reportSchedule.ScheduledTrigger}")
+                .WithDescription($"{reportSchedule.FacilityId}-{reportSchedule.ReportType}-{reportSchedule.ReportEndDate.ToShortDateString()}")
                 .UsingJobData(jobDataMap)
                 .Build();
         }
