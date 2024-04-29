@@ -12,6 +12,8 @@ import java.util.List;
 @Getter
 @Setter
 public class QueryResults {
+    private String patientId;
+
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<QueryResult> queryResults = new ArrayList<>();
 
