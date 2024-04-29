@@ -20,10 +20,6 @@ public class MeasureEvaluatorCache {
     }
 
     public MeasureEvaluator get(String id) {
-        return instancesById.get(id);
-    }
-
-    public MeasureEvaluator getOrFind(String id) {
         return instancesById.computeIfAbsent(id, _id -> {
             MeasureDefinition measureDefinition = mongoOperations.findById(_id, MeasureDefinition.class);
             if (measureDefinition == null) {
