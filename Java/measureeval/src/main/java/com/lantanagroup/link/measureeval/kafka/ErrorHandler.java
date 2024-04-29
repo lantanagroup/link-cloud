@@ -18,7 +18,7 @@ public class ErrorHandler implements CommonErrorHandler {
             @Nonnull ConsumerRecord<?, ?> record,
             @Nonnull Consumer<?, ?> consumer,
             @Nonnull MessageListenerContainer container) {
-        logger.error("Failed to process record: {}", KafkaUtils.format(record), exception);
+        logger.error("Failed to consume record: {}", KafkaUtils.format(record), exception);
         return true;
     }
 }
