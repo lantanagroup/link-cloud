@@ -2,57 +2,175 @@ version: '3.4'
 
 services:
   account:
-    image: ${DOCKER_REGISTRY-}account
+    image: link-account
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8060
+    ports:
+      - "8060"
     build:
       context: .
-      dockerfile: Account/Dockerfile
+      dockerfile: DotNet/Account/Dockerfile
 
-  api:
-    image: ${DOCKER_REGISTRY-}api
+  api-gw:
+    image: link-api-gw
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8061
+    ports:
+      - "8061"
     build:
       context: .
-      dockerfile: Api/Dockerfile
+      dockerfile: DotNet/DemoApiGateway/Dockerfile
+    depends_on:
+      - tenant
+      - report
+      - normalization
+      - dataacquisition
 
-  tenant:
-    image: ${DOCKER_REGISTRY-}tenant
+  audit:
+    image: link-audit
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8062
+    ports:
+      - "8062"
     build:
       context: .
-      dockerfile: Tenant/Dockerfile
-
-  query:
-    image: ${DOCKER_REGISTRY-}query
+      dockerfile: DotNet/Audit/Dockerfile
+      
+  bff:
+    image: link-bff
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8063
+    ports:
+      - "8063"
     build:
       context: .
-      dockerfile: Query/Dockerfile
+      dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
+    depends_on:
+      - tenant
+      - report
+      - normalization
+      - dataacquisition
 
-  validation:
-    image: ${DOCKER_REGISTRY-}validation
+  census:
+    image: link-census
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8064
+    ports:
+      - "8064"
     build:
       context: .
-      dockerfile: Validation/Dockerfile
+      dockerfile: DotNet/Census/Dockerfile
 
-  report:
-    image: ${DOCKER_REGISTRY-}report
+  dataacquisition:
+    image: link-dataacquisition
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8065
+    ports:
+      - "8065"
     build:
       context: .
-      dockerfile: Report/Dockerfile
+      dockerfile: DotNet/DataAcquisition/Dockerfile
 
-  patientlist:
-    image: ${DOCKER_REGISTRY-}patientlist
+  demo-app:
+    image: link-demo-app
+    ports:
+      - "8066:80"
     build:
-      context: .
-      dockerfile: PatientList/Dockerfile
-
-  normalization:
-    image: ${DOCKER_REGISTRY-}normalization
-    build:
-      context: .
-      dockerfile: Normalization/Dockerfile
-
+      context: Web/DemoApp
 
   measureeval:
-    image: ${DOCKER_REGISTRY-}measureeval
+    image: link-measureeval
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8067
+    ports:
+      - "8067"
     build:
       context: .
-      dockerfile: MeasureEval/Dockerfile
+      dockerfile: DotNet/MeasureEval/Dockerfile
+      
+  normalization:
+    image: link-normalization
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8068
+    ports:
+      - "8068"
+    build:
+      context: .
+      dockerfile: DotNet/Normalization/Dockerfile
+      
+  notification:
+    image: link-notification
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8069
+    ports:
+      - "8069"
+    build:
+      context: .
+      dockerfile: DotNet/Notification/Dockerfile
+      
+  patientquery:
+    image: link-patientquery
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8070
+    ports:
+      - "8070"
+    build:
+      context: .
+      dockerfile: DotNet/PatientsToQuery/Dockerfile
+      
+  querydispatch:
+    image: link-querydispatch
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8071
+    ports:
+      - "8071"
+    build:
+      context: .
+      dockerfile: DotNet/QueryDispatch/Dockerfile
+
+  report:
+    image: link-report
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8072
+    ports:
+      - "8072"
+    build:
+      context: .
+      dockerfile: DotNet/Report/Dockerfile
+
+  submission:
+    image: link-submission
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8073
+    ports:
+      - "8073"
+    build:
+      context: .
+      dockerfile: DotNet/Submission/Dockerfile
+
+  tenant:
+    image: link-tenant
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8074
+    ports:
+      - "8074"
+    build:
+      context: .
+      dockerfile: DotNet/Tenant/Dockerfile
+      
+  # TODO: Java MeasureEval and Validation Services
 
