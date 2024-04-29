@@ -30,4 +30,7 @@ link:
   data-acquisition:
     base-url: http://localhost:5194
     routes:
-      query-result: /api/{facilityId}/QueryResult/{patientId}
+      query-result:
+        path: /api/{facilityId}/QueryResult/{patientId}
+        query:
+          - correlationId={correlationId}
