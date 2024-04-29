@@ -33,9 +33,9 @@ using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using Microsoft.Extensions.Options;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -112,6 +112,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add services to the container. 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
@@ -127,6 +128,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
+
+    //Add dead letter exception handlers
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, IDeadLetterExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, IDeadLetterExceptionHandler<string, string>>();
+
+    //Add Hosted Services
+    builder.Services.AddHostedService<AuditEventListener>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -180,10 +188,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //builder.Services.AddAuthorizationService();
 
-    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();
-
-    //Add Hosted Services
-    builder.Services.AddHostedService<AuditEventListener>();
+    builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();    
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();

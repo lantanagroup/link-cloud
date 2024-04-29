@@ -30,6 +30,8 @@ public enum KafkaTopic
     MeasureEvalFailed,
     FHIRValidationFailed,
     AuditableEventOccurred,
+    [StringValue("AuditableEventOccurred-Retry")]
+    AuditableEventOccurredRetry,
     NotificationRequested,
     PatientCensusScheduled,
     PatientEvent,
