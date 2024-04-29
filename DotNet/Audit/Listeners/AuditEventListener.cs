@@ -7,6 +7,7 @@ using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Audit.Listeners
@@ -76,7 +77,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (ConsumeException ex)
                         {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                                                     
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                            Activity.Current?.RecordException(ex);
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             if (ex.Error.IsFatal)
                             {
@@ -85,7 +87,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                         }
                         catch (Exception ex)
                         {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                            Activity.Current?.RecordException(ex);
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
                             break;
                         }
@@ -97,7 +100,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                 }
                 catch(OperationCanceledException oce)
                 {
-                    Activity.Current?.SetStatus(ActivityStatusCode.Error);                    
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                    Activity.Current?.RecordException(oce);
                     _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();
