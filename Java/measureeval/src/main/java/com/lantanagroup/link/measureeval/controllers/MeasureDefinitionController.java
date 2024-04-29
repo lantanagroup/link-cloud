@@ -20,14 +20,15 @@ import java.util.List;
 @RequestMapping("/api/measure-definition")
 public class MeasureDefinitionController {
     private final MongoOperations mongoOperations;
-    private final MeasureDefinitionBundleValidator measureDefinitionBundleValidator;
+    private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache measureEvaluatorCache;
 
     public MeasureDefinitionController(
-            MongoOperations mongoOperations, MeasureDefinitionBundleValidator measureDefinitionBundleValidator,
+            MongoOperations mongoOperations,
+            MeasureDefinitionBundleValidator bundleValidator,
             MeasureEvaluatorCache measureEvaluatorCache) {
         this.mongoOperations = mongoOperations;
-        this.measureDefinitionBundleValidator = measureDefinitionBundleValidator;
+        this.bundleValidator = bundleValidator;
         this.measureEvaluatorCache = measureEvaluatorCache;
     }
 
@@ -48,7 +49,7 @@ public class MeasureDefinitionController {
 
     @PutMapping("/{id}")
     public MeasureDefinition put(@PathVariable String id, @RequestBody Bundle bundle) {
-        measureDefinitionBundleValidator.validate(bundle);
+        bundleValidator.validate(bundle);
         MeasureDefinition entity = mongoOperations.findById(id, MeasureDefinition.class);
         if (entity == null) {
             entity = new MeasureDefinition();
