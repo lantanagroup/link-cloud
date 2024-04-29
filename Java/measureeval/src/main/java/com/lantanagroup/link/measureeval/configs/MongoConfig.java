@@ -4,11 +4,12 @@ import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.serdes.FhirMongoCustomConversions;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 
 @Configuration
 public class MongoConfig {
     @Bean
-    public FhirMongoCustomConversions fhirCustomConversions(FhirContext fhirContext) {
+    public MongoCustomConversions fhirCustomConversions(FhirContext fhirContext) {
         return new FhirMongoCustomConversions(fhirContext);
     }
 }
