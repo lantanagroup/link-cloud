@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
@@ -86,10 +87,10 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
 
                 _metrics.IncrementReportScheduledCounter([
-                    new KeyValuePair<string, object?>("facility", facility.FacilityId),
-                    new KeyValuePair<string, object?>("reportType", reportType),
-                    new KeyValuePair<string, object?>("period.start", startDate),
-                    new KeyValuePair<string, object?>("period.end", endDate)
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportType),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
                 ]);
 
             }

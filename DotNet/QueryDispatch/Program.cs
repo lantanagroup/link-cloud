@@ -132,7 +132,7 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 builder.Services.AddSingleton<IScheduledReportRepository, ScheduledReportMongoRepo>();
 builder.Services.AddSingleton<IPatientDispatchRepository, PatientDispatchMongoRepo>();
 builder.Services.AddSingleton<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationMongoRepo>();
-builder.Services.AddSingleton<RetryRepository>();
+builder.Services.AddSingleton<RetryRepository_Mongo>();
 
 //Add Queries
 builder.Services.AddTransient<IGetScheduledReportQuery, GetScheduledReportQuery>();
