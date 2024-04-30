@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.HealthChecks;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
@@ -27,6 +28,8 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Quartz.Impl;
+using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -143,7 +146,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
     builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepository_SQL>();
+    builder.Services.AddSingleton<IRetryRepository, RetryRepository_SQL_DataAcq>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -151,9 +154,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<QueryListener>();
+    builder.Services.AddHostedService<RetryListener>();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -199,6 +204,8 @@ static void SetupMiddleware(WebApplication app)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    app.AutoMigrateEF<DataAcquisitionDbContext>();
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
