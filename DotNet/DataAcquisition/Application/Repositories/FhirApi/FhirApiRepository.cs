@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuer
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using MediatR;
 using System.Net.Http.Headers;
 
@@ -156,8 +157,9 @@ public class FhirApiRepository : IFhirApiRepository
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>("facility", facilityId),           
-            new KeyValuePair<string, object?>("resource", "Patient")
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),  
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
         ]);
 
         var fhirClient = GenerateFhirClient(baseUrl);
@@ -197,10 +199,10 @@ public class FhirApiRepository : IFhirApiRepository
         try
         {
             using var _ = _metrics.MeasureDataRequestDuration([
-                new KeyValuePair<string, object?>("facility", facilityId),
-                new KeyValuePair<string, object?>("patient", patientId),
-                new KeyValuePair<string, object?>("query.type", queryType),
-                new KeyValuePair<string, object?>("resource", resourceType)
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+                new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
@@ -235,10 +237,10 @@ public class FhirApiRepository : IFhirApiRepository
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>("facility", facilityId),
-            new KeyValuePair<string, object?>("patient", patientId),
-            new KeyValuePair<string, object?>("query.type", queryType),
-            new KeyValuePair<string, object?>("resource", resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
         ]);
 
         DomainResource? readResource = resourceType switch
@@ -389,10 +391,10 @@ public class FhirApiRepository : IFhirApiRepository
     private void IncrementResourceAcquiredMetric(string? patientIdReference, string? facilityId, string? queryType, string resourceType)
     {
         _metrics.IncrementResourceAcquiredCounter([
-            new KeyValuePair<string, object?>("facility", facilityId),
-            new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
-            new KeyValuePair<string, object?>("query.type", queryType),
-            new KeyValuePair<string, object?>("resource", resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientIdReference), //TODO: Can we keep this?
+            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
         ]);
     }
 }

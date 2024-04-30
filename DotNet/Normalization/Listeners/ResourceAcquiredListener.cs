@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using Microsoft.Extensions.Options;
@@ -211,12 +212,12 @@ public class ResourceAcquiredListener : BackgroundService
                             };
 
                             _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
-                                new KeyValuePair<string, object?>("facility", messageMetaData.facilityId),
-                                new KeyValuePair<string, object?>("correlation.id", messageMetaData.correlationId),
-                                new KeyValuePair<string, object?>("patient", message.Message.Value.PatientId),
-                                new KeyValuePair<string, object?>("resource", operationCommandResult.Resource.TypeName),
-                                new KeyValuePair<string, object?>("query.type", message.Message.Value.QueryType),
-                                new KeyValuePair<string, object?>("normalization.operation", op.Value.GetType().Name)
+                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, operationCommandResult.Resource.TypeName),
+                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
+                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, op.Value.GetType().Name)
                             });
                         }
                     }
