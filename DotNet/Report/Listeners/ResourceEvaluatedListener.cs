@@ -194,9 +194,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && allReady)
                                 {
                                     var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
-                                    var parser = new FhirJsonParser();
-                                    parser.Parse<MeasureReport>(entry.MeasureReport);
 
+                                    var parser = new FhirJsonParser();
                                     var measureReports = submissionEntries.Select(e =>
                                         parser.Parse<MeasureReport>(e.MeasureReport)).ToList();
 
