@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -53,7 +54,6 @@ namespace LantanaGroup.Link.Submission.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
@@ -74,47 +74,53 @@ namespace LantanaGroup.Link.Submission.Listeners
                     string facilityId = string.Empty;
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
-                        if (consumeResult == null)
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                         {
-                            throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
-                        }
+                            consumeResult = result;
 
-                        var key = consumeResult.Message.Key;
-                        var value = consumeResult.Message.Value;
-                        facilityId = key.FacilityId;
+                            if (consumeResult == null)
+                            {
+                                throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
+                            }
 
-                        if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                            string.IsNullOrWhiteSpace(key.ReportType) ||
-                            string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
-                        {
-                            throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
-                        }
+                            var key = consumeResult.Message.Key;
+                            var value = consumeResult.Message.Value;
+                            facilityId = key.FacilityId;
 
-                        string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
+                            if (string.IsNullOrWhiteSpace(key.FacilityId) ||
+                                string.IsNullOrWhiteSpace(key.ReportType) ||
+                                string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
+                            {
+                                throw new DeadLetterException(
+                                    $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
+                            }
 
-                        var response = await _httpClient.CreateClient().GetAsync(requestUrl, cancellationToken);
-                        var measureReportSubmissionBundle =
-                            JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(await response.Content.ReadAsStringAsync(cancellationToken));
+                            string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
 
-                        #region File IO
-                        string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
-                        if (!Directory.Exists(facilityDirectory))
-                        {
-                            Directory.CreateDirectory(facilityDirectory);
-                        }
+                            var response = await _httpClient.CreateClient().GetAsync(requestUrl, cancellationToken);
+                            var measureReportSubmissionBundle =
+                                JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(await response.Content.ReadAsStringAsync(cancellationToken));
 
-                        var dtu = DateTime.UtcNow;
-                        string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
+                            #region File IO
+                            string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
+                            if (!Directory.Exists(facilityDirectory))
+                            {
+                                Directory.CreateDirectory(facilityDirectory);
+                            }
 
-                        await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
+                            var dtu = DateTime.UtcNow;
+                            string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
 
-                        if (!File.Exists(fullFilePath))
-                        {
-                            throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
-                        }
-                        #endregion
+                            await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
+
+                            if (!File.Exists(fullFilePath))
+                            {
+                                throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
+                            }
+                            #endregion
+
+                        }, cancellationToken);
+                        
                     }
                     catch (ConsumeException ex)
                     {
@@ -149,7 +155,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
                 consumer.Dispose();
             }
