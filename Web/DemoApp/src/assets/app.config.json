@@ -1,8 +1,8 @@
 {
   "production": false,
-  "baseApiUrl": "http://localhost:5218",
+  "baseApiUrl": "/api",
   "idpIssuer": "",
   "idpClientId": "",
   "idpClientSecret": "",
-  "idpScope": "openid profile email botwdemogatewayapi.read botwdemogatewayapi.write botwdemogatewayapi.delete"
+  "idpScope": "openid profile email"
 }

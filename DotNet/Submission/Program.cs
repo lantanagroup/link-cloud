@@ -109,7 +109,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpc().AddJsonTranscoding();
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<RetryRepository>();
+    builder.Services.AddSingleton<RetryRepository_Mongo>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
 

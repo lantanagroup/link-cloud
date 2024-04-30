@@ -122,7 +122,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
     builder.Services.AddSingleton<ReportRepository>();
     builder.Services.AddSingleton<PatientsToQueryRepository>();
-    builder.Services.AddSingleton<RetryRepository>();
+    builder.Services.AddSingleton<RetryRepository_Mongo>();
 
     // Add controllers
     builder.Services.AddControllers();
