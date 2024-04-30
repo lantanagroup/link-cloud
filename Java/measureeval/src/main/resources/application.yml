@@ -11,6 +11,8 @@ spring:
 
   data:
     mongodb:
+      host: localhost
+      port: 27017
       database: ${spring.application.name}
 
   jackson:
@@ -20,6 +22,9 @@ spring:
       default-view-inclusion: false
 
   kafka:
+    bootstrap-servers:
+      - localhost:9092
+
     consumer:
       group-id: ${spring.application.name}
 
