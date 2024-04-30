@@ -64,8 +64,7 @@ services:
       - type: bind
         source: create-dbs.sql
         target: /create-dbs.sql
-    command: >
-      bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
+    command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
       - mssql
     networks:
@@ -299,7 +298,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: audit-events
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8062:8062"
     build:
@@ -332,7 +331,6 @@ services:
       - report
       - normalization
       - dataacquisition
-
   
   census:
     image: link-census
@@ -367,6 +365,7 @@ services:
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: dataacquisition-events
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8065:8065"
     build:
@@ -409,8 +408,12 @@ services:
     image: link-normalization
     hostname: normalization_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8068
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: normalization-events
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
     ports:
       - "8068:8068"
     build:
@@ -510,7 +513,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: tenant-events
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8074:8074"
     build:
