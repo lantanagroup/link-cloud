@@ -18,6 +18,7 @@ using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Core;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -32,18 +33,22 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
+        private readonly MeasureReportSubmissionBundler _bundler;
         private string Name => this.GetType().Name;
 
         public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
+            MeasureReportSubmissionBundler bundler)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _bundler = bundler;
+
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -59,14 +64,6 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
-
-        private async Task<bool> readyForSubmission(string scheduleId)
-        {
-            var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = scheduleId });
-          
-            return  submissionEntries.All(x => x.ReadyForSubmission);
-        }
-
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
@@ -190,8 +187,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }, cancellationToken);
                                 }
 
-                                if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
+                                var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id });
+
+                                var allReady = submissionEntries.All(x => x.ReadyForSubmission);
+
+                                if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && allReady)
                                 {
+                                    var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
+
                                     using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
                                     prod.Produce(nameof(KafkaTopic.SubmitReport),
                                         new Message<SubmissionReportKey, SubmissionReportValue>
@@ -199,11 +202,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                             Key = new SubmissionReportKey()
                                             {
                                                 FacilityId = schedule.FacilityId,
-                                                ReportType = schedule.ReportType
+                                                StartDate = schedule.ReportStartDate,
+                                                EndDate = schedule.ReportEndDate
                                             },
                                             Value = new SubmissionReportValue()
                                             {
-                                                MeasureReportScheduleId = schedule.Id
+                                                PatientIds = patientIds,
+                                                Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                                Aggregates = new object() //Sean HALLP
                                             },
                                             Headers = new Headers
                                             {

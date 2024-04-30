@@ -369,7 +369,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
 
-        protected Organization CreateOrganization(String facilityId)
+        public Organization CreateOrganization(String facilityId)
         {
             Organization org = new Organization();
             org.Meta = new Meta
