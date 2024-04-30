@@ -2,7 +2,9 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
 const routes: Routes = [
-  { path: '', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
+  { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent)  },
+  { path: 'dashboard', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
+  { path: 'logout', loadComponent: () => import('./components/dashboard/admin-dashboard/admin-dashboard.component').then(mod => mod.AdminDashboardComponent) },
   { path: 'tenant', loadComponent: () => import('./components/tenant/tenant-dashboard/tenant-dashboard.component').then(mod => mod.TenantDashboardComponent) },
   { path: 'tenant/facility/:id', loadComponent: () => import('./components/tenant/facility-view/facility-view.component').then(mod => mod.FacilityViewComponent) },
   { path: 'measure-def', loadComponent: () => import('./components/measure-def/measure-def-dashboard/measure-def-dashboard.component').then(mod => mod.MeasureDefinitionDashboardComponent) },
