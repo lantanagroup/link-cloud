@@ -43,7 +43,6 @@ namespace Tenant
             SetupMiddleware(app);
 
             app.Run();
-
         }
 
 
@@ -176,9 +175,8 @@ namespace Tenant
             // Logging using Serilog
             builder.Logging.AddSerilog();
 
-            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
-                            .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                            .ReadFrom.Configuration(builder.Configuration)
                                         .Filter.ByExcluding("RequestPath like '/health%'")
                                         .Filter.ByExcluding("RequestPath like '/swagger%'")
                                         .Enrich.WithExceptionDetails()
@@ -187,6 +185,8 @@ namespace Tenant
                                         .Enrich.With<ActivityEnricher>()
                                         .Enrich.FromLogContext()
                                         .CreateLogger();
+            
+            Serilog.Debugging.SelfLog.Enable(Console.Error);
 
 
             builder.Services.AddSingleton<IJobFactory, JobFactory>();

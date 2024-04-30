@@ -56,7 +56,7 @@ services:
     networks:
       - link-nw
       
-  mssql-init:
+  mssql_init:
     image: mcr.microsoft.com/mssql-tools
     environment:
       LINK_DB_PASS: ${LINK_DB_PASS}
@@ -71,12 +71,20 @@ services:
     networks:
       - link-nw
       
+  mongo:
+    image: mongo:6-jammy
+    ports:
+      - '17017:27017'
+    volumes:
+      - mongo_data:/data/db
+      
   ###########################################
   ### Telemetry
   ###########################################
       
   loki:
     image: grafana/loki:2.9.0
+    hostname: loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
@@ -269,7 +277,7 @@ services:
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: account-events
       Postgres__ConnectionString: Host=pg_db:5432;Database=link-account;Username=link-db-user;Password=link-db-pass;
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
     ports:
       - "8060:8060"
@@ -279,6 +287,7 @@ services:
     networks:
       - link-nw
     depends_on:
+      - loki
       - pg_db
       - kafka_b
 
@@ -299,9 +308,10 @@ services:
     networks:
       - link-nw
     depends_on:
+      - loki
       - kafka_b
       - mssql
-      - mssql-init
+      - mssql_init
       
   bff:
     image: link-bff
@@ -310,7 +320,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8063
     ports:
-      - "8063"
+      - "8063:8063"
     build:
       context: .
       dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
@@ -331,28 +341,34 @@ services:
       ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: census-events
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       AutoMigrate: true
     ports:
-      - "8064"
+      - "8064:8064"
     build:
       context: .
       dockerfile: DotNet/Census/Dockerfile
     networks:
       - link-nw
     depends_on:
+      - loki
       - kafka_b
-      - mssql
-      - mssql-init
+      - mssql_init
+      - tenant
 
   dataacquisition:
     image: link-dataacquisition
     hostname: dataacquisition_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8065
+      ASPNETCORE_ENVIRONMENT: Docker
+      MongoDB__ConnectionString: mongodb://mongo:17017
+      MongoDB__DatabaseName: link-dataacquisition
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: dataacquisition-events
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
     ports:
-      - "8065"
+      - "8065:8065"
     build:
       context: .
       dockerfile: DotNet/DataAcquisition/Dockerfile
@@ -360,6 +376,7 @@ services:
       - link-nw
     depends_on:
       - kafka_b
+      - mongo
 
   demo-app:
     image: link-demo-app
@@ -379,7 +396,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8067
     ports:
-      - "8067"
+      - "8067:8067"
     build:
       context: .
       dockerfile: DotNet/MeasureEval/Dockerfile
@@ -395,7 +412,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8068
     ports:
-      - "8068"
+      - "8068:8068"
     build:
       context: .
       dockerfile: DotNet/Normalization/Dockerfile
@@ -411,7 +428,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8069
     ports:
-      - "8069"
+      - "8069:8069"
     build:
       context: .
       dockerfile: DotNet/Notification/Dockerfile
@@ -427,7 +444,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8070
     ports:
-      - "8070"
+      - "8070:8070"
     build:
       context: .
       dockerfile: DotNet/PatientsToQuery/Dockerfile
@@ -443,7 +460,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8071
     ports:
-      - "8071"
+      - "8071:8071"
     build:
       context: .
       dockerfile: DotNet/QueryDispatch/Dockerfile
@@ -459,7 +476,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8072
     ports:
-      - "8072"
+      - "8072:8072"
     build:
       context: .
       dockerfile: DotNet/Report/Dockerfile
@@ -475,7 +492,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8073
     ports:
-      - "8073"
+      - "8073:8073"
     build:
       context: .
       dockerfile: DotNet/Submission/Dockerfile
@@ -488,17 +505,23 @@ services:
     image: link-tenant
     hostname: tenant_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8074
+      ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: tenant-events
+      Serilog__WriteTo__1__Args__uri: http://loki:3100
     ports:
-      - "8074"
+      - "8074:8074"
     build:
       context: .
       dockerfile: DotNet/Tenant/Dockerfile
     networks:
       - link-nw
     depends_on:
+      - loki
       - kafka_b
+      - mssql_init
       
   # TODO: Java MeasureEval and Validation Services
 
@@ -513,4 +536,6 @@ volumes:
   mssql_data:
     driver: local
   redis_cache:
+    driver: local
+  mongo_data:
     driver: local
