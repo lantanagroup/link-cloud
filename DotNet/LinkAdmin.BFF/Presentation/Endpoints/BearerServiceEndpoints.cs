@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public void RegisterEndpoints(WebApplication app)
         {
-            var tokenEndpoints = app.MapGroup("/auth")
+            var tokenEndpoints = app.MapGroup("/api/auth")
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Link Bearer Services" } }
