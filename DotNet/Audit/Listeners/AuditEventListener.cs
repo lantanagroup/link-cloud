@@ -53,6 +53,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                 GroupId = AuditConstants.ServiceName,
                 EnableAutoCommit = false
             };
+
             using (var _consumer = _kafkaConsumerFactory.CreateConsumer(config))
             {
                 try 
