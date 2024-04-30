@@ -9,6 +9,7 @@
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<RootNamespace>LantanaGroup.Link.DataAcquisition</RootNamespace>
 		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
+		<InvariantGlobalization>true</InvariantGlobalization>
 	</PropertyGroup>
 
 	<PropertyGroup>
