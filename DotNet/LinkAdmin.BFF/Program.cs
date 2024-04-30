@@ -273,11 +273,10 @@ static void SetupMiddleware(WebApplication app)
 
     // Configure swagger
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        //var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    {       
         app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
             opts.RoutePrefix = "api/swagger";
         });
     }
@@ -290,7 +289,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization(); 
 
     // Register endpoints
-    app.MapGet("/api/info", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+    app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
