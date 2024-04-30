@@ -130,7 +130,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
     builder.Services.AddSingleton<BasicAuth>();
-    builder.Services.AddScoped<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
+    builder.Services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
 
     //Exception Handlers
     builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
