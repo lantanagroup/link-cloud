@@ -69,7 +69,12 @@ public class ConnectionValidationController : Controller
             _logger.LogError(ex, "Facility ID is required to validate connection.");
             return BadRequest("Facility ID is required to validate connection.");
         }
-        catch(MissingPatientIdOrPatientIdentifierException ex)
+        catch (MissingFacilityConfigurationException ex)
+        {
+            _logger.LogError(ex, "No configuration found for Facility ID {facilityId}.", facilityId);
+            return BadRequest($"No configuration found for Facility ID {facilityId}.");
+        }
+        catch (MissingPatientIdOrPatientIdentifierException ex)
         {
             _logger.LogError(ex, "No Patient ID or Patient Identifier was provided. One is required to validate.");
             return BadRequest("No Patient ID or Patient Identifier was provided. One is required to validate.");
