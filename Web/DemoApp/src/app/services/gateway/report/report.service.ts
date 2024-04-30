@@ -14,6 +14,7 @@ import { AppConfigService } from '../../app-config.service';
 export class ReportService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
+
   createReportConfiguration(facilityId: string, reportType: string, bundlingType: string): Observable<IEntityCreatedResponse> {
     let report: IReportConfigModel = {
       id: "",
@@ -22,7 +23,7 @@ export class ReportService {
       bundlingType: bundlingType
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/report/config`, report)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/reportconfig/Create`, report)
       .pipe(
         tap(_ => console.log(`Request for configuration creation was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -40,7 +41,7 @@ export class ReportService {
       bundlingType: bundlingType
     };
 
-    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/report/config/${reportConfigId}`, report)
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/reportconfig/Update?id=${reportConfigId}`, report)
       .pipe(
         tap(_ => console.log(`Request for configuration update was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -51,7 +52,7 @@ export class ReportService {
   }
 
   getReportConfiguration(reportConfigId: string): Observable<IReportConfigModel> {
-    return this.http.get<IReportConfigModel>(`${this.appConfigService.config?.baseApiUrl}/report/config/${reportConfigId}`)
+    return this.http.get<IReportConfigModel>(`${this.appConfigService.config?.baseApiUrl}/reportconfig/Get?id=/${reportConfigId}`)
       .pipe(
         tap(_ => console.log(`Fetched configuration.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -59,7 +60,7 @@ export class ReportService {
   }
 
   deleteReportConfiguration(reportConfigId: string): Observable<IEntityDeletedResponse> {
-    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/report/config/${reportConfigId}`)
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/reportconfig/Delete/?id=${reportConfigId}`)
       .pipe(
         tap(_ => console.log(`Request for configuration deletion was sent.`)),
         catchError((error) => this.errorHandler.handleError(error))
@@ -67,7 +68,7 @@ export class ReportService {
   }
 
   getReportConfigurations(facilityId: string): Observable<IReportConfigModel[]> {
-    return this.http.get<IReportConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/report/config/reports/${facilityId}`)
+    return this.http.get<IReportConfigModel[]>(`${this.appConfigService.config?.baseApiUrl}/reportconfig/facility/${facilityId}`)
       .pipe(
         tap(_ => console.log(`Fetched reports.`)),
         map((response: IReportConfigModel[]) => {
