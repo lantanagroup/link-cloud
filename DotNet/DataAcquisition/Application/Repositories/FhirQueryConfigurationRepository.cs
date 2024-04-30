@@ -92,6 +92,6 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
 
     public void Dispose()
     {
-        throw new NotImplementedException();
+        
     }
 }

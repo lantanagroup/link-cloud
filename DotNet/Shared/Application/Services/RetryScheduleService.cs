@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,9 +15,9 @@ namespace LantanaGroup.Link.Shared.Application.Services
         private readonly ILogger<RetryScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository _retryRepository;
+        private readonly IRetryRepository _retryRepository;
 
-        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, RetryRepository repository)
+        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IRetryRepository repository)
         {
             _logger = logger;
             _jobFactory = jobFactory;

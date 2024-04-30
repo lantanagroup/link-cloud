@@ -19,6 +19,10 @@ public class QueriedFhirResourceRepository : BaseSqlConfigurationRepo<QueriedFhi
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
+    public void Dispose()
+    {
+    }
+
     public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string facilityId, string? patientId = default, string? correlationId = default, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(patientId) && !string.IsNullOrWhiteSpace(correlationId))
