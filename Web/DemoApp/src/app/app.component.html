@@ -11,7 +11,7 @@
   <span class="toolbar-divider">Link Adminstrative Demo</span>
   <span class="example-spacer"></span>
   <span class="toolbar-divider"><theme-picker></theme-picker></span>
-  <span class="user-profile toolbar-divider"  *ngIf="userProfile?.firstName">
+  <span class="user-profile toolbar-divider"  *ngIf="userProfile?.username">
     <button mat-icon-button [matMenuTriggerFor]="userProfileMenu" aria-label="Access user profile options">
       <mat-icon class="profile-icon">account_circle</mat-icon>
     </button>
@@ -27,9 +27,9 @@
   </span>
 
 </mat-toolbar>
-<mat-drawer-container class="sidenav-container" autosize>
+<mat-drawer-container class="sidenav-container" autosize  >
   <mat-drawer #drawer mode="side" opened>
-    <mat-nav-list>
+    <mat-nav-list *ngIf="userProfile?.username">
 
       <!-- Main Dashboard -->
       <a mat-list-item routerLink="" routerLinkActive="active">
