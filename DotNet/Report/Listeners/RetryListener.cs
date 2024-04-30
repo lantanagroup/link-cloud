@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaConsumerFactory;
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository _retryRepository;
+        private readonly RetryRepository_Mongo _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.Listeners
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            RetryRepository retryRepository,
+            RetryRepository_Mongo retryRepository,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
