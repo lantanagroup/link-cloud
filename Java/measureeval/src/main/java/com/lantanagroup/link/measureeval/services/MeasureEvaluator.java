@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.hl7.fhir.r4.model.*;
@@ -15,7 +16,10 @@ import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 
 public class MeasureEvaluator {
     private static final Logger logger = LoggerFactory.getLogger(MeasureEvaluator.class);
@@ -54,7 +58,7 @@ public class MeasureEvaluator {
     }
 
     private void compile() {
-        logger.debug("Compiling measure: {}", measure.getUrl());
+        logger.info("Compiling measure: {}", measure.getUrl());
         String subject = "Patient/the-patient";
         Patient patient = new Patient();
         patient.setId(subject);
@@ -93,15 +97,24 @@ public class MeasureEvaluator {
             Bundle additionalData) {
         List<Bundle.BundleEntryComponent> entries = additionalData.getEntry();
         logger.debug(
-                "Evaluating {} from {} to {} with {} additional resources",
-                subject, periodStart, periodEnd, entries.size());
+                "Evaluating measure: MEASURE=[{}] START=[{}] END=[{}] SUBJECT=[{}] RESOURCES=[{}]",
+                measure.getUrl(), periodStart.asStringValue(), periodEnd.asStringValue(), subject, entries.size());
         if (logger.isTraceEnabled()) {
             for (int entryIndex = 0; entryIndex < entries.size(); entryIndex++) {
                 Resource resource = entries.get(entryIndex).getResource();
-                logger.trace("Resource {}: {}", entryIndex, resource.getId());
+                logger.trace("Resource {}: {}/{}", entryIndex, resource.getResourceType(), resource.getIdPart());
             }
         }
         return doEvaluate(periodStart, periodEnd, subject, additionalData);
+    }
+
+    public MeasureReport evaluate(Date periodStart, Date periodEnd, String patientId, Bundle additionalData) {
+        TimeZone utc = TimeZone.getTimeZone(ZoneOffset.UTC);
+        return evaluate(
+                new DateTimeType(periodStart, TemporalPrecisionEnum.MILLI, utc),
+                new DateTimeType(periodEnd, TemporalPrecisionEnum.MILLI, utc),
+                new StringType(new IdType(ResourceType.Patient.name(), patientId).getValue()),
+                additionalData);
     }
 
     public MeasureReport evaluate(Parameters parameters) {
