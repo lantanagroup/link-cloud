@@ -2,6 +2,7 @@
 {
     public interface ICensusServiceMetrics
     {
-        void IncrementPatientIdentifiedCounter(List<KeyValuePair<string, object?>> tags);
+        void IncrementPatientAdmittedCounter(List<KeyValuePair<string, object?>> tags);
+        void IncrementPatientDischargedCounter(List<KeyValuePair<string, object?>> tags);
     }
 }
