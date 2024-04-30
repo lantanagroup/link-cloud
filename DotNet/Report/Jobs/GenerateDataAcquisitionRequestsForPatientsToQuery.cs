@@ -12,7 +12,10 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Quartz;
 using System.Text;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -25,10 +28,11 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IMediator _mediator;
         private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly MeasureReportAggregator _aggregator;
 
         public GenerateDataAcquisitionRequestsForPatientsToQuery(ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger, 
             IKafkaProducerFactory<string, DataAcquisitionRequestedValue> dataAcquisitionProducerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, IMediator mediator, MeasureReportSubmissionBundler bundler)
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, IMediator mediator, MeasureReportSubmissionBundler bundler, MeasureReportAggregator aggregator)
         {
             _logger = logger;
             _dataAcquisitionProducerFactory = dataAcquisitionProducerFactory;
@@ -36,6 +40,7 @@ namespace LantanaGroup.Link.Report.Jobs
             _schedulerFactory = schedulerFactory;
             _mediator = mediator;
             _bundler = bundler;
+            _aggregator = aggregator;
         }
 
         private async Task<bool> readyForSubmission(string scheduleId)
@@ -141,6 +146,11 @@ namespace LantanaGroup.Link.Report.Jobs
                 else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {
                     var submissionEntries = (await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id })).ToList();
+                    
+                    var parser = new FhirJsonParser();
+                    List<MeasureReport> measureReports = submissionEntries
+                        .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                        .ToList();
 
                     var allReady = submissionEntries.All(x => x.ReadyForSubmission);
 
@@ -167,7 +177,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 {
                                     PatientIds = patientIds,
                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
-                                    Aggregates = new object() //Sean HALLP
+                                    Aggregates = _aggregator.Aggregate(measureReports)
                                 },
                                 Headers = new Headers
                                 {

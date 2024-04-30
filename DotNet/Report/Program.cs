@@ -161,6 +161,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<RetryScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
+    builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     #region Exception Handling

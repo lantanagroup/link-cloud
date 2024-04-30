@@ -34,13 +34,16 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
         private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly MeasureReportAggregator _aggregator;
+        
         private string Name => this.GetType().Name;
 
         public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
-            MeasureReportSubmissionBundler bundler)
+            MeasureReportSubmissionBundler bundler,
+            MeasureReportAggregator aggregator)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -48,8 +51,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
             _bundler = bundler;
-
-
+            _aggregator = aggregator;
+            
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
@@ -187,7 +190,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }, cancellationToken);
                                 }
 
-                                var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id });
+                                var submissionEntries = (await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id })).ToList();
 
                                 var allReady = submissionEntries.All(x => x.ReadyForSubmission);
 
@@ -196,8 +199,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
 
                                     var parser = new FhirJsonParser();
-                                    var measureReports = submissionEntries.Select(e =>
-                                        parser.Parse<MeasureReport>(e.MeasureReport)).ToList();
+                                    List<MeasureReport> measureReports = submissionEntries
+                                        .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                                        .ToList();
 
                                     using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
 
@@ -214,7 +218,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 PatientIds = patientIds,
                                                 Organization = _bundler.CreateOrganization(schedule.FacilityId),
-                                                Aggregates = new object() //Sean HALLP
+                                                Aggregates = _aggregator.Aggregate(measureReports)
                                             },
                                             Headers = new Headers
                                             {
