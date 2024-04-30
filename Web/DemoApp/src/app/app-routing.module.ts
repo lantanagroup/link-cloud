@@ -1,8 +1,5 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { LogOutComponent } from './components/logout/logout.component';
-import { CookieService } from './services/security/CookieService';
-
 
 const routes: Routes = [
   { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent)  },

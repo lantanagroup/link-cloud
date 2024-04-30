@@ -3,7 +3,6 @@ import { Injectable } from '@angular/core';
 import { Observable, Subject, firstValueFrom } from 'rxjs';
 import { IUserProfile } from '../interfaces/user-profile.interface';
 import { UserProfile } from '../models/user-pofile.model';
-import { CookieService } from './security/CookieService';
 import { SessionStorageService } from './session.service';
 
 @Injectable({
@@ -32,8 +31,8 @@ export class UserProfileService {
       return JSON.parse(profile) as IUserProfile;
     }
     else {
-      return new UserProfile('', '', '', [''], [''], ['']); 
-    } 
+      return new UserProfile('', '', '', [''], [''], ['']);
+    }
   }
 
   clearProfile() {
