@@ -19,8 +19,8 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     FacilityName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     MRPModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     MRPCreatedDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    LastModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     MonthlyReportingPlans = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ScheduledTasks = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },

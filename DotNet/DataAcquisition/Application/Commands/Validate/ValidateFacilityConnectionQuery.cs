@@ -60,7 +60,7 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
         catch(MissingFacilityConfigurationException ex)
         {
             _logger.LogError(ex, "Error getting facility connection information for facility {FacilityId}", request.FacilityId);
-            throw;
+            throw ex;
         } 
         catch(Exception ex)
         {
