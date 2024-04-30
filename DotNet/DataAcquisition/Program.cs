@@ -138,12 +138,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Repositories
     builder.Services.AddSingleton<DataAcqTenantConfigMongoRepo>();
-    builder.Services.AddSingleton<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
-    builder.Services.AddSingleton<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
-    builder.Services.AddSingleton<IQueryPlanRepository,QueryPlanRepository>();
-    builder.Services.AddSingleton<IReferenceResourcesRepository,ReferenceResourcesRepository>();
+    builder.Services.AddScoped<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
+    builder.Services.AddScoped<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
+    builder.Services.AddScoped<IQueryPlanRepository,QueryPlanRepository>();
+    builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
-    builder.Services.AddSingleton<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
+    builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
     builder.Services.AddSingleton<IRetryRepository, RetryRepository_SQL>();
 
     //Factories
