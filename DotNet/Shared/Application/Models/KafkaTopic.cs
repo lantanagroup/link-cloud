@@ -6,6 +6,8 @@ public enum KafkaTopic
 {
     DataAcquired,
     PatientIDsAcquired,
+    [StringValue("PatientIDsAcquired-Retry")]
+    PatientIDsAcquiredRetry,
     PatientAcquired,
     ResourceAcquired,
     [StringValue("ResourceAcquired-Retry")]
