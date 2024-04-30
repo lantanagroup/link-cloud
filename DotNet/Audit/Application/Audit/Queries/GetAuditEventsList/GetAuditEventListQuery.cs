@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
@@ -27,6 +28,8 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         public async Task<PagedAuditModel> Execute(AuditSearchFilterRecord searchFilter, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
+            activity?.EnrichWithAuditSearchFilter(searchFilter);
+
 
             var (result, metadata) = await _datastore.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy, 
                 searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder, 
