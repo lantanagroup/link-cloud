@@ -178,6 +178,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<CensusContext>();
+    
     //if (app.Environment.IsDevelopment())
     //{
     app.UseSwagger();
