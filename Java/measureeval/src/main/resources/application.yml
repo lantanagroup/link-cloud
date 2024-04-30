@@ -27,8 +27,12 @@ spring:
       client-id: ${spring.application.name}
 
 link:
+  reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
+
   data-acquisition:
     base-url: http://localhost:5194
     routes:
       query-result:
         path: /api/{facilityId}/QueryResult/{correlationId}
+        query:
+          - queryType={queryType}

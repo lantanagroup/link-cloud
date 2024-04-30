@@ -37,6 +37,10 @@ public class PatientReportingEvaluationStatus {
     @LastModifiedDate
     private Date modifiedDate;
 
+    public boolean hasQueryType(QueryType queryType) {
+        return resources.stream().anyMatch(resource -> resource.getQueryType() == queryType);
+    }
+
     @Getter
     @Setter
     public static class Report {
@@ -49,10 +53,10 @@ public class PatientReportingEvaluationStatus {
     @Getter
     @Setter
     public static class Resource {
+        private Boolean isPatientResource;
         private ResourceType resourceType;
         private String resourceId;
         private QueryType queryType;
-        private Boolean isPatientResource;
         private NormalizationStatus normalizationStatus;
     }
 }

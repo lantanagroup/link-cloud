@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.models.QueryResults;
+import com.lantanagroup.link.measureeval.models.QueryType;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
@@ -13,10 +14,11 @@ public class DataAcquisitionClient extends Router {
         this.restClient = restClient;
     }
 
-    public QueryResults getQueryResults(String facilityId, String correlationId) {
+    public QueryResults getQueryResults(String facilityId, String correlationId, QueryType queryType) {
         URI uri = getUri(Routes.QUERY_RESULT, Map.of(
                 "facilityId", facilityId,
-                "correlationId", correlationId));
+                "correlationId", correlationId,
+                "queryType", queryType));
         return restClient.get()
                 .uri(uri)
                 .retrieve()
