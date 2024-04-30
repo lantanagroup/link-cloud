@@ -120,7 +120,7 @@ namespace TenantTests
            .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer())
+            .Setup(p => p.CreateAuditEventProducer(false))
             .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
 
             Task<string> _updatedFacilityId = _service.UpdateFacility(Guid.Parse(id), _model, CancellationToken.None);

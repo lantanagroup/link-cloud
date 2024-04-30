@@ -1,8 +1,5 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
+﻿namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
-namespace LantanaGroup.Link.Normalization.Domain.Entities;
-
-[BsonDiscriminator("CopyElementOperation")]
 public class CopyElementOperation : INormalizationOperation
 {
     public string FacilityId { get; set; }

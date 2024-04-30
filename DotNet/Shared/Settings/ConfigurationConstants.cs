@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.Shared.Settings
         {
             public const string ServiceInformation = "ServiceInformation";
             public const string Telemetry = "Telemetry";
+            public const string CORS = "CORS";
         }
     }
 }

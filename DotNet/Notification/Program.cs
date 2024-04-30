@@ -22,6 +22,7 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
@@ -115,6 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Add HttpClients
     builder.Services.AddHttpClient<IFacilityClient, FacilityClient>();
@@ -182,10 +184,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<NotificationRequestedListener>();
 
     //Add infrastructure
-    builder.Services.AddTransient<IEmailService, EmailService>();    
+    builder.Services.AddTransient<IEmailService, EmailService>();
 
     //configure CORS
-    builder.Services.AddCorsService(builder.Environment);
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });
 
     //configure servive api security   
     var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();

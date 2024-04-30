@@ -50,10 +50,10 @@ public class QueryListener : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        await System.Threading.Tasks.Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
+        await Task.Run(() => StartConsumerLoop(cancellationToken), cancellationToken);
     }
 
-    private async System.Threading.Tasks.Task StartConsumerLoop(CancellationToken cancellationToken)
+    private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
         var settings = new ConsumerConfig
         {

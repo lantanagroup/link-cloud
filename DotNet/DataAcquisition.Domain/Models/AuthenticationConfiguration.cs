@@ -7,23 +7,23 @@ public class AuthenticationConfiguration
 {
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string AuthType { get; set; }
+    public string? AuthType { get; set; }
     
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Key { get; set; }
+    public string? Key { get; set; }
 
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string TokenUrl { get; set; }
+    public string? TokenUrl { get; set; }
 
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Audience { get; set; }
+    public string? Audience { get; set; }
 
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string ClientId { get; set; }
+    public string? ClientId { get; set; }
     
     [BsonIgnoreIfNull]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

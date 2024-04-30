@@ -1,10 +1,9 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
-using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
-[BsonCollection("queryPlan")]
+[Table("queryPlan")]
 public class QueryPlan : BaseEntity
 {
     public string PlanName { get; set; }
@@ -14,6 +13,4 @@ public class QueryPlan : BaseEntity
     public string LookBack { get; set; }
     public Dictionary<string, IQueryConfig> InitialQueries { get; set; }
     public Dictionary<string, IQueryConfig> SupplementalQueries { get; set; }
-    public DateTime? CreateDate { get; set; }
-    public DateTime? ModifyDate { get; set; }
 }

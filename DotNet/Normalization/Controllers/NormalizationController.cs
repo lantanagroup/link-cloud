@@ -3,12 +3,12 @@ using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Serializers;
-using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Normalization.Domain.Entities;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -236,7 +236,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 //auditEvent.UserId =
                 auditEvent.User = "SystemUser";
                 auditEvent.Action = type;
-                auditEvent.Resource = typeof(NormalizationConfigEntity).Name;
+                auditEvent.Resource = nameof(NormalizationConfig);
                 auditEvent.Notes = $"{type} for normalization configuration ({model.FacilityId})'.";
 
                 var headers = new Headers();
