@@ -137,7 +137,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
 
     //Repositories
-    builder.Services.AddSingleton<DataAcqTenantConfigMongoRepo>();
     builder.Services.AddScoped<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
     builder.Services.AddScoped<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
     builder.Services.AddScoped<IQueryPlanRepository,QueryPlanRepository>();
