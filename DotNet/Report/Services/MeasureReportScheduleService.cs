@@ -93,10 +93,10 @@ namespace LantanaGroup.Link.Report.Services
 
             return TriggerBuilder
                 .Create()
-                .StartAt(offset)
                 .ForJob(jobKey)
+                .StartAt(offset)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithDescription($"{reportSchedule.FacilityId}-{reportSchedule.ReportType}-{reportSchedule.ReportEndDate.ToShortDateString()}")
+                .WithDescription($"{reportSchedule.Id}-{reportSchedule.ReportEndDate}")
                 .UsingJobData(jobDataMap)
                 .Build();
         }
