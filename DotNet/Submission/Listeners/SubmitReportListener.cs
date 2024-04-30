@@ -88,14 +88,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                             facilityId = key.FacilityId;
 
                             if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                string.IsNullOrWhiteSpace(key.ReportType) ||
-                                string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
+                                key.StartDate == null ||
+                                key.EndDate == null)
                             {
                                 throw new DeadLetterException(
                                     $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
                             }
 
-                            string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
+                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl = "";
+                            string requestUrl = _submissionConfig.ReportServiceUrl + $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
 
                             var response = await _httpClient.CreateClient().GetAsync(requestUrl, cancellationToken);
                             var measureReportSubmissionBundle =

@@ -3,5 +3,6 @@
     public class SubmissionServiceConfig
     {
         public string ReportServiceUrl { get; set; } = null!;
+        public string CensusAdmittedPatientsUrl { get; set; } = null!;
     }
 }
