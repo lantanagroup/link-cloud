@@ -26,11 +26,15 @@ public class QueryResultController : ControllerBase
     /// <param name="correlationId"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpGet("patientId")]
-    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(string facilityId, string patientId, [FromQuery] string correlationId, CancellationToken cancellationToken)
+    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(string facilityId, CancellationToken cancellationToken, string? patientId = null, string? correlationId = null)
     {
         try
         {
+            if (patientId == null && correlationId == null)
+            {
+                return BadRequest("PatientId or CorrelationId parameter required");
+            }
+
             return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { FacilityId = facilityId, PatientId = patientId, CorrelationId = correlationId }, cancellationToken));
         }
         catch (Exception ex)
