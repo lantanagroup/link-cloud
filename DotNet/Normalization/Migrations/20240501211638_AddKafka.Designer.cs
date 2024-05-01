@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Normalization.Migrations
 {
     [DbContext(typeof(NormalizationDbContext))]
-    partial class NormalizationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240501211638_AddKafka")]
+    partial class AddKafka
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,7 +97,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("RetryEvent");
+                    b.ToTable("kafkaRetryTbl");
                 });
 #pragma warning restore 612, 618
         }

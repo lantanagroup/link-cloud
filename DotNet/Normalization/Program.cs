@@ -176,9 +176,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
-    //Serilog.Debugging.SelfLog.Enable(Console.Error);  
-    // Add services to the container.
-
     //Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database");
@@ -191,8 +188,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
     builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
-
-    //builder.Services.AddSwaggerGen();
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
