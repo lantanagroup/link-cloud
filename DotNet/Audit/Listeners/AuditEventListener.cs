@@ -2,7 +2,7 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Interfaces;
-using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;

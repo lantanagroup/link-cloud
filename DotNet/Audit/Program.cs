@@ -30,12 +30,14 @@ using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Audit.Persistance.Interceptors;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -164,7 +166,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
-    builder.Services.AddScoped<ISearchRepository, MsSqlAuditLogSearchRepository>();
+    builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
+    builder.Services.AddScoped<IRetryRepository, AuditLogRetryRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()
