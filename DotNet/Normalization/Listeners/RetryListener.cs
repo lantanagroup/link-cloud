@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
         private readonly IOptions<ServiceInformation> _serviceInformation;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository_Mongo _retryRepository;
+        private readonly IRetryRepository _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
@@ -31,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             IOptions<ServiceInformation> serviceInformation,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            RetryRepository_Mongo retryRepository,
+            IRetryRepository retryRepository,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
