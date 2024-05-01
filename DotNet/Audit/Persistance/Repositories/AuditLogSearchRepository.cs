@@ -7,12 +7,12 @@ using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Audit.Persistance.Repositories
 {
-    public class MsSqlAuditLogSearchRepository : ISearchRepository
+    public class AuditLogSearchRepository : ISearchRepository
     {
         private readonly ILogger<AuditLogRepository> _logger;
         private readonly AuditDbContext _dbContext;
 
-        public MsSqlAuditLogSearchRepository(ILogger<AuditLogRepository> logger, AuditDbContext dbContext)
+        public AuditLogSearchRepository(ILogger<AuditLogRepository> logger, AuditDbContext dbContext)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));

@@ -2,9 +2,9 @@
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
-using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Models;
-using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+
 
 namespace LantanaGroup.Link.Audit.Application.Factory
 {
