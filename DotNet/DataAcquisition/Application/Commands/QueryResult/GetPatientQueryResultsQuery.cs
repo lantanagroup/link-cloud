@@ -26,13 +26,20 @@ public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQuer
     public async Task<QueryResultsModel> Handle(GetPatientQueryResultsQuery request, CancellationToken cancellationToken)
     {
         var resultSet = await _queriedFhirResourceRepository.GetQueryResultsAsync(request.FacilityId, request.PatientId, request.CorrelationId, cancellationToken);
+
         var queryResults = new QueryResultsModel();
-        resultSet.ForEach(x => queryResults.QueryResults.Add(new Models.QueryResult
+
+        if (resultSet != null && resultSet.Count > 0)
         {
-            QueryType = x.QueryType,
-            ResourceId = x.ResourceId,
-            ResourceType = x.ResourceType
-        }));
+            queryResults.PatientId = resultSet.Select(x => x.PatientId).FirstOrDefault();
+            resultSet.ForEach(x => queryResults.QueryResults.Add(new Models.QueryResult
+            {
+                QueryType = x.QueryType,
+                ResourceId = x.ResourceId,
+                ResourceType = x.ResourceType
+            }));
+        }
+
         return queryResults;
     }
 }
