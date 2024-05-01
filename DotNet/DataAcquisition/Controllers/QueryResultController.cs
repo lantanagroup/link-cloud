@@ -21,21 +21,20 @@ public class QueryResultController : ControllerBase
     /// <summary>
     /// Get query results for a patient
     /// </summary>
-    /// <param name="facilityId"></param>
-    /// <param name="patientId"></param>
     /// <param name="correlationId"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(string facilityId, CancellationToken cancellationToken, string? patientId = null, string? correlationId = null)
+    [HttpGet("{correlationId}")]
+    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(CancellationToken cancellationToken, string correlationId, string? queryType)
     {
+        if (string.IsNullOrWhiteSpace(correlationId)) 
+        {
+            return BadRequest("Correlation Id is empty");
+        }
+
         try
         {
-            if (patientId == null && correlationId == null)
-            {
-                return BadRequest("PatientId or CorrelationId parameter required");
-            }
-
-            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { FacilityId = facilityId, PatientId = patientId, CorrelationId = correlationId }, cancellationToken));
+            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType }, cancellationToken));
         }
         catch (Exception ex)
         {
