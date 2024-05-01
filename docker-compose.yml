@@ -156,7 +156,7 @@ services:
     networks:
       - link-nw
       
-  init-kafka:
+  kafka_init:
     image: confluentinc/cp-kafka:6.1.1
     depends_on:
       - kafka_b
@@ -220,7 +220,6 @@ services:
       kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
       kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
-
       "
       
   kafka-ui:
@@ -288,7 +287,7 @@ services:
     depends_on:
       - loki
       - pg_db
-      - kafka_b
+      - kafka_init
 
   audit:
     image: link-audit
@@ -308,7 +307,7 @@ services:
       - link-nw
     depends_on:
       - loki
-      - kafka_b
+      - kafka_init
       - mssql
       - mssql_init
       
@@ -351,7 +350,7 @@ services:
       - link-nw
     depends_on:
       - loki
-      - kafka_b
+      - kafka_init
       - mssql_init
       - tenant
 
@@ -374,7 +373,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
       - mongo
 
   demo-app:
@@ -402,7 +401,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
       
   normalization:
     image: link-normalization
@@ -422,7 +421,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
       
   notification:
     image: link-notification
@@ -438,7 +437,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
       
   patientquery:
     image: link-patientquery
@@ -454,7 +453,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
       
   querydispatch:
     image: link-querydispatch
@@ -470,7 +469,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
 
   report:
     image: link-report
@@ -486,7 +485,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
 
   submission:
     image: link-submission
@@ -502,7 +501,7 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
+      - kafka_init
 
   tenant:
     image: link-tenant
@@ -523,7 +522,7 @@ services:
       - link-nw
     depends_on:
       - loki
-      - kafka_b
+      - kafka_init
       - mssql_init
       
   # TODO: Java MeasureEval and Validation Services
