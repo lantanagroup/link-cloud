@@ -1,8 +1,6 @@
-﻿using System.Collections.Immutable;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Entities;
+﻿using Hl7.Fhir.Model;
 using Serilog;
+using System.Collections.Immutable;
 
 namespace LantanaGroup.Link.Report.Core;
 
@@ -51,8 +49,8 @@ public class MeasureReportAggregator
                 
                 foreach (MeasureReport.PopulationComponent indPopulation in indGroup.Population)
                 {
-                    MeasureReport.PopulationComponent aggregatePopulation = getOrCreateGroupAndPopulation(aggregate, indGroup, indPopulation);
-                    List list = getOrCreateContainedList(aggregate, aggregatePopulation);
+                    MeasureReport.PopulationComponent aggregatePopulation = GetOrCreateGroupAndPopulation(aggregate, indGroup, indPopulation);
+                    List list = GetOrCreateContainedList(aggregate, aggregatePopulation);
                     
                     aggregatePopulation.Count += indPopulation.Count;
                     list.Entry.Add(new List.EntryComponent()
@@ -66,7 +64,7 @@ public class MeasureReportAggregator
         return aggregates;
     }
 
-    private List getOrCreateContainedList(MeasureReport aggregate, MeasureReport.PopulationComponent population)
+    private List GetOrCreateContainedList(MeasureReport aggregate, MeasureReport.PopulationComponent population)
     {
         if (aggregate is null)
             throw new ArgumentNullException(nameof(aggregate));
@@ -92,7 +90,7 @@ public class MeasureReportAggregator
         return list;
     }
     
-    private MeasureReport.PopulationComponent getOrCreateGroupAndPopulation(MeasureReport aggregate, MeasureReport.GroupComponent indGroup, MeasureReport.PopulationComponent indPopulation)
+    private MeasureReport.PopulationComponent GetOrCreateGroupAndPopulation(MeasureReport aggregate, MeasureReport.GroupComponent indGroup, MeasureReport.PopulationComponent indPopulation)
     {
         if (aggregate is null)
         {

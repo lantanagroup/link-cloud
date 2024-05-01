@@ -203,6 +203,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                         .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
                                         .ToList();
 
+                                    var patientReportIds = new Dictionary<string, List<string>>();
+                                    foreach (var subEntry in submissionEntries)
+                                    {
+                                        if (!patientReportIds.TryAdd(subEntry.PatientId,
+                                                new List<string>() { subEntry.MeasureReportScheduleId }))
+                                        {
+                                            patientReportIds[subEntry.PatientId].Add(subEntry.MeasureReportScheduleId);
+                                        }
+                                    }
+
                                     using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
 
                                     prod.Produce(nameof(KafkaTopic.SubmitReport),
@@ -217,6 +227,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             Value = new SubmissionReportValue()
                                             {
                                                 PatientIds = patientIds,
+                                                PatientReportIds = patientReportIds,
                                                 Organization = _bundler.CreateOrganization(schedule.FacilityId),
                                                 Aggregates = _aggregator.Aggregate(measureReports)
                                             },

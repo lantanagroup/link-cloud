@@ -8,6 +8,7 @@ using LantanaGroup.Link.Submission.Application.Models;
 using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -95,12 +96,27 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
                             }
 
-                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl = "";
-                            string requestUrl = _submissionConfig.ReportServiceUrl + $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
+                            var httpClient = _httpClient.CreateClient();
+                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl + $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
+                            var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
+                            var admittedPatients = JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(await censusResponse.Content.ReadAsStringAsync(cancellationToken));
 
-                            var response = await _httpClient.CreateClient().GetAsync(requestUrl, cancellationToken);
-                            var measureReportSubmissionBundle =
-                                JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(await response.Content.ReadAsStringAsync(cancellationToken));
+                            string dataAcqRequestUrl = _submissionConfig.DataAcquisitionQueryPlanUrl + $"/{key.FacilityId}/QueryPlans";
+                            var dataAcqResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
+                            var queryPlans = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+
+                            foreach (var patientId in value.PatientIds)
+                            {
+                                foreach (var reportId in value.PatientReportIds[patientId])
+                                {
+                                    string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={reportId}";
+                                    var response = await httpClient.GetAsync(requestUrl, cancellationToken);
+
+                                    var measureReportSubmissionBundle =
+                                        JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
+                                            await response.Content.ReadAsStringAsync(cancellationToken));
+                                }
+                            }
 
                             #region File IO
                             string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
