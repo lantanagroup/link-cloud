@@ -6,6 +6,8 @@ public enum KafkaTopic
 {
     DataAcquired,
     PatientIDsAcquired,
+    [StringValue("PatientIDsAcquired-Retry")]
+    PatientIDsAcquiredRetry,
     PatientAcquired,
     ResourceAcquired,
     [StringValue("ResourceAcquired-Retry")]
@@ -14,6 +16,8 @@ public enum KafkaTopic
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
     DataAcquisitionRequested,
+    [StringValue("DataAcquisitionRequested-Retry")]
+    DataAcquisitionRequestedRetry,
     DataAcquisitionFailed,
     PatientDataEvaluated,
     PatientNormalized,
@@ -34,6 +38,8 @@ public enum KafkaTopic
     AuditableEventOccurredRetry,
     NotificationRequested,
     PatientCensusScheduled,
+    [StringValue("PatientCensusScheduled-Retry")]
+    PatientCensusScheduledRetry,
     PatientEvent,
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
