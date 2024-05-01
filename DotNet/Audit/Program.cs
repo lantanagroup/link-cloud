@@ -38,6 +38,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -130,10 +131,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     //Add dead letter exception handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, IDeadLetterExceptionHandler<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, IDeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, DeadLetterExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
