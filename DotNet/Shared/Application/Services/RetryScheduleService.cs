@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
@@ -15,23 +16,27 @@ namespace LantanaGroup.Link.Shared.Application.Services
         private readonly ILogger<RetryScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IRetryRepository _retryRepository;
 
-        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IRetryRepository repository)
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        public RetryScheduleService(ILogger<RetryScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _jobFactory = jobFactory;
             _schedulerFactory = schedulerFactory;
-            _retryRepository = repository;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
+            var retryRepository = _serviceScopeFactory.CreateScope().ServiceProvider
+                .GetRequiredService<IRetryRepository>();
+
             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
             scheduler.JobFactory = _jobFactory;
 
-            var retries = await _retryRepository.GetAllAsync(cancellationToken);
+            var retries = await retryRepository.GetAllAsync(cancellationToken);
 
             foreach (var retry in retries)
             {
