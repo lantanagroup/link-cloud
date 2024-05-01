@@ -4,11 +4,13 @@ using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 using StackExchange.Redis;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Shared.Application.Models
 {
     [BsonCollection("retryEntity")]
     [BsonIgnoreExtraElements]
+    [Table("kafkaRetryTbl")]
     public class RetryEntity : BaseEntity
     {
         public string ServiceName { get; set; }
