@@ -7,9 +7,8 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResult;
 
 public class GetPatientQueryResultsQuery : IRequest<QueryResultsModel>
 {
-    public string FacilityId { get; set; }
-    public string PatientId { get; set; }
     public string CorrelationId { get; set; }
+    public string QueryType { get; set; }
 }
 
 public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQueryResultsQuery, QueryResultsModel>
@@ -25,7 +24,18 @@ public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQuer
 
     public async Task<QueryResultsModel> Handle(GetPatientQueryResultsQuery request, CancellationToken cancellationToken)
     {
-        var resultSet = await _queriedFhirResourceRepository.GetQueryResultsAsync(request.FacilityId, request.PatientId, request.CorrelationId, cancellationToken);
+        string queryType = request.QueryType;
+        
+        if (string.Equals(queryType, "initial", StringComparison.InvariantCultureIgnoreCase))
+        {
+            queryType = QueryPlanType.InitialQueries.ToString();
+        }
+        else if (string.Equals(queryType, "supplemental", StringComparison.InvariantCultureIgnoreCase))
+        {
+            queryType = QueryPlanType.SupplementalQueries.ToString();
+        }
+
+        var resultSet = await _queriedFhirResourceRepository.GetQueryResultsAsync(request.CorrelationId, request.QueryType);
 
         var queryResults = new QueryResultsModel();
 

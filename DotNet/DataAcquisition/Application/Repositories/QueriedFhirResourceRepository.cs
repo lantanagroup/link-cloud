@@ -23,24 +23,15 @@ public class QueriedFhirResourceRepository : BaseSqlConfigurationRepo<QueriedFhi
     {
     }
 
-    public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string facilityId, string? patientId = default, string? correlationId = default, CancellationToken cancellationToken = default)
+    public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string correlationId, string queryType)
     {
-        if (!string.IsNullOrWhiteSpace(patientId) && !string.IsNullOrWhiteSpace(correlationId))
+        var query = _dbContext.QueriedFhirResources.Where(x => x.CorrelationId == correlationId);
+
+        if (!string.IsNullOrWhiteSpace(queryType))
         {
-            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.PatientId == patientId && x.CorrelationId == correlationId).ToListAsync();
+            query.Where(x => x.QueryType == queryType);
         }
 
-        if (!string.IsNullOrWhiteSpace(patientId) && string.IsNullOrWhiteSpace(correlationId))
-        {
-            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.PatientId == patientId).ToListAsync();
-        }
-
-        if (string.IsNullOrWhiteSpace(patientId) && !string.IsNullOrWhiteSpace(correlationId))
-        {
-            return await _dbContext.QueriedFhirResources.Where(x => x.FacilityId == facilityId && x.CorrelationId == correlationId).ToListAsync();
-        }
-
-        _logger.LogWarning("Parameters passed to GetQueryResultsAsync are invalid. Please provide at least one valid parameter.\n facilityId: {1} \n patientId: {2} \n correlationId: {3}", facilityId, patientId, correlationId);
-        return null;
+        return await query.ToListAsync();
     }
 }
