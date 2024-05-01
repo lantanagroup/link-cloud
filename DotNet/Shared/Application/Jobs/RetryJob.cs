@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -17,12 +18,12 @@ namespace LantanaGroup.Link.Shared.Jobs
         private readonly ILogger<RetryJob> _logger;
         private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository_Mongo _retryRepository;
+        private readonly IRetryRepository _retryRepository;
 
         public RetryJob(ILogger<RetryJob> logger,
             IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
             ISchedulerFactory schedulerFactory,
-            RetryRepository_Mongo retryRepository)
+            IRetryRepository retryRepository)
         {
             _logger = logger;
             _retryKafkaProducerFactory = retryKafkaProducerFactory;
