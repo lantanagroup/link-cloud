@@ -69,34 +69,7 @@ namespace LantanaGroup.Link.Shared.Jobs
 
                     producer.Flush();
                 }
-
-                using (var producer = _retryKafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: false))
-                {
-                    try
-                    {
-                        var val = new AuditEventMessage
-                        {
-                            FacilityId = retryEntity.FacilityId,
-                            ServiceName = retryEntity.ServiceName,
-                            Action = AuditEventType.Create,
-                            EventDate = DateTime.UtcNow,
-                            Resource = retryEntity.Topic,
-                            Notes = retryEntity.JobId
-                        };
-
-                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                            new Message<string, AuditEventMessage>
-                            {
-                                Value = val,
-                                Headers = headers
-                            });
-                        producer.Flush();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Failed to generate a {nameof(KafkaTopic.AuditableEventOccurred)} message");
-                    }
-                }
+                
             }
             catch (Exception ex)
             {

@@ -45,6 +45,8 @@ using Quartz.Impl;
 using Quartz;
 using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using Quartz.Spi;
+using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Audit.Infrastructure.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -136,8 +138,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IGetAuditEventListQuery, GetAuditEventListQuery>();
 
     //Add factories
-    builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
-    builder.Services.AddSingleton<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IAuditFactory, AuditFactory>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();    
@@ -146,19 +148,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, AuditDeadLetterExceptionHandler<string, AuditEventMessage>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, AuditDeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, AuditTransientExceptionHandler<string, AuditEventMessage>>();
-
-    //Add Hosted Services
-    builder.Services.AddHostedService<AuditEventListener>();
-
-    var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
-    {
-        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
-        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-        builder.Services.AddHostedService<RetryListener>();
-        builder.Services.AddHostedService<RetryScheduleService>();
-        builder.Services.AddTransient<IJobFactory, JobFactory>();
-    }    
+        
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -190,6 +180,21 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
     builder.Services.AddScoped<IRetryRepository, AuditLogRetryRepository>();
+
+    //Add Hosted Services
+    builder.Services.AddHostedService<AuditEventListener>();
+
+    var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddTransient<IJobFactory, JobFactory>();
+        builder.Services.AddTransient<AuditRetryJob>();
+
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+    }
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -247,7 +252,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
                     .Filter.ByExcluding("RequestPath like '/swagger%'")
-                    .Enrich.WithExceptionDetails()
+                    //.Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()                  
                     .Enrich.With<ActivityEnricher>()
