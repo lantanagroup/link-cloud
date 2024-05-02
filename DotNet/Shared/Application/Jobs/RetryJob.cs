@@ -2,10 +2,9 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
-using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using System.Text;
@@ -18,23 +17,31 @@ namespace LantanaGroup.Link.Shared.Jobs
         private readonly ILogger<RetryJob> _logger;
         private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IRetryRepository _retryRepository;
+        //private readonly IRetryRepository _retryRepository;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public RetryJob(ILogger<RetryJob> logger,
             IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
             ISchedulerFactory schedulerFactory,
-            IRetryRepository retryRepository)
+            //IRetryRepository retryRepository)
+            IServiceScopeFactory serviceScopeFactory
+            )
         {
             _logger = logger;
             _retryKafkaProducerFactory = retryKafkaProducerFactory;
             _schedulerFactory = schedulerFactory;
-            _retryRepository = retryRepository;
+            _serviceScopeFactory = serviceScopeFactory;
+            //_retryRepository = retryRepository;
         }
 
         public async Task Execute(IJobExecutionContext context)
         {
             try
             {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _retryRepository = scope.ServiceProvider
+                    .GetRequiredService<IRetryRepository>();
+
                 var triggerMap = context.Trigger.JobDataMap;
                 var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
 
