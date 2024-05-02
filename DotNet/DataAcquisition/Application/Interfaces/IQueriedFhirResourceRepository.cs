@@ -5,5 +5,5 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
 public interface IQueriedFhirResourceRepository : IMongoDbRepository<QueriedFhirResourceRecord>, IDisposable
 {
-    Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string correlationId, string queryType);
+    Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string correlationId, string queryType, bool successOnly);
 }

@@ -23,9 +23,11 @@ public class QueryResultController : ControllerBase
     /// </summary>
     /// <param name="correlationId"></param>
     /// <param name="cancellationToken"></param>
+    /// <param name="queryType"></param>
+    /// <param name="SuccessOnly"></param>
     /// <returns></returns>
     [HttpGet("{correlationId}")]
-    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(CancellationToken cancellationToken, string correlationId, string? queryType)
+    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(CancellationToken cancellationToken, [FromRoute]string correlationId, string? queryType, bool SuccessOnly = true)
     {
         if (string.IsNullOrWhiteSpace(correlationId)) 
         {
@@ -34,7 +36,7 @@ public class QueryResultController : ControllerBase
 
         try
         {
-            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType }, cancellationToken));
+            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType, SuccessOnly = SuccessOnly }, cancellationToken));
         }
         catch (Exception ex)
         {

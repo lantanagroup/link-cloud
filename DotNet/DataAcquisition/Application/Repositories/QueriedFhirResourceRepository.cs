@@ -23,13 +23,18 @@ public class QueriedFhirResourceRepository : BaseSqlConfigurationRepo<QueriedFhi
     {
     }
 
-    public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string correlationId, string queryType)
+    public async Task<List<QueriedFhirResourceRecord>> GetQueryResultsAsync(string correlationId, string queryType, bool successOnly)
     {
         var query = _dbContext.QueriedFhirResources.Where(x => x.CorrelationId == correlationId);
 
+        if (successOnly)
+        {
+            query = query.Where(x => x.IsSuccessful == true);
+        }
+
         if (!string.IsNullOrWhiteSpace(queryType))
         {
-            query.Where(x => x.QueryType == queryType);
+            query = query.Where(x => x.QueryType == queryType);
         }
 
         return await query.ToListAsync();
