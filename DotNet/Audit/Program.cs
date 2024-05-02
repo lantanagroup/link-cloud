@@ -38,7 +38,13 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.DeadLetter;
+using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.Transient;
+using LantanaGroup.Link.Shared.Application.Services;
+using Quartz.Impl;
+using Quartz;
+using LantanaGroup.Link.Audit.Application.Retry.Commands;
+using Quartz.Spi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,6 +128,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add commands
     builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
+    builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
 
     //Add queries
     builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
@@ -131,15 +138,27 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddSingleton<IAuditFactory, AuditFactory>();
     builder.Services.AddSingleton<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();    
 
-    //Add dead letter exception handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, DeadLetterExceptionHandler<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    //Add event exception handlers
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, AuditDeadLetterExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, AuditDeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, AuditTransientExceptionHandler<string, AuditEventMessage>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();
+
+    var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+        builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddTransient<IJobFactory, JobFactory>();
+    }    
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
