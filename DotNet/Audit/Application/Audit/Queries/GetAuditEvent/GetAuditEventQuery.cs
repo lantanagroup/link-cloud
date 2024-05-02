@@ -2,6 +2,8 @@
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
@@ -27,7 +29,10 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// <exception cref="ApplicationException"></exception>
         public async Task<AuditModel> Execute(AuditId id, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Audit Event By Id Query");            
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Get Audit Event By Id Query",
+            [
+                new KeyValuePair<string, object?>(DiagnosticNames.AuditId, id)
+            ]);            
             
             var result = await _datastore.GetAsync(id, true, cancellationToken);
             AuditModel? auditEvent = null;

@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using MediatR;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
@@ -56,8 +57,10 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                 patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
 
-                _metrics.IncrementPatientIdentifiedCounter([ 
-                    new KeyValuePair<string, object?>("facility", request.FacilityId)                     
+                _metrics.IncrementPatientAdmittedCounter([ 
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Admit.ToString())
                 ]);
             }
         }
@@ -70,7 +73,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
                 patient.ModifyDate = DateTime.UtcNow;
-                patientUpdates.Add(patient);
+                patientUpdates.Add(patient);                
             }
         }
 
@@ -92,6 +95,12 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                     },
                     TopicName = KafkaTopic.PatientEvent.ToString()
                 });
+
+                _metrics.IncrementPatientDischargedCounter([
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString())
+                ]);
             }
         }
 
