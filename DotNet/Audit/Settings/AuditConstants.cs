@@ -41,7 +41,9 @@
             public const int EventConsumerInit = 2000;
             public const int EventConsumerObserved = 2001;
             public const int EventConsumerException = 2002;
-            public const int EventConsumerOperationCanceled = 2003;            
+            public const int EventConsumerOperationCanceled = 2003;
+            public const int DeadLetterException = 2004;
+            public const int TransientException = 2005;
             public const int HealthCheck = 9000;
         }
     }

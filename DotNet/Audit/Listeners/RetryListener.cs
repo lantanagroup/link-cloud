@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -7,9 +8,8 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
@@ -24,20 +24,20 @@ namespace LantanaGroup.Link.Audit.Listeners
         private readonly ILogger<RetryListener> _logger;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IRetryRepository _retryRepository;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
-        private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;        
 
-        public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, ISchedulerFactory schedulerFactory, IRetryRepository retryRepository, IOptions<ConsumerSettings> consumerSettings, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
+        public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, ISchedulerFactory schedulerFactory, IOptions<ConsumerSettings> consumerSettings, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
+            _scopeFactory = scopeFactory ?? throw new ArgumentException(nameof(scopeFactory));
             _consumerSettings = consumerSettings ?? throw new ArgumentException(nameof(consumerSettings));
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
-            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));      
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Audit.Listeners
 
             try
             {
-                _consumer.Subscribe(nameof(KafkaTopic.AuditableEventOccurredRetry));
+                _consumer.Subscribe(KafkaTopic.AuditableEventOccurredRetry.GetStringValue());
                 _logger.LogConsumerStarted(nameof(KafkaTopic.AuditableEventOccurredRetry), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -93,7 +93,16 @@ namespace LantanaGroup.Link.Audit.Listeners
 
                             var retryEntity = _retryEntityFactory.CreateRetryEntity(result, _consumerSettings.Value);
 
-                            await _retryRepository.AddAsync(retryEntity, cancellationToken);
+                            using (var scope = _scopeFactory.CreateScope())
+                            {
+                                var _createRetryCommand = scope.ServiceProvider.GetRequiredService<ICreateRetryEntity>();
+                                bool outcome = await _createRetryCommand.Execute(retryEntity, cancellationToken);
+
+                                if(!outcome)
+                                {
+                                    throw new Exception("Failed to create retry entity");
+                                }
+                            }                            
 
                             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 

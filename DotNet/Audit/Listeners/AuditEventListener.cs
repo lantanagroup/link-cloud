@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
@@ -23,8 +24,9 @@ namespace LantanaGroup.Link.Audit.Listeners
         private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
         private readonly IDeadLetterExceptionHandler<string, AuditEventMessage> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumerExceptionDeadLetterHandler;
+        private readonly ITransientExceptionHandler<string, AuditEventMessage> _transientExceptionHandler;
 
-        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory<string, AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumerExceptionDeadLetterHandler)
+        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory<string, AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumerExceptionDeadLetterHandler, ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
@@ -32,6 +34,7 @@ namespace LantanaGroup.Link.Audit.Listeners
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
             _consumerExceptionDeadLetterHandler = consumerExceptionDeadLetterHandler ?? throw new ArgumentNullException(nameof(consumerExceptionDeadLetterHandler));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
 
             //configure deadletter exception handlers
             _deadLetterExceptionHandler.ServiceName = AuditConstants.ServiceName;
@@ -39,6 +42,11 @@ namespace LantanaGroup.Link.Audit.Listeners
 
             _consumerExceptionDeadLetterHandler.ServiceName = AuditConstants.ServiceName;
             _consumerExceptionDeadLetterHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
+
+            //configure transient exception handler
+            _transientExceptionHandler.ServiceName = AuditConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Retry";
+
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,7 +77,7 @@ namespace LantanaGroup.Link.Audit.Listeners
 
                                 try
                                 {
-                                    if (result is null || string.IsNullOrEmpty(result.Message.Key))
+                                    if (result is null)
                                     {
                                         throw new DeadLetterException("Invalid Auditable Event", AuditEventType.Create);
                                     }
@@ -87,10 +95,20 @@ namespace LantanaGroup.Link.Audit.Listeners
 
                                     //create scoped create audit event command
                                     //deals with issue of non-singleton services being used within singleton hosted service
-                                    using (var scope = _scopeFactory.CreateScope())
+                                    try
                                     {
-                                        var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
-                                        _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
+                                        throw new Exception("ooopsies");
+                                        using (var scope = _scopeFactory.CreateScope())
+                                        {
+                                            var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
+                                            _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                        Activity.Current?.RecordException(ex);
+                                        throw new TransientException($"Unable to create audit log entry", AuditEventType.Create);
                                     }
 
                                     //consume the result and offset
@@ -104,8 +122,15 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
                                     _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
                                     _consumer.Commit(result);                                    
-                                }                                
-                                
+                                }
+                                catch (TransientException ex)
+                                {
+                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                    Activity.Current?.RecordException(ex);                                   
+                                    _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
+                                    _consumer.Commit(result);
+                                }
+
                             }, cancellationToken);          
 
                         }                        
