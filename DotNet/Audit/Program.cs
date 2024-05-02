@@ -46,7 +46,6 @@ using Quartz;
 using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Audit.Infrastructure.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -190,7 +189,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
         builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
         builder.Services.AddTransient<IJobFactory, JobFactory>();
-        builder.Services.AddTransient<AuditRetryJob>();
+        builder.Services.AddTransient<RetryJob>();
 
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
