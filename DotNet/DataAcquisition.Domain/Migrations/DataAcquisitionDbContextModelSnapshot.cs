@@ -92,7 +92,6 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CorrelationId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("CreateDate")
@@ -109,19 +108,15 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("PatientId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("QueryType")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceType")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
