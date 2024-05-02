@@ -3,6 +3,7 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Census;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
@@ -115,7 +116,7 @@ public class QueryListener : BackgroundService
 
                                 if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                                 {
-                                    throw new TransientException("Facility ID is null or empty", AuditEventType.Query);
+                                    throw new DeadLetterException("Facility ID is null or empty", AuditEventType.Query);
                                 }
 
                                 try
@@ -135,11 +136,14 @@ public class QueryListener : BackgroundService
                                         _ => null
                                     };
                                 }
+                                catch(MissingFacilityConfigurationException ex)
+                                {
+                                    throw new TransientException("Facility configuration is missing: " + ex.Message, AuditEventType.Query, ex);
+                                }
                                 catch (Exception ex)
                                 {
-                                    throw new DeadLetterException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new TransientException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
                                 }
-
                             }
 
                             if (responseMessages?.Count > 0)
