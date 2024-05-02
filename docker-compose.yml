@@ -443,8 +443,10 @@ services:
     image: link-patientquery
     hostname: patientquery_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8070
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: patientquery-events
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8070:8070"
     build:
