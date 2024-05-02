@@ -1,20 +1,16 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson.IO;
-using Newtonsoft.Json;
 using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -81,7 +77,8 @@ public class QueryPlanConfigController : Controller
                 facilityId,
                 AuditEventType.Query,
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", facilityId);
+            throw;
         }
     }
 
@@ -155,7 +152,8 @@ public class QueryPlanConfigController : Controller
                 facilityId, 
                 AuditEventType.Create, 
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "CreateQueryPlan"), ex, "An exception occurred while attempting to create a query place with a facility id of {id}", facilityId);
+            throw;
         }
     }
 
@@ -234,7 +232,8 @@ public class QueryPlanConfigController : Controller
                 facilityId,
                 AuditEventType.Update,
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateQueryPlan"), ex, "An exception occurred while attempting to update a query place with a facility id of {id}", facilityId);
+            throw;
         }
     }
 
@@ -287,7 +286,8 @@ public class QueryPlanConfigController : Controller
                 facilityId,
                 AuditEventType.Query,
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteQueryPlan"), ex, "An exception occurred while attempting to delete a query place with a facility id of {id}", facilityId);
+            throw;
         }
     }
 

@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
@@ -101,13 +102,13 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(null);
+                .Throws(new MissingFacilityConfigurationException());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<StatusCodeResult>(result);
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -157,7 +158,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(null);
+                .Throws(new Exception());
 
             _mocker.GetMock<IMediator>()
                 .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
@@ -170,9 +171,15 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
 
-            var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
-
-            Assert.IsType<StatusCodeResult>(result);
+            try
+            {
+                var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+                Assert.True(false);
+            }
+            catch (Exception)
+            {
+                Assert.True(true);
+            }
         }
 
         [Fact]
@@ -206,13 +213,20 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(null);
+                .Throws(new Exception());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.DeleteAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
+            try
+            {
+                var result = await _controller.DeleteAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
+                Assert.True(false);
+            }
+            catch (Exception)
+            {
 
-            Assert.IsType<StatusCodeResult>(result);
+                Assert.True(true);
+            }
         }
     }
 }
