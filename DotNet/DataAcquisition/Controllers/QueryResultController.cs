@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResult;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,15 +20,24 @@ public class QueryResultController : ControllerBase
     }
 
     /// <summary>
-    /// Get query results for a patient
+    /// Get query results for a correlation Id
     /// </summary>
     /// <param name="correlationId"></param>
     /// <param name="cancellationToken"></param>
     /// <param name="queryType"></param>
-    /// <param name="SuccessOnly"></param>
-    /// <returns></returns>
+    /// <param name="successOnly"></param>
+    /// <returns>
+    /// Success: 200
+    /// Bad Request: 400
+    /// Not Found: 404
+    /// Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryResultsModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("{correlationId}")]
-    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(CancellationToken cancellationToken, [FromRoute]string correlationId, string? queryType, bool SuccessOnly = true)
+    public async Task<ActionResult<QueryResultsModel>> GetQueryResults(CancellationToken cancellationToken, [FromRoute]string correlationId, string queryType = "", bool successOnly = true)
     {
         if (string.IsNullOrWhiteSpace(correlationId)) 
         {
@@ -36,12 +46,20 @@ public class QueryResultController : ControllerBase
 
         try
         {
-            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType, SuccessOnly = SuccessOnly }, cancellationToken));
+            var results = await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType, SuccessOnly = successOnly }, cancellationToken);
+
+            if (results.QueryResults.Count == 0)
+            {
+                return NotFound();
+            }
+
+            return Ok(results);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting patient query results");
-            return StatusCode(500, "Error getting patient query results");
+            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get Query Results"), ex, "An exception occurred while attempting to retrieve Query Results for correlationId {correlationId}", correlationId);
+
+            throw;
         }
     }
 }
