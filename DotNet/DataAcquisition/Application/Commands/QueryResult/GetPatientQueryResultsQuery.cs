@@ -9,6 +9,7 @@ public class GetPatientQueryResultsQuery : IRequest<QueryResultsModel>
 {
     public string CorrelationId { get; set; }
     public string QueryType { get; set; }
+    public bool SuccessOnly { get; set; }
 }
 
 public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQueryResultsQuery, QueryResultsModel>
@@ -35,18 +36,20 @@ public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQuer
             queryType = QueryPlanType.SupplementalQueries.ToString();
         }
 
-        var resultSet = await _queriedFhirResourceRepository.GetQueryResultsAsync(request.CorrelationId, request.QueryType);
+        var resultSet = await _queriedFhirResourceRepository.GetQueryResultsAsync(request.CorrelationId, queryType, request.SuccessOnly);
 
-        var queryResults = new QueryResultsModel();
+        var queryResults = new QueryResultsModel() { QueryResults = new List<Models.QueryResult>() } ;
 
         if (resultSet != null && resultSet.Count > 0)
         {
             queryResults.PatientId = resultSet.Select(x => x.PatientId).FirstOrDefault();
+
             resultSet.ForEach(x => queryResults.QueryResults.Add(new Models.QueryResult
             {
                 QueryType = x.QueryType,
                 ResourceId = x.ResourceId,
-                ResourceType = x.ResourceType
+                ResourceType = x.ResourceType,
+                IsSuccessful = x.IsSuccessful
             }));
         }
 
