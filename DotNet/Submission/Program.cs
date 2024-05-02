@@ -31,6 +31,8 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Submission.Application.Repositories;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -109,31 +111,21 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpc().AddJsonTranscoding();
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<RetryRepository_Mongo>();
+    builder.Services.AddTransient<IRetryRepository, RetryRepository_Mongo>();
+    builder.Services.AddTransient<TenantSubmissionRepository>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
 
     // Add Controllers
     builder.Services.AddControllers();
 
-    // Add hosted services
-    builder.Services.AddHostedService<SubmitReportListener>();
-    builder.Services.AddHostedService<RetryListener>();
-    builder.Services.AddHostedService<RetryScheduleService>();
-
     // Add quartz scheduler
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddSingleton<RetryJob>();
+    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
 
     //Add health checks
     builder.Services.AddHealthChecks();
-
-    // Add commands
-    // TODO
-
-    // Add queries
-    // TODO
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
@@ -143,18 +135,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
-    // Add repositories
-    // TODO
-
     #region Exception Handling
     //Report Scheduled Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>, DeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<SubmitReportKey, SubmitReportValue>, TransientExceptionHandler<SubmitReportKey, SubmitReportValue>>();
 
     //Retry Listener
-    //Retry Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
+
+    // Add hosted services
+    builder.Services.AddHostedService<SubmitReportListener>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
