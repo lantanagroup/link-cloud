@@ -39,6 +39,8 @@ namespace LantanaGroup.Link.Audit.Application.Retry.Commands
 
             try
             {
+                //create id for retry entity
+                model.Id = Guid.NewGuid().ToString();
                 await _retryRepository.AddAsync(model, cancellationToken);
                 return true;
             }
