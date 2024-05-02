@@ -43,6 +43,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -132,7 +133,7 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 builder.Services.AddSingleton<IScheduledReportRepository, ScheduledReportMongoRepo>();
 builder.Services.AddSingleton<IPatientDispatchRepository, PatientDispatchMongoRepo>();
 builder.Services.AddSingleton<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationMongoRepo>();
-builder.Services.AddSingleton<RetryRepository_Mongo>();
+builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
 
 //Add Queries
 builder.Services.AddTransient<IGetScheduledReportQuery, GetScheduledReportQuery>();

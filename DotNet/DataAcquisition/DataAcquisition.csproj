@@ -33,6 +33,7 @@
 		<PackageReference Include="JWT" Version="10.*" />
 		<!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
 		<PackageReference Include="MediatR" Version="12.*" />
+		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.0.4" />
 		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.0.4" />
@@ -53,6 +54,7 @@
 		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
 		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
 		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
+		<PackageReference Include="Serilog.Expressions" Version="4.0.0" />
 		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
 	</ItemGroup>

@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -51,8 +52,8 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error retrieving FhirQueryConfiguration for facility {facilityId}");
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetFhirConfiguration"), ex, "An exception occurred while attempting to get a fhir query configuration with a facility id of {id}", facilityId);
+            throw;
         }
     }
 
@@ -91,8 +92,8 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error saving FhirQueryConfiguration for facility {facilityId}");
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", facilityId);
+            throw;
         }
     }
 }

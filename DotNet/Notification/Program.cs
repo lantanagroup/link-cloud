@@ -112,7 +112,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
