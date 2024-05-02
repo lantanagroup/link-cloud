@@ -211,11 +211,11 @@ public class QueryListener : BackgroundService
                                     //Resource = string.Join(',', deserializedMessage.Type),
                                     ServiceName = DataAcquisitionConstants.ServiceName,
                                     EventDate = DateTime.UtcNow,
-                                    Notes = $"Message with topic: {rawmessage.Topic} meets no condition for processing. full message: {rawmessage.Message}",
+                                    Notes = $"Message with topic: {rawmessage.Topic}. No messages were produced. Please check logs. full message: {rawmessage.Message}",
                                 });
-                                _logger.LogWarning("Message with topic: {1} meets no condition for processing. full message: {2}", rawmessage.Topic, rawmessage.Message);
+                                _logger.LogWarning("Message with topic: {1}. No messages were produced. Please check logs. full message: {2}", rawmessage.Topic, rawmessage.Message);
 
-                                throw new DeadLetterException("Message meets no condition for processing", AuditEventType.Query);
+                                throw new DeadLetterException("No messages were produced. Please check logs.", AuditEventType.Query);
                             }
                         }
                         catch (DeadLetterException ex)

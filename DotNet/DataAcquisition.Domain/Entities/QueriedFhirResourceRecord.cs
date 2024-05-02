@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 public class QueriedFhirResourceRecord : BaseEntity
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-    public string FacilityId { get; set; }
+    public string? FacilityId { get; set; }
     public string? CorrelationId { get; set; }
     public string? PatientId { get; set; }
     public string? QueryType { get; set; }
