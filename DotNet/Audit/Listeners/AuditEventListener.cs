@@ -97,12 +97,10 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     //deals with issue of non-singleton services being used within singleton hosted service
                                     try
                                     {
-                                        throw new Exception("ooopsies");
-                                        using (var scope = _scopeFactory.CreateScope())
-                                        {
-                                            var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
-                                            _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
-                                        }
+                                        using var scope = _scopeFactory.CreateScope();
+
+                                        var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
+                                        _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
                                     }
                                     catch (Exception ex)
                                     {
