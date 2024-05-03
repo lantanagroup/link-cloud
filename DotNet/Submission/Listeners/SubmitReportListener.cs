@@ -119,21 +119,22 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
 
                             #region File IO
-                            string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
-                            if (!Directory.Exists(facilityDirectory))
-                            {
-                                Directory.CreateDirectory(facilityDirectory);
-                            }
+                            //TODO Replace with new File IO
+                            //string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
+                            //if (!Directory.Exists(facilityDirectory))
+                            //{
+                            //    Directory.CreateDirectory(facilityDirectory);
+                            //}
 
-                            var dtu = DateTime.UtcNow;
-                            string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
+                            //var dtu = DateTime.UtcNow;
+                            //string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
 
-                            await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
+                            //await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
 
-                            if (!File.Exists(fullFilePath))
-                            {
-                                throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
-                            }
+                            //if (!File.Exists(fullFilePath))
+                            //{
+                            //    throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
+                            //}
                             #endregion
 
                         }, cancellationToken);
