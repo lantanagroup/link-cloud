@@ -2,10 +2,10 @@ FROM maven:3-eclipse-temurin-17 AS build
 
 WORKDIR /root
 
-COPY pom.xml ./
+COPY measureeval/pom.xml ./
 RUN mvn dependency:go-offline
 
-COPY ./ ./
+COPY measureeval/ ./
 RUN mvn package
 
 FROM eclipse-temurin:17-jre-alpine AS run
