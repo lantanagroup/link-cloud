@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/PatientList/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/PatientList/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
