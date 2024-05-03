@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/Notification/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Notification/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

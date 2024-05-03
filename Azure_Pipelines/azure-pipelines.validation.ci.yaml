@@ -1,6 +1,13 @@
 trigger:
   paths:
     include:
+    - Java/shared/*
+    - Java/validation/*
+    
+pr:
+  paths:
+    include:
+    - Java/shared/*
     - Java/validation/*
 
 pool:

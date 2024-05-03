@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/MeasureEval/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/MeasureEval/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
