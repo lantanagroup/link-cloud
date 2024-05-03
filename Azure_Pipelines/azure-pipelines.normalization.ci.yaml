@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/Normalization/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Normalization/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

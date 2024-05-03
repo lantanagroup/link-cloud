@@ -6,6 +6,13 @@ trigger:
     - DotNet/Link.Authorization/*
     exclude:
     - '*'
+    
+pr:
+  paths:
+    include:
+    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
 
 name: Admin Backend-for-Frontend
 
