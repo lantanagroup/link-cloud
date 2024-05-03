@@ -11,6 +11,7 @@ public static class DataAcquisitionConstants
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         public const string DatabaseProvider = "DatabaseProvider";
         public const string DatabaseConnection = "SqlServer";
+        public const string Serilog = "Serilog";
     }
 
     public static class ValidationErrorMessages

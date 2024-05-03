@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -86,8 +87,8 @@ public class ConnectionValidationController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating connection for facility {FacilityId}", facilityId);
-            return StatusCode(500, "An error occurred while validating the connection.");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFacilityConnection"), ex, "An exception occurred while attempting to validate a connection with a facility id of {id}", facilityId);
+            throw;
         }
         return StatusCode(500, "Something went wrong. Please contact an administrator.");
     }

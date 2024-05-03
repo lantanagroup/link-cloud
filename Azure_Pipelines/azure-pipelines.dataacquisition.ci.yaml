@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/DataAcquisition/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/DataAcquisition/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
