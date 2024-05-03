@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
@@ -74,8 +75,15 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
             if(fhirQueryConfiguration == null || queryPlans == null) 
             {
-                throw new Exception($"No configuration for {request.FacilityId} exists.");
+                throw new MissingFacilityConfigurationException($"No configuration for {request.FacilityId} exists.");
             }
+        }
+        catch(MissingFacilityConfigurationException ex)
+        {
+            var message = $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
+            _logger.LogError(message);
+            await GenerateAuditMessage(message, request, "N/A");
+            throw;
         }
         catch(Exception ex)
         {
@@ -300,7 +308,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                         CreateDate = currentDateTime,
                         ModifyDate = currentDateTime,
                     }; 
-                    _referenceResourcesRepository.Add(refResource);
+                    await _referenceResourcesRepository.AddAsync(refResource);
                     bundle.AddResourceEntry(resource, $"{resource.TypeName}/{resource.Id}");
 
                 }
