@@ -23,7 +23,7 @@ namespace AccountUnitTests
         public async Task TestGetAccountAsync()
         {
             _mocker = new AutoMocker();
-            var accounts = new List<AccountModel>() { _helper.CreateTestAccount() };
+            var accounts = new List<LinkUser>() { _helper.CreateTestAccount() };
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
                 .Options;
@@ -33,7 +33,7 @@ namespace AccountUnitTests
             var mockSettings = new Mock<IOptions<PostgresConnection>>();
 
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
-            var dbSet = new Mock<DbSet<AccountModel>>();
+            var dbSet = new Mock<DbSet<LinkUser>>();
             _helper.AccountDbSetSetup(dbSet, accounts);
 
             testDataContext.Setup(x => x.Accounts).Returns(dbSet.Object);
@@ -49,7 +49,7 @@ namespace AccountUnitTests
         public void TestGetAccountByEmailAsync()
         {
             _mocker = new AutoMocker();
-            var accounts = new List<AccountModel>() { _helper.CreateTestAccount() };
+            var accounts = new List<LinkUser>() { _helper.CreateTestAccount() };
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
                 .Options;
@@ -59,7 +59,7 @@ namespace AccountUnitTests
             var mockSettings = new Mock<IOptions<PostgresConnection>>();
 
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
-            var dbSet = new Mock<DbSet<AccountModel>>();
+            var dbSet = new Mock<DbSet<LinkUser>>();
             _helper.AccountDbSetSetup(dbSet, accounts);
             testDataContext.Setup(x => x.Accounts).Returns(dbSet.Object);
             _mocker.Use(testDataContext);
@@ -76,7 +76,7 @@ namespace AccountUnitTests
             _mocker = new AutoMocker();
             var accountModel = _helper.CreateTestAccount();
             var groupModel = _helper.CreateTestGroup();
-            var accounts = new List<AccountModel>() { accountModel };
+            var accounts = new List<LinkUser>() { accountModel };
             var groups = new List<GroupModel>() { groupModel };
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
@@ -92,7 +92,7 @@ namespace AccountUnitTests
 
             var _accountRepository = _mocker.CreateInstance<AccountRepository>();
 
-            var accounDbSet = new Mock<DbSet<AccountModel>>();
+            var accounDbSet = new Mock<DbSet<LinkUser>>();
             var groupDbSet = new Mock<DbSet<GroupModel>>();
             _helper.AccountDbSetSetup(accounDbSet, accounts);
             _helper.GroupDbSetSetup(groupDbSet, groups);
@@ -114,7 +114,7 @@ namespace AccountUnitTests
             var groups = new List<GroupModel>() { groupModel };
             accountModel.Groups.Add(groupModel);
 
-            var accounts = new List<AccountModel>() { accountModel };
+            var accounts = new List<LinkUser>() { accountModel };
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
                 .Options;
@@ -125,7 +125,7 @@ namespace AccountUnitTests
 
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
 
-            var accountDbSet = new Mock<DbSet<AccountModel>>();
+            var accountDbSet = new Mock<DbSet<LinkUser>>();
             var groupDbSet = new Mock<DbSet<GroupModel>>();
             _helper.AccountDbSetSetup(accountDbSet, accounts);
             _helper.GroupDbSetSetup(groupDbSet, groups);
@@ -149,8 +149,8 @@ namespace AccountUnitTests
             _mocker = new AutoMocker();
             var accountModel = _helper.CreateTestAccount();
             var roleModel = _helper.CreateTestRole();
-            var accounts = new List<AccountModel>() { accountModel };
-            var roles = new List<RoleModel>() { roleModel };
+            var accounts = new List<LinkUser>() { accountModel };
+            var roles = new List<LinkRole>() { roleModel };
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
                 .Options;
@@ -161,8 +161,8 @@ namespace AccountUnitTests
 
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
 
-            var accountDbSet = new Mock<DbSet<AccountModel>>();
-            var roleDbSet = new Mock<DbSet<RoleModel>>();
+            var accountDbSet = new Mock<DbSet<LinkUser>>();
+            var roleDbSet = new Mock<DbSet<LinkRole>>();
             _helper.AccountDbSetSetup(accountDbSet, accounts);
             _helper.RoleDbSetSetup(roleDbSet, roles);
             testDataContext.Setup(x => x.Accounts).Returns(accountDbSet.Object);
@@ -185,8 +185,8 @@ namespace AccountUnitTests
 
             var accountModel = _helper.CreateTestAccount();
             var roleModel = _helper.CreateTestRole();
-            var accounts = new List<AccountModel>() { accountModel };
-            var roles = new List<RoleModel>() { roleModel };
+            var accounts = new List<LinkUser>() { accountModel };
+            var roles = new List<LinkRole>() { roleModel };
             accountModel.Roles.Add(roleModel);
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
@@ -198,8 +198,8 @@ namespace AccountUnitTests
 
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
 
-            var accountDbSet = new Mock<DbSet<AccountModel>>();
-            var roleDbSet = new Mock<DbSet<RoleModel>>();
+            var accountDbSet = new Mock<DbSet<LinkUser>>();
+            var roleDbSet = new Mock<DbSet<LinkRole>>();
             _helper.AccountDbSetSetup(accountDbSet, accounts);
             _helper.RoleDbSetSetup(roleDbSet, roles);
             testDataContext.Setup(x => x.Accounts).Returns(accountDbSet.Object);
@@ -247,7 +247,7 @@ namespace AccountUnitTests
             var groupModel = _helper.CreateTestGroup();
             var roleModel = _helper.CreateTestRole();
             var groups = new List<GroupModel>() { groupModel };
-            var roles = new List<RoleModel>() { roleModel };
+            var roles = new List<LinkRole>() { roleModel };
 
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
@@ -260,7 +260,7 @@ namespace AccountUnitTests
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
 
             var groupDbSet = new Mock<DbSet<GroupModel>>();
-            var roleDbSet = new Mock<DbSet<RoleModel>>();
+            var roleDbSet = new Mock<DbSet<LinkRole>>();
             _helper.GroupDbSetSetup(groupDbSet, groups);
             _helper.RoleDbSetSetup(roleDbSet, roles);
             testDataContext.Setup(x => x.Groups).Returns(groupDbSet.Object);
@@ -282,7 +282,7 @@ namespace AccountUnitTests
             var groupModel = _helper.CreateTestGroup();
             var roleModel = _helper.CreateTestRole();
             var groups = new List<GroupModel>() { groupModel };
-            var roles = new List<RoleModel>() { roleModel };
+            var roles = new List<LinkRole>() { roleModel };
             groupModel.Roles.Add(roleModel);
             DbContextOptions options = new DbContextOptionsBuilder<DataContext>()
                 .UseInMemoryDatabase("TestDatabase")
@@ -295,7 +295,7 @@ namespace AccountUnitTests
             var testDataContext = new Mock<DataContext>(mockLogger.Object, mockKafka.Object, mockSettings.Object, options);
 
             var groupDbSet = new Mock<DbSet<GroupModel>>();
-            var roleDbSet = new Mock<DbSet<RoleModel>>();
+            var roleDbSet = new Mock<DbSet<LinkRole>>();
             _helper.GroupDbSetSetup(groupDbSet, groups);
             _helper.RoleDbSetSetup(roleDbSet, roles);
             testDataContext.Setup(x => x.Groups).Returns(groupDbSet.Object);

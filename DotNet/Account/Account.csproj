@@ -27,6 +27,7 @@
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.4" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.*" />

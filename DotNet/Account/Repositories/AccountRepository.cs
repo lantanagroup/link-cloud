@@ -4,7 +4,7 @@ using MongoDB.Driver;
 
 namespace LantanaGroup.Link.Account.Repositories
 {
-    public class AccountRepository : BaseRepository<AccountModel>
+    public class AccountRepository : BaseRepository<LinkUser>
     {
 
         public AccountRepository(ILogger<AccountRepository> logger, DataContext dataContext) : base(logger, dataContext)
@@ -12,13 +12,13 @@ namespace LantanaGroup.Link.Account.Repositories
         }
 
 
-        public override async Task<AccountModel> GetAsync(Guid id, bool noTracking = false, CancellationToken cancellationToken = default)
+        public override async Task<LinkUser> GetAsync(Guid id, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var query = noTracking ? _dataContext.Accounts.AsNoTracking() : _dataContext.Accounts;
             return await query.Include(a => a.Groups).Include(a => a.Roles).FirstOrDefaultAsync(a => a.Id == id);
         }
 
-        public async Task<AccountModel> GetAccountByEmailAsync(string email, bool noTracking = false, CancellationToken cancellationToken = default)
+        public async Task<LinkUser> GetAccountByEmailAsync(string email, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var query = noTracking ? _dataContext.Accounts.AsNoTracking() : _dataContext.Accounts;
             return await query.Include(a => a.Groups).Include(a => a.Roles).FirstOrDefaultAsync(a => a.EmailAddress == email);
@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Repositories
 
         #region Account group management
 
-        public async Task<AccountModel> AddAccountToGroup(Guid accountId, Guid groupId)
+        public async Task<LinkUser> AddAccountToGroup(Guid accountId, Guid groupId)
         {
             var account = await GetAsync(accountId, false);
             if (account is null) 
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Account.Repositories
 
         #region Account role management
 
-        public async Task<AccountModel> AddRoleToAccount(Guid accountId, Guid roleId)
+        public async Task<LinkUser> AddRoleToAccount(Guid accountId, Guid roleId)
         {
             var account = await GetAsync(accountId, false);
             if (account is null)

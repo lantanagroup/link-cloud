@@ -26,8 +26,8 @@ namespace LantanaGroup.Link.Account.Services
             _roleRepository = roleRepository;
             _tenantApiService = tenantApiService;
 
-            _mapperModelToMessage = new ProtoMessageMapper<RoleModel, RoleMessage>(new AccountProfile()).CreateMapper();
-            _mapperMessageToModel = new ProtoMessageMapper<RoleMessage, RoleModel>(new AccountProfile()).CreateMapper();
+            _mapperModelToMessage = new ProtoMessageMapper<LinkRole, RoleMessage>(new AccountProfile()).CreateMapper();
+            _mapperMessageToModel = new ProtoMessageMapper<RoleMessage, LinkRole>(new AccountProfile()).CreateMapper();
         }
 
         
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Account.Services
 
             foreach (var Role in res)
             {
-                var message = _mapperModelToMessage.Map<RoleModel, RoleMessage>(Role);
+                var message = _mapperModelToMessage.Map<LinkRole, RoleMessage>(Role);
                 await responseStream.WriteAsync(message);
             }
 
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, $"No Role found for {request.Id}"));
             }
 
-            var acc = _mapperModelToMessage.Map<RoleModel, RoleMessage>(res);
+            var acc = _mapperModelToMessage.Map<LinkRole, RoleMessage>(res);
 
             return acc;
         }
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
             }
 
-            var newRole = _mapperMessageToModel.Map<RoleMessage, RoleModel>(request);
+            var newRole = _mapperMessageToModel.Map<RoleMessage, LinkRole>(request);
 
             try
             {
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw;
             }
 
-            return _mapperModelToMessage.Map<RoleModel, RoleMessage>(newRole);
+            return _mapperModelToMessage.Map<LinkRole, RoleMessage>(newRole);
         }
 
         public override async Task<RoleMessage> UpdateRole(RoleMessage request, ServerCallContext context)
@@ -104,14 +104,14 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
             }
 
-            var updatedRole = _mapperMessageToModel.Map<RoleMessage, RoleModel>(request);
+            var updatedRole = _mapperMessageToModel.Map<RoleMessage, LinkRole>(request);
 
             if (updatedRole.Id == Guid.Empty)
             {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid ID provided"));
             }
 
-            RoleModel returnedModel;
+            LinkRole returnedModel;
             try
             {
                 returnedModel = await _roleRepository.UpdateAsync(updatedRole);
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.Account.Services
             }
 
 
-            return _mapperModelToMessage.Map<RoleModel, RoleMessage>(returnedModel);
+            return _mapperModelToMessage.Map<LinkRole, RoleMessage>(returnedModel);
         }
 
         public override async Task<RoleDeletedMessage> DeleteRole(DeleteRoleMessage request, ServerCallContext context)
@@ -150,7 +150,7 @@ namespace LantanaGroup.Link.Account.Services
         public override async Task<RoleMessage> RestoreRole(RestoreRoleMessage request, ServerCallContext context)
         {
 
-            RoleModel restoredRole;
+            LinkRole restoredRole;
             try
             {
                 restoredRole = await _roleRepository.RestoreAsync(Guid.Parse(request.Id));
@@ -161,7 +161,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.Internal, $"RestoreRole exception: {ex.Message}"));
             }
 
-            return _mapperModelToMessage.Map<RoleModel, RoleMessage>(restoredRole);
+            return _mapperModelToMessage.Map<LinkRole, RoleMessage>(restoredRole);
         }
 
 

@@ -29,8 +29,8 @@ namespace LantanaGroup.Link.Account.Services
             _accountRepository = accountRepository;
             _tenantApiService = tenantApiService;
 
-            _mapperModelToMessage = new ProtoMessageMapper<AccountModel, AccountMessage>(new AccountProfile()).CreateMapper();
-            _mapperMessageToModel = new ProtoMessageMapper<AccountMessage, AccountModel>(new AccountProfile()).CreateMapper();
+            _mapperModelToMessage = new ProtoMessageMapper<LinkUser, AccountMessage>(new AccountProfile()).CreateMapper();
+            _mapperMessageToModel = new ProtoMessageMapper<AccountMessage, LinkUser>(new AccountProfile()).CreateMapper();
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Account.Services
 
             foreach (var account in res)
             {
-                var message = _mapperModelToMessage.Map<AccountModel, AccountMessage>(account);
+                var message = _mapperModelToMessage.Map<LinkUser, AccountMessage>(account);
                 await responseStream.WriteAsync(message);
             }
 
@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, $"No account found for {request.Id}"));
             }
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(res);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(res);
         }
 
 
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
             }
 
-            var newAccount = _mapperMessageToModel.Map<AccountMessage, AccountModel>(request);
+            var newAccount = _mapperMessageToModel.Map<AccountMessage, LinkUser>(request);
 
             //TODO: find better condition to use to see if newAccount already exists
             var res = await _accountRepository.GetAccountByEmailAsync(newAccount.EmailAddress);
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Account.Services
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, newAccount.FacilityIds)
             ]);
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(newAccount);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(newAccount);
         }
 
         public override async Task<AccountMessage> UpdateAccount(AccountMessage request, ServerCallContext context)
@@ -141,14 +141,14 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.NotFound, sb.ToString()));
             }
 
-            var updatedAccount = _mapperMessageToModel.Map<AccountMessage, AccountModel>(request);
+            var updatedAccount = _mapperMessageToModel.Map<AccountMessage, LinkUser>(request);
 
             if (updatedAccount.Id == Guid.Empty)
             {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid ID provided"));
             }
 
-            AccountModel returnedModel;
+            LinkUser returnedModel;
             try
             {
                 returnedModel = await _accountRepository.UpdateAsync(updatedAccount);
@@ -164,7 +164,7 @@ namespace LantanaGroup.Link.Account.Services
             }
 
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(returnedModel);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(returnedModel);
         }
 
         public override async Task<AccountDeletedMessage> DeleteAccount(DeleteAccountMessage request, ServerCallContext context)
@@ -189,7 +189,7 @@ namespace LantanaGroup.Link.Account.Services
         public override async Task<AccountMessage> RestoreAccount(RestoreAccountMessage request, ServerCallContext context)
         {
 
-            AccountModel restoredAccount;
+            LinkUser restoredAccount;
             try
             {
                 restoredAccount = await _accountRepository.RestoreAsync(Guid.Parse(request.Id));
@@ -202,7 +202,7 @@ namespace LantanaGroup.Link.Account.Services
 
             _metrics.IncrementAccountRestoredCounter([]);
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(restoredAccount);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(restoredAccount);
         }
 
 
@@ -213,7 +213,7 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<AccountMessage> AddAccountToGroup(AddAccountToGroupMessage request, ServerCallContext context)
         {
-            AccountModel account;
+            LinkUser account;
             try
             {
                 account = await _accountRepository.AddAccountToGroup(Guid.Parse(request.AccountId), Guid.Parse(request.GroupId));
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.Account.Services
             }
 
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(account);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(account);
         }
 
         public override async Task<AccountRemovedFromGroupMessage> RemoveAccountFromGroup(RemoveAccountFromGroupMessage request, ServerCallContext context)
@@ -252,7 +252,7 @@ namespace LantanaGroup.Link.Account.Services
 
         public override async Task<AccountMessage> AddRoleToAccount(AddRoleToAccountMessage request, ServerCallContext context)
         {
-            AccountModel account;
+            LinkUser account;
             try
             {
                 account = await _accountRepository.AddRoleToAccount(Guid.Parse(request.AccountId), Guid.Parse(request.RoleId));
@@ -263,7 +263,7 @@ namespace LantanaGroup.Link.Account.Services
                 throw new RpcException(new Status(StatusCode.Internal, $"AddRoleToAccount exception: {ex.Message}"));
             }
 
-            return _mapperModelToMessage.Map<AccountModel, AccountMessage>(account);
+            return _mapperModelToMessage.Map<LinkUser, AccountMessage>(account);
         }
 
         public override async Task<RoleRemovedFromAccountMessage> RemoveRoleFromAccount(RemoveRoleFromAccountMessage request, ServerCallContext context)

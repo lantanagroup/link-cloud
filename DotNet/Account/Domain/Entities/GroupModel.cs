@@ -12,8 +12,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
 
         public List<string>? FacilityIds { get; set; }
         
-        public ICollection<AccountModel> Accounts { get; set; } = new List<AccountModel>();
-        public ICollection<RoleModel> Roles { get; set; } = new List<RoleModel>();
+        public ICollection<LinkUser> Accounts { get; set; } = new List<LinkUser>();
+        public ICollection<LinkRole> Roles { get; set; } = new List<LinkRole>();
 
     }
 }
