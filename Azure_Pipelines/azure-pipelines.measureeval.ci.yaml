@@ -1,39 +1,31 @@
 trigger:
   paths:
     include:
-    - DotNet/MeasureEval/*
-    - DotNet/Shared/*
+    - Java/shared/*
+    - Java/measureeval/*
     
 pr:
   paths:
     include:
-    - DotNet/MeasureEval/*
-    - DotNet/Shared/*
+    - Java/shared/*
+    - Java/measureeval/*
 
 pool:
   vmImage: 'ubuntu-latest'
-
+  
 variables:
-  project: 'DotNet/MeasureEval/MeasureEval.csproj'
-  testProject: 'DotNet/MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
-  serviceName: 'MeasureEval'
+- group: Link_BOTW_Build_Package_Variables
 
 steps:
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: JavaToolInstaller@0
     inputs:
-      command: restore
-      projects: '$(project)'
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
-  - task: DotNetCoreCLI@2
+  - task: Maven@2
+    displayName: Maven Install
     inputs:
-      command: 'test'
-      projects: $(testProject)
-    displayName: 'Run Tests'
-
+      mavenPomFile: 'Java/pom.xml'
+      goals: install
+      options: '-pl measureeval -am'
