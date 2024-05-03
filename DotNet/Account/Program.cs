@@ -177,7 +177,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapGet("/api/account/email/{email}", async (AccountRepository accountRepository, string email) =>
     {
-        AccountModel? account = await accountRepository.GetAccountByEmailAsync(email);
+        LinkUser? account = await accountRepository.GetAccountByEmailAsync(email);
         return account;
     });
 

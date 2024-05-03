@@ -20,9 +20,9 @@ namespace LantanaGroup.Link.Account.Repositories
         protected IOptions<PostgresConnection> _pgSettings;
         protected string[] BridgeTypes = new string[] { "AccountModelGroupModel", "AccountModelRoleModel", "GroupModelRoleModel" };
 
-        public virtual DbSet<AccountModel> Accounts { get; set; }
+        public virtual DbSet<LinkUser> Accounts { get; set; }
         public virtual DbSet<GroupModel> Groups { get; set; }
-        public virtual DbSet<RoleModel> Roles { get; set; }
+        public virtual DbSet<LinkRole> Roles { get; set; }
 
         public DataContext(ILogger<DataContext> logger, IOptions<KafkaConnection> kafkaConnection, IOptions<PostgresConnection> pgSettings, DbContextOptions options) : base(options)
         {
@@ -49,12 +49,12 @@ namespace LantanaGroup.Link.Account.Repositories
         {
             // manually set bridge table names
 
-            modelBuilder.Entity<AccountModel>()
+            modelBuilder.Entity<LinkUser>()
                 .HasMany(left => left.Groups)
                 .WithMany(right => right.Accounts)
                 .UsingEntity(join => join.ToTable("AccountGroups"));
 
-            modelBuilder.Entity<AccountModel>()
+            modelBuilder.Entity<LinkUser>()
                 .HasMany(left => left.Roles)
                 .WithMany(right => right.Accounts)
                 .UsingEntity(join => join.ToTable("AccountRoles"));
@@ -67,9 +67,9 @@ namespace LantanaGroup.Link.Account.Repositories
 
 
             // Filter query for deleted entities
-            modelBuilder.Entity<AccountModel>().HasQueryFilter(a => !a.IsDeleted);
+            modelBuilder.Entity<LinkUser>().HasQueryFilter(a => !a.IsDeleted);
             modelBuilder.Entity<GroupModel>().HasQueryFilter(a => !a.IsDeleted);
-            modelBuilder.Entity<RoleModel>().HasQueryFilter(a => !a.IsDeleted);
+            modelBuilder.Entity<LinkRole>().HasQueryFilter(a => !a.IsDeleted);
         }
 
         public override int SaveChanges()

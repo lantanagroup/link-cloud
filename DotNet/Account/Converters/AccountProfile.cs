@@ -12,30 +12,30 @@ namespace LantanaGroup.Link.Account.Converters
     {
         public AccountProfile()
         {
-            CreateMap<AccountModel, AccountMessage>();
-            CreateMap<AccountMessage, AccountModel>();
+            CreateMap<LinkUser, AccountMessage>();
+            CreateMap<AccountMessage, LinkUser>();
 
             CreateMap<GroupModel, GroupMessage>();
             CreateMap<GroupMessage, GroupModel>();
 
-            CreateMap<RoleModel, RoleMessage>();
-            CreateMap<RoleMessage, RoleModel>();
+            CreateMap<LinkRole, RoleMessage>();
+            CreateMap<RoleMessage, LinkRole>();
 
 
             // Mappings to remove nested related entity collections as the JSON serializer for gRPC implementation doesn't currently seem to have an "ignore cycles" capability
-            CreateMap<ICollection<AccountModel>, RepeatedField<AccountMessage>>().ConvertUsing(new AccountModelTypeConverter());
+            CreateMap<ICollection<LinkUser>, RepeatedField<AccountMessage>>().ConvertUsing(new AccountModelTypeConverter());
             CreateMap<ICollection<GroupModel>, RepeatedField<GroupMessage>>().ConvertUsing(new GroupModelTypeConverter());
-            CreateMap<ICollection<RoleModel>, RepeatedField<RoleMessage>>().ConvertUsing(new RoleModelTypeConverter());
+            CreateMap<ICollection<LinkRole>, RepeatedField<RoleMessage>>().ConvertUsing(new RoleModelTypeConverter());
         }
 
 
 
 
-        internal class AccountModelTypeConverter : ITypeConverter<ICollection<AccountModel>, RepeatedField<AccountMessage>>
+        internal class AccountModelTypeConverter : ITypeConverter<ICollection<LinkUser>, RepeatedField<AccountMessage>>
         {
-            IMapper _mappper = new ProtoMessageMapper<AccountModel, AccountMessage>().CreateMapper();
+            IMapper _mappper = new ProtoMessageMapper<LinkUser, AccountMessage>().CreateMapper();
 
-            public RepeatedField<AccountMessage> Convert(ICollection<AccountModel> source, RepeatedField<AccountMessage> destination, ResolutionContext context)
+            public RepeatedField<AccountMessage> Convert(ICollection<LinkUser> source, RepeatedField<AccountMessage> destination, ResolutionContext context)
             {
 
                 foreach (var account in source)
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Account.Converters
                     if (account.Roles is not null)
                         account.Roles.Clear();
 
-                    destination.Add(_mappper.Map<AccountModel, AccountMessage>(account));
+                    destination.Add(_mappper.Map<LinkUser, AccountMessage>(account));
                 }
 
                 return destination;
@@ -74,11 +74,11 @@ namespace LantanaGroup.Link.Account.Converters
         }
 
 
-        internal class RoleModelTypeConverter : ITypeConverter<ICollection<RoleModel>, RepeatedField<RoleMessage>>
+        internal class RoleModelTypeConverter : ITypeConverter<ICollection<LinkRole>, RepeatedField<RoleMessage>>
         {
-            IMapper _mappper = new ProtoMessageMapper<RoleModel, RoleMessage>().CreateMapper();
+            IMapper _mappper = new ProtoMessageMapper<LinkRole, RoleMessage>().CreateMapper();
 
-            public RepeatedField<RoleMessage> Convert(ICollection<RoleModel> source, RepeatedField<RoleMessage> destination, ResolutionContext context)
+            public RepeatedField<RoleMessage> Convert(ICollection<LinkRole> source, RepeatedField<RoleMessage> destination, ResolutionContext context)
             {
 
                 foreach (var role in source)
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Account.Converters
                     if (role.Groups is not null)
                         role.Groups.Clear();
 
-                    destination.Add(_mappper.Map<RoleModel, RoleMessage>(role));
+                    destination.Add(_mappper.Map<LinkRole, RoleMessage>(role));
                 }
 
                 return destination;
