@@ -16,8 +16,7 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly MeasureReportSubmissionBundler _bundler;
         private readonly IMediator _mediator;
 
-        public ReportController(ILogger<ReportController> logger,
-            MeasureReportSubmissionBundler bundler, IMediator mediator)
+        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, IMediator mediator)
         {
             _logger = logger;
             _bundler = bundler;
