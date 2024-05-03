@@ -26,7 +26,8 @@ public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQuer
     public async Task<QueryResultsModel> Handle(GetPatientQueryResultsQuery request, CancellationToken cancellationToken)
     {
         string queryType = request.QueryType;
-        
+
+        //TODO: Doing this for now to not interfere with any other dependecies of the QueryPlanType enum. The return of this is to align with Query Type values that are sent before and after DataAcquisitionRequested events
         if (string.Equals(queryType, "initial", StringComparison.InvariantCultureIgnoreCase))
         {
             queryType = QueryPlanType.InitialQueries.ToString();
@@ -46,7 +47,7 @@ public class GetPatientQueryResultsQueryHandler : IRequestHandler<GetPatientQuer
 
             resultSet.ForEach(x => queryResults.QueryResults.Add(new Models.QueryResult
             {
-                QueryType = x.QueryType,
+                QueryType = x.QueryType == QueryPlanType.InitialQueries.ToString() ? "Initial" : "Supplemental",
                 ResourceId = x.ResourceId,
                 ResourceType = x.ResourceType,
                 IsSuccessful = x.IsSuccessful
