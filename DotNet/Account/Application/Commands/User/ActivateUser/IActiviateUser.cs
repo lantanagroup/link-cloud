@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.ActivateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public interface IActiviateUser
     {

@@ -10,7 +10,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.ActivateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public class ActivateUser : IActiviateUser
     {
@@ -55,9 +55,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.ActivateUser
                     tagList.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-
+                _metrics.IncrementAccountActiviatedCounter(tagList);
                 _logger.LogActivateUser(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
-                return true;
+
+                return result.Succeeded;
             }
             catch (Exception ex)
             {
