@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
-    public interface IActiviateUser
+    public interface IDeleteUser
     {
         Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default);
     }

@@ -12,13 +12,13 @@ using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
-    public class ActivateUser : IActiviateUser
+    public class DeleteUser : IDeleteUser
     {
         private readonly ILogger<CreateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
 
-        public ActivateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public DeleteUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -34,18 +34,18 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
 
-                if (user.IsActive)
+                if (user.IsDeleted)
                 {
                     return true;
                 }
 
-                user.IsActive = true;
+                user.IsDeleted = true;
 
                 var result = await _userManager.UpdateAsync(user);
 
                 if (!result.Succeeded)
                 {
-                    throw new ApplicationException($"Unable to activate user: {result.Errors}");
+                    throw new ApplicationException($"Unable to delete user: {result.Errors}");
                 }
 
                 //generate tags for telemetry                
@@ -55,8 +55,8 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     tagList.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountActiviatedCounter(tagList);
-                _logger.LogActivateUser(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                _metrics.IncrementAccountDeletedCounter(tagList);
+                _logger.LogDeleteUser(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
                 return result.Succeeded;
             }
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogActivateUserException(userId, ex.Message);
+                _logger.LogDeleteUserException(userId, ex.Message);
                 throw;
             }
         }
