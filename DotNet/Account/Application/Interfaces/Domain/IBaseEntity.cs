@@ -3,9 +3,9 @@
     public interface IBaseEntity
     {
         DateTime CreatedOn { get; set; }
-        Guid? CreatedBy { get; set; }
+        string? CreatedBy { get; set; }
         DateTime? LastModifiedOn { get; set; }
-        Guid? LastModifiedBy { get; set; }
+        string? LastModifiedBy { get; set; }
         bool IsDeleted { get; set; }
     }
 }
