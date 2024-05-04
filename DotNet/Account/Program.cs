@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
+using Serilog.Enrichers.Span;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -149,10 +150,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Logging using Serilog
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
+                    //.Enrich.WithExceptionDetails()
+                    .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
+                    .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
@@ -164,7 +170,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = AccountConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Version;              
     });
 
     builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
