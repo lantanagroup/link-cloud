@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Account.Application.Models;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.CreateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public interface ICreateUser
     {

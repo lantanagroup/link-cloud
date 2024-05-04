@@ -38,6 +38,10 @@
             public const int UserClaimAssignmentException = 1018;
             public const int UserClaimRemoval = 1019;
             public const int UserClaimRemovalException = 1020;
+            public const int DeleteUser = 1021;
+            public const int DeleteUserException = 1022;
+            public const int UserRecovery = 1023;
+            public const int UserRecoveryException = 1024;
 
         }
     }

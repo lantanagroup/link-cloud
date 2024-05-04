@@ -12,13 +12,13 @@ using Link.Authorization.Infrastructure;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
-    public class DeactivateUser : IDeactivateUser
+    public class RecoverUser : IRecoverUser
     {
         private readonly ILogger<DeactivateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
 
-        public DeactivateUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
@@ -27,27 +27,27 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("DeactivateUser:Execute",
+            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute",
                 [
-                    new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)    
+                    new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)
                 ]);
 
             try
             {
                 var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
-                
-                if(!user.IsActive)
-                {                    
+
+                if (!user.IsDeleted)
+                {
                     return true;
                 }
-                
-                user.IsActive = false;
+
+                user.IsDeleted = false;
 
                 var result = await _userManager.UpdateAsync(user);
 
                 if (!result.Succeeded)
                 {
-                    throw new ApplicationException($"Unable to deactivate user: {result.Errors}");
+                    throw new ApplicationException($"Unable to recover user: {result.Errors}");
                 }
 
                 //generate tags for telemetry
@@ -58,18 +58,20 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     tagList.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountDeactivatedCounter(tagList);
-                _logger.LogDeactivateUser(user.Id, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                _metrics.IncrementAccountRestoredCounter(tagList);
+                _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
                 return result.Succeeded;
+
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogDeactivateUserException(userId, ex.Message);
+                _logger.LogDeleteUserException(userId, ex.Message);
                 throw;
-            }                  
+            }
+
         }
     }
 }
