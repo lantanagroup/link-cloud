@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Account.Domain.Interfaces;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 

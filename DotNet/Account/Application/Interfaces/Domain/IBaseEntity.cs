@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Account.Domain.Interfaces
+﻿namespace LantanaGroup.Link.Account.Application.Interfaces.Domain
 {
     public interface IBaseEntity
     {

@@ -1,6 +1,6 @@
-﻿using LantanaGroup.Link.Account.Domain.Interfaces;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using LantanaGroup.Link.Account.Application.Interfaces.Domain;
 
 namespace LantanaGroup.Link.Account.Domain.Entities
 {
