@@ -38,4 +38,15 @@
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Application\Commands\Role\" />
+    <Folder Include="Application\Commands\User\DeactivateUser\" />
+    <Folder Include="Application\Commands\User\ReactivateUser\" />
+    <Folder Include="Application\Commands\User\UpdateUser\" />
+    <Folder Include="Application\Queries\Role\" />
+    <Folder Include="Application\Queries\Link\GetUserById\" />
+    <Folder Include="Application\Queries\Link\GetUserByEmail\" />
+    <Folder Include="Application\Queries\Link\GetUsers\" />
+  </ItemGroup>
+
 </Project>
