@@ -7,7 +7,6 @@ using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
-using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -105,8 +104,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
 
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
-    builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));    
       
@@ -132,15 +130,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             default:
                 throw new InvalidOperationException($"Database provider {dbProvider} is not supported.");
         }
-    });    
-    
-
-    // Add services to the container.
-    // Additional configuration is required to successfully run gRPC on macOS.
-    // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
-    builder.Services.AddGrpc().AddJsonTranscoding();
-    builder.Services.AddGrpcReflection();
-       
+    });          
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -161,8 +151,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
     });
-    builder.Services.AddGrpcSwagger();
-
 
     builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
@@ -210,18 +198,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.MapControllers();
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
     app.UseMiddleware<UserScopeMiddleware>();
-
-    // Map gRPC services
-    app.MapGrpcService<AccountService>();
-    app.MapGrpcService<GroupService>();
-    app.MapGrpcService<RoleService>();
-    app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
 
     app.MapGet("/api/account/email/{email}", async (UserManager<LinkUser> _userManager, string email) =>
     {

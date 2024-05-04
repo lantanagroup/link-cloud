@@ -13,20 +13,12 @@
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
-	
-  <ItemGroup>
-	<Protobuf Include="Protos\account.proto" GrpcServices="Server" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
     <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="Azure.Identity" Version="1.11.2" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.4" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
