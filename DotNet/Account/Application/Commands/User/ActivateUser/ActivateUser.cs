@@ -4,48 +4,48 @@ using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
-using Link.Authorization.Infrastructure;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User
+namespace LantanaGroup.Link.Account.Application.Commands.User.ActivateUser
 {
-    public class RecoverUser : IRecoverUser
+    public class ActivateUser : IActiviateUser
     {
-        private readonly ILogger<DeactivateUser> _logger;
+        private readonly ILogger<CreateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
 
-        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public ActivateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
-        public async Task<LinkUser> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
+            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("ActivateUser:Execute", tagList);
 
             try
             {
                 var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
 
-                if (!user.IsDeleted)
+                if (user.IsActive)
                 {
-                    throw new InvalidOperationException($"User with id {userId} has not been deleted");
+                    return true;
                 }
 
-                user.IsDeleted = false;
+                user.IsActive = true;
 
                 var result = await _userManager.UpdateAsync(user);
 
                 if (!result.Succeeded)
                 {
-                    throw new ApplicationException($"Unable to recover user: {result.Errors}");
+                    throw new ApplicationException($"Unable to activate user: {result.Errors}");
                 }
 
                 //generate tags for telemetry                
@@ -55,20 +55,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     tagList.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountRestoredCounter(tagList);
-                _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
-                return user;
-
+                _logger.LogActivateUser(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                return true;
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogDeleteUserException(userId, ex.Message);
+                _logger.LogActivateUserException(userId, ex.Message);
                 throw;
             }
-
         }
     }
 }
