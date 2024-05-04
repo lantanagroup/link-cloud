@@ -25,12 +25,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<LinkUser> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute",
-                [
-                    new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)
-                ]);
+            List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
+            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
 
             try
             {
@@ -38,7 +36,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (!user.IsDeleted)
                 {
-                    return true;
+                    throw new InvalidOperationException($"User with id {userId} has not been deleted");
                 }
 
                 user.IsDeleted = false;
@@ -50,8 +48,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     throw new ApplicationException($"Unable to recover user: {result.Errors}");
                 }
 
-                //generate tags for telemetry
-                List<KeyValuePair<string, object?>> tagList = [ new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
+                //generate tags for telemetry                
                 foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.Facility))
                 {
                     var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, claim.ClaimValue);
@@ -61,7 +58,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 _metrics.IncrementAccountRestoredCounter(tagList);
                 _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
-                return result.Succeeded;
+                return user;
 
             }
             catch (Exception ex)
