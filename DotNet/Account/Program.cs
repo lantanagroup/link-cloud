@@ -5,7 +5,8 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
-using LantanaGroup.Link.Account.Repositories;
+using LantanaGroup.Link.Account.Persistence;
+using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.Account.Services;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -16,8 +17,11 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -76,23 +80,67 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+
+    //Add problem details
+    builder.Services.AddProblemDetails(options => {
+        options.CustomizeProblemDetails = ctx =>
+        {
+            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+            {
+                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+            }
+
+            if (builder.Environment.IsDevelopment())
+            {
+                ctx.ProblemDetails.Extensions.Add("service", "Account");
+            }
+            else
+            {
+                ctx.ProblemDetails.Extensions.Remove("exception");
+            }
+
+        };
+    });
+
+
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<PostgresConnection>(builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.Postgres));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
-    builder.Services.AddDbContext<DataContext>();
-    //builder.Services.AddDbContext<TestDataContext>();
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));    
+      
+
+    //Add database context
+    builder.Services.AddDbContext<AccountDbContext>((sp, options) => {
+
+        var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
+        var dbProvider = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseProvider);
+        switch (dbProvider)
+        {
+            case "SqlServer":
+                string? connectionString = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseConnectionString);
+
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);
+
+                break;
+            default:
+                throw new InvalidOperationException($"Database provider {dbProvider} is not supported.");
+        }
+    });    
+    
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
     builder.Services.AddGrpc().AddJsonTranscoding();
     builder.Services.AddGrpcReflection();
-
-    // Add repositories
-    builder.Services.AddScoped<AccountRepository>();
-    builder.Services.AddScoped<GroupRepository>();
-    builder.Services.AddScoped<RoleRepository>();
+       
 
     //Add health checks
     builder.Services.AddHealthChecks()
@@ -175,16 +223,16 @@ static void SetupMiddleware(WebApplication app)
     app.MapGrpcService<RoleService>();
     app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
 
-    app.MapGet("/api/account/email/{email}", async (AccountRepository accountRepository, string email) =>
+    app.MapGet("/api/account/email/{email}", async (UserManager<LinkUser> _userManager, string email) =>
     {
-        LinkUser? account = await accountRepository.GetAccountByEmailAsync(email);
+        LinkUser? account = await _userManager.Users.Where(x => x.Email != null && x.Email.Equals(email, StringComparison.OrdinalIgnoreCase)).FirstAsync();
         return account;
     });
 
     // Ensure database created
     using (var scope = app.Services.CreateScope())
     {
-        var context = scope.ServiceProvider.GetRequiredService<DataContext>();
+        var context = scope.ServiceProvider.GetRequiredService<AccountDbContext>();
         context.Database.EnsureCreated();
     }
 
