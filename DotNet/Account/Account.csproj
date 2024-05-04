@@ -36,12 +36,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Application\Commands\Role\" />
-    <Folder Include="Application\Commands\User\DeactivateUser\" />
     <Folder Include="Application\Commands\User\ReactivateUser\" />
     <Folder Include="Application\Commands\User\UpdateUser\" />
     <Folder Include="Application\Queries\Role\" />

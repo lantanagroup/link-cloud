@@ -24,6 +24,21 @@
             public const int UserRemovedFromRole = 1004;
             public const int UserRoleAssignmentException = 1005;
             public const int UserRoleRemovalException = 1006;
+            public const int UpdateUser = 1007;
+            public const int UpdateUserException = 1008;
+            public const int DeactivateUser = 1009;
+            public const int DeactivateUserException = 1010;
+            public const int ActivateUser = 1011;
+            public const int ActivateUserException = 1012;
+            public const int FindUser = 1013;
+            public const int FindUserException = 1014;
+            public const int FindUsers = 1015;
+            public const int FindUsersException = 1016;
+            public const int UserClaimAssignment = 1017;
+            public const int UserClaimAssignmentException = 1018;
+            public const int UserClaimRemoval = 1019;
+            public const int UserClaimRemovalException = 1020;
+
         }
     }
 }
