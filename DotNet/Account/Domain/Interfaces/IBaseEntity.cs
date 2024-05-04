@@ -2,8 +2,6 @@
 {
     public interface IBaseEntity
     {
-        Guid Id { get; set; }
-
         DateTime CreatedOn { get; set; }
         Guid? CreatedBy { get; set; }
         DateTime? LastModifiedOn { get; set; }
