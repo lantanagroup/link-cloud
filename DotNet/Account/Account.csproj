@@ -42,7 +42,6 @@
 
   <ItemGroup>
     <Folder Include="Application\Commands\Role\" />
-    <Folder Include="Application\Commands\User\ReactivateUser\" />
     <Folder Include="Application\Commands\User\UpdateUser\" />
     <Folder Include="Application\Queries\Role\" />
     <Folder Include="Application\Queries\Link\GetUserById\" />

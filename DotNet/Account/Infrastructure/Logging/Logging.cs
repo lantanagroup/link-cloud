@@ -129,5 +129,30 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while removing claim {claimType} with value {claimValue} from user {userId}: {message}")]
         public static partial void LogUserClaimRemovalException(this ILogger logger, string userId, string claimType, string claimValue, string message);
+
+
+        [LoggerMessage(
+            AccountLoggingIds.DeleteUser,
+            LogLevel.Information,
+            "User {userId} was deleted by {requestor}.")]
+        public static partial void LogDeleteUser(this ILogger logger, string userId, string requestor);
+
+        [LoggerMessage(
+            AccountLoggingIds.DeleteUserException,
+            LogLevel.Error,
+            "An exception occured while deleting user {userId}: {message}")]
+        public static partial void LogDeleteUserException(this ILogger logger, string userId, string message);
+
+        [LoggerMessage(
+            AccountLoggingIds.UserRecovery,
+            LogLevel.Information,
+            "User {userId} was recovered by {requestor}.")]
+        public static partial void LogUserRecovery(this ILogger logger, string userId, string requestor);
+
+        [LoggerMessage(
+            AccountLoggingIds.UserRecoveryException,
+            LogLevel.Error,
+            "An exception occured while recovering user {userId}: {message}")]
+        public static partial void LogUserRecoveryException(this ILogger logger, string userId, string message);
     }
 }

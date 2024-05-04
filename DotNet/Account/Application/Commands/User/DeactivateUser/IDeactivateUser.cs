@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.DeactivateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public interface IDeactivateUser
     {

@@ -8,7 +8,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.CreateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public class CreateUser : ICreateUser
     {

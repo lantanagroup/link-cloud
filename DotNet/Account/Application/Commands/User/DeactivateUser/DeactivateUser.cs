@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
-using static Link.Authorization.Infrastructure.LinkAuthorizationConstants;
+using Link.Authorization.Infrastructure;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.DeactivateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public class DeactivateUser : IDeactivateUser
     {
@@ -35,7 +35,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.DeactivateUser
             try
             {
                 var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
-                user.IsDeleted = true;
+                
+                if(!user.IsActive)
+                {                    
+                    return true;
+                }
+                
+                user.IsActive = false;
 
                 var result = await _userManager.UpdateAsync(user);
 
@@ -46,13 +52,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.DeactivateUser
 
                 //generate tags for telemetry
                 List<KeyValuePair<string, object?>> tagList = [ new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
-                foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkSystemClaims.LinkPermissions))
+                foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.Facility))
                 {
                     var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, claim.ClaimValue);
                     tagList.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountDeactivatedCounter([..tagList]);
+                _metrics.IncrementAccountDeactivatedCounter(tagList);
                 _logger.LogDeactivateUser(user.Id, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
                 return result.Succeeded;
@@ -61,6 +67,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.DeactivateUser
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
+                _logger.LogDeactivateUserException(userId, ex.Message);
                 throw;
             }                  
         }
