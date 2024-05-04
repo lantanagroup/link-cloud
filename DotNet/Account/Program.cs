@@ -4,6 +4,7 @@ using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Health;
+using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
@@ -18,11 +19,14 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -146,6 +150,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     builder.Services.Configure<JsonOptions>(opt => opt.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
+
+    //Add logging redaction
+    builder.Logging.EnableRedaction();
+    builder.Services.AddRedaction(x => {
+
+        x.SetRedactor<StarRedactor>(new DataClassificationSet(DataTaxonomy.SensitiveData));
+
+        var hmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
+        if (!string.IsNullOrEmpty(hmacKey))
+        {
+            x.SetHmacRedactor(opts => {
+                opts.Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(hmacKey));
+                opts.KeyId = 808;
+            }, new DataClassificationSet(DataTaxonomy.PiiData));
+        }
+    });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();

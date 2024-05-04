@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
+using LantanaGroup.Link.Account.Infrastructure.Logging;
 using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -50,6 +51,8 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.CreateUser
                     throw new ApplicationException($"Unable to create user: {result.Errors}");
                 }
 
+                _logger.LogUserCreated(user.Id, user.CreatedBy ?? "Unknown");
+
                 //Increment the account added counter
                 _metrics.IncrementAccountAddedCounter([]);
 
@@ -60,9 +63,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.CreateUser
                     {
                         result = await _userManager.AddToRoleAsync(user, role);
                         if (!result.Succeeded)
-                        {
-                            _logger.LogError($"Unable to add user {user.Id} to role: {result.Errors}");
+                        {                           
+                            _logger.LogUserRoleAssignmentException(user.Id, role, $"{result.Errors}");
                         }
+                        _logger.LogUserAddedToRole(user.Id, role, user.CreatedBy ?? "Unknown");
                     }
                 }
 
@@ -73,6 +77,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.CreateUser
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
+                _logger.LogUserCreationException(ex.Message);
                 throw;
             }            
         }
