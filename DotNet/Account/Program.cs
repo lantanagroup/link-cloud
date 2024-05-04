@@ -41,9 +41,12 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    //Initialize activity source
+    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    ServiceActivitySource.Initialize(version);
+
     //load external configuration source if specified
     var externalConfigurationSource = builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-
     if (!string.IsNullOrEmpty(externalConfigurationSource))
     {
         switch (externalConfigurationSource)
@@ -68,17 +71,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                 break;
         }
     }
-
-    var serviceInformation = builder.Configuration.GetRequiredSection(AccountConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);  
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
-
 
     //Add problem details
     builder.Services.AddProblemDetails(options => {
@@ -172,7 +164,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = AccountConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
     });
 
     builder.Services.AddSingleton<IAccountServiceMetrics, AccountServiceMetrics>();
