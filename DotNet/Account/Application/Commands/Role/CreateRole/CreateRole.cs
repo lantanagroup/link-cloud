@@ -24,46 +24,53 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
         }
 
-        public async Task<LinkRoleModel> Execute(string name, string? description, List<string>? claims, CancellationToken cancellationToken = default)
+        public async Task<LinkRoleModel> Execute(ClaimsPrincipal? requestor, LinkRoleModel model, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("CreateRole:Execute");
 
             try
             {
-                if (string.IsNullOrWhiteSpace(name))
+                if (string.IsNullOrWhiteSpace(model.Name))
                 {
                     throw new ArgumentException("A role name is required");
                 }
 
                 var role = new LinkRole
                 {
-                    Name = name,
-                    Description = description                    
+                    Name = model.Name,
+                    Description = model.Description                    
                 };
+
+                //add created by if requestor is provided
+                if (requestor is not null)
+                {
+                    role.CreatedBy = requestor.Claims.First(c => c.Type == "sub").Value;
+                }
 
                 var result = await _roleManager.CreateAsync(role);
 
                 if (!result.Succeeded)
                 {
-                    throw new ApplicationException($"Failed to create role {name}");
+                    throw new ApplicationException($"Failed to create role {model.Name}");
                 }
 
                 //if claims were provided, add them
-                if (claims is not null)
+                if (model.Claims is not null)
                 {
-                    foreach (var claim in claims)
+                    foreach (var claim in model.Claims)
                     {
                         result = await _roleManager.AddClaimAsync(role, 
                             new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
 
                         if (!result.Succeeded)
                         {
-                            throw new ApplicationException($"Failed to add claim {claim} to role {name}");
+                            throw new ApplicationException($"Failed to add claim {claim} to role {model.Name}");
                         }
                     }
                 }
 
                 var roleModel = _roleModelFactory.Create(role);
+                _logger.LogRoleCreated(roleModel.Name, role.CreatedBy ?? "Unknown", roleModel);
 
                 return roleModel;
             }
@@ -71,8 +78,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogRoleCreated(name, ex.Message, 
-                    new LinkRoleModel(string.Empty, name, description ?? string.Empty, claims ?? []));
+                _logger.LogRoleCreationException(model.Name, ex.Message, model);
                 throw;
             }
         }
