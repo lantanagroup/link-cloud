@@ -1,13 +1,10 @@
-﻿using LantanaGroup.Link.Account.Domain.Entities;
-using System.Security.Claims;
-
-namespace LantanaGroup.Link.Account.Application.Models
+﻿namespace LantanaGroup.Link.Account.Application.Models
 {
     public class LinkUserModel
     {
         public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
         
-        public LinkUserModel(string id, string userName, string firstName, string? middleName, string lastName, string email, List<string> roles, List<Claim> claims, List<string> facilities)
+        public LinkUserModel(string id, string userName, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> claims, List<string> facilities)
         {
             Id = id;
             UserName = userName;
@@ -65,8 +62,8 @@ namespace LantanaGroup.Link.Account.Application.Models
         /// <summary>
         /// The claims assigned to the user
         /// </summary>
-        /// <example>[{ Type: "permissions", Value: "CanViewLogs" }]</example>
-        public List<Claim> Claims { get; set; }
+        /// <example>["CanViewLogs"]</example>
+        public List<string> Claims { get; set; }
 
         /// <summary>
         /// The facilities the user has access to
