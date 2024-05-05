@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Account.Application.Models.Responses;
-using LantanaGroup.Link.Account.Application.Models.User;
+﻿using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 
 namespace LantanaGroup.Link.Account.Application.Interfaces.Factories
