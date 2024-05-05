@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User.GetFacilityUsers
 {
     public interface IGetFacilityUsers
     {
-        Task<List<GroupedUserModel>> Execute(string facilityId, CancellationToken cancellationToken = default);
+        Task<IEnumerable<GroupedUserModel>> Execute(string facilityId, CancellationToken cancellationToken = default);
     }
 }

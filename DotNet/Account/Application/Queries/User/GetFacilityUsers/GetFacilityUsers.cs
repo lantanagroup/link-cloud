@@ -23,18 +23,18 @@ namespace LantanaGroup.Link.Account.Application.Queries.User.GetFacilityUsers
             _groupedUserModelFactory = groupedUserModelFactory ?? throw new ArgumentNullException(nameof(groupedUserModelFactory));
         }
 
-        public async Task<List<GroupedUserModel>> Execute(string facilityId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<GroupedUserModel>> Execute(string facilityId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId)];
             Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);
 
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                throw new ArgumentException("A facility id is required");
-            }
-
             try
             {
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    throw new ArgumentException("A facility id is required");
+                }
+
                 var users = await _userRepository.GetFacilityUsersAsync(facilityId, cancellationToken);
 
                 if (users is null)
