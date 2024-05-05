@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Account.Domain.Entities;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -13,11 +14,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole
     {
         private readonly ILogger<DeleteRole> _logger;
         private readonly RoleManager<LinkRole> _roleManager;
+        private readonly ILinkRoleModelFactory _roleModelFactory;
 
-        public DeleteRole(ILogger<DeleteRole> logger, RoleManager<LinkRole> roleManager)
+        public DeleteRole(ILogger<DeleteRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
+            _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, CancellationToken cancellationToken = default)
@@ -29,12 +32,16 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole
                 var role = await _roleManager.FindByIdAsync(roleId) ?? throw new ApplicationException($"Role with id {roleId} not found");
                 activity?.AddTag(DiagnosticNames.Role, role.Name);
 
+                role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+
                 var result = await _roleManager.DeleteAsync(role);
 
                 if (!result.Succeeded)
                 {
                     throw new ApplicationException($"Failed to delete role {role.Name}");
                 }
+
+                _logger.LogRoleDeleted(role.Name ?? string.Empty, role.LastModifiedBy ?? string.Empty, _roleModelFactory.Create(role));
 
                 return result.Succeeded;
             }
