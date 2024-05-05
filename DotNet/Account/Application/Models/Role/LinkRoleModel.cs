@@ -16,24 +16,24 @@
         /// The id of the role
         /// </summary>
         /// <example>627c8762-de3c-4c92-a9f5-25483b6e7922</example>
-        public string Id { get; set; } = string.Empty;
+        public string Id { get; set; }
 
         /// <summary>
         /// The name of the role
         /// </summary>
         /// <example>LinkAdministrator</example>
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; set; }
 
         /// <summary>
         /// The description of the role
         /// </summary>
         /// <example>Administrator for the Link application</example>
-        public string Description { get; set; } = string.Empty;
+        public string Description { get; set; }
 
         /// <summary>
         /// The claims associated with the role
         /// </summary>
         /// <example>["CanViewLogs", "CanViewResources"]</example>
-        public List<string> Claims { get; set; } = [];
+        public List<string> Claims { get; set; }
     }
 }
