@@ -21,6 +21,8 @@
         public const string PeriodStart = "period.start";
         public const string PeriodEnd = "period.end";        
         public const string UserId = "user.id";
+        public const string UserName = "user.name";
+        public const string Email = "email";
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";

@@ -1,10 +1,13 @@
-﻿namespace LantanaGroup.Link.Account.Application.Models
+﻿using LantanaGroup.Link.Account.Domain.Entities;
+using System.Security.Claims;
+
+namespace LantanaGroup.Link.Account.Application.Models
 {
     public class LinkUserModel
     {
-        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], []) { }
+        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
         
-        public LinkUserModel(string id, string userName, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> facilities)
+        public LinkUserModel(string id, string userName, string firstName, string? middleName, string lastName, string email, List<string> roles, List<Claim> claims, List<string> facilities)
         {
             Id = id;
             UserName = userName;
@@ -13,6 +16,7 @@
             LastName = lastName;
             Email = email;
             Roles = roles;
+            Claims = claims;
             Facilities = facilities;
         }
 
@@ -59,9 +63,15 @@
         public List<string> Roles { get; set; }
 
         /// <summary>
+        /// The claims assigned to the user
+        /// </summary>
+        /// <example>[{ Type: "permissions", Value: "CanViewLogs" }]</example>
+        public List<Claim> Claims { get; set; }
+
+        /// <summary>
         /// The facilities the user has access to
         /// </summary>
         /// <example>["TestFacility01"]</example>
-        public List<string> Facilities { get; set; }
+        public List<string> Facilities { get; set; }        
     }
 }
