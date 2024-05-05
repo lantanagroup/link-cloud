@@ -41,7 +41,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Application\Commands\Role\DeleteRole\" />
     <Folder Include="Application\Commands\Role\UpdateClaims\" />
     <Folder Include="Application\Queries\Role\GetRole\" />
     <Folder Include="Application\Queries\Role\GetRoles\" />

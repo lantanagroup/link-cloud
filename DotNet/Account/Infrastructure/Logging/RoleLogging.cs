@@ -39,6 +39,6 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             AccountLoggingIds.RoleDeletionException,
             LogLevel.Error,
             "An exception occured while deleting role {roleName}: {message}")]
-        public static partial void LogRoleDeletionException(this ILogger logger, string roleName, string message, [LogProperties] LinkRoleModel role);
+        public static partial void LogRoleDeletionException(this ILogger logger, string roleName, string message);
     }
 }
