@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 
-namespace LantanaGroup.Link.Account.Application.Factories
+namespace LantanaGroup.Link.Account.Application.Factories.User
 {
     public class GroupedUserModelFactory : IGroupedUserModelFactory
     {
@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Account.Application.Factories
                 MiddleName = user.MiddleName ?? string.Empty,
             };
 
-            return model;            
+            return model;
         }
 
         public GroupedUserModel Create(LinkUserModel user)

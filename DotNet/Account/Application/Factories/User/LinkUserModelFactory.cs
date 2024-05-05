@@ -1,9 +1,9 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Factories
+namespace LantanaGroup.Link.Account.Application.Factories.User
 {
     public class LinkUserModelFactory : ILinkUserModelFactory
     {
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Account.Application.Factories
                 Claims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
             };
 
-            return model;            
+            return model;
         }
 
         public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<string>? claims)
@@ -41,6 +41,6 @@ namespace LantanaGroup.Link.Account.Application.Factories
             };
 
             return model;
-        }        
+        }
     }
 }

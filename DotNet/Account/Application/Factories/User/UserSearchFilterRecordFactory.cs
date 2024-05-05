@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Shared.Application.Enums;
 
-namespace LantanaGroup.Link.Account.Application.Factories
+namespace LantanaGroup.Link.Account.Application.Factories.User
 {
     public class UserSearchFilterRecordFactory : IUserSearchFilterRecordFactory
     {
