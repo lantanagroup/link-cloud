@@ -8,11 +8,11 @@ using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Account.Persistence.Repositories
 {
-    public class SearchRepository : ISearchRepository
+    public class UserSearchRepository : IUserSearchRepository
     {
         private readonly AccountDbContext _dbContext;
 
-        public SearchRepository(AccountDbContext dbContext)
+        public UserSearchRepository(AccountDbContext dbContext)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
@@ -88,13 +88,13 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         }
 
-        public async Task<(IEnumerable<LinkUser>, IPaginationMetadata)> TenantSearchAsync(string filterFacilityBy, string? searchText, string? filterRoleBy, string? filterClaimBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<LinkUser>, IPaginationMetadata)> FacilitySearchAsync(string facilityId, string? searchText, string? filterRoleBy, string? filterClaimBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<LinkUser> users;
             var query = _dbContext.Users.AsNoTracking().AsQueryable();
 
             //filter by facility
-            query = query.Where(x => x.Facilities != null && x.Facilities.Contains(filterFacilityBy));
+            query = query.Where(x => x.Facilities != null && x.Facilities.Contains(facilityId));
 
             #region Build Query
             if (searchText is not null && searchText.Length > 0)

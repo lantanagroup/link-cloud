@@ -42,9 +42,7 @@
 
   <ItemGroup>
     <Folder Include="Application\Commands\Role\" />
-    <Folder Include="Application\Models\Responses\" />
     <Folder Include="Application\Queries\Role\" />
-    <Folder Include="Application\Queries\User\SearchFacilityUsers\" />
     <Folder Include="Application\Queries\User\SearchUsers\" />
   </ItemGroup>
 

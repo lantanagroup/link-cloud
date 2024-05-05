@@ -154,5 +154,18 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while recovering user {userId}: {message}")]
         public static partial void LogUserRecoveryException(this ILogger logger, string userId, string message);
+
+        [LoggerMessage(
+            AccountLoggingIds.SearchUsers,
+            LogLevel.Information,
+            "A request to search users by {requestor} was successful.")]
+        public static partial void LogSearchUsers(this ILogger logger, string requestor);
+
+        [LoggerMessage(
+            AccountLoggingIds.SearchUsersException,
+            LogLevel.Error,
+            "An exception occured while attempting to search users: {message}")]
+        public static partial void LogSearchUsersException(this ILogger logger, string message);
+
     }
 }

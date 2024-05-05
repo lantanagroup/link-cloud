@@ -42,6 +42,8 @@
             public const int DeleteUserException = 1022;
             public const int UserRecovery = 1023;
             public const int UserRecoveryException = 1024;
+            public const int SearchUsers = 1025;
+            public const int SearchUsersException = 1026;
 
         }
     }
