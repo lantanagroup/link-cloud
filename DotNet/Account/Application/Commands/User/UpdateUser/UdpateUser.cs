@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.Account.Application.Models;
+using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
                 //TODO: Capture changes
                 List<PropertyChangeModel> changes = GetUserDiff(model, user);
 
-                user.UserName = model.UserName;
+                user.UserName = model.Username;
                 user.Email = model.Email;
                 user.FirstName = model.FirstName;
                 user.MiddleName = model.MiddleName;
@@ -88,9 +88,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
         {
             List<PropertyChangeModel> changes = [];
 
-            if(user.UserName != model.UserName)
+            if(user.UserName != model.Username)
             {
-                changes.Add(new PropertyChangeModel("UserName", user.UserName ?? string.Empty, model.UserName));
+                changes.Add(new PropertyChangeModel("UserName", user.UserName ?? string.Empty, model.Username));
             }
 
             if(user.Email != model.Email)

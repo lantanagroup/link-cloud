@@ -1,13 +1,13 @@
-﻿namespace LantanaGroup.Link.Account.Application.Models
+﻿namespace LantanaGroup.Link.Account.Application.Models.User
 {
     public class LinkUserModel
     {
         public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
-        
-        public LinkUserModel(string id, string userName, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> claims, List<string> facilities)
+
+        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> claims, List<string> facilities)
         {
             Id = id;
-            UserName = userName;
+            Username = username;
             FirstName = firstName;
             MiddleName = middleName;
             LastName = lastName;
@@ -45,7 +45,7 @@
         /// The username of the user
         /// </summary>
         /// <example>john.doe</example>
-        public string UserName { get; set; }
+        public string Username { get; set; }
 
         /// <summary>
         /// The email address of the user
@@ -69,6 +69,6 @@
         /// The facilities the user has access to
         /// </summary>
         /// <example>["TestFacility01"]</example>
-        public List<string> Facilities { get; set; }        
+        public List<string> Facilities { get; set; }
     }
 }

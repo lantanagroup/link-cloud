@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
-using LantanaGroup.Link.Account.Application.Models;
+using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
