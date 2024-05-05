@@ -40,8 +40,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
             try
             { 
                 var user = await _userManager.FindByIdAsync(model.Id) ?? throw new ApplicationException($"User with id {model.Id} not found");
-            
-                //TODO: Capture changes
+                           
                 List<PropertyChangeModel> changes = GetUserDiff(model, user);
 
                 user.UserName = model.Username;
@@ -71,7 +70,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
                 if (addedRoles.Any() || removedRoles.Any())
                 {
                     changes.Add(new PropertyChangeModel("Roles", string.Join(",", currentRoles), string.Join(",", model.Roles)));
-                }               
+                }    
+                
+                //TODO: Create audit event
 
                 return true;
             }
