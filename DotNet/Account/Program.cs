@@ -206,7 +206,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 static void SetupMiddleware(WebApplication app)
 {
 
-    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.ToLower() == "local" || app.Configuration.GetValue<bool>("EnableSwagger"))
+    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("local", StringComparison.CurrentCultureIgnoreCase) || app.Configuration.GetValue<bool>("EnableSwagger"))
     {
         app.UseSwagger();
         app.UseSwaggerUI();

@@ -13,7 +13,7 @@
 
 	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<NoWarn>$(NoWarn);1591</NoWarn>
+		<NoWarn>$(NoWarn);1591,IDE0290</NoWarn>
 	</PropertyGroup>
 
   <ItemGroup>
@@ -45,7 +45,6 @@
     <Folder Include="Application\Queries\Role\" />
     <Folder Include="Application\Queries\Link\GetUserById\" />
     <Folder Include="Application\Queries\Link\GetUsers\" />
-    <Folder Include="Persistence\Repositories\" />
   </ItemGroup>
 
 </Project>

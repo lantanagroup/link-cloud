@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Health
         {
             try
             {
-                bool outcome = await _dbContext.Database.CanConnectAsync();
+                bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
 
                 if (outcome)
                 {
