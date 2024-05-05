@@ -19,13 +19,13 @@ namespace LantanaGroup.Link.Account.Application.Factories
                 MiddleName = user.MiddleName,
                 Facilities = user.Facilities ?? [],
                 Roles = user.UserRoles.Select(r => r.Role.Name ?? string.Empty).ToList() ?? [],
-                Claims = user.Claims.Select(c => c.ToClaim()).ToList() ?? [],
+                Claims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
             };
 
             return model;            
         }
 
-        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<Claim>? claims)
+        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<string>? claims)
         {
             LinkUserModel model = new()
             {
