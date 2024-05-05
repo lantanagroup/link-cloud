@@ -44,6 +44,23 @@
             public const int UserRecoveryException = 1024;
             public const int SearchUsers = 1025;
             public const int SearchUsersException = 1026;
+            public const int UserLocked = 1027;
+            public const int UserLockedException = 1028;
+        
+            public const int RoleCreated = 1100;
+            public const int RoleCreationException = 1101;
+            public const int RoleDeleted = 1102;
+            public const int RoleDeletionException = 1103;
+            public const int RoleUpdated = 1104;
+            public const int RoleUpdateException = 1105;
+            public const int FindRole = 1106;
+            public const int FindRoleException = 1107;
+            public const int FindRoles = 1108;
+            public const int FindRolesException = 1109;
+            public const int RoleClaimAssignment = 1110;
+            public const int RoleClaimAssignmentException = 1111;
+            public const int RoleClaimRemoval = 1112;
+            public const int RoleClaimRemovalException = 1113;
 
         }
     }
