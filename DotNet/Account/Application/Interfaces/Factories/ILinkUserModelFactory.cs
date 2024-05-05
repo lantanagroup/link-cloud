@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Account.Application.Models;
+﻿using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using System.Security.Claims;
 

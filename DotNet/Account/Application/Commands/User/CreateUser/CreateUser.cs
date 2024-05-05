@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.Account.Application.Models;
+using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     FirstName = model.FirstName,
                     MiddleName = model.MiddleName,
                     LastName = model.LastName,
-                    UserName = model.UserName,
+                    UserName = model.Username,
                     Email = model.Email,
                     Facilities = model.Facilities
                 };

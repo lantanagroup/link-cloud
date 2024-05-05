@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
-using LantanaGroup.Link.Account.Application.Models;
+using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using System.Security.Claims;
 
@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Account.Application.Factories
             LinkUserModel model = new()
             {
                 Id = user.Id,
-                UserName = user.UserName ?? string.Empty,
+                Username = user.UserName ?? string.Empty,
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Account.Application.Factories
             LinkUserModel model = new()
             {
                 Id = userId,
-                UserName = username ?? string.Empty,
+                Username = username ?? string.Empty,
                 Email = email ?? string.Empty,
                 FirstName = firstName ?? string.Empty,
                 LastName = lastName ?? string.Empty,

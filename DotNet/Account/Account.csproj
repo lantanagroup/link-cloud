@@ -43,7 +43,6 @@
   <ItemGroup>
     <Folder Include="Application\Commands\Role\" />
     <Folder Include="Application\Queries\Role\" />
-    <Folder Include="Application\Queries\User\GetFacilityUsers\" />
     <Folder Include="Application\Queries\User\GetRoleUsers\" />
     <Folder Include="Application\Queries\User\SearchFacilityUsers\" />
     <Folder Include="Application\Queries\User\SearchUsers\" />
