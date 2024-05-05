@@ -44,8 +44,8 @@
     <Folder Include="Application\Commands\Role\" />
     <Folder Include="Application\Queries\Role\" />
     <Folder Include="Application\Queries\Link\GetUserById\" />
-    <Folder Include="Application\Queries\Link\GetUserByEmail\" />
     <Folder Include="Application\Queries\Link\GetUsers\" />
+    <Folder Include="Persistence\Repositories\" />
   </ItemGroup>
 
 </Project>
