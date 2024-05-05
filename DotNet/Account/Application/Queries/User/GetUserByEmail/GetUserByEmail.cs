@@ -8,7 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
-namespace LantanaGroup.Link.Account.Application.Queries.Link.GetUserByEmail
+namespace LantanaGroup.Link.Account.Application.Queries.User
 {
     public class GetUserByEmail : IGetUserByEmail
     {
