@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.Account.Infrastructure.Logging
 {
-    public static partial class Logging
+    public static partial class UserLogging
     {
         [LoggerMessage(
             AccountLoggingIds.ApiRegistered,
