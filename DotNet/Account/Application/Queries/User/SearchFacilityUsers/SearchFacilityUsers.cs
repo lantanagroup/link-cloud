@@ -15,13 +15,13 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
     {
         private readonly ILogger<SearchFacilityUsers> _logger;
         private readonly IUserSearchRepository _userSearchRepository;
-        private readonly ILinkUserModelFactory _linkUserModelFactory;
+        private readonly IGroupedUserModelFactory _groupedUserModelFactory;
 
-        public SearchFacilityUsers(ILogger<SearchFacilityUsers> logger, IUserSearchRepository userSearchRepository, ILinkUserModelFactory linkUserModelFactory)
+        public SearchFacilityUsers(ILogger<SearchFacilityUsers> logger, IUserSearchRepository userSearchRepository, IGroupedUserModelFactory groupedUserModelFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userSearchRepository = userSearchRepository ?? throw new ArgumentNullException(nameof(userSearchRepository));
-            _linkUserModelFactory = linkUserModelFactory ?? throw new ArgumentNullException(nameof(linkUserModelFactory)); 
+            _groupedUserModelFactory = groupedUserModelFactory ?? throw new ArgumentNullException(nameof(groupedUserModelFactory));
         }
 
         public async Task<PagedUserModel> Execute(string facilityId, UserSearchFilterRecord filters, CancellationToken cancellationToken = default)
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
                 PagedUserModel pagedModel = new()
                 {
-                    Records = users.Select(x => _linkUserModelFactory.Create(x)).ToList(),
+                    Records = users.Select(x => _groupedUserModelFactory.Create(x)).ToList(),
                     Metadata = metadata
                 };
 
@@ -54,7 +54,10 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 _logger.LogSearchUsersException(ex.Message);
                 throw;
             }
-
+            finally
+            {
+                activity?.Stop();
+            }
         }
     }
 }
