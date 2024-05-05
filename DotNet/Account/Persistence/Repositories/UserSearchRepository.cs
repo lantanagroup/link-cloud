@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public async Task<(IEnumerable<LinkUser>, IPaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterRoleBy, string? filterClaimBy, bool includeDeactivatedUsers, bool includeDeletedUsers, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<LinkUser>, PaginationMetadata)> SearchAsync(string? searchText, string? filterFacilityBy, string? filterRoleBy, string? filterClaimBy, bool includeDeactivatedUsers, bool includeDeletedUsers, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<LinkUser> users;
             var query = _dbContext.Users.AsNoTracking().AsQueryable();
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         }
 
-        public async Task<(IEnumerable<LinkUser>, IPaginationMetadata)> FacilitySearchAsync(string facilityId, string? searchText, string? filterRoleBy, string? filterClaimBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<(IEnumerable<LinkUser>, PaginationMetadata)> FacilitySearchAsync(string facilityId, string? searchText, string? filterRoleBy, string? filterClaimBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             IEnumerable<LinkUser> users;
             var query = _dbContext.Users.AsNoTracking().AsQueryable();
