@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public async Task<List<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default)
         {
             var users = await _dbContext.Users.AsNoTracking()
                 .Where(x => x.Facilities != null && x.Facilities.Contains(facilityId)).ToListAsync(cancellationToken);
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return users;
         }
 
-        public async Task<List<LinkUser>> GetRoleUsersAsync(string role, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<LinkUser>> GetRoleUsersAsync(string role, CancellationToken cancellationToken = default)
         {
             var users = await _dbContext.Users.AsNoTracking()
                 .Where(x => x.UserRoles.Any(r => r.Role.Name == role)).ToListAsync(cancellationToken);
