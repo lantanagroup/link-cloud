@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Account.Application.Models.Responses
+﻿namespace LantanaGroup.Link.Account.Application.Models.User
 {
     public class GroupedUserModel
     {
