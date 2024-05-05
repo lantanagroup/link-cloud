@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure;

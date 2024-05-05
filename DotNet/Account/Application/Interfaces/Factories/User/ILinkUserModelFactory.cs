@@ -2,7 +2,7 @@
 using LantanaGroup.Link.Account.Domain.Entities;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Interfaces.Factories
+namespace LantanaGroup.Link.Account.Application.Interfaces.Factories.User
 {
     public interface ILinkUserModelFactory
     {
