@@ -5,39 +5,32 @@ using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.User
 {
-    public class SearchFacilityUsers : ISearchFacilityUsers
+    public class SearchUsers : ISearchUsers
     {
-        private readonly ILogger<SearchFacilityUsers> _logger;
+        private readonly ILogger<SearchUsers> _logger;
         private readonly IUserSearchRepository _userSearchRepository;
         private readonly IGroupedUserModelFactory _groupedUserModelFactory;
 
-        public SearchFacilityUsers(ILogger<SearchFacilityUsers> logger, IUserSearchRepository userSearchRepository, IGroupedUserModelFactory groupedUserModelFactory)
+        public SearchUsers(ILogger<SearchUsers> logger, IUserSearchRepository userSearchRepository, IGroupedUserModelFactory groupedUserModelFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userSearchRepository = userSearchRepository ?? throw new ArgumentNullException(nameof(userSearchRepository));
             _groupedUserModelFactory = groupedUserModelFactory ?? throw new ArgumentNullException(nameof(groupedUserModelFactory));
         }
 
-        public async Task<PagedUserModel> Execute(string facilityId, UserSearchFilterRecord filters, CancellationToken cancellationToken = default)
+        public async Task<PagedUserModel> Execute(UserSearchFilterRecord filters, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("SearchFacilityUsers:Execute");
-            activity?.AddTag(DiagnosticNames.FacilityId, facilityId);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("SearchUsers:Execute");            
             activity?.EnrichWithUserSearchFilter(filters);
 
             try
             {
-                if (string.IsNullOrWhiteSpace(facilityId))
-                {
-                    throw new ArgumentException("A facility id is required");
-                }
-
-                var (users, metadata) = await _userSearchRepository.FacilitySearchAsync(facilityId, filters.SearchText, filters.FilterRoleBy, filters.FilterClaimBy, filters.SortBy, filters.SortOrder, filters.PageSize, filters.PageNumber, cancellationToken);
+                var (users, metadata) = await _userSearchRepository.SearchAsync(filters.SearchText, filters.FilterFacilityBy, filters.FilterRoleBy, filters.FilterClaimBy, filters.IncludeDeactivatedUsers, filters.IncludeDeletedUsers, filters.SortBy, filters.SortOrder, filters.PageSize, filters.PageNumber, cancellationToken);
 
                 PagedUserModel pagedModel = new()
                 {
@@ -49,8 +42,8 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             }
             catch (Exception ex)
             {
-                activity?.SetStatus(ActivityStatusCode.Error);
-                activity?.RecordException(ex);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
                 _logger.LogSearchUsersException(ex.Message);
                 throw;
             }

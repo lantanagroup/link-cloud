@@ -4,14 +4,14 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Account.Application.Models.Responses
 {
-    public class PagedUserModel : IPagedModel<LinkUserModel>
+    public class PagedUserModel : IPagedModel<GroupedUserModel>
     {
-        public List<LinkUserModel> Records { get; set; } = [];
+        public List<GroupedUserModel> Records { get; set; } = [];
         public PaginationMetadata Metadata { get; set; } = null!;
 
         public PagedUserModel(): this([], new PaginationMetadata()) { }
 
-        public PagedUserModel(List<LinkUserModel> records, PaginationMetadata metadata)
+        public PagedUserModel(List<GroupedUserModel> records, PaginationMetadata metadata)
         {
             Records = records;
             Metadata = metadata;
