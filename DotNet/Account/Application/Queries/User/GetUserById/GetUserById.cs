@@ -8,8 +8,8 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
-namespace LantanaGroup.Link.Account.Application.Queries.Link.GetUserById
-{
+namespace LantanaGroup.Link.Account.Application.Queries.User
+{ 
     public class GetUserById : IGetUserByid
     {
         private readonly ILogger<GetUserById> _logger;

@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Models;
 
-namespace LantanaGroup.Link.Account.Application.Queries.Link.GetUserById
+namespace LantanaGroup.Link.Account.Application.Queries.User
 {
     public interface IGetUserByid
     {
