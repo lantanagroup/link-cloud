@@ -2,7 +2,8 @@
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
-using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
@@ -33,7 +34,14 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         /// <exception cref="ApplicationException"></exception>
         public async Task<AuditLog> Execute(CreateAuditEventModel model, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Create Audit Event Command");
+            using Activity? activity = ServiceActivitySource.Instance
+                .StartActivityWithTags(DiagnosticNames.CreateAuditEvent,
+                [
+                    new KeyValuePair<string, object?>(DiagnosticNames.Service, model.ServiceName),
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, model.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.AuditLogAction, model.Action),
+                    new KeyValuePair<string, object?>(DiagnosticNames.Resource, model.Resource)
+                ]);                                    
 
             if (string.IsNullOrWhiteSpace(model.ServiceName))
             {
@@ -51,12 +59,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex, new TagList { 
-                    { "service.name", model.ServiceName },
-                    { "facility", model.FacilityId },
-                    { "action", model.Action },
-                    { "resource", model.Resource }
-                });
+                Activity.Current?.RecordException(ex);
                 _logger.LogDebug(new EventId(AuditLoggingIds.GenerateItems, "Audit Service - Create event"), ex, "New audit event creation failed for '{auditLogAction}' of resource '{auditLogResource}' in the '{auditLogServiceName}' service.", auditLog.Action, auditLog.Resource, auditLog.ServiceName);
                 throw;
             }
@@ -64,10 +67,10 @@ namespace LantanaGroup.Link.Audit.Application.Commands
             //Log creation of new audit event                                 
             _logger.LogAuditEventCreation(auditLog);
             _metrics.IncrementAuditableEventCounter([
-                new KeyValuePair<string, object?>("service", auditLog.ServiceName),
-                new KeyValuePair<string, object?>("facility", auditLog.FacilityId),
-                new KeyValuePair<string, object?>("action", auditLog.Action),
-                new KeyValuePair<string, object?>("resource", auditLog.Resource)
+                new KeyValuePair<string, object?>(DiagnosticNames.Service, auditLog.ServiceName),
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, auditLog.FacilityId),
+                new KeyValuePair<string, object?>(DiagnosticNames.AuditLogAction, auditLog.Action),
+                new KeyValuePair<string, object?>(DiagnosticNames.Resource, auditLog.Resource)
             ]);                
           
             return auditLog;           

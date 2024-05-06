@@ -3,6 +3,7 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 
@@ -53,7 +54,7 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                         var sentDate = DateTimeOffset.UtcNow;
                         currentActivity?.AddEvent(new("Sending request to email channel service.", sentDate));
                         await _emailService.Send(model.Id, model.Recipients, model.Bcc, model.Subject, model.Message, null);
-                        _logger.LogNotificationSent("Email", sentDate.DateTime);
+                        _logger.LogNotificationSent(nameof(ChannelType.Email), sentDate.DateTime);
                             
                         using (ServiceActivitySource.Instance.StartActivity("Set notification sent on date"))
                         {
@@ -66,13 +67,15 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                             }                                
 
                             //add id to current activity                            
-                            currentActivity?.AddTag("notification.id", model.Id);
-                            currentActivity?.AddTag("facility.id", model.FacilityConfig?.FacilityId);
+                            currentActivity?.AddTag(DiagnosticNames.NotificationId, model.Id);
+                            currentActivity?.AddTag(DiagnosticNames.FacilityId, model.FacilityConfig?.FacilityId);
 
                             //update notification creation metric counter                            
                             _metrics.IncrementNotificationSentCounter([
-                                new KeyValuePair<string, object?>("facility", model.FacilityConfig?.FacilityId),
-                                new KeyValuePair<string, object?>("channel", "Email")
+                                new KeyValuePair<string, object?>(DiagnosticNames.NotificationId, model.Id),
+                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, model.FacilityConfig?.FacilityId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.RecipientCount, model.Recipients.Count),
+                                new KeyValuePair<string, object?>(DiagnosticNames.NotificationChannel, nameof(ChannelType.Email))
                             ]);
                         }
                         
@@ -80,18 +83,16 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                     else
                     {
                         var message = $"Facility {model.FacilityConfig.FacilityId} does not have channels configured for email notifications. Did not send notification {model.Id}.";
-                        _logger.LogNotificationSentWarning("Email", message);                        
-                        var currentActivity = Activity.Current;
-                        currentActivity?.SetStatus(ActivityStatusCode.Ok, "Facility does not have channels configured for email notifications. Did not send notification.");
+                        _logger.LogNotificationSentWarning("Email", message);
+                        Activity.Current?.SetStatus(ActivityStatusCode.Ok, "Facility does not have channels configured for email notifications. Did not send notification.");
                     }
                 }
                 
                 return true;
             }
             catch(Exception ex)
-            {                
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error);
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogNotificationSentException("Email", ex.Message);
                 throw;
             }

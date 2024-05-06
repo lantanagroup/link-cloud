@@ -3,6 +3,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -58,7 +60,6 @@ public class QueryResultController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get Query Results"), ex, "An exception occurred while attempting to retrieve Query Results for correlationId {correlationId}", correlationId);
-
             throw;
         }
     }

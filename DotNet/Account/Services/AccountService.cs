@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Protos;
 using LantanaGroup.Link.Account.Repositories;
 using LantanaGroup.Link.Shared.Application.Converters;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.Account.Services
@@ -118,7 +119,7 @@ namespace LantanaGroup.Link.Account.Services
             }
 
             _metrics.IncrementAccountAddedCounter([
-                new KeyValuePair<string, object?>("facility", newAccount.FacilityIds)
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, newAccount.FacilityIds)
             ]);
 
             return _mapperModelToMessage.Map<AccountModel, AccountMessage>(newAccount);
