@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,13 +16,11 @@ namespace LantanaGroup.Link.Shared.Jobs
         private readonly ILogger<RetryJob> _logger;
         private readonly IKafkaProducerFactory<string, string> _retryKafkaProducerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        //private readonly IRetryRepository _retryRepository;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public RetryJob(ILogger<RetryJob> logger,
             IKafkaProducerFactory<string, string> retryKafkaProducerFactory,
             ISchedulerFactory schedulerFactory,
-            //IRetryRepository retryRepository)
             IServiceScopeFactory serviceScopeFactory
             )
         {
@@ -31,7 +28,6 @@ namespace LantanaGroup.Link.Shared.Jobs
             _retryKafkaProducerFactory = retryKafkaProducerFactory;
             _schedulerFactory = schedulerFactory;
             _serviceScopeFactory = serviceScopeFactory;
-            //_retryRepository = retryRepository;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -39,8 +35,7 @@ namespace LantanaGroup.Link.Shared.Jobs
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var _retryRepository = scope.ServiceProvider
-                    .GetRequiredService<IRetryRepository>();
+                var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
 
                 var triggerMap = context.Trigger.JobDataMap;
                 var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
@@ -76,34 +71,7 @@ namespace LantanaGroup.Link.Shared.Jobs
 
                     producer.Flush();
                 }
-
-                using (var producer = _retryKafkaProducerFactory.CreateAuditEventProducer(useOpenTelemetry: false))
-                {
-                    try
-                    {
-                        var val = new AuditEventMessage
-                        {
-                            FacilityId = retryEntity.FacilityId,
-                            ServiceName = retryEntity.ServiceName,
-                            Action = AuditEventType.Create,
-                            EventDate = DateTime.UtcNow,
-                            Resource = retryEntity.Topic,
-                            Notes = retryEntity.JobId
-                        };
-
-                        producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                            new Message<string, AuditEventMessage>
-                            {
-                                Value = val,
-                                Headers = headers
-                            });
-                        producer.Flush();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Failed to generate a {nameof(KafkaTopic.AuditableEventOccurred)} message");
-                    }
-                }
+                
             }
             catch (Exception ex)
             {

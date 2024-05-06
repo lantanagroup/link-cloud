@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
