@@ -54,10 +54,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 _logger.LogSearchUsersException(ex.Message);
                 throw;
             }
-            finally
-            {
-                activity?.Stop();
-            }
         }
     }
 }

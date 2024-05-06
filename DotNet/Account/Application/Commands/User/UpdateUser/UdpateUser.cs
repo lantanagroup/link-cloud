@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
             {
                 var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility);
             }
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UdpateUser:Execute", tagList);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UdpateUser:Execute", tagList);
 
             try
             { 

@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, CancellationToken cancellationToken = default)
         {
-            Activity? activity = ServiceActivitySource.Instance.StartActivity("DeleteRole:Execute");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("DeleteRole:Execute");
 
             try
             { 

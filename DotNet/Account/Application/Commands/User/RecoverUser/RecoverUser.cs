@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         public async Task<LinkUser> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
 
             try
             {
