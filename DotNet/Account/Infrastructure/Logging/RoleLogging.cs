@@ -40,5 +40,17 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while deleting role {roleName}: {message}")]
         public static partial void LogRoleDeletionException(this ILogger logger, string roleName, string message);
+
+        [LoggerMessage(
+            AccountLoggingIds.FindRole,
+            LogLevel.Information,
+            "A request to find role {roleName} by {requestor} was successful.")]
+        public static partial void LogFindRole(this ILogger logger, string roleName, string requestor, [LogProperties] LinkRoleModel role);
+
+        [LoggerMessage(
+            AccountLoggingIds.FindRoleException,
+            LogLevel.Error,
+            "An exception occured while finding role {roleName}: {message}")]
+        public static partial void LogFindRoleException(this ILogger logger, string roleName, string message);
     }
 }

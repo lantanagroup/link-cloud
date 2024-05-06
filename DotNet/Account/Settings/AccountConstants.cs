@@ -61,7 +61,6 @@
             public const int RoleClaimAssignmentException = 1111;
             public const int RoleClaimRemoval = 1112;
             public const int RoleClaimRemovalException = 1113;
-
         }
     }
 }
