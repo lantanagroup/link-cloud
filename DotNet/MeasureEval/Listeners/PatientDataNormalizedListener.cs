@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.MeasureEval.Auditing;
 using LantanaGroup.Link.MeasureEval.Models;
@@ -49,107 +50,98 @@ namespace LantanaGroup.Link.MeasureEval.Listeners
 
                     while (!stoppingToken.IsCancellationRequested)
                     {
+                        ConsumeResult<string, PatientDataNormalizedMessage>? consumeResult;
 
-                    }
-                }
-                catch (Exception ex)
-                {
-
-                }
-
-            }
-
-
-
-
-
-
-                _kafkaWrapper.SubscribeToKafkaTopic(new string[] { KafkaTopic.PatientNormalized.ToString() });
-               
-            _logger.LogTrace($"Subscribed to topic {KafkaTopic.PatientNormalized}");
-
-            while (true)
-            {
-                try
-                {
-                    var consumeResult = await Task.Run(() => _kafkaWrapper.ConsumeAndReturnFullMessage(stoppingToken), stoppingToken);
-                    if (consumeResult != null)
-                    {
-                        PatientDataNormalizedMessage patientMessage = consumeResult.Message.Value;
-                        string CorrelationId = "";
-
-                        if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                         {
-                            CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);
-                            _logger.LogInformation($"Received message with correlation ID {CorrelationId}: {consumeResult.Topic}");
-                        }
-                        else
-                        {
-                            _logger.LogInformation($"Received message without correlation ID: {consumeResult.Topic}");
-                        }
+                            consumeResult = result;
 
-                        _logger.LogTrace($"Consuming {KafkaTopic.PatientNormalized} message");
-
-                        MeasureReport? measureReport = await _measureEvalReportService.EvaluateAsync(consumeResult.Message.Key, patientMessage, CorrelationId, stoppingToken);
-
-                        var headers = new Headers();
-                        string correlationId = (!string.IsNullOrEmpty(CorrelationId) ? new Guid(CorrelationId).ToString() : Guid.NewGuid().ToString());
-
-                        headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
-                        Bundle patientBundle = (Bundle)patientMessage.PatientBundle;
-
-                        if (measureReport != null)
-                        {
-                            //generate an ID
-                            measureReport.Id = Guid.NewGuid().ToString();
-                            await _kafkaWrapper.ProduceKafkaMessageAsync(KafkaTopic.MeasureEvaluated.ToString(), () => new Message<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>
+                            if (consumeResult != null)
                             {
-                                Key = new PatientDataEvaluatedKey
+                                PatientDataNormalizedMessage patientMessage = consumeResult.Message.Value;
+                                string CorrelationId = "";
+
+                                if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    //TODO: Account for additional list entries
-                                    FacilityId = consumeResult.Message.Key,
-                                    StartDate = patientMessage.ScheduledReports.First<ScheduledReport>().StartDate,
-                                    EndDate = patientMessage.ScheduledReports.First<ScheduledReport>().EndDate,
-                                    ReportType = patientMessage.ScheduledReports.First<ScheduledReport>().ReportType
-
-                                },
-                                Value = new PatientDataEvaluatedMessage
+                                    CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);
+                                    _logger.LogInformation($"Received message with correlation ID {CorrelationId}: {consumeResult.Topic}");
+                                }
+                                else
                                 {
-                                    PatientId = patientMessage.PatientId,
-                                    Result = measureReport
-                                },
-                                Headers = headers
-                            });
+                                    _logger.LogInformation($"Received message without correlation ID: {consumeResult.Topic}");
+                                }
 
-                            AuditEventMessage auditEvent = new AuditEventMessage();
-                            auditEvent.ServiceName = "MeasureEvalReportService";
-                            auditEvent.EventDate = DateTime.UtcNow;
-                            auditEvent.User = "SystemUser";
-                            auditEvent.Action = AuditEventType.Create;
-                            auditEvent.Resource = "Patient: " + patientBundle.Id + " Measure: " + patientMessage.ScheduledReports.First<ScheduledReport>().ReportType + " Measure Report Id: " + measureReport.Id;
-                            auditEvent.Notes = $"Report Message created for {patientMessage.PatientId} and Measure: {patientMessage.ScheduledReports.First<ScheduledReport>().ReportType} and Measure Report Id: {measureReport.Id}";
+                                _logger.LogTrace($"Consuming {KafkaTopic.PatientNormalized} message");
 
+                                MeasureReport? measureReport = await _measureEvalReportService.EvaluateAsync(consumeResult.Message.Key, patientMessage, CorrelationId, stoppingToken);
 
-                            await this._kafkaAuditWrapper.ProduceKafkaMessageAsync(KafkaTopic.AuditableEventOccurred.ToString(), () =>
-                            {
-                                return new Message<string, AuditEventMessage>
+                                var headers = new Headers();
+                                string correlationId = (!string.IsNullOrEmpty(CorrelationId) ? new Guid(CorrelationId).ToString() : Guid.NewGuid().ToString());
+
+                                headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
+                                Bundle patientBundle = (Bundle)patientMessage.PatientBundle;
+
+                                if (measureReport != null)
                                 {
-                                    Key = consumeResult.Message.Key,
-                                    Value = auditEvent,
-                                    Headers = headers
-                                };
-                            });
+                                    //generate an ID
+                                    measureReport.Id = Guid.NewGuid().ToString();
 
-                        }
-                        else
-                        {
-                            _logger.LogError($"Facility ID {consumeResult.Message.Key}'s evaluation for patient {patientMessage.PatientId} did not result in a MeasureReport");
-                        }
+                                    using (var producer = _kafkaProducerFactory.CreateProducer(new ProducerConfig())) 
+                                    {
+                                        producer.Produce(
+                                            KafkaTopic.MeasureEvaluated.ToString(), 
+                                            new Message<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>()
+                                            {
+                                                Key = new PatientDataEvaluatedKey
+                                                {
+                                                    //TODO: Account for additional list entries
+                                                    FacilityId = consumeResult.Message.Key,
+                                                    StartDate = patientMessage.ScheduledReports.First<ScheduledReport>().StartDate,
+                                                    EndDate = patientMessage.ScheduledReports.First<ScheduledReport>().EndDate,
+                                                    ReportType = patientMessage.ScheduledReports.First<ScheduledReport>().ReportType
+
+                                                },
+                                                Value = new PatientDataEvaluatedMessage
+                                                {
+                                                    PatientId = patientMessage.PatientId,
+                                                    Result = measureReport
+                                                },
+                                                Headers = headers
+                                            });
+                                    }
+
+                                    AuditEventMessage auditEvent = new AuditEventMessage();
+                                    auditEvent.ServiceName = "MeasureEvalReportService";
+                                    auditEvent.EventDate = DateTime.UtcNow;
+                                    auditEvent.User = "SystemUser";
+                                    auditEvent.Action = AuditEventType.Create;
+                                    auditEvent.Resource = "Patient: " + patientBundle.Id + " Measure: " + patientMessage.ScheduledReports.First<ScheduledReport>().ReportType + " Measure Report Id: " + measureReport.Id;
+                                    auditEvent.Notes = $"Report Message created for {patientMessage.PatientId} and Measure: {patientMessage.ScheduledReports.First<ScheduledReport>().ReportType} and Measure Report Id: {measureReport.Id}";
+
+
+                                    using (var producer = _kafkaAuditProducerFactory.CreateProducer(new ProducerConfig()))
+                                    {
+                                        producer.Produce(
+                                            KafkaTopic.AuditableEventOccurred.ToString(),
+                                            new Message<string, AuditEventMessage>()
+                                            {
+                                                Key = consumeResult.Message.Key,
+                                                Value = auditEvent,
+                                                Headers = headers
+                                            });
+                                    }
+                                }
+                                else
+                                {
+                                    _logger.LogError($"Facility ID {consumeResult.Message.Key}'s evaluation for patient {patientMessage.PatientId} did not result in a MeasureReport");
+                                }
+                            }
+                        }, stoppingToken);
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    break;
+                  
                 }
             }
         }
