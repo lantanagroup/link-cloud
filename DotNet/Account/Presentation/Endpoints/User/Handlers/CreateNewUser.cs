@@ -6,7 +6,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class CreateNewUser
     {
-        public static async Task<IResult> Handle(HttpContext context, LinkUserModel model, ILogger logger, ICreateUser createUserCommand)
+        public static async Task<IResult> Handle(HttpContext context, 
+            LinkUserModel model, ILogger logger, ICreateUser createUserCommand)
         {            
             if (model is null)
             {
