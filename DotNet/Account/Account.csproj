@@ -42,7 +42,6 @@
 
   <ItemGroup>
     <Folder Include="Application\Queries\Role\GetRoles\" />
-    <Folder Include="Application\Queries\Role\GetRoleByName\" />
   </ItemGroup>
 
 </Project>
