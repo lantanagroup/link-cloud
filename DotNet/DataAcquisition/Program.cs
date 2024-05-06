@@ -38,6 +38,11 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Services;
+using Quartz.Spi;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
+using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -146,9 +151,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
     builder.Services.AddScoped<IQueryPlanRepository,QueryPlanRepository>();
     builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
-    builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
+    builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();
     builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepository_SQL_DataAcq>();
+    builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -157,10 +162,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<RetryJob>();
+    builder.Services.AddScoped<IJobFactory, JobFactory>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<QueryListener>();
     builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -174,7 +182,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     builder.Services.AddSwaggerGen(c =>
     {

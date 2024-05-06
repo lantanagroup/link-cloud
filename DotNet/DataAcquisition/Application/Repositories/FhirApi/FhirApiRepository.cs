@@ -243,37 +243,51 @@ public class FhirApiRepository : IFhirApiRepository
             new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
         ]);
 
-        DomainResource? readResource = resourceType switch
-        {
-            nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
-            nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
-            nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
-            nameof(Location) => await fhirClient.ReadAsync<Location>(id),
-            nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
-            nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
-            nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
-            nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
-            nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
-            nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
-            nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
-            nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
-            _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
-        };
+        DomainResource? readResource = null;
 
-        await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+        try
         {
-            ResourceId = id,
-            ResourceType = resourceType,
-            CorrelationId = correlationId,
-            PatientId = patientId,
-            FacilityId = facilityId,
-            QueryType = queryType,
-            IsSuccessful = readResource is not OperationOutcome,
-        }, cancellationToken);
+            readResource = resourceType switch
+            {
+                nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
+                nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
+                nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
+                nameof(Location) => await fhirClient.ReadAsync<Location>(id),
+                nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
+                nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
+                nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
+                nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
+                nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
+                nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
+                nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
+                nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
+                _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "error encountered retrieving fhir resource.");
+            throw;
+        }
 
-        if (readResource is not OperationOutcome)
+
+        if (readResource != null)
         {
-            IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+            await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+            {
+                ResourceId = id,
+                ResourceType = resourceType,
+                CorrelationId = correlationId,
+                PatientId = patientId,
+                FacilityId = facilityId,
+                QueryType = queryType,
+                IsSuccessful = readResource is not OperationOutcome,
+            }, cancellationToken);
+
+            if (readResource is not OperationOutcome)
+            {
+                IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+            } 
         }
         
 
