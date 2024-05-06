@@ -23,10 +23,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             }
 
             var outcome = await userCommand.Execute(requestor, id, context.RequestAborted);
+            if (outcome is null)
+            {
+                return Results.Problem("Failed to recover deleted user");
+            }
 
             logger.LogUserRecovery(id, requestor.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
 
-            return Results.NoContent();
+            return Results.Ok(outcome);
         }
     }
 }

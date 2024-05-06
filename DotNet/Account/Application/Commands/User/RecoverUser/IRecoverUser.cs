@@ -1,10 +1,11 @@
-﻿using LantanaGroup.Link.Account.Domain.Entities;
+﻿using LantanaGroup.Link.Account.Application.Models.User;
+using LantanaGroup.Link.Account.Domain.Entities;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public interface IRecoverUser
     {
-        Task<LinkUser> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default);
+        Task<LinkUserModel> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default);
     }
 }
