@@ -2,6 +2,8 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -35,8 +37,8 @@ public class QueryResultController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting patient query results");
-            return StatusCode(500, "Error getting patient query results");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetPatientQueryResults"), ex, "An exception occurred while attempting to retrieve patient query results with a facility id of {id}", facilityId);
+            throw;
         }
     }
 }

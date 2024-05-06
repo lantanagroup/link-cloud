@@ -43,6 +43,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,8 +92,11 @@ else
 builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+
+IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
+builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
+var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
 // Add services to the container.
 builder.Services.AddGrpc();
@@ -129,7 +133,7 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 builder.Services.AddSingleton<IScheduledReportRepository, ScheduledReportMongoRepo>();
 builder.Services.AddSingleton<IPatientDispatchRepository, PatientDispatchMongoRepo>();
 builder.Services.AddSingleton<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationMongoRepo>();
-builder.Services.AddSingleton<RetryRepository>();
+builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
 
 //Add Queries
 builder.Services.AddTransient<IGetScheduledReportQuery, GetScheduledReportQuery>();
@@ -148,16 +152,24 @@ builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventVal
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
-builder.Services.AddHostedService<PatientEventListener>();
-builder.Services.AddHostedService<ReportScheduledEventListener>();
-builder.Services.AddHostedService<RetryListener>();
-builder.Services.AddHostedService<ScheduleService>();
-builder.Services.AddHostedService<RetryScheduleService>();
+if (consumerSettings == null || !consumerSettings.DisableConsumer)
+{
+    builder.Services.AddHostedService<PatientEventListener>();
+    builder.Services.AddHostedService<ReportScheduledEventListener>();
+    builder.Services.AddHostedService<ScheduleService>();
+    builder.Services.AddSingleton<QueryDispatchJob>();
+}
+
+if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+{
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddSingleton<RetryJob>();
+}
 
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
-builder.Services.AddSingleton<RetryJob>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-builder.Services.AddSingleton<QueryDispatchJob>();
+
 
 //Add problem details
 builder.Services.AddProblemDetails(options => {

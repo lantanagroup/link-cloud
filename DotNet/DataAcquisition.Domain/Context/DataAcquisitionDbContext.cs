@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -61,6 +62,14 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
         );
+
+        //Retry Repository
+        modelBuilder.Entity<RetryEntity>()
+            .Property(x => x.Headers)
+            .HasConversion(
+                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                                          v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
+                                                 );
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

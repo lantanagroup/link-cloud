@@ -5,12 +5,13 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { IFacilityConfigModel } from '../../../interfaces/tenant/facility-config-model.interface';
+import { IFacilityConfigModel, PagedFacilityConfigModel } from '../../../interfaces/tenant/facility-config-model.interface';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { FacilityConfigDialogComponent } from '../facility-config-dialog/facility-config-dialog.component';
 import { RouterLink } from '@angular/router';
+import { PaginationMetadata } from '../../../models/pagination-metadata.model';
 
 @Component({
   selector: 'demo-tenant-dashboard',
@@ -33,7 +34,8 @@ export class TenantDashboardComponent implements OnInit {
   private initPageSize: number = 10;
   private initPageNumber: number = 0;
 
-  facilities: IFacilityConfigModel[] = []
+  facilities: IFacilityConfigModel[] = [];
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   displayedColumns: string[] = [ "facilityId", 'facilityName', 'scheduledTasks' ];
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
@@ -47,8 +49,9 @@ export class TenantDashboardComponent implements OnInit {
   }
 
   getFacilities() {
-    this.tenantService.listFacilities('', '').subscribe((facilities: IFacilityConfigModel[]) => {
-      this.facilities = facilities;      
+    this.tenantService.listFacilities('', '').subscribe((facilities: PagedFacilityConfigModel) => {
+      this.facilities = facilities.records;
+      this.paginationMetadata = facilities.metadata;
     });
   }  
 

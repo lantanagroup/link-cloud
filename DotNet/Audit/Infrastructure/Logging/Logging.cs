@@ -20,7 +20,25 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
             LogLevel.Information, 
             "New auditable event observed for facility {facility} from service {serviceName}.")]
         public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties]CreateAuditEventModel auditEvent);
-        
+
+        [LoggerMessage(
+            AuditLoggingIds.DeadLetterException, 
+            LogLevel.Error, 
+            "Dead lettered Exception - {message}")]
+        public static partial void LogDeadLetterException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AuditLoggingIds.TransientException, 
+            LogLevel.Error, 
+            "Transient Consumer Exception - {message}.")]
+        public static partial void LogTransientException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AuditLoggingIds.InsertItem, 
+            LogLevel.Error, 
+            "Failed to create retry entity: {message}.")]
+        public static partial void LogRetryEntityCreationException(this ILogger logger, string message);
+
         [LoggerMessage(
             AuditLoggingIds.GenerateItems, 
             LogLevel.Information, 
