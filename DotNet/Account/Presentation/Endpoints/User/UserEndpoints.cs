@@ -155,6 +155,32 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                     Description = "Recovers a deleted user and makes them active"
                 });
 
+            userEndpoints.MapPost("/user/{id}/activate", ActivateExistingUser.Handle)
+                .Produces(StatusCodes.Status204NoContent)
+                .Produces(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Activate a user",
+                    Description = "Activates a user and makes them active"
+                });
+
+            userEndpoints.MapPost("/user/{id}/deactivate", DeactivateExistingUser.Handle)
+                .Produces(StatusCodes.Status204NoContent)
+                .Produces(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Deactivate a user",
+                    Description = "Deactivates a user and makes them inactive"
+                });
+
             #endregion
 
             _logger.LogApiRegistration(nameof(UserEndpoints));
