@@ -5,12 +5,6 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
     public static partial class UserLogging
     {
         [LoggerMessage(
-            AccountLoggingIds.ApiRegistered,
-            LogLevel.Information,
-            "API {api} registered.")]
-        public static partial void LogApiRegistration(this ILogger logger, string api);
-
-        [LoggerMessage(
             AccountLoggingIds.UserCreated,
             LogLevel.Information,
             "User {userId} was created by {requestor}.")]

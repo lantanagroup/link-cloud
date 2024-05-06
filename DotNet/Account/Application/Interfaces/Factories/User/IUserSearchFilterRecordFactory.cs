@@ -6,6 +6,6 @@ namespace LantanaGroup.Link.Account.Application.Interfaces.Factories.User
     public interface IUserSearchFilterRecordFactory
     {
         UserSearchFilterRecord Create(string? searchText, string? filterFacilityBy, string? filterRoleBy, string? filterClaimBy,
-            bool includeDeactivatedUsers, bool includeDeletedUsers, string? sortBy, SortOrder sortOrder, int pageSize, int pageNumber);
+            bool includeDeactivatedUsers, bool includeDeletedUsers, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
     }
 }
