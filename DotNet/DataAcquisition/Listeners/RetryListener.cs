@@ -1,6 +1,7 @@
 ﻿
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -57,7 +58,7 @@ public class RetryListener : BackgroundService
     {
         var config = new ConsumerConfig()
         {
-            GroupId = "DataAcquisitionRetry",
+            GroupId = DataAcquisitionConstants.ServiceName,
             EnableAutoCommit = false
         };
 
