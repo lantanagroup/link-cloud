@@ -129,6 +129,19 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                     Description = "Updates an existing user"
                 });
 
+            userEndpoints.MapDelete("/user/{id}", DeleteExistingUser.Handle)
+                .Produces(StatusCodes.Status204NoContent)
+                .Produces(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Delete user",
+                    Description = "Deletes an existing user from the system."
+                });
+
             #endregion
 
             _logger.LogApiRegistration(nameof(UserEndpoints));
