@@ -82,7 +82,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = "NormalizationService-ResourceAcquired",
+            GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
         using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: true);
