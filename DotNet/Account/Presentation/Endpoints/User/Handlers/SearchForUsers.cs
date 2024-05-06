@@ -1,0 +1,49 @@
+﻿using Azure;
+using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
+using LantanaGroup.Link.Account.Application.Queries.User;
+using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Enums;
+using System.Text.Json;
+
+namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
+{
+    public static class SearchForUsers
+    {
+        public static async Task<IResult> Handle(
+            HttpContext context, ILogger logger, ISearchUsers command, IUserSearchFilterRecordFactory filterFactory,
+            string? searchText,
+            string? filterFacilityBy,
+            string? filterRoleBy,
+            string? filterClaimBy,
+            bool includeDeactivatedUsers,
+            bool includeDeletedUsers,
+            string? sortBy,
+            SortOrder? sortOrder,
+            int pageSize = 10,
+            int pageNumber = 1)
+        {
+
+            // Create search filters
+            var filters = filterFactory.Create(
+                searchText, 
+                filterFacilityBy, 
+                filterRoleBy, 
+                filterClaimBy, 
+                includeDeactivatedUsers, 
+                includeDeletedUsers, 
+                sortBy, 
+                sortOrder, 
+                pageSize, 
+                pageNumber); 
+
+            var users = await command.Execute(filters, context.RequestAborted);
+
+            logger.LogFindUsers(context.User.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
+
+            //add X-Pagination header for machine-readable pagination metadata
+            context.Response.Headers["X-Pagination"] = JsonSerializer.Serialize(users.Metadata);
+
+            return Results.Ok(users);
+        }
+    }
+}
