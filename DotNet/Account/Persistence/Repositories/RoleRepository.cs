@@ -22,6 +22,15 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return role;
         }
 
+        public async Task<LinkRole> GetRoleByNameAsync(string roleName, bool noTracking = true, CancellationToken cancellationToken = default)
+        {
+            var role = noTracking ?
+                await _dbContext.Roles.AsNoTracking().FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken) :
+                await _dbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken);
+
+            return role;
+        }
+
         public async Task<IEnumerable<LinkRole>> GetRolesAsync(CancellationToken cancellationToken = default)
         {
             var roles = await _dbContext.Roles.AsNoTracking().ToListAsync(cancellationToken);                
