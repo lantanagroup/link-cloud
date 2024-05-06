@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Submission.Application.Models;
+using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -58,7 +59,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "SubmitReportEvent",
+                GroupId = SubmissionConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
