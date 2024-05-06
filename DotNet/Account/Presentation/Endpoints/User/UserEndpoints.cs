@@ -104,7 +104,6 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
             #region Commands
 
             userEndpoints.MapPost("/user", CreateNewUser.Handle)
-                .RequireAuthorization("AuthenticatedUser")
                 .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
                 .Produces(StatusCodes.Status201Created)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -115,6 +114,19 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 {
                     Summary = "Create user",
                     Description = "Creates a new user"
+                });
+
+            userEndpoints.MapPut("/user/{id}", UpdateExistingUser.Handle)
+                .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
+                .Produces(StatusCodes.Status204NoContent)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Update user",
+                    Description = "Updates an existing user"
                 });
 
             #endregion
