@@ -1,5 +1,4 @@
 using Azure.Identity;
-using Confluent.Kafka;
 using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
@@ -22,18 +21,28 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Wrappers;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Quartz.Impl;
+using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Diagnostics;
+using Serilog.Settings.Configuration;
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Services;
+using Quartz.Spi;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
+using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,13 +95,14 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+    //configs
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
+    builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
+    //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-
     SQLServerEFExtension.AddSQLServerEF_DataAcq(builder);
 
 
@@ -127,41 +137,52 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database");
 
+    //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
     builder.Services.AddSingleton<BasicAuth>();
-    builder.Services.AddScoped<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
+    builder.Services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
 
+    //Exception Handlers
     builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
 
-    builder.Services.AddSingleton<DataAcqTenantConfigMongoRepo>();
-    builder.Services.AddSingleton<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
-    builder.Services.AddSingleton<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
-    builder.Services.AddSingleton<IQueryPlanRepository,QueryPlanRepository>();
-    builder.Services.AddSingleton<IReferenceResourcesRepository,ReferenceResourcesRepository>();
-    builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
-    builder.Services.AddSingleton<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
-    
+    //Repositories
+    builder.Services.AddScoped<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
+    builder.Services.AddScoped<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
+    builder.Services.AddScoped<IQueryPlanRepository,QueryPlanRepository>();
+    builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
+    builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();
+    builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
+    builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
+
+    //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddScoped<IKafkaWrapper<string, string, string, object>, DataAcquisitionKafkaService<string, string, string, object>>();
-    builder.Services.AddScoped<IKafkaWrapper<Ignore, Ignore, string, string>, KafkaWrapper<Ignore, Ignore, string, string>>();
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<RetryJob>();
+    builder.Services.AddScoped<IJobFactory, JobFactory>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<QueryListener>();
+    builder.Services.AddHostedService<RetryListener>();
+    builder.Services.AddHostedService<RetryScheduleService>();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
     Log.Logger = new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration)
-        .Enrich.WithExceptionDetails()
-        .Enrich.FromLogContext()
-        .Enrich.WithSpan()
-        .Enrich.With<ActivityEnricher>()
-        .CreateLogger();
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    //.Enrich.WithExceptionDetails()
+                    .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
+                    .Enrich.With<ActivityEnricher>()
+                    .CreateLogger();
 
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     builder.Services.AddSwaggerGen(c =>
     {
@@ -181,7 +202,27 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;
         options.ServiceName = DataAcquisitionConstants.ServiceName;
         options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
-    });          
+    });
+
+    builder.Services.AddProblemDetails(options => {
+        options.CustomizeProblemDetails = ctx =>
+        {
+            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+            {
+                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+            }
+            if (builder.Environment.IsDevelopment())
+            {
+                ctx.ProblemDetails.Extensions.Add("service", "Data Acquisition");
+            }
+            else
+            {
+                ctx.ProblemDetails.Extensions.Remove("exception");
+            }
+        };
+    });
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
@@ -196,9 +237,20 @@ static void SetupMiddleware(WebApplication app)
     app.UseSwagger();
     app.UseSwaggerUI();
 
+    app.AutoMigrateEF<DataAcquisitionDbContext>();
+
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
         app.MapGrpcReflectionService();
+    }
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
     }
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

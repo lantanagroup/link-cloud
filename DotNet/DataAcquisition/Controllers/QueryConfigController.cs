@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -67,7 +68,8 @@ public class QueryConfigController : Controller
         }
         catch (Exception ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetFhirQueryConfig"), ex, "An exception occurred while attempting to get a fhir configuration with a facility id of {id}", facilityId);
+            throw;
         }
     }
 
@@ -147,7 +149,8 @@ public class QueryConfigController : Controller
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Create,
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "CreateFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", fhirQueryConfiguration?.FacilityId);
+            throw;
         }
     }
 
@@ -224,7 +227,8 @@ public class QueryConfigController : Controller
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Update,
                 null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {id}", fhirQueryConfiguration?.FacilityId);
+            throw;
         }
     }
 
@@ -268,7 +272,8 @@ public class QueryConfigController : Controller
         }
         catch (Exception ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, "An exception occurred while attempting to delete a fhir query configuration with a facility id of {id}", facilityId);
+            throw;
         }
     }
 }

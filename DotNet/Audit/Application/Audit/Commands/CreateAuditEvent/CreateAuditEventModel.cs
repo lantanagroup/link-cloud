@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Audit.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 
 namespace LantanaGroup.Link.Audit.Application.Commands

@@ -36,6 +36,9 @@ export class SessionStorageService {
 
   removeItem(key: string): void {
     sessionStorage.removeItem(key);
+    if (!environment.production) {
+      sessionStorage.removeItem(key.concat("-dev"));
+    }
   }
 
   clearSession(): void {
