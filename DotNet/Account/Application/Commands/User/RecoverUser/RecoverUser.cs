@@ -9,6 +9,8 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 using Link.Authorization.Infrastructure;
+using LantanaGroup.Link.Account.Application.Models.User;
+using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
@@ -17,15 +19,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly ILogger<DeactivateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
+        private readonly ILinkUserModelFactory  _linkUserModelFactory;
 
-        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _linkUserModelFactory = linkUserModelFactory ?? throw new ArgumentNullException(nameof(linkUserModelFactory));
         }
 
-        public async Task<LinkUser> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<LinkUserModel> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
@@ -58,7 +62,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 _metrics.IncrementAccountRestoredCounter(tagList);
                 _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
 
-                return user;
+                return _linkUserModelFactory.Create(user);
 
             }
             catch (Exception ex)

@@ -4,10 +4,10 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
-    public static class RecoverDeletedUser
+    public static class ActivateExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id, 
-            ILogger logger, IUserRepository userRepository, IRecoverUser userCommand)
+            ILogger logger, IUserRepository userRepository, IActiviateUser command)
         {
             if (string.IsNullOrEmpty(id))
             {
@@ -22,15 +22,15 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 return Results.NotFound();
             }
 
-            var outcome = await userCommand.Execute(requestor, id, context.RequestAborted);
-            if (outcome is null)
+            var outcome = await command.Execute(requestor, id, context.RequestAborted);
+            if (!outcome)
             {
-                return Results.Problem("Failed to recover deleted user");
+                return Results.Problem("Failed to activate an existing user");
             }
 
-            logger.LogUserRecovery(id, requestor.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
+            logger.LogActivateUser(id, requestor.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
 
-            return Results.Ok(outcome);
+            return Results.NoContent();
         }
     }
 }
