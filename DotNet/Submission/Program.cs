@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
@@ -19,6 +20,7 @@ using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Application.Queries;
+using LantanaGroup.Link.Submission.Application.Repositories;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
@@ -109,9 +111,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddGrpc().AddJsonTranscoding();
     builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<RetryRepository_Mongo>();
+    builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
+    builder.Services.AddTransient<TenantSubmissionRepository>();
 
     // Add Controllers
     builder.Services.AddControllers();
