@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
         public async Task<LinkUserModel> Execute(string id, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, id)];
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);
 
             try
             {
@@ -48,10 +48,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 Activity.Current?.RecordException(ex);
                 _logger.LogFindUserException(id, ex.Message);
                 throw;
-            }
-            finally
-            {
-                activity?.Stop();
             }
         }
     }

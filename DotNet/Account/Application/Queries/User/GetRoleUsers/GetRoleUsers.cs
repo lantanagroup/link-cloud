@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
         public async Task<IEnumerable<GroupedUserModel>> Execute(string role, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.Role, role)];
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);                   
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);                   
 
             try
             {
@@ -56,10 +56,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 Activity.Current?.RecordException(ex);
                 _logger.LogFindUsersException(ex.Message);
                 throw;
-            }
-            finally
-            {
-                activity?.Stop();
             }
         }
     }

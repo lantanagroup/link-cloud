@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
         {
-            Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("DeactivateUser:Execute",
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("DeactivateUser:Execute",
                 [
                     new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)    
                 ]);

@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, List<string> claims, CancellationToken cancellationToken = default)
         {
-            Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
 
             try
             { 
