@@ -4,6 +4,7 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.MeasureEval.Auditing;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Services;
+using LantanaGroup.Link.MeasureEval.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Threading;
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.MeasureEval.Listeners
         {
             var config = new ConsumerConfig
             {
-                GroupId = "measure-eval",              
+                GroupId = MeasureEvalConstants.ServiceName,              
                 EnableAutoCommit = false,
             };
 
