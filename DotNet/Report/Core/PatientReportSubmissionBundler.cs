@@ -138,11 +138,10 @@ namespace LantanaGroup.Link.Report.Core
                 // Clean up the contained resources within the measure report
                 cleanupContainedResource(mr);
 
-                _logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
+                //_logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
 
-                // add to aggregate measure report
-                AddToAggregateMeasureReport(bundle, mr, orgId);
-
+                //// add to aggregate measure report
+                //AddToAggregateMeasureReport(bundle, mr, orgId);
 
                 if (config != null && config.BundlingType == BundlingType.SharedPatientLineLevel)
                     BundleSharedPatientLineLevel(bundle, mr);
