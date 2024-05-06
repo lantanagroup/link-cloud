@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
         {            
             if (model is null)
             {
-                return Results.BadRequest("No user was provide din the request.");
+                return Results.BadRequest("No user was provided in the request.");
             }
 
             var requestor = context.User;
