@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Audit.Domain.Entities;
+﻿using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Audit.Application.Models
 {
