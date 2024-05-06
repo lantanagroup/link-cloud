@@ -8,7 +8,6 @@ using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Repository;
 using LantanaGroup.Link.MeasureEval.Services;
 using LantanaGroup.Link.MeasureEval.Settings;
-using LantanaGroup.Link.MeasureEval.Wrappers;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
