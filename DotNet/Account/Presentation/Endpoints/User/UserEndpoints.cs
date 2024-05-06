@@ -142,6 +142,19 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                     Description = "Deletes an existing user from the system."
                 });
 
+            userEndpoints.MapPost("/user/{id}/recover", RecoverDeletedUser.Handle)
+                .Produces(StatusCodes.Status204NoContent)
+                .Produces(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Recover a deleted user",
+                    Description = "Recovers a deleted user and makes them active"
+                });
+
             #endregion
 
             _logger.LogApiRegistration(nameof(UserEndpoints));
