@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using Quartz;
+using QueryDispatch.Application.Settings;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -55,7 +56,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "QueryDispatchRetry",
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
