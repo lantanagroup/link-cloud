@@ -1,6 +1,9 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
+using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers;
+using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
@@ -100,19 +103,19 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
 
             #region Commands
 
-            //userEndpoints.MapPost("/user", CreateUser.Handle)
-            //    .RequireAuthorization("AuthenticatedUser")
-            //    .AddEndpointFilter<ValidationFilter<User>>()
-            //    .Produces(StatusCodes.Status201Created)
-            //    .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
-            //    .Produces(StatusCodes.Status401Unauthorized)
-            //    .Produces(StatusCodes.Status403Forbidden)
-            //    .ProducesProblem(StatusCodes.Status500InternalServerError)
-            //    .WithOpenApi(x => new OpenApiOperation(x)
-            //    {
-            //        Summary = "Create user",
-            //        Description = "Creates a new user"
-            //    });
+            userEndpoints.MapPost("/user", CreateNewUser.Handle)
+                .RequireAuthorization("AuthenticatedUser")
+                .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
+                .Produces(StatusCodes.Status201Created)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Create user",
+                    Description = "Creates a new user"
+                });
 
             #endregion
 
