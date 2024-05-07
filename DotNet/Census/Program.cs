@@ -206,6 +206,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    app.AutoMigrateEF<CensusContext>();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
