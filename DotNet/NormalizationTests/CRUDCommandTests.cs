@@ -98,10 +98,6 @@ public class CRUDCommandTests
 
         var context = new NormalizationDbContext(options);
 
-        //var mocker = new AutoMocker();
-        //mocker.GetMock<IServiceScopeFactory>().Setup(f => f.CreateScope()).Returns(mocker.GetMock<IServiceScope>().Object);
-        //mocker.GetMock<IServiceScope>().Setup(s => s.ServiceProvider.GetRequiredService<NormalizationDbContext>()).Returns(context);
-
         context.Add(new NormalizationConfig()
         {
             FacilityId = "test",
