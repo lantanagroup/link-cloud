@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.3</version>
+        <version>3.2.5</version>
         <relativePath/>
     </parent>
 
@@ -23,7 +23,7 @@
         <spring.kafka.version>3.1.2</spring.kafka.version>
         <hapi.version>7.0.2</hapi.version>
         <junit.version>4.13.2</junit.version>
-        <spring.boot.version>3.2.3</spring.boot.version>
+        <spring.boot.version>3.2.5</spring.boot.version>
         <mssql.version>12.6.1.jre11</mssql.version>
     </properties>
 
