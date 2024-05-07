@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Settings;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Report.Settings;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -58,7 +59,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "ReportRetryService",
+                GroupId = ReportConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

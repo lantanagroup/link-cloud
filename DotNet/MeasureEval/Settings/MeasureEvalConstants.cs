@@ -2,6 +2,8 @@
 {
     public class MeasureEvalConstants
     {
+        public const string ServiceName = "MeasureEval";
+
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";

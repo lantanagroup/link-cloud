@@ -31,7 +31,6 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
             config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
             config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
             config.ClientId = _kafkaConnection.Value.ClientId;
-            config.GroupId = _kafkaConnection.Value.GroupId;
 
             if (_kafkaConnection.Value.SaslProtocolEnabled)
             {
