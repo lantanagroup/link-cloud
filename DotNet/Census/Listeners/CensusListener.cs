@@ -53,7 +53,7 @@ public class CensusListener : BackgroundService
     {
         var consumerConfig = new ConsumerConfig
         {
-            GroupId = "CensusService-PatientIdsAcquired",
+            GroupId = CensusConstants.ServiceName,
             EnableAutoCommit = false
         };
         using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);

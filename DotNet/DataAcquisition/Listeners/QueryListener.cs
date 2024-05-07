@@ -65,10 +65,8 @@ public class QueryListener : BackgroundService
         var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
-            GroupId = "DataAcquisition-Query"
+            GroupId = DataAcquisitionConstants.ServiceName
         };
-        settings.GroupId = "DataAcquisitionGroup";
-        settings.EnableAutoCommit = false;
 
         using var consumer = _kafkaConsumerFactory.CreateConsumer(settings);
 
