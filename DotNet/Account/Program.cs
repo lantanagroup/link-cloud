@@ -2,6 +2,7 @@ using Azure.Identity;
 using FluentValidation;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
 using LantanaGroup.Link.Account.Application.Validators;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
@@ -11,6 +12,8 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
+using LantanaGroup.Link.Account.Presentation.Endpoints.Role;
+using LantanaGroup.Link.Account.Presentation.Endpoints.User;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -129,8 +132,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-    // Add controllers
-    builder.Services.AddControllers().AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
+    //Add endpoints
+    builder.Services.AddTransient<IApi, UserEndpoints>();
+    builder.Services.AddTransient<IApi, RoleEndpoints>();
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
@@ -206,15 +210,17 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    app.MapControllers();
-
     app.UseMiddleware<UserScopeMiddleware>();
 
-    app.MapGet("/api/account/email/{email}", async (UserManager<LinkUser> _userManager, string email) =>
+    // Register endpoints
+    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+
+    var apis = app.Services.GetServices<IApi>();
+    foreach (var api in apis)
     {
-        LinkUser? account = await _userManager.Users.Where(x => x.Email != null && x.Email.Equals(email, StringComparison.OrdinalIgnoreCase)).FirstAsync();
-        return account;
-    });
+        if (api is null) throw new InvalidProgramException("No Endpoints were registered.");
+        api.RegisterEndpoints(app);
+    }
 
     // Ensure database created
     using (var scope = app.Services.CreateScope())
@@ -227,7 +233,7 @@ static void SetupMiddleware(WebApplication app)
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    }).RequireCors("HealthCheckPolicy"); ;
 }
 
 #endregion
