@@ -5,6 +5,7 @@ using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
 using LantanaGroup.Link.Account.Application.Validators;
+using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Extensions;
 using LantanaGroup.Link.Account.Infrastructure.Health;
@@ -44,8 +45,6 @@ var app = builder.Build();
 SetupMiddleware(app);
 
 app.Run();
-
-
 
 #region Register Services
 
@@ -104,6 +103,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(UserValidator));
 
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+
     //Add database context
     builder.Services.AddDbContext<AccountDbContext>((sp, options) => {
 
@@ -125,10 +127,18 @@ static void RegisterServices(WebApplicationBuilder builder)
             default:
                 throw new InvalidOperationException($"Database provider {dbProvider} is not supported.");
         }
-    });          
+    });
+
+    //Add Identity
+    builder.Services.AddIdentity<LinkUser, LinkRole>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddEntityFrameworkStores<AccountDbContext>();
 
     //Add repositories
     builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IUserSearchRepository, UserSearchRepository>();
     builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
     //Add health checks
@@ -201,9 +211,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 #endregion
 
-
-
-
 #region Set up middleware
 
 static void SetupMiddleware(WebApplication app)
@@ -231,13 +238,6 @@ static void SetupMiddleware(WebApplication app)
     {
         if (api is null) throw new InvalidProgramException("No Endpoints were registered.");
         api.RegisterEndpoints(app);
-    }
-
-    // Ensure database created
-    using (var scope = app.Services.CreateScope())
-    {
-        var context = scope.ServiceProvider.GetRequiredService<AccountDbContext>();
-        context.Database.EnsureCreated();
     }
 
     //map health check middleware
