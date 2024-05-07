@@ -2,7 +2,6 @@
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Services;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -37,7 +36,7 @@ public class MeasureEvalServiceTests
         };
 
         var httpClient = CreateHttpClient(HttpMethod.Post, measureEvalConfig.EvaluationServiceUrl, HttpStatusCode.OK, cqfrResponse);
-        var measureEvalService = new MeasureEvalService(logger, httpClient, Mock.Of<IKafkaWrapper<Ignore, Null, Null, MeasureChanged>>(), Options.Create(measureEvalConfig));
+        var measureEvalService = new MeasureEvalService(logger, httpClient, Options.Create(measureEvalConfig));
 
         var response = await measureEvalService.UpdateMeasure(measureId, rawData);
 
