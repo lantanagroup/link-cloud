@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Extensions
     {
         public static IServiceCollection AddFactories(this IServiceCollection services)
         {
-            services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+            services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
             
             //Add user factories
             services.AddTransient<ILinkUserModelFactory, LinkUserModelFactory>();
