@@ -81,28 +81,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add problem details
-    builder.Services.AddProblemDetails(options => {
-        options.CustomizeProblemDetails = ctx =>
-        {
-            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-            {
-                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-            }
-
-            if (builder.Environment.IsDevelopment())
-            {
-                ctx.ProblemDetails.Extensions.Add("service", "Account");
-            }
-            else
-            {
-                ctx.ProblemDetails.Extensions.Remove("exception");
-            }
-
-        };
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = AccountConstants.ServiceName;
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
-
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
