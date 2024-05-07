@@ -6,21 +6,20 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.User.UpdateUser
+namespace LantanaGroup.Link.Account.Application.Commands.User
 {
-    public class UdpateUser : IUpdateUser
+    public class UpdateUser : IUpdateUser
     {
         private readonly ILogger<CreateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
 
-        public UdpateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public UpdateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));

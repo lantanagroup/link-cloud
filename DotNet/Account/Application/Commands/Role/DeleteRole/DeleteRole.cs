@@ -8,7 +8,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole
+namespace LantanaGroup.Link.Account.Application.Commands.Role
 {
     public class DeleteRole : IDeleteRole
     {

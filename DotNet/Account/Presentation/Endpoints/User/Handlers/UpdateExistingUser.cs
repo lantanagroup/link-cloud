@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.User;
-using LantanaGroup.Link.Account.Application.Commands.User.UpdateUser;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;

@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Account.Application.Models.Role;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateRole
+namespace LantanaGroup.Link.Account.Application.Commands.Role
 {
     public interface IUpdateRole
     {

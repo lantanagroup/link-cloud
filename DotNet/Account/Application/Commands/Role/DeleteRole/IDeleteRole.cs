@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole
+namespace LantanaGroup.Link.Account.Application.Commands.Role
 {
     public interface IDeleteRole
     {

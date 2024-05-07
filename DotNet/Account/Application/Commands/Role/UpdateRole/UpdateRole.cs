@@ -11,7 +11,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateRole
+namespace LantanaGroup.Link.Account.Application.Commands.Role
 {   
     public class UpdateRole : IUpdateRole
     {
