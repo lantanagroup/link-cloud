@@ -89,15 +89,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(nameof(MongoConnection)));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(nameof(KafkaConnection)));
 
-    // Add Kafka factories
-    builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
-    builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
-
     // Add custom services to the container.
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataNormalizedMessage>, KafkaConsumerFactory<string, PatientDataNormalizedMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, NotificationMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>, KafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, NotificationMessage>, KafkaProducerFactory<string, NotificationMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     builder.Services.AddSingleton<IMeasureEvalReportService, MeasureEvalReportService>();
 
