@@ -120,7 +120,6 @@ public class ResourceAcquiredListener : BackgroundService
                             FacilityId = messageMetaData.facilityId
                         });
                     }
- 
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
