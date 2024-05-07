@@ -2,9 +2,9 @@ using Azure.Identity;
 using FluentValidation;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
 using LantanaGroup.Link.Account.Application.Validators;
-using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Extensions;
 using LantanaGroup.Link.Account.Infrastructure.Health;
@@ -12,6 +12,7 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
+using LantanaGroup.Link.Account.Persistence.Repositories;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Role;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User;
 using LantanaGroup.Link.Account.Settings;
@@ -23,14 +24,12 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
-using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -123,6 +122,10 @@ static void RegisterServices(WebApplicationBuilder builder)
                 throw new InvalidOperationException($"Database provider {dbProvider} is not supported.");
         }
     });          
+
+    //Add repositories
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
     //Add health checks
     builder.Services.AddHealthChecks()

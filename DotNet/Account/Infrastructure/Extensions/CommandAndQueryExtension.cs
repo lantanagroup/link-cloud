@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Account.Application.Commands.Role;
+﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+using LantanaGroup.Link.Account.Application.Commands.Role;
 using LantanaGroup.Link.Account.Application.Commands.User;
 using LantanaGroup.Link.Account.Application.Queries.Role;
 using LantanaGroup.Link.Account.Application.Queries.User;
@@ -31,6 +32,9 @@ namespace LantanaGroup.Link.Account.Infrastructure.Extensions
             services.AddTransient<IGetRole, GetRole>();
             services.AddTransient<IGetRoleByName, GetRoleByName>();
             services.AddTransient<IGetRoles, GetRoles>();
+
+            //register audit event command
+            services.AddTransient<ICreateAuditEvent, CreateAuditEvent>();
 
             return services;
         }
