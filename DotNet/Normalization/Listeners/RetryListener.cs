@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Normalization.Application.Models;
+using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -60,7 +61,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
 
             var config = new ConsumerConfig()
             {
-                GroupId = "NormalizationRetry",
+                GroupId = NormalizationConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

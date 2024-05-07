@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var consumerConfig = new ConsumerConfig()
             {
-                GroupId = "ResourceEvaluatedEvent",
+                GroupId = ReportConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
