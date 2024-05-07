@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class GetRoleById
     {
         public static async Task<IResult> Handle(HttpContext context, string id, 
-            ILogger logger, IGetRole command)
+            ILogger logger, IGetRole query)
         {
             if (string.IsNullOrEmpty(id))
             {
@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             }
 
             var requestor = context.User;
-            var role = await command.Execute(id, context.RequestAborted);
+            var role = await query.Execute(id, context.RequestAborted);
             if (role is null)
             {
                 return Results.NotFound();

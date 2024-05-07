@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class CreateNewUser
     {
         public static async Task<IResult> Handle(HttpContext context, 
-            LinkUserModel model, ILogger logger, ICreateUser createUserCommand)
+            LinkUserModel model, ILogger logger, ICreateUser command)
         {            
             if (model is null)
             {
@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             }
 
             var requestor = context.User;
-            var createdUser = await createUserCommand.Execute(requestor, model, context.RequestAborted);
+            var createdUser = await command.Execute(requestor, model, context.RequestAborted);
 
             logger.LogUserCreated(createdUser.Id, requestor.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
 

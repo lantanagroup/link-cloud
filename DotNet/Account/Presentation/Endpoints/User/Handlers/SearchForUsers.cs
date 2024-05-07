@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class SearchForUsers
     {
         public static async Task<IResult> Handle(
-            HttpContext context, ILogger logger, ISearchUsers command, IUserSearchFilterRecordFactory filterFactory,
+            HttpContext context, ILogger logger, ISearchUsers query, IUserSearchFilterRecordFactory filterFactory,
             string? searchText,
             string? filterFacilityBy,
             string? filterRoleBy,
@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 pageSize, 
                 pageNumber); 
 
-            var users = await command.Execute(filters, context.RequestAborted);
+            var users = await query.Execute(filters, context.RequestAborted);
 
             logger.LogFindUsers(context.User.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
 

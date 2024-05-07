@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class DeleteExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id, 
-            ILogger logger, IUserRepository userRepository, IDeleteUser deleteUserCommand)
+            ILogger logger, IUserRepository userRepository, IDeleteUser command)
         {
             if (string.IsNullOrEmpty(id))
             {
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 return Results.NotFound();
             }
             
-            var outcome = await deleteUserCommand.Execute(requestor, id, context.RequestAborted);            
+            var outcome = await command.Execute(requestor, id, context.RequestAborted);            
             if(!outcome)
             {
                 return Results.Problem("Failed to delete user");
