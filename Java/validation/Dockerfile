@@ -1,14 +1,14 @@
 # Stage 1: Build the Spring Boot application
 FROM maven:3.8.7-openjdk-18-slim AS build
 WORKDIR /tmp
-COPY Java/pom.xml ./
-COPY Java/shared/pom.xml ./shared/
-COPY Java/measureeval/pom.xml ./measureeval/
-COPY Java/validation/pom.xml ./validation/
+COPY pom.xml ./
+COPY shared/pom.xml ./shared/
+COPY measureeval/pom.xml ./measureeval/
+COPY validation/pom.xml ./validation/
 RUN mvn dependency:go-offline
 
 WORKDIR /app
-COPY Java/ ./
+COPY . .
 RUN mvn package -pl validation -am
 RUN mv validation/target/validation-*-jar-with-dependencies.jar validation/target/validation.jar
 
