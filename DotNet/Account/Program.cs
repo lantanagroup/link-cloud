@@ -202,10 +202,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 static void SetupMiddleware(WebApplication app)
 {
 
-    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("local", StringComparison.CurrentCultureIgnoreCase) || app.Configuration.GetValue<bool>("EnableSwagger"))
+    // Configure swagger
+    if (app.Configuration.GetValue<bool>(AccountConstants.AppSettingsSectionNames.EnableSwagger))
     {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
+        app.UseSwaggerUI(opts => {
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.RoutePrefix = "api/swagger";
+        });
     }
 
     app.UseRouting();
@@ -213,7 +217,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseMiddleware<UserScopeMiddleware>();
 
     // Register endpoints
-    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+    app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)

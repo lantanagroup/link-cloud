@@ -11,6 +11,9 @@
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";            
             public const string Postgres = "Postgres";
             public const string Telemetry = "Telemetry";
+            public const string Serilog = "Serilog";
+            public const string EnableSwagger = "EnableSwagger";
+            public const string SecretManagement = "SecretManagement";
             public const string TenantApiSettings = "TenantApiSettings";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
