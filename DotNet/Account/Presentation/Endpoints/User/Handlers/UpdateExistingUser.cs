@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class UpdateExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, ILogger logger, 
-            IUserRepository userRepository, ICreateUser createUserCommand, IUpdateUser updateUserCommand)
+            IUserRepository userRepository, ICreateUser createUserCommand, IUpdateUser command)
         {
             if (string.IsNullOrEmpty(id))
             {
@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             }
 
             //update an existing user
-            var updateResult = await updateUserCommand.Execute(requestor, model, context.RequestAborted);
+            var updateResult = await command.Execute(requestor, model, context.RequestAborted);
             if (!updateResult)
             {
                 return Results.Problem("Failed to update user");

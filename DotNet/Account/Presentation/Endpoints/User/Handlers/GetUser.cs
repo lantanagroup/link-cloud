@@ -5,14 +5,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, ILogger logger, IGetUserByid getUserCommand)
+        public static async Task<IResult> Handle(HttpContext context, string id, ILogger logger, IGetUserByid query)
         {
             if (string.IsNullOrEmpty(id))
             {
                 return Results.BadRequest("A user id is required");
             }
 
-            var user = await getUserCommand.Execute(id, context.RequestAborted);
+            var user = await query.Execute(id, context.RequestAborted);
             if (user is null)
             {
                 return Results.NotFound();
