@@ -90,9 +90,13 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
+    //Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+
+    //add factories
+    builder.Services.AddFactories();
 
     //add command and queries
     builder.Services.AddCommandAndQueries();

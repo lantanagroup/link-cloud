@@ -9,6 +9,9 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 using Link.Authorization.Infrastructure;
+using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
@@ -17,12 +20,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly ILogger<DeactivateUser> _logger;
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
+        private readonly ICreateAuditEvent _createAuditEvent;
 
-        public DeactivateUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics)
+        public DeactivateUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
@@ -42,6 +47,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
                 
                 user.IsActive = false;
+                user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
 
                 var result = await _userManager.UpdateAsync(user);
 
@@ -60,6 +66,20 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
                 _metrics.IncrementAccountDeactivatedCounter(tagList);
                 _logger.LogDeactivateUser(user.Id, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+
+                //generate audit event
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = user.Facilities?.Count > 0 ? user.Facilities.FirstOrDefault() : string.Empty,
+                    Action = AuditEventType.Update,
+                    EventDate = DateTime.UtcNow,
+                    UserId = user.LastModifiedBy,
+                    User = requestor?.Identity?.Name ?? string.Empty,
+                    Resource = typeof(LinkUser).Name,
+                    Notes = $"User ({user.Id}) deactivated by '{user.LastModifiedBy}'."
+                };
+
+                _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 return result.Succeeded;
             }
