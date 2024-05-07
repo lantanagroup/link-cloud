@@ -7,11 +7,10 @@ namespace LantanaGroup.Link.Tenant.Config
         public static class AppSettingsSectionNames
         {
             public const string ServiceInformation = "ServiceInformation";
-            public const string Telemetry = "TelemetryConfig";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string MeasureConfig = "MeasureConfig";
             public const string EnableSwagger = "EnableSwagger";
-            public const string Serilog = "Logging:Serilog";
+            public const string Serilog = "Serilog";
             public const string DatabaseProvider = "DatabaseProvider";
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
         }

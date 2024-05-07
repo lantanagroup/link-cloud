@@ -174,9 +174,9 @@ namespace Tenant
 
             // Logging using Serilog
             builder.Logging.AddSerilog();
-
+            var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
-                            .ReadFrom.Configuration(builder.Configuration)
+                .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                                         .Filter.ByExcluding("RequestPath like '/health%'")
                                         .Filter.ByExcluding("RequestPath like '/swagger%'")
                                         .Enrich.WithExceptionDetails()
