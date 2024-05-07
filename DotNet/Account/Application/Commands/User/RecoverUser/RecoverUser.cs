@@ -11,6 +11,9 @@ using System.Security.Claims;
 using Link.Authorization.Infrastructure;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
+using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
@@ -20,13 +23,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly UserManager<LinkUser> _userManager;
         private readonly IAccountServiceMetrics _metrics;
         private readonly ILinkUserModelFactory  _linkUserModelFactory;
+        private readonly ICreateAuditEvent _createAuditEvent;
 
-        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory)
+        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _linkUserModelFactory = linkUserModelFactory ?? throw new ArgumentNullException(nameof(linkUserModelFactory));
+            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
         public async Task<LinkUserModel> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
@@ -44,6 +49,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
 
                 user.IsDeleted = false;
+                user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
 
                 var result = await _userManager.UpdateAsync(user);
 
@@ -61,6 +67,20 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
                 _metrics.IncrementAccountRestoredCounter(tagList);
                 _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+
+                //generate audit event
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = user.Facilities?.Count > 0 ? user.Facilities.FirstOrDefault() : string.Empty,
+                    Action = AuditEventType.Update,
+                    EventDate = DateTime.UtcNow,
+                    UserId = user.LastModifiedBy,
+                    User = requestor?.Identity?.Name ?? string.Empty,
+                    Resource = typeof(LinkUser).Name,
+                    Notes = $"User ({user.Id}) recovered by '{user.LastModifiedBy}'."
+                };
+
+                _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 return _linkUserModelFactory.Create(user);
 
