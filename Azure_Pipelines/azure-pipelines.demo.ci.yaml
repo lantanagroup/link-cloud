@@ -2,6 +2,11 @@ trigger:
   paths:
     include:
     - Web/DemoApp/*
+    
+pr:
+  paths:
+    include:
+    - Web/DemoApp/*
 
 name: Demo API Gateway CI
 

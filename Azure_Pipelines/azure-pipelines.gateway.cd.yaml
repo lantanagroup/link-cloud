@@ -7,6 +7,8 @@ trigger:
     - DotNet/DemoApiGateway/*
     exclude:
     - '*'
+    
+pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
