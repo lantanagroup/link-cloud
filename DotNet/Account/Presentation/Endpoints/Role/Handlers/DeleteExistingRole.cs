@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Account.Application.Commands.Role.DeleteRole;
+﻿using LantanaGroup.Link.Account.Application.Commands.Role;
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Infrastructure.Logging;

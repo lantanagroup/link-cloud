@@ -6,7 +6,7 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
-namespace LantanaGroup.Link.Account.Application.Queries.Role.GetRoleByName
+namespace LantanaGroup.Link.Account.Application.Queries.Role
 {
     public class GetRoleByName : IGetRoleByName
     {

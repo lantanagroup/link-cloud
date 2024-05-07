@@ -1,8 +1,11 @@
 using Azure.Identity;
+using FluentValidation;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Account.Application.Validators;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
+using LantanaGroup.Link.Account.Infrastructure.Extensions;
 using LantanaGroup.Link.Account.Infrastructure.Health;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Infrastructure.Telemetry;
@@ -103,8 +106,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));    
-      
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+
+    //add command and queries
+    builder.Services.AddCommandAndQueries();
+
+    // Add fluent validation
+    builder.Services.AddValidatorsFromAssemblyContaining(typeof(UserValidator));
 
     //Add database context
     builder.Services.AddDbContext<AccountDbContext>((sp, options) => {

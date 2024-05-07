@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.Role;
-using LantanaGroup.Link.Account.Application.Commands.Role.UpdateRole;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Infrastructure.Logging;

@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
 {
     public class UserSearchFilterRecordFactory : IUserSearchFilterRecordFactory
     {
-        private int maxPageSize = 20;
+        private readonly int maxPageSize = 20;
 
         public UserSearchFilterRecord Create(string? searchText, string? filterFacilityBy, string? filterRoleBy, string? filterClaimBy, bool includeDeactivatedUsers, bool includeDeletedUsers, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {

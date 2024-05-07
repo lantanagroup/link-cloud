@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Models.Role;
 
-namespace LantanaGroup.Link.Account.Application.Queries.Role.GetRoleByName
+namespace LantanaGroup.Link.Account.Application.Queries.Role
 {
     public interface IGetRoleByName
     {

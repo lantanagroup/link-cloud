@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Account.Application.Queries.Role.GetRoleByName;
+﻿using LantanaGroup.Link.Account.Application.Queries.Role;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
