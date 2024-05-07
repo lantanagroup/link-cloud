@@ -22,7 +22,7 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/.idea
-**/target
+*/target/
 *.iml
 LICENSE
 README.md
