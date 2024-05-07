@@ -76,6 +76,8 @@ services:
       - '17017:27017'
     volumes:
       - mongo_data:/data/db
+    networks:
+      - link-nw
       
   ###########################################
   ### Telemetry
@@ -335,6 +337,7 @@ services:
     image: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
       ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: census-events
@@ -359,7 +362,8 @@ services:
     hostname: dataacquisition_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      MongoDB__ConnectionString: mongodb://mongo:17017
+      AutoMigrate: true
+      MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-dataacquisition
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: dataacquisition-events
@@ -389,10 +393,9 @@ services:
 
   measureeval:
     image: link-measureeval
-    hostname: measureeval_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      spring.data.mongodb.uri: mongodb://mongo:17017
+      spring.data.mongodb.uri: mongodb://mongo:27017
       spring.data.mongodb.database: link-measureeval
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.kafka.consumer.group-id: measureeval-events
@@ -415,6 +418,8 @@ services:
     hostname: normalization_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
+      DatabaseProvider: SqlServer
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: normalization-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
