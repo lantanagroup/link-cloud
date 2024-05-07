@@ -63,6 +63,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddProblemDetailsService(options =>
     {
         options.Environment = builder.Environment;  
+        options.ServiceName = LinkAdminConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
