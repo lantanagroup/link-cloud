@@ -51,7 +51,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 user.FirstName = model.FirstName;
                 user.MiddleName = model.MiddleName;
                 user.LastName = model.LastName;
-                user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+
+                if (requestor is not null)
+                {
+                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                }
 
                 await _userManager.UpdateAsync(user);
 
