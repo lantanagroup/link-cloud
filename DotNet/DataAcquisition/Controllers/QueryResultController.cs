@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResult;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -21,23 +22,44 @@ public class QueryResultController : ControllerBase
     }
 
     /// <summary>
-    /// Get query results for a patient
+    /// Get query results for a correlation Id
     /// </summary>
-    /// <param name="facilityId"></param>
-    /// <param name="patientId"></param>
     /// <param name="correlationId"></param>
     /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    [HttpGet("patientId")]
-    public async Task<ActionResult<QueryResultsModel>> GetPatientQueryResults(string facilityId, string patientId, [FromQuery] string correlationId, CancellationToken cancellationToken)
+    /// <param name="queryType"></param>
+    /// <param name="successOnly"></param>
+    /// <returns>
+    /// Success: 200
+    /// Bad Request: 400
+    /// Not Found: 404
+    /// Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryResultsModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpGet("{correlationId}")]
+    public async Task<ActionResult<QueryResultsModel>> GetQueryResults(CancellationToken cancellationToken, [FromRoute]string correlationId, string queryType = "", bool successOnly = true)
     {
+        if (string.IsNullOrWhiteSpace(correlationId)) 
+        {
+            return BadRequest("Correlation Id is empty");
+        }
+
         try
         {
-            return Ok(await _mediator.Send(new GetPatientQueryResultsQuery { FacilityId = facilityId, PatientId = patientId, CorrelationId = correlationId }, cancellationToken));
+            var results = await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType, SuccessOnly = successOnly }, cancellationToken);
+
+            if (results.QueryResults.Count == 0)
+            {
+                return NotFound();
+            }
+
+            return Ok(results);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetPatientQueryResults"), ex, "An exception occurred while attempting to retrieve patient query results with a facility id of {id}", facilityId);
+            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get Query Results"), ex, "An exception occurred while attempting to retrieve Query Results for correlationId {correlationId}", correlationId);
             throw;
         }
     }
