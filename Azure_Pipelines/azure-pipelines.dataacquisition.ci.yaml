@@ -8,6 +8,7 @@ pr:
   paths:
     include:
     - DotNet/DataAcquisition/*
+    - DotNet/DataAcquisition.Domain/*
     - DotNet/Shared/*
 
 pool:
