@@ -1,5 +1,33 @@
 version: '3.4'
 
+#### services and ports
+## redis_cache: 6379
+## pg_db: 5432
+## mssql: 1433
+## mongo: 17017
+## loki: 3100
+## promtail: N/A
+## grafana: 3000
+## kafka_b: 9092, 9094
+## kafka-ui: 9095
+## rest-proxy: 8082
+## schema-registry: 8081
+## account: 8060
+## audit: 8062
+## bff: 8063
+## census: 8064
+## dataacquisition: 8065
+## demo-app: 8066
+## measureeval: 8067
+## normalization: 8068
+## notification: 8069
+## patientstoquery: 8070
+## querydispatch: 8071
+## report: 8072
+## submission: 8073
+## tenant: 8074
+## validation: 8075
+
 services:
       
   ###########################################
@@ -317,8 +345,7 @@ services:
     image: link-bff
     hostname: bff_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8063
+      ASPNETCORE_ENVIRONMENT: Development
     ports:
       - "8063:8063"
     build:
@@ -337,7 +364,6 @@ services:
     image: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      AutoMigrate: true
       ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: census-events
@@ -379,6 +405,7 @@ services:
     depends_on:
       - kafka_init
       - mongo
+      - loki
 
   demo-app:
     image: link-demo-app
@@ -394,7 +421,6 @@ services:
   measureeval:
     image: link-measureeval
     environment:
-      ASPNETCORE_ENVIRONMENT: Docker
       spring.data.mongodb.uri: mongodb://mongo:27017
       spring.data.mongodb.database: link-measureeval
       spring.kafka.bootstrap-servers: kafka_b:9094
@@ -434,13 +460,21 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - loki
       
   notification:
     image: link-notification
     hostname: notification_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8069
+      ASPNETCORE_ENVIRONMENT: Docker
+      DatabaseProvider: SqlServer
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: normalization-events
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
+      IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8069:8069"
     build:
@@ -450,8 +484,10 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - mssql_init
+      - loki
       
-  patientquery:
+  patientstoquery:
     image: link-patientquery
     hostname: patientquery_svc
     environment:
@@ -468,13 +504,18 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - loki
       
   querydispatch:
     image: link-querydispatch
     hostname: querydispatch_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8071
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: patientquery-events
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-querydispatch
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8071:8071"
     build:
@@ -484,13 +525,20 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - mongo
+      - loki
 
   report:
     image: link-report
     hostname: report_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8072
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: patientquery-events
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-report
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8072:8072"
     build:
@@ -500,13 +548,20 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - mongo
+      - loki
 
   submission:
     image: link-submission
     hostname: submission_svc
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8073
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__GroupId: patientquery-events
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-submission
+      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8073:8073"
     build:
@@ -514,8 +569,12 @@ services:
       dockerfile: DotNet/Submission/Dockerfile
     networks:
       - link-nw
+    volumes: 
+      - submission_data:/data/Submission
     depends_on:
       - kafka_init
+      - mongo
+      - loki
 
   tenant:
     image: link-tenant
@@ -535,11 +594,30 @@ services:
     networks:
       - link-nw
     depends_on:
+      - kafka_init
       - loki
+      - mssql_init
+
+  validation:
+    image: link-validation
+    environment:
+      server.port: 8075
+      spring.security.oauth2.resourceserver.jwt.issuer-url: https://oauth.nhsnlink.org/realms/NHSNLink
+      spring.datasource.url: jdbc:sqlserver://mssql:1433;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+      spring.datasource.username: link-user
+      spring.datasource.password: ${LINK_DB_PASS}
+      spring.kafka.bootstrap-servers: kafka_b:9094
+      spring.jpa.hibernate.ddl-auto: update
+    ports:
+      - "8075:8075"
+    build:
+      context: Java/
+      dockerfile: validation/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
       - kafka_init
       - mssql_init
-      
-  # TODO: Java MeasureEval and Validation Services
 
 networks:
   link-nw:
@@ -554,4 +632,6 @@ volumes:
   redis_cache:
     driver: local
   mongo_data:
+    driver: local
+  submission_data:
     driver: local
