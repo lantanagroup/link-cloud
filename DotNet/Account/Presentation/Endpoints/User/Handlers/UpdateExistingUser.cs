@@ -16,16 +16,16 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 return Results.BadRequest("A user id is required");
             }
 
+            //check that the id in the url matches the id in the model
+            if (model.Id != id)
+            {
+                return Results.BadRequest("The user id in the url does not match the user id in the user model provided.");
+            }
+
             var requestor = context.User;
             var existingUser = await userRepository.GetUserAsync(id, cancellationToken: context.RequestAborted);
             if (existingUser is null)
-            {
-                //check that the id in the url matches the id in the model
-                if (model.Id != id)
-                {
-                    return Results.BadRequest("The user id in the url does not match the user id in the user model provided.");
-                }
-
+            {              
                 //create new user
                 var createdUser = await createUserCommand.Execute(requestor, model, context.RequestAborted);
 
