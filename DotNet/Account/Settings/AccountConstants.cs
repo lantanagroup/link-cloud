@@ -6,16 +6,15 @@
 
         public static class AppSettingsSectionNames
         {
-            public const string ServiceInformation = "ServiceInformation";
+            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string Kafka = "KafkaConnection";
             public const string DatabaseProvider = "DatabaseProvider";
             public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";            
             public const string Postgres = "Postgres";
-            public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";
             public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
-            public const string TenantApiSettings = "TenantApiSettings";
-            public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string TenantApiSettings = "TenantApiSettings";            
         }
 
         public static class AccountLoggingIds
@@ -64,6 +63,9 @@
             public const int RoleClaimAssignmentException = 1111;
             public const int RoleClaimRemoval = 1112;
             public const int RoleClaimRemovalException = 1113;
+
+            public const int AuditEventCreated = 1200;
+            public const int AuditEventCreationException = 1201;
         }
     }
 }
