@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Submission.Settings
         {
             public const string Mongo = "MongoDB";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string Serilog = "Serilog";
         }
 
     }
