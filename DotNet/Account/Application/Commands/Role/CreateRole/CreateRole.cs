@@ -1,8 +1,11 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
@@ -16,12 +19,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         private readonly ILogger<CreateRole> _logger;
         private readonly RoleManager<LinkRole> _roleManager;
         private readonly ILinkRoleModelFactory _roleModelFactory;
+        private readonly ICreateAuditEvent _createAuditEvent;
 
-        public CreateRole(ILogger<CreateRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory)
+        public CreateRole(ILogger<CreateRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
+            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
         public async Task<LinkRoleModel> Execute(ClaimsPrincipal? requestor, LinkRoleModel model, CancellationToken cancellationToken = default)
@@ -71,6 +76,19 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 var roleModel = _roleModelFactory.Create(role);
                 _logger.LogRoleCreated(roleModel.Name, role.CreatedBy ?? "Unknown", roleModel);
+
+                //generate audit event
+                var auditMessage = new AuditEventMessage
+                {                    
+                    Action = AuditEventType.Create,
+                    EventDate = DateTime.UtcNow,
+                    UserId = role.CreatedBy,
+                    User = requestor?.Identity?.Name ?? string.Empty,
+                    Resource = typeof(LinkRole).Name,
+                    Notes = $"New role ({role.Id}) created by '{role.CreatedBy}'."
+                };
+
+                _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 return roleModel;
             }

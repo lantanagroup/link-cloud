@@ -45,7 +45,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 }
 
                 user.IsDeleted = true;
-                user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+
+                if (requestor is not null)
+                {
+                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                }
 
                 var result = await _userManager.UpdateAsync(user);
 
@@ -73,6 +77,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     UserId = user.LastModifiedBy,
                     User = requestor?.Identity?.Name ?? string.Empty,
                     Resource = typeof(LinkUser).Name,
+                    PropertyChanges = new List<PropertyChangeModel>([
+                        new PropertyChangeModel("IsDeleted", "False", "True")
+                    ]),
                     Notes = $"User ({user.Id}) deleted by '{user.LastModifiedBy}'."
                 };
 

@@ -1,9 +1,11 @@
-﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
+using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.AspNetCore.Identity;
@@ -18,12 +20,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         private readonly ILogger<UpdateRole> _logger;
         private readonly RoleManager<LinkRole> _roleManager;
         private readonly ILinkRoleModelFactory _roleModelFactory;
+        private readonly ICreateAuditEvent _createAuditEvent;
 
-        public UpdateRole(ILogger<UpdateRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory)
+        public UpdateRole(ILogger<UpdateRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
+            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkRoleModel model, CancellationToken cancellationToken = default)
@@ -41,6 +45,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 role.Name = model.Name;
                 role.Description = model.Description;
+                
+                if(requestor is not null)
+                {
+                    role.LastModifiedBy = requestor.Claims.First(c => c.Type == "sub").Value;
+                }
 
                 await _roleManager.UpdateAsync(role);
 
@@ -71,7 +80,19 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", model.Claims)));
                 }
 
-                //TODO: Create audit event
+                //generate audit event
+                var auditMessage = new AuditEventMessage
+                {
+                    Action = AuditEventType.Update,
+                    EventDate = DateTime.UtcNow,
+                    UserId = role.LastModifiedBy,
+                    User = requestor?.Identity?.Name ?? string.Empty,
+                    Resource = typeof(LinkRole).Name,
+                    PropertyChanges = changes,
+                    Notes = $"New role ({role.Id}) created by '{role.LastModifiedBy}'."
+                };
+
+                _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 return true;
                 
