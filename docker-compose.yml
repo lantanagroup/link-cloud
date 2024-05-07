@@ -389,8 +389,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       AutoMigrate: true
-      MongoDB__ConnectionString: mongodb://mongo:27017
-      MongoDB__DatabaseName: link-dataacquisition
+      DatabaseProvider: SqlServer
+      ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__GroupId: dataacquisition-events
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
@@ -404,7 +404,7 @@ services:
       - link-nw
     depends_on:
       - kafka_init
-      - mongo
+      - mssql_init
       - loki
 
   demo-app:
@@ -603,7 +603,7 @@ services:
     environment:
       server.port: 8075
       spring.security.oauth2.resourceserver.jwt.issuer-url: https://oauth.nhsnlink.org/realms/NHSNLink
-      spring.datasource.url: jdbc:sqlserver://mssql:1433;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+      spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
       spring.datasource.username: link-user
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.bootstrap-servers: kafka_b:9094
