@@ -23,7 +23,6 @@ public class RetryListener : BackgroundService
     private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
     private readonly IRetryEntityFactory _retryEntityFactory;
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
-    //private readonly IRetryRepository _retryRepository;
     private readonly IOptions<ConsumerSettings> _consumerSettings;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -33,7 +32,6 @@ public class RetryListener : BackgroundService
         IKafkaConsumerFactory<string, string> kafkaConsumerFactory, 
         IRetryEntityFactory retryEntityFactory, 
         IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, 
-        //IRetryRepository retryRepository, 
         IOptions<ConsumerSettings> consumerSettings, 
         ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory
@@ -43,7 +41,6 @@ public class RetryListener : BackgroundService
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _retryEntityFactory = retryEntityFactory ?? throw new ArgumentNullException(nameof(retryEntityFactory));
         _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-        //_retryRepository = retryRepository ?? throw new ArgumentNullException(nameof(retryRepository));
         _consumerSettings = consumerSettings ?? throw new ArgumentNullException(nameof(consumerSettings));
         _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));

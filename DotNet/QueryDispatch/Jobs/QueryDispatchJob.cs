@@ -19,16 +19,20 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
         private readonly ILogger<QueryDispatchJob> _logger;
         private readonly IKafkaProducerFactory<string, DataAcquisitionRequestedValue> _acquisitionProducerFactory;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
-        private readonly IDeletePatientDispatchCommand _deletePatientDispatchCommand;
-   
-        public QueryDispatchJob(ILogger<QueryDispatchJob> logger, IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IDeletePatientDispatchCommand deletePatientDispatchCommand)
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        public QueryDispatchJob(
+            ILogger<QueryDispatchJob> logger, 
+            IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory,
+            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, 
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _acquisitionProducerFactory = acquisitionProducerFactory ?? throw new ArgumentNullException(nameof(acquisitionProducerFactory));
             _auditProducerFactory = auditProducerFactory ?? throw new ArgumentNullException(nameof(auditProducerFactory));
-            _deletePatientDispatchCommand = deletePatientDispatchCommand;
+            _serviceScopeFactory = serviceScopeFactory;
         }
-        
+
         public Task Execute(IJobExecutionContext context)
         {
             JobDataMap triggerMap = context.Trigger.JobDataMap!;
@@ -43,6 +47,9 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             {
                 try
                 {
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var _deletePatientDispatchCommand = scope.ServiceProvider.GetRequiredService<IDeletePatientDispatchCommand>();
+
                     DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                     {
                         PatientId = patientDispatchEntity.PatientId,
