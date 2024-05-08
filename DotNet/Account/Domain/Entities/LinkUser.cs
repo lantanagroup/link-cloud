@@ -1,13 +1,16 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Domain;
-using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Domain.Entities
 {
 
-    [Table("Accounts")]
-    public class LinkUser : IdentityUser, IBaseEntity
-    {      
+    [Table("Users")]
+    public class LinkUser : IBaseEntity
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string? MiddleName { get; set; }
         public string LastName { get; set; } = string.Empty;
@@ -22,26 +25,36 @@ namespace LantanaGroup.Link.Account.Domain.Entities
 
 
         public virtual ICollection<LinkUserClaim> Claims { get; set; } = new List<LinkUserClaim>();
-        public virtual ICollection<LinkUserLogin> Logins { get; set; } = new List<LinkUserLogin>();
-        public virtual ICollection<LinkUserToken> Tokens { get; set; } = new List<LinkUserToken>();
         public virtual ICollection<LinkUserRole> UserRoles { get; set; } = new List<LinkUserRole>();        
     }
 
-    [Table("AccountClaims")]
-    public class LinkUserClaim : IdentityUserClaim<string>
+    [Table("UserRoles")]
+    public class LinkUserRole
     {
+        public string UserId { get; set; } = default!;
+        public string RoleId { get; set; } = default!;
+
         public virtual LinkUser User { get; set; } = default!;
+        public virtual LinkRole Role { get; set; } = default!;
     }
 
-    [Table("AccountLogins")]
-    public class LinkUserLogin : IdentityUserLogin<string>
+    [Table("UserClaims")]
+    public class LinkUserClaim
     {
-        public virtual LinkUser User { get; set; } = default!;
-    }
+        public int Id { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string? ClaimType { get; set; }
+        public string? ClaimValue { get; set; }     
 
-    [Table("AccountTokens")]
-    public class LinkUserToken : IdentityUserToken<string>
-    {
-        public virtual LinkUser User { get; set; } = default!;
-    }   
+        public virtual Claim ToClaim()
+        {
+            return new(ClaimType!, ClaimValue!);
+        }
+
+        public virtual void InitializeFromClaim(Claim claim)
+        {
+            ClaimType = claim.Type;
+            ClaimValue = claim.Value;
+        }
+    }
 }

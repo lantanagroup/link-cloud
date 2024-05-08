@@ -5,7 +5,6 @@ using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
 using LantanaGroup.Link.Account.Application.Validators;
-using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Extensions;
 using LantanaGroup.Link.Account.Infrastructure.Health;
@@ -128,13 +127,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                 throw new InvalidOperationException($"Database provider {dbProvider} is not supported.");
         }
     });
-
-    //Add Identity
-    builder.Services.AddIdentity<LinkUser, LinkRole>(options =>
-    {
-        options.User.RequireUniqueEmail = true;
-    })
-    .AddEntityFrameworkStores<AccountDbContext>();
 
     //Add repositories
     builder.Services.AddScoped<IUserRepository, UserRepository>();
