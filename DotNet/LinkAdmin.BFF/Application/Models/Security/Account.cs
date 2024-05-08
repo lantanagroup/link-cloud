@@ -3,13 +3,14 @@
     public class Account
     {
         public required string Id { get; set; }
-        public required string Username { get; set; }
-        public required string EmailAddress { get; set; }
-        public required string FirstName { get; set; }
+        public string Username { get; set; } = default!;
+        public string Email { get; set; } = default!;
+        public string FirstName { get; set; } = default!;
         public string? MiddleName { get; set; }
-        public required string LastName { get; set; }
+        public string LastName { get; set; } = default!;
         public List<string> FacilityIds { get; set; } = [];
-        public List<Group> Groups { get; set; } = [];
-        public List<Role> Roles { get; set; } = [];
+        public List<string> UserClaims { get; set; } = [];
+        public List<string> RoleClaims { get; set; } = [];
+        public List<string> Roles { get; set; } = [];
     }
 }

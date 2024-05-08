@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
 
             //send the request to the account service
-            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/email/{accountId}", cancellationToken);
+            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/user/email/{accountId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
