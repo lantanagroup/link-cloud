@@ -3,6 +3,7 @@ using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Queries.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Enums;
+using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
@@ -10,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class SearchForUsers
     {
         public static async Task<IResult> Handle(
-            HttpContext context, ILogger logger, ISearchUsers query, IUserSearchFilterRecordFactory filterFactory,
+            HttpContext context, [FromServices] ILogger logger, [FromServices] ISearchUsers query, [FromServices] IUserSearchFilterRecordFactory filterFactory,
             string? searchText,
             string? filterFacilityBy,
             string? filterRoleBy,

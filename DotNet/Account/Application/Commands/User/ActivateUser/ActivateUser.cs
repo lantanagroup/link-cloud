@@ -9,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -39,7 +38,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 var user = await _userRepository.GetUserAsync(userId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {userId} not found");
 
-                if(user is null)
+                if (user is null)
                 {
                     throw new ApplicationException($"User with id {userId} not found");
                 }
@@ -53,7 +52,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (requestor is not null)
                 {
-                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 var result = await _userRepository.UpdateAsync(user, cancellationToken);
@@ -93,11 +92,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogActivateUserException(userId, ex.Message);
                 throw;
             }
         }

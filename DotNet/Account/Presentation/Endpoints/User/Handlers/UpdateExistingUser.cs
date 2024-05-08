@@ -2,13 +2,14 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class UpdateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, ILogger logger, 
-            IUserRepository userRepository, ICreateUser createUserCommand, IUpdateUser command)
+        public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, [FromServices] ILogger logger,
+            [FromServices] IUserRepository userRepository, [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
         {
             if (string.IsNullOrEmpty(id))
             {

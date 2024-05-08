@@ -7,7 +7,6 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -66,7 +65,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
                     role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }
          
-                await _roleRepository.UpdateAsync(role);                
+                await _roleRepository.UpdateAsync(role, cancellationToken);                
 
                 _logger.LogRoleUpdated(role.Name ?? string.Empty, role.LastModifiedBy ?? string.Empty, _roleModelFactory.Create(role));
 
@@ -86,11 +85,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                activity?.SetStatus(ActivityStatusCode.Error);
-                activity?.RecordException(ex);
-                _logger.LogRoleUpdateException(roleId, ex.Message, _roleModelFactory.Create(roleId, string.Empty, claims));
+                activity?.SetStatus(ActivityStatusCode.Error);                
                 throw;
             }
         }

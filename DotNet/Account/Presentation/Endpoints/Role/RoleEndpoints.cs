@@ -52,8 +52,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                     Summary = "Get role by name",
                     Description = "Retrieves information about a role with the name provided"
                 });
-
-            //crate get roles endpoint
+            
             roleEndpoints.MapGet("/role", GetRoleList.Handle)
                 .Produces(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)

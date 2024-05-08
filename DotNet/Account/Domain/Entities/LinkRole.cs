@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         public DateTime? LastModifiedOn { get; set; }
         public string? LastModifiedBy { get; set; }
       
-        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = new List<LinkUserRole>();
+        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = [];
         public virtual ICollection<LinkRoleClaim> RoleClaims { get; set; } = [];
 
         public override string ToString()

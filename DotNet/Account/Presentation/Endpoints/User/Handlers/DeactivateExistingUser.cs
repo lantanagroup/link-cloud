@@ -1,13 +1,14 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class DeactivateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, 
-            ILogger logger, IUserRepository userRepository, IDeactivateUser command)
+        public static async Task<IResult> Handle(HttpContext context, string id,
+            [FromServices] ILogger logger, [FromServices] IUserRepository userRepository, [FromServices] IDeactivateUser command)
         {
             if (string.IsNullOrEmpty(id))
             {

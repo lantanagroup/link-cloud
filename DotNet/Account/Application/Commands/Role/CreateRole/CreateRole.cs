@@ -8,7 +8,6 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -52,7 +51,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     role.CreatedBy = requestor.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                var result = await _roleRepository.CreateAsync(role);
+                var result = await _roleRepository.CreateAsync(role, cancellationToken);
 
                 if (!result)
                 {
@@ -92,11 +91,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 return roleModel;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogRoleCreationException(model.Name, ex.Message, model);
                 throw;
             }
         }

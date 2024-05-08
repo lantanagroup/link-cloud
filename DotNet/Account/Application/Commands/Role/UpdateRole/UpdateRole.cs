@@ -4,13 +4,11 @@ using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
-using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -40,7 +38,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
             try
             {
-                var role = await _roleRepository.GetRoleAsync(model.Id) ?? throw new ApplicationException($"Role with id {model.Id} not found");
+                var role = await _roleRepository.GetRoleAsync(model.Id, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {model.Id} not found");
 
                 List<PropertyChangeModel> changes = GetRoleDiff(model, role);
 
@@ -49,7 +47,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 
                 if(requestor is not null)
                 {
-                    role.LastModifiedBy = requestor.Claims.First(c => c.Type == "sub").Value;
+                    role.LastModifiedBy = requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 await _roleRepository.UpdateAsync(role, cancellationToken);
@@ -102,11 +100,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 return true;
                 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogRoleUpdateException(model.Name, ex.Message, model);
                 throw;
             }
         }

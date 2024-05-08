@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.Account.Application.Queries.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUserByEmail
     {
-        public static async Task<IResult> Handle(HttpContext context, string email, ILogger logger, IGetUserByEmail query)
+        public static async Task<IResult> Handle(HttpContext context, string email, [FromServices] ILogger logger, [FromServices] IGetUserByEmail query)
         {
             if (string.IsNullOrEmpty(email))
             {

@@ -25,15 +25,13 @@ namespace LantanaGroup.Link.Account.Persistence.Configurations
 
             // Each User can have many UserClaims
             builder.HasMany(e => e.Claims)
-                .WithOne()
-                .HasForeignKey(uc => uc.UserId)
-                .IsRequired();
+                .WithOne(e => e.User)
+                .HasForeignKey(uc => uc.UserId);
 
             // Each User can have many entries in the UserRole join table
             builder.HasMany(e => e.UserRoles)
-                .WithOne()
-                .HasForeignKey(ur => ur.UserId)
-                .IsRequired();
+                .WithOne(e => e.User)
+                .HasForeignKey(ur => ur.UserId);
 
         }
     }
