@@ -106,17 +106,37 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<LinkUser> GetUserAsync(string id, bool noTracking = true, CancellationToken cancellationToken = default)
         {
             var user = noTracking ?
-                await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken) :
-                await _dbContext.Users.FindAsync([id], cancellationToken);
-            
+                await _dbContext.Users.AsNoTracking()
+                    .Include(x => x.UserRoles)
+                        .ThenInclude(x => x.Role)
+                            .ThenInclude(x => x.RoleClaims)
+                    .Include(x => x.Claims)
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken) :
+                await _dbContext.Users
+                    .Include(x => x.UserRoles)
+                        .ThenInclude(x => x.Role)
+                            .ThenInclude(x => x.RoleClaims)
+                    .Include(x => x.Claims)
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
             return user;
         }
 
         public async Task<LinkUser> GetUserByEmailAsync(string email, bool noTracking = true, CancellationToken cancellationToken = default)
         {
             var user = noTracking ?
-                await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == email, cancellationToken) :
-                await _dbContext.Users.FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
+                await _dbContext.Users.AsNoTracking()
+                    .Include(x => x.UserRoles)
+                        .ThenInclude(x => x.Role)
+                            .ThenInclude(x => x.RoleClaims)
+                    .Include(x => x.Claims)
+                    .FirstOrDefaultAsync(x => x.Email == email, cancellationToken) :
+                await _dbContext.Users
+                    .Include(x => x.UserRoles)
+                        .ThenInclude(x => x.Role)
+                            .ThenInclude(x => x.RoleClaims)
+                    .Include(x => x.Claims)
+                    .FirstOrDefaultAsync(x => x.Email == email, cancellationToken);
 
             return user;
         }        

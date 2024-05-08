@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
                 return userModel;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;

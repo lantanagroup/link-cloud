@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class GetRoleByName
     {
         public static async Task<IResult> Handle(HttpContext context, string name, 
-            [FromServices] ILogger logger, [FromServices] IGetRoleByName query)
+            [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRoleByName query)
         {
             try
             {
