@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 if (requestor is not null)
                 {
-                    role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    role.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 var result = await _roleRepository.DeleteAsync(role.Id);
