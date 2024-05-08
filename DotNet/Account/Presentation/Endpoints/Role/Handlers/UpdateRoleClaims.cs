@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 
                 logger.LogRoleUpdated(role.Name, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown", role);
 
-                return Results.NoContent();
+                return Results.Ok(role);
             }
             catch (Exception ex)
             {

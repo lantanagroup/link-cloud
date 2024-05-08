@@ -28,11 +28,11 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
             #region Queries
 
             userEndpoints.MapGet("/user/{id}", GetUser.Handle)
-                .Produces(StatusCodes.Status200OK)
-                .Produces(StatusCodes.Status400BadRequest)
+                .Produces<LinkUserModel>(StatusCodes.Status200OK)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
-                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
@@ -41,11 +41,11 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/email/{email}", GetUserByEmail.Handle)
-                .Produces(StatusCodes.Status200OK)
-                .Produces(StatusCodes.Status400BadRequest)
+                .Produces<LinkUserModel>(StatusCodes.Status200OK)
+                .ProducesProblem(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
-                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status404NotFound)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/facility/{id}", GetUsersByFacility.Handle)
-                .Produces(StatusCodes.Status200OK)
+                .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/role/{id}", GetUsersByRole.Handle)
-                .Produces(StatusCodes.Status200OK)
+                .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/users", SearchForUsers.Handle)
-               .Produces(StatusCodes.Status200OK)
+               .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .Produces(StatusCodes.Status403Forbidden)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                });
 
             userEndpoints.MapGet("/users/facility/{id}", SearchForFacilityUsers.Handle)
-               .Produces(StatusCodes.Status200OK)
+               .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .Produces(StatusCodes.Status403Forbidden)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
 
             userEndpoints.MapPost("/user", CreateNewUser.Handle)
                 .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
-                .Produces(StatusCodes.Status201Created)
+                .Produces<LinkUserModel>(StatusCodes.Status201Created)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -143,7 +143,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPost("/user/{id}/recover", RecoverDeletedUser.Handle)
-                .Produces(StatusCodes.Status204NoContent)
+                .Produces<LinkUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
