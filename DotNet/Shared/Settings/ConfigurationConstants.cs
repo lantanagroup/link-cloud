@@ -9,6 +9,12 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string Telemetry = "Telemetry";
             public const string CORS = "CORS";
             public const string AutoMigrate = "AutoMigrate";
+            public const string DatabaseProvider = "DatabaseProvider";
+        }
+
+        public static class DatabaseConnections
+        {
+            public const string SqlServer = "SqlServer";
         }
     }
 }

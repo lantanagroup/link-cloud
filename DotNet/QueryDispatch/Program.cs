@@ -44,6 +44,7 @@ using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using QueryDispatch.Domain.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -93,6 +94,9 @@ builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSec
 builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+
+//Add database context
+builder.AddSQLServerEF<QueryDispatchDbContext>(true);
 
 IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
 builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
