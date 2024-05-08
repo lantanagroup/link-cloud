@@ -2,6 +2,8 @@
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using Microsoft.AspNetCore.Mvc;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
@@ -9,33 +11,41 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     {
         public static async Task<IResult> Handle(HttpContext context, 
             LinkUserModel model, [FromServices] ILogger logger, [FromServices] ICreateUser command)
-        {            
-            if (model is null)
+        {
+            try
             {
-                return Results.BadRequest("No user was provided in the request.");
+                if (model is null)
+                {
+                    return Results.BadRequest("No user was provided in the request.");
+                }
+
+                var requestor = context.User;
+                var createdUser = await command.Execute(requestor, model, context.RequestAborted);
+
+                logger.LogUserCreated(createdUser.Id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+
+                //build resource uri
+                var uriBuilder = new UriBuilder
+                {
+                    Scheme = context.Request.Scheme,
+                    Host = context.Request.Host.Host,
+                    Path = $"api/account/user/{createdUser.Id}"
+                };
+
+                if (context.Request.Host.Port.HasValue)
+                {
+                    uriBuilder.Port = context.Request.Host.Port.Value;
+                }
+
+                return Results.Created(uriBuilder.ToString(), createdUser);
             }
-
-            var requestor = context.User;
-            var createdUser = await command.Execute(requestor, model, context.RequestAborted);
-
-            logger.LogUserCreated(createdUser.Id, requestor.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
-
-            //build resource uri
-            var uriBuilder = new UriBuilder
+            catch (Exception ex)
             {
-                Scheme = context.Request.Scheme,
-                Host = context.Request.Host.Host,
-                Path = $"api/account/user/{createdUser.Id}"
-            };
-
-            if (context.Request.Host.Port.HasValue)
-            {
-                uriBuilder.Port = context.Request.Host.Port.Value;
-            }
-
-            return Results.Created(uriBuilder.ToString(), createdUser);
-        }
-
-        
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                logger.LogUserCreationException(ex.Message);
+                throw;
+            }            
+        }        
     }
 }

@@ -4,7 +4,6 @@ using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 using Link.Authorization.Infrastructure;
@@ -52,7 +51,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (requestor is not null)
                 {
-                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }                
 
                 var result = await _userRepository.UpdateAsync(user, cancellationToken);
@@ -70,7 +69,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountRestoredCounter(tagList);
-                _logger.LogUserRecovery(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                _logger.LogUserRecovery(userId, user.LastModifiedBy ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
@@ -92,11 +91,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 return _linkUserModelFactory.Create(user);
 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogDeleteUserException(userId, ex.Message);
                 throw;
             }
 

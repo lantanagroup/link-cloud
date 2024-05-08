@@ -2,10 +2,8 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure;
-using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.User
@@ -45,8 +43,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogFindUserException(email, ex.Message);
                 throw;
             }
         }

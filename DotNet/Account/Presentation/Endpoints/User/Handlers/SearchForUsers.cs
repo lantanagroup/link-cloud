@@ -1,9 +1,10 @@
-﻿using Azure;
-using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
+﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Queries.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.AspNetCore.Mvc;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
@@ -23,28 +24,37 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             int pageSize = 10,
             int pageNumber = 1)
         {
+            try
+            {
+                // Create search filters
+                var filters = filterFactory.Create(
+                    searchText,
+                    filterFacilityBy,
+                    filterRoleBy,
+                    filterClaimBy,
+                    includeDeactivatedUsers,
+                    includeDeletedUsers,
+                    sortBy,
+                    sortOrder,
+                    pageSize,
+                    pageNumber);
 
-            // Create search filters
-            var filters = filterFactory.Create(
-                searchText, 
-                filterFacilityBy, 
-                filterRoleBy, 
-                filterClaimBy, 
-                includeDeactivatedUsers, 
-                includeDeletedUsers, 
-                sortBy, 
-                sortOrder, 
-                pageSize, 
-                pageNumber); 
+                var users = await query.Execute(filters, context.RequestAborted);
 
-            var users = await query.Execute(filters, context.RequestAborted);
+                logger.LogFindUsers(context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
-            logger.LogFindUsers(context.User.Claims.First(c => c.Type == "sub").Value ?? "Uknown");
+                //add X-Pagination header for machine-readable pagination metadata
+                context.Response.Headers["X-Pagination"] = JsonSerializer.Serialize(users.Metadata);
 
-            //add X-Pagination header for machine-readable pagination metadata
-            context.Response.Headers["X-Pagination"] = JsonSerializer.Serialize(users.Metadata);
-
-            return Results.Ok(users);
+                return Results.Ok(users);
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
+                logger.LogFindUsersException(ex.Message);
+                throw;
+            }           
         }
     }
 }

@@ -9,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -56,7 +55,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (requestor is not null)
                 {
-                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 await _userRepository.UpdateAsync(user);
@@ -131,8 +130,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogUpdateUserException(model.Id, ex.Message);
                 throw;
             }
         }
