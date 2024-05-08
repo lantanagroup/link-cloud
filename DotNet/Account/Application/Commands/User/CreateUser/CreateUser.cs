@@ -7,7 +7,6 @@ using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -52,7 +51,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     user.CreatedBy = requestor.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                var result = await _userRepository.CreateAsync(user);
+                var result = await _userRepository.CreateAsync(user, cancellationToken);
                 if (!result)
                 {
                     throw new ApplicationException($"Unable to create user.");
@@ -105,11 +104,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 return model;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogUserCreationException(ex.Message);
                 throw;
             }            
         }

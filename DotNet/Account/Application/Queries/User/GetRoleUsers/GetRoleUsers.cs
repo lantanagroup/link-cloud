@@ -53,8 +53,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogFindUsersException(ex.Message);
                 throw;
             }
         }
