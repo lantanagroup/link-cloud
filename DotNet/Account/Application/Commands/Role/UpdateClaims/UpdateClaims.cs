@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using Microsoft.AspNetCore.Identity;
+using Link.Authorization.Infrastructure;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -15,14 +16,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
     public class UpdateClaims : IUpdateClaims
     {
         private readonly ILogger<UpdateClaims> _logger;
-        private readonly RoleManager<LinkRole> _roleManager;
+        private readonly IRoleRepository _roleRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
 
-        public UpdateClaims(ILogger<UpdateClaims> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateClaims(ILogger<UpdateClaims> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
+            _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
@@ -33,15 +34,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
 
             try
             { 
-                var role = await _roleManager.FindByIdAsync(roleId) ?? throw new ApplicationException($"Role with id {roleId} not found");
+                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {roleId} not found");
 
-                var currentClaims = await _roleManager.GetClaimsAsync(role);
+                var currentClaims = await _roleRepository.GetClaimsAsync(role.Id, cancellationToken);
                 var addedClaims = claims.Except(currentClaims.Select(c => c.Value));
                 var removedClaims = currentClaims.Select(c => c.Value).Except(claims);
 
                 foreach (var claim in addedClaims)
                 {
-                    await _roleManager.AddClaimAsync(role, new Claim("role", claim));
+                    await _roleRepository.AddClaimAsync(role.Id, new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim), cancellationToken);
                 }
 
                 foreach (var claim in removedClaims)
@@ -49,7 +50,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
                     var roleClaim = currentClaims.FirstOrDefault(c => c.Value == claim);
                     if (roleClaim is not null)
                     {
-                        await _roleManager.RemoveClaimAsync(role, roleClaim);
+                        await _roleRepository.RemoveClaimAsync(role.Id, roleClaim, cancellationToken);
                     }
                 }
 
@@ -65,7 +66,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
                     role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }
          
-                await _roleManager.UpdateAsync(role);                
+                await _roleRepository.UpdateAsync(role);                
 
                 _logger.LogRoleUpdated(role.Name ?? string.Empty, role.LastModifiedBy ?? string.Empty, _roleModelFactory.Create(role));
 

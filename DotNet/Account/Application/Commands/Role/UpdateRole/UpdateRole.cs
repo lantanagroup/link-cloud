@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
@@ -8,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -18,14 +20,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
     public class UpdateRole : IUpdateRole
     {
         private readonly ILogger<UpdateRole> _logger;
-        private readonly RoleManager<LinkRole> _roleManager;
+        private readonly IRoleRepository _roleRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
 
-        public UpdateRole(ILogger<UpdateRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateRole(ILogger<UpdateRole> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
+            _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
@@ -39,7 +41,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
             try
             {
-                var role = await _roleManager.FindByIdAsync(model.Id) ?? throw new ApplicationException($"Role with id {model.Id} not found");
+                var role = await _roleRepository.GetRoleAsync(model.Id) ?? throw new ApplicationException($"Role with id {model.Id} not found");
 
                 List<PropertyChangeModel> changes = GetRoleDiff(model, role);
 
@@ -51,10 +53,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     role.LastModifiedBy = requestor.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                await _roleManager.UpdateAsync(role);
+                await _roleRepository.UpdateAsync(role);
 
                 //update role claims
-                var currentClaims = await _roleManager.GetClaimsAsync(role);
+                var currentClaims = await _roleRepository.GetClaimsAsync(role.Id, cancellationToken);
                 var addedClaims = model.Claims.Except(currentClaims.Select(c => c.Value));
                 var removedClaims = currentClaims.Select(c => c.Value).Except(model.Claims);
 
@@ -62,7 +64,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 {
                     foreach (var claim in addedClaims)
                     {
-                        await _roleManager.AddClaimAsync(role, new Claim("role", claim));
+                        await _roleRepository.AddClaimAsync(role.Id, new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim), cancellationToken);
                     }
                 }
 
@@ -70,7 +72,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 {
                     foreach (var claim in removedClaims)
                     {
-                        await _roleManager.RemoveClaimAsync(role, new Claim("role", claim));
+                        var roleClaim = currentClaims.FirstOrDefault(c => c.Value == claim);
+                        if (roleClaim is not null)
+                        {
+                            await _roleRepository.RemoveClaimAsync(role.Id, roleClaim, cancellationToken);
+                        }
                     }
                 }
 
