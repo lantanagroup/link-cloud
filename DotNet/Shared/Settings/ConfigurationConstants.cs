@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Shared.Settings
         public static class DatabaseConnections
         {
             public const string SqlServer = "SqlServer";
+            public const string DatabaseConnection = "DatabaseConnection";
         }
     }
 }

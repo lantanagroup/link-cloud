@@ -29,6 +29,7 @@ using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -36,7 +37,6 @@ using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Services;
 using QueryDispatch.Application.Settings;
-using QueryDispatch.Presentation.Services;
 using Serilog;
 using System.Diagnostics;
 using Serilog.Enrichers.Span;
@@ -45,6 +45,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using QueryDispatch.Domain.Context;
+using QueryDispatch.Persistence.Retry;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,7 +92,6 @@ else
 
 
 builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
-builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection("MongoDB"));
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
@@ -134,17 +134,17 @@ builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
 
 //Add repos
-builder.Services.AddSingleton<IScheduledReportRepository, ScheduledReportMongoRepo>();
-builder.Services.AddSingleton<IPatientDispatchRepository, PatientDispatchMongoRepo>();
-builder.Services.AddSingleton<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationMongoRepo>();
-builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
+builder.Services.AddScoped<IScheduledReportRepository, ScheduledReportRepo>();
+builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
+builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
+builder.Services.AddScoped<IRetryRepository, RetryRepositorySQL_QD>();
 
 //Add Queries
-builder.Services.AddTransient<IGetScheduledReportQuery, GetScheduledReportQuery>();
-builder.Services.AddTransient<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
-builder.Services.AddTransient<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
-builder.Services.AddTransient<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
-builder.Services.AddTransient<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
+builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();
+builder.Services.AddScoped<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
+builder.Services.AddScoped<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
+builder.Services.AddScoped<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
+builder.Services.AddScoped<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
 
 //Excepation Handlers
 builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
@@ -210,7 +210,7 @@ builder.Services.AddSwaggerGen(c =>
 
 //Add health checks
 builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("Database");
+    .AddDbContextCheck<QueryDispatchDbContext>();
 
 // Logging using Serilog
 builder.Logging.AddSerilog();
@@ -264,6 +264,9 @@ static void SetupMiddleware(WebApplication app)
     {
         app.UseExceptionHandler();
     }
+
+    //Run DB migrations
+    app.AutoMigrateEF<QueryDispatchDbContext>();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

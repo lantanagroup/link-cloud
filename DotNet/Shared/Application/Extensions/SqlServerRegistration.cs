@@ -20,11 +20,11 @@ public static class SqlServerRegistration
                     {
                         if (useUpdateBaseEntityInterceptor)
                             options.UseSqlServer(
-                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.SqlServer))
+                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection))
                                 .AddInterceptors(updateBaseEntityInterceptor);
                         else
                             options.UseSqlServer(
-                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.SqlServer));
+                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
                     }
                     break;
                 default:
