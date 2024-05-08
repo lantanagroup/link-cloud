@@ -13,5 +13,6 @@ namespace LantanaGroup.Link.Account.Application.Interfaces.Persistence
         Task<LinkRole> GetRoleAsync(string roleId, bool noTracking = true, CancellationToken cancellationToken = default);
         Task<LinkRole> GetRoleByNameAsync(string roleName, bool noTracking = true, CancellationToken cancellationToken = default);
         Task<IEnumerable<LinkRole>> GetRolesAsync(CancellationToken cancellationToken = default);
+        Task<IEnumerable<Claim>> GetClaimsAsync(string roleId, CancellationToken cancellationToken = default);
     }
 }

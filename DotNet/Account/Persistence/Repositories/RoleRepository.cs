@@ -103,6 +103,18 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             var roles = await _dbContext.Roles.AsNoTracking().ToListAsync(cancellationToken);                
 
             return roles;
-        }        
+        }
+
+        public async Task<IEnumerable<Claim>> GetClaimsAsync(string roleId, CancellationToken cancellationToken = default)
+        {
+            var roleClaims = await _dbContext.Roles.AsNoTracking()
+                .Where(x => x.Id == roleId)
+                .SelectMany(x => x.RoleClaims)                
+                .ToListAsync(cancellationToken);
+
+            var claims = roleClaims.Select(x => x.ToClaim());
+
+            return claims;
+        }
     }
 }

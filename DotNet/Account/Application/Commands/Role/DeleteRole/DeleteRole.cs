@@ -1,8 +1,10 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Account.Persistence.Repositories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -16,14 +18,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
     public class DeleteRole : IDeleteRole
     {
         private readonly ILogger<DeleteRole> _logger;
-        private readonly RoleManager<LinkRole> _roleManager;
+        private readonly IRoleRepository _roleRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent  _createAuditEvent;
 
-        public DeleteRole(ILogger<DeleteRole> logger, RoleManager<LinkRole> roleManager, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public DeleteRole(ILogger<DeleteRole> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _roleManager = roleManager ?? throw new ArgumentNullException(nameof(roleManager));
+            _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
@@ -31,10 +33,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("DeleteRole:Execute");
-
             try
             { 
-                var role = await _roleManager.FindByIdAsync(roleId) ?? throw new ApplicationException($"Role with id {roleId} not found");
+                var role = await _roleRepository.GetRoleAsync(roleId) ?? throw new ApplicationException($"Role with id {roleId} not found");
                 activity?.AddTag(DiagnosticNames.Role, role.Name);
 
                 if (requestor is not null)
@@ -42,9 +43,9 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                var result = await _roleManager.DeleteAsync(role);
+                var result = await _roleRepository.DeleteAsync(role.Id);
 
-                if (!result.Succeeded)
+                if (!result)
                 {
                     throw new ApplicationException($"Failed to delete role {role.Name}");
                 }
@@ -64,7 +65,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
-                return result.Succeeded;
+                return result;
             }
             catch (Exception ex)
             {
