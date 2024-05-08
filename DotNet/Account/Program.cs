@@ -175,13 +175,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Logging using Serilog
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
-                    .Filter.ByExcluding("RequestPath like '/health%'")
-                    .Filter.ByExcluding("RequestPath like '/swagger%'")
-                    //.Enrich.WithExceptionDetails()
-                    .Enrich.FromLogContext()
-                    .Enrich.WithSpan()
-                    .Enrich.With<ActivityEnricher>()
-                    .CreateLogger();
+        .ReadFrom.Configuration(builder.Configuration)
+        .Filter.ByExcluding("RequestPath like '/health%'")
+        .Filter.ByExcluding("RequestPath like '/swagger%'")
+        //.Enrich.WithExceptionDetails()
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .Enrich.With<ActivityEnricher>()
+        .CreateLogger();
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 

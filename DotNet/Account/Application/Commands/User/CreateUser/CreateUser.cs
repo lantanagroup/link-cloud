@@ -37,6 +37,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 var user = new LinkUser
                 {
+                    Id = Guid.NewGuid().ToString(),
                     FirstName = model.FirstName,
                     MiddleName = model.MiddleName,
                     LastName = model.LastName,
