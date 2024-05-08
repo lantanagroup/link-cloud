@@ -28,7 +28,14 @@ public class GetConfigurationEntityQueryHandler : IRequestHandler<GetConfigurati
     public async Task<NormalizationConfig> Handle(GetConfigurationEntityQuery request, CancellationToken cancellationToken)
     {
         var _dbContext = _serviceScopeFactory.CreateScope().ServiceProvider
-                .GetRequiredService<NormalizationDbContext>();
+                .GetService<NormalizationDbContext>();
+
+        if(_dbContext == null)
+        {
+            var message = "Database context is null.";
+            _logger.LogCritical(message);
+            throw new DbContextNullException(message);
+        }
 
         NormalizationConfig? config = await _dbContext.NormalizationConfigs.FirstOrDefaultAsync(c => c.FacilityId == request.FacilityId, cancellationToken);   
 
