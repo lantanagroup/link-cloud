@@ -19,6 +19,11 @@
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         }
 
+        public static class DbConnection
+        {
+            public const string DatabaseConnection = "SqlServer";
+        }
+
         public static class LoggingIds
         {
             public const int GenerateItems = 1000;
