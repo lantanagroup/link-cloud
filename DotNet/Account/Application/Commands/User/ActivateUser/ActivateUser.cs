@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
@@ -8,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
-using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -18,14 +18,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
     public class ActivateUser : IActiviateUser
     {
         private readonly ILogger<CreateUser> _logger;
-        private readonly UserManager<LinkUser> _userManager;
+        private readonly IUserRepository _userRepository;
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
 
-        public ActivateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
+        public ActivateUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
@@ -37,8 +37,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
             try
             {
-                var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
+                var user = await _userRepository.GetUserAsync(userId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {userId} not found");
 
+                if(user is null)
+                {
+                    throw new ApplicationException($"User with id {userId} not found");
+                }
+                
                 if (user.IsActive)
                 {
                     return true;
@@ -51,11 +56,12 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                var result = await _userManager.UpdateAsync(user);
+                var result = await _userRepository.UpdateAsync(user, cancellationToken);
 
-                if (!result.Succeeded)
+                if (!result)
                 {
-                    throw new ApplicationException($"Unable to activate user: {result.Errors}");
+                    _logger.LogActivateUserException(user.Id, "Failed to activiate user");
+                    return false;
                 }
 
                 //generate tags for telemetry                
@@ -85,7 +91,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
-                return result.Succeeded;
+                return result;
             }
             catch (Exception ex)
             {

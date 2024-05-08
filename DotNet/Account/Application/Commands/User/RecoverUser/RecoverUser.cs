@@ -4,7 +4,6 @@ using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -14,21 +13,22 @@ using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 
 namespace LantanaGroup.Link.Account.Application.Commands.User
 {
     public class RecoverUser : IRecoverUser
     {
         private readonly ILogger<DeactivateUser> _logger;
-        private readonly UserManager<LinkUser> _userManager;
+        private readonly IUserRepository _userRepository;
         private readonly IAccountServiceMetrics _metrics;
         private readonly ILinkUserModelFactory  _linkUserModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
 
-        public RecoverUser(ILogger<DeactivateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory, ICreateAuditEvent createAuditEvent)
+        public RecoverUser(ILogger<DeactivateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ILinkUserModelFactory linkUserModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _linkUserModelFactory = linkUserModelFactory ?? throw new ArgumentNullException(nameof(linkUserModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
             try
             {
-                var user = await _userManager.FindByIdAsync(userId) ?? throw new ApplicationException($"User with id {userId} not found");
+                var user = await _userRepository.GetUserAsync(userId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {userId} not found");
 
                 if (!user.IsDeleted)
                 {
@@ -55,11 +55,11 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }                
 
-                var result = await _userManager.UpdateAsync(user);
+                var result = await _userRepository.UpdateAsync(user, cancellationToken);
 
-                if (!result.Succeeded)
+                if (!result)
                 {
-                    throw new ApplicationException($"Unable to recover user: {result.Errors}");
+                    throw new ApplicationException($"Unable to recover user.");
                 }
 
                 //generate tags for telemetry                

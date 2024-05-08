@@ -10,13 +10,12 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
-using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Application.Commands.Role
-{   
+{
     public class UpdateRole : IUpdateRole
     {
         private readonly ILogger<UpdateRole> _logger;
@@ -53,7 +52,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     role.LastModifiedBy = requestor.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                await _roleRepository.UpdateAsync(role);
+                await _roleRepository.UpdateAsync(role, cancellationToken);
 
                 //update role claims
                 var currentClaims = await _roleRepository.GetClaimsAsync(role.Id, cancellationToken);

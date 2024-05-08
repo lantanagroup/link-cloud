@@ -63,6 +63,7 @@
             public const int RoleClaimAssignmentException = 1111;
             public const int RoleClaimRemoval = 1112;
             public const int RoleClaimRemovalException = 1113;
+            public const int RoleNotFound = 1114;
 
             public const int AuditEventCreated = 1200;
             public const int AuditEventCreationException = 1201;
