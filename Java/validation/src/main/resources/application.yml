@@ -1,3 +1,5 @@
+artifact:
+  init: true
 server:
   port: 31820
 springdoc:
