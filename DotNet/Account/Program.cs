@@ -219,10 +219,10 @@ static void SetupMiddleware(WebApplication app)
     // Configure swagger
     if (app.Configuration.GetValue<bool>(AccountConstants.AppSettingsSectionNames.EnableSwagger))
     {
-        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/account/swagger/{documentname}/swagger.json"; });
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
-            opts.RoutePrefix = "api/swagger";
+            opts.SwaggerEndpoint("/api/account/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.RoutePrefix = "api/account/swagger";
         });
     }
 

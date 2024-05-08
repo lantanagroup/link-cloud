@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
             #region Queries
 
             roleEndpoints.MapGet("/role/{id}", GetRoleById.Handle)
-                .Produces(StatusCodes.Status200OK)
+                .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
             
             roleEndpoints.MapGet("/role/name/{name}", GetRoleByName.Handle)
-                .Produces(StatusCodes.Status200OK)
+                .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
             
             roleEndpoints.MapGet("/role", GetRoleList.Handle)
-                .Produces(StatusCodes.Status200OK)
+                .Produces<ListRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
 
             roleEndpoints.MapPost("/role", CreateNewRole.Handle)
                 .AddEndpointFilter<ValidationFilter<LinkRoleModel>>()
-                .Produces(StatusCodes.Status201Created)
+                .Produces<LinkRoleModel>(StatusCodes.Status201Created)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
 
             roleEndpoints.MapPut("/role/{id}", UpdateExistingRole.Handle)
                 .AddEndpointFilter<ValidationFilter<LinkRoleModel>>()
-                .Produces(StatusCodes.Status200OK)
+                .Produces(StatusCodes.Status204NoContent)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)
@@ -112,7 +112,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
          
             roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)               
-                .Produces(StatusCodes.Status200OK)
+                .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status403Forbidden)

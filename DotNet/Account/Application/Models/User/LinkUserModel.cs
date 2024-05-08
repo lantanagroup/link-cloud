@@ -69,6 +69,7 @@
         /// <summary>
         /// The claims granted by roles assigned to the user
         /// </summary>
+        /// <example>["CanViewLogs"]</example>
         public List<string> RoleClaims { get; set; }
 
         /// <summary>
