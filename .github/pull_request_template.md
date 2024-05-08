@@ -1,10 +1,10 @@
 ### 🛠 Changes being made
 
-Summarize the changes you've made in this pull request. Include an itemized list if you can. It'll help the reviewer
+Summarize the changes you've made in this pull request. Include an itemized list if you can.
 
 ### 🧪 Testing performed
 
-Describe the testing that was performed
+Summarize the testing that was performed.
 
 ### 🏎 Quality check
 
