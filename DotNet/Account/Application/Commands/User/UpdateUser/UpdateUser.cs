@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.AuditEvent;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
@@ -8,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using Microsoft.AspNetCore.Identity;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -18,16 +18,18 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
     public class UpdateUser : IUpdateUser
     {
         private readonly ILogger<CreateUser> _logger;
-        private readonly UserManager<LinkUser> _userManager;
+        private readonly IUserRepository _userRepository;
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
+        private readonly IRoleRepository _roleRepository;
 
-        public UpdateUser(ILogger<CreateUser> logger, UserManager<LinkUser> userManager, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent)
+        public UpdateUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent, IRoleRepository roleRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
+            _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkUserModel model, CancellationToken cancellationToken = default)
@@ -42,7 +44,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
             try
             { 
-                var user = await _userManager.FindByIdAsync(model.Id) ?? throw new ApplicationException($"User with id {model.Id} not found");
+                var user = await _userRepository.GetUserAsync(model.Id, cancellationToken: cancellationToken) ?? throw new ApplicationException($"User with id {model.Id} not found");
                            
                 List<PropertyChangeModel> changes = GetUserDiff(model, user);
 
@@ -57,21 +59,50 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
                 }
 
-                await _userManager.UpdateAsync(user);
+                await _userRepository.UpdateAsync(user);
 
                 //update user roles
-                var currentRoles = await _userManager.GetRolesAsync(user);
+                var userRoles = await _userRepository.GetUserRoles(user.Id, cancellationToken);
+                var currentRoles = userRoles.Select(r => r.Name);
                 var addedRoles = model.Roles.Except(currentRoles);
                 var removedRoles = currentRoles.Except(model.Roles);
 
                 if(addedRoles.Any())
                 {
-                    await _userManager.AddToRolesAsync(user, addedRoles);                    
+                    foreach(var role in addedRoles)
+                    {
+                        if (!string.IsNullOrEmpty(role))
+                        {
+                            var linkRole = await _roleRepository.GetRoleByNameAsync(role, cancellationToken: cancellationToken);
+
+                            if(linkRole is null)
+                            {
+                                _logger.LogRoleNotFound(role);
+                                continue;
+                            }
+
+                            await _userRepository.AddRoleAsync(user.Id, linkRole, cancellationToken);
+                        }                        
+                    }                                     
                 }
 
                 if(removedRoles.Any())
                 {
-                    await _userManager.RemoveFromRolesAsync(user, removedRoles);
+                    foreach (var role in addedRoles)
+                    {
+                        if (!string.IsNullOrEmpty(role))
+                        {
+                            var linkRole = await _roleRepository.GetRoleByNameAsync(role, cancellationToken: cancellationToken);
+
+                            if (linkRole is null)
+                            {
+                                _logger.LogRoleNotFound(role);
+                                continue;
+                            }
+
+                            await _userRepository.RemoveRoleAsync(user.Id, linkRole, cancellationToken);
+                        }
+                    }
                 }
 
                 //capture role changes

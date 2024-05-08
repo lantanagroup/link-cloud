@@ -64,5 +64,11 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Error,
             "An exception occured while finding roles: {message}")]
         public static partial void LogFindRolesException(this ILogger logger, string message);
+
+        [LoggerMessage(
+            AccountLoggingIds.RoleNotFound,
+            LogLevel.Warning,
+            "The role {roleId} was not found.")]
+        public static partial void LogRoleNotFound(this ILogger logger, string roleId);
     }
 }
