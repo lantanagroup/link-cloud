@@ -602,9 +602,9 @@ services:
     image: link-validation
     environment:
       server.port: 8075
-      spring.security.oauth2.resourceserver.jwt.issuer-url: https://oauth.nhsnlink.org/realms/NHSNLink
+      spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
-      spring.datasource.username: link-user
+      spring.datasource.username: sa
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.jpa.hibernate.ddl-auto: update
