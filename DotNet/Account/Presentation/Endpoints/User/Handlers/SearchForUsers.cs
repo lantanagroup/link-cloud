@@ -12,13 +12,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class SearchForUsers
     {
         public static async Task<IResult> Handle(
-            HttpContext context, [FromServices] ILogger logger, [FromServices] ISearchUsers query, [FromServices] IUserSearchFilterRecordFactory filterFactory,
+            HttpContext context, [FromServices] ILogger<UserEndpoints> logger, [FromServices] ISearchUsers query, 
+            [FromServices] IUserSearchFilterRecordFactory filterFactory,
             string? searchText,
             string? filterFacilityBy,
             string? filterRoleBy,
             string? filterClaimBy,
-            bool includeDeactivatedUsers,
-            bool includeDeletedUsers,
+            bool? includeDeactivatedUsers,
+            bool? includeDeletedUsers,
             string? sortBy,
             SortOrder? sortOrder,
             int pageSize = 10,
@@ -32,8 +33,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     filterFacilityBy,
                     filterRoleBy,
                     filterClaimBy,
-                    includeDeactivatedUsers,
-                    includeDeletedUsers,
+                    includeDeactivatedUsers ?? false,
+                    includeDeletedUsers ?? false,
                     sortBy,
                     sortOrder,
                     pageSize,

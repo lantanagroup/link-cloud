@@ -10,8 +10,9 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class UpdateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, [FromServices] ILogger logger,
-            [FromServices] IGetUserByid queryUser, [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
+        public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, 
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, 
+            [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
         {
             try
             {

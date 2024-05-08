@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class DeactivateExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id,
-            [FromServices] ILogger logger, [FromServices] IGetUserByid queryUser, [FromServices] IDeactivateUser command)
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IDeactivateUser command)
         {
             try
             {

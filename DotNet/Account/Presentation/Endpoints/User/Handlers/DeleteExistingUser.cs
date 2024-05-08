@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class DeleteExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id,
-            [FromServices] ILogger logger, [FromServices] IGetUserByid queryUser, [FromServices] IDeleteUser command)
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IDeleteUser command)
         {
             try
             {

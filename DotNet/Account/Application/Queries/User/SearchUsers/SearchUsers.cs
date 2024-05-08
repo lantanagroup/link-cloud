@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
                 return pagedModel;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;

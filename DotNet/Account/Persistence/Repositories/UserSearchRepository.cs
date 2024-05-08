@@ -94,6 +94,8 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
             //filter by facility
             query = query.Where(x => x.Facilities != null && x.Facilities.Contains(facilityId));
+            query = query.Where(x => x.IsActive);
+            query = query.Where(x => !x.IsDeleted);
 
             #region Build Query
             if (searchText is not null && searchText.Length > 0)
