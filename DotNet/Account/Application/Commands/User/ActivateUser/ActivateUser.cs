@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountActiviatedCounter(tagList);
-                _logger.LogActivateUser(userId, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                _logger.LogActivateUser(userId, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage

@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 //add created by if requestor is provided
                 if (requestor is not null)
                 {
-                    role.CreatedBy = requestor.Claims.First(c => c.Type == "sub").Value;
+                    role.CreatedBy = requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 var result = await _roleRepository.CreateAsync(role, cancellationToken);

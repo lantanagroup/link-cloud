@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
 
                 if(requestor is not null)
                 {
-                    role.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    role.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
          
                 await _roleRepository.UpdateAsync(role, cancellationToken);                

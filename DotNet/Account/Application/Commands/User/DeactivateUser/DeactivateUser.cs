@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (requestor is not null)
                 {
-                    user.LastModifiedBy = requestor?.Claims.First(c => c.Type == "sub").Value;
+                    user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 var result = await _userRepository.UpdateAsync(user, cancellationToken);
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountDeactivatedCounter(tagList);
-                _logger.LogDeactivateUser(user.Id, requestor?.Claims.First(c => c.Type == "sub").Value ?? "Unknown");
+                _logger.LogDeactivateUser(user.Id, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage

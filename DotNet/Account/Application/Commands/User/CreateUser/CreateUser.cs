@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 //add created by if requestor is provided
                 if (requestor is not null)
                 {
-                    user.CreatedBy = requestor.Claims.First(c => c.Type == "sub").Value;
+                    user.CreatedBy = requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
                 var result = await _userRepository.CreateAsync(user, cancellationToken);
