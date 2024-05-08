@@ -8,7 +8,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUserByEmail
     {
-        public static async Task<IResult> Handle(HttpContext context, string email, [FromServices] ILogger logger, [FromServices] IGetUserByEmail query)
+        public static async Task<IResult> Handle(HttpContext context, string email, 
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByEmail query)
         {
             try
             {

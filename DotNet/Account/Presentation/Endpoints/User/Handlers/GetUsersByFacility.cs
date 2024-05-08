@@ -8,7 +8,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUsersByFacility
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, [FromServices] ILogger logger, [FromServices] IGetFacilityUsers query)
+        public static async Task<IResult> Handle(HttpContext context, string id, 
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetFacilityUsers query)
         {
             try
             {

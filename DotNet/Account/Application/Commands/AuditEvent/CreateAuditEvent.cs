@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -29,6 +30,8 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
 
             try
             {
+                model.ServiceName = AccountConstants.ServiceName;
+
                 // send the Audit Event
                 Headers headers = [];
 
