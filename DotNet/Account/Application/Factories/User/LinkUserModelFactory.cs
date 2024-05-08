@@ -1,7 +1,6 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Domain.Entities;
-using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Application.Factories.User
 {
@@ -19,13 +18,14 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 MiddleName = user.MiddleName,
                 Facilities = user.Facilities ?? [],
                 Roles = user.UserRoles.Select(r => r.Role.Name ?? string.Empty).ToList() ?? [],
-                Claims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
+                UserClaims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
+                RoleClaims = user.UserRoles.SelectMany(r => r.Role.RoleClaims).Select(c => c.ClaimValue ?? string.Empty).ToList() ?? []
             };
 
             return model;
         }
 
-        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<string>? claims)
+        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<string>? userClaims, List<string>? roleClaims)
         {
             LinkUserModel model = new()
             {
@@ -37,7 +37,8 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 MiddleName = middleName ?? string.Empty,
                 Facilities = facilities ?? [],
                 Roles = roles ?? [],
-                Claims = claims ?? []
+                UserClaims = userClaims ?? [],
+                RoleClaims = roleClaims ?? []
             };
 
             return model;

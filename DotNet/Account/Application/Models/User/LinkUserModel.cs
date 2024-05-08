@@ -2,9 +2,9 @@
 {
     public class LinkUserModel
     {
-        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
+        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], [], []) { }
 
-        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> claims, List<string> facilities)
+        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims, List<string> facilities)
         {
             Id = id;
             Username = username;
@@ -13,7 +13,8 @@
             LastName = lastName;
             Email = email;
             Roles = roles;
-            Claims = claims;
+            UserClaims = userClaims;
+            RoleClaims = roleClaims;
             Facilities = facilities;
         }
 
@@ -63,7 +64,12 @@
         /// The claims assigned to the user
         /// </summary>
         /// <example>["CanViewLogs"]</example>
-        public List<string> Claims { get; set; }
+        public List<string> UserClaims { get; set; }
+
+        /// <summary>
+        /// The claims granted by roles assigned to the user
+        /// </summary>
+        public List<string> RoleClaims { get; set; }
 
         /// <summary>
         /// The facilities the user has access to
