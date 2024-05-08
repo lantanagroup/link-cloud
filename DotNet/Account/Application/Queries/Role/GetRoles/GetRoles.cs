@@ -2,8 +2,6 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Infrastructure;
-using LantanaGroup.Link.Account.Infrastructure.Logging;
-using OpenTelemetry.Trace;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.Role
@@ -33,11 +31,9 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
 
                 return roleList;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                _logger.LogFindRolesException(ex.Message);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);             
                 throw;
             }
         }

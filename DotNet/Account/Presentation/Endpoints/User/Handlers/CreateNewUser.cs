@@ -1,13 +1,14 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.User;
 using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class CreateNewUser
     {
         public static async Task<IResult> Handle(HttpContext context, 
-            LinkUserModel model, ILogger logger, ICreateUser command)
+            LinkUserModel model, [FromServices] ILogger logger, [FromServices] ICreateUser command)
         {            
             if (model is null)
             {

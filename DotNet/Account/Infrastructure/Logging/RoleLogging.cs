@@ -70,5 +70,17 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             LogLevel.Warning,
             "The role {roleId} was not found.")]
         public static partial void LogRoleNotFound(this ILogger logger, string roleId);
+
+        [LoggerMessage(
+            AccountLoggingIds.RoleClaimAssignment,
+            LogLevel.Information,
+            "Claim {claimType} with value {claimValue} was added to role {roleName} by {requestor}.")]
+        public static partial void LogRoleClaimAssignment(this ILogger logger, string roleName, string requestor, string claimType, string claimValue);
+
+        [LoggerMessage(
+            AccountLoggingIds.RoleClaimAssignmentException,
+            LogLevel.Error,
+            "An exception occured while adding claim(s) {claims} to role {roleName}: {message}")]
+        public static partial void LogRoleClaimAssignmentException(this ILogger logger, string roleName, string claims, string message);
     }
 }

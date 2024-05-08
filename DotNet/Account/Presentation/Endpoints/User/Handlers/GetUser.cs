@@ -1,11 +1,12 @@
 ﻿using LantanaGroup.Link.Account.Application.Queries.User;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, ILogger logger, IGetUserByid query)
+        public static async Task<IResult> Handle(HttpContext context, string id, [FromServices] ILogger logger, [FromServices] IGetUserByid query)
         {
             if (string.IsNullOrEmpty(id))
             {

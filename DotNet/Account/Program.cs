@@ -207,6 +207,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
 
     // Configure swagger
     if (app.Configuration.GetValue<bool>(AccountConstants.AppSettingsSectionNames.EnableSwagger))

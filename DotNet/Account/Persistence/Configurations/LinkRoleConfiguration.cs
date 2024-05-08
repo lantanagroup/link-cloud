@@ -15,19 +15,19 @@ namespace LantanaGroup.Link.Account.Persistence.Configurations
         {
             builder.ToTable("Roles");
 
-            builder.Property(r => r.Name).HasMaxLength(128);       
+            builder.HasKey(r => r.Id);
+
+            builder.Property(r => r.Name).HasMaxLength(128);
 
             // Each Role can have many entries in the UserRole join table
             builder.HasMany(e => e.UserRoles)
                 .WithOne(e => e.Role)
-                .HasForeignKey(ur => ur.RoleId)
-                .IsRequired();
+                .HasForeignKey(ur => ur.RoleId);
 
             // Each Role can have many associated RoleClaims
             builder.HasMany(e => e.RoleClaims)
                 .WithOne(e => e.Role)
-                .HasForeignKey(rc => rc.RoleId)
-                .IsRequired();
+                .HasForeignKey(rc => rc.RoleId);
         }
     }
 }

@@ -24,8 +24,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         public bool IsDeleted { get; set; }
 
 
-        public virtual ICollection<LinkUserClaim> Claims { get; set; } = new List<LinkUserClaim>();
-        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = new List<LinkUserRole>();        
+        public virtual ICollection<LinkUserClaim> Claims { get; set; } = [];
+        public virtual ICollection<LinkUserRole> UserRoles { get; set; } = [];        
     }
 
     [Table("UserRoles")]
@@ -56,5 +56,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
             ClaimType = claim.Type;
             ClaimValue = claim.Value;
         }
+
+        public virtual LinkUser User { get; set; } = default!;
     }
 }
