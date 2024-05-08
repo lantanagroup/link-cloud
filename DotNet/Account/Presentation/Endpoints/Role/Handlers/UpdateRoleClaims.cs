@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class UpdateRoleClaims
     {
         public static async Task<IResult> Handle(HttpContext context, string id, RoleClaimsModel model,
-            [FromServices] ILogger logger, [FromServices] IGetRole queryRole, [FromServices] IUpdateClaims command)
+            [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole queryRole, [FromServices] IUpdateClaims command)
         {
             try
             {

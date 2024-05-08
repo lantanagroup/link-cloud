@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class UpdateExistingRole
     {
         public static async Task<IResult> Handle(HttpContext context, string id, LinkRoleModel model,
-            [FromServices] ILogger logger, [FromServices] IGetRole roleQuery, [FromServices] IUpdateRole command, [FromServices] ICreateRole createCommand)
+            [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole roleQuery, [FromServices] IUpdateRole command, [FromServices] ICreateRole createCommand)
         {
             try
             {

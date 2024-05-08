@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
     public static class DeleteExistingRole
     {
         public static async Task<IResult> Handle(HttpContext context, string id,
-            [FromServices] ILogger logger, [FromServices] IRoleRepository roleRepository, [FromServices] ILinkRoleModelFactory linkRoleModelFactory, [FromServices] IDeleteRole command)
+            [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IRoleRepository roleRepository, [FromServices] ILinkRoleModelFactory linkRoleModelFactory, [FromServices] IDeleteRole command)
         {
 
             try
