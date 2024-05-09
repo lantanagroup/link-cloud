@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("DeleteRole:Execute");
             try
             { 
-                var role = await _roleRepository.GetRoleAsync(roleId) ?? throw new ApplicationException($"Role with id {roleId} not found");
+                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {roleId} not found");
                 activity?.AddTag(DiagnosticNames.Role, role.Name);
 
                 if (requestor is not null)
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                     role.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
-                var result = await _roleRepository.DeleteAsync(role.Id);
+                var result = await _roleRepository.DeleteAsync(role.Id, cancellationToken);
 
                 if (!result)
                 {
