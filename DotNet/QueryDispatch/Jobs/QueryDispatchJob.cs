@@ -33,7 +33,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        public Task Execute(IJobExecutionContext context)
+        public async Task Execute(IJobExecutionContext context)
         {
             JobDataMap triggerMap = context.Trigger.JobDataMap!;
             PatientDispatchEntity patientDispatchEntity = (PatientDispatchEntity)triggerMap["PatientDispatchEntity"];
@@ -83,11 +83,11 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                     _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: { patientDispatchEntity.FacilityId }");
 
-                    _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+                    await _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Failed to generate a Data Acquisition Requested event", ex);
+                    _logger.LogError(ex, "Failed to generate a Data Acquisition Requested event");
                 }
             }
 
@@ -117,8 +117,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 producer.Flush();
             }
-
-            return Task.CompletedTask;
         }
     }
 }
