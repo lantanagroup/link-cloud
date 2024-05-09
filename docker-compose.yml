@@ -6,7 +6,6 @@ version: '3.4'
 ## mssql: 1433
 ## mongo: 17017
 ## loki: 3100
-## promtail: N/A
 ## grafana: 3000
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
@@ -94,7 +93,8 @@ services:
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
-      - mssql
+      mssql:
+        condition: service_healthy
     networks:
       - link-nw
       
@@ -117,14 +117,6 @@ services:
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - link-nw
-
-  promtail:
-    image: grafana/promtail:2.9.0
-    volumes:
-      - /var/log:/var/log
-    command: -config.file=/etc/promtail/config.yml
     networks:
       - link-nw
 
@@ -336,7 +328,6 @@ services:
     depends_on:
       - loki
       - kafka_init
-      - mssql
       - mssql_init
       
   bff:
