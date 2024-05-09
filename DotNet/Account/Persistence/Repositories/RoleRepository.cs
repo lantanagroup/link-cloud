@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> UpdateAsync(LinkRole entity, CancellationToken cancellationToken = default)
         {
-            var currentRole = await _dbContext.Roles.FindAsync(entity.Id, cancellationToken);
+            var currentRole = await _dbContext.Roles.FindAsync([entity.Id], cancellationToken);
             if(currentRole is null)
             {
                 return false;
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
         {
-            var role = await _dbContext.Roles.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            var role = await _dbContext.Roles.FindAsync([id], cancellationToken);
             if(role is null)
             {
                 return false;
@@ -83,8 +83,12 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<LinkRole> GetRoleAsync(string roleId, bool noTracking = true, CancellationToken cancellationToken = default)
         {
             var role = noTracking ?
-                await _dbContext.Roles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == roleId, cancellationToken) :
-                await _dbContext.Roles.FirstOrDefaultAsync(x => x.Id == roleId, cancellationToken);
+                await _dbContext.Roles.AsNoTracking()
+                    .Include(x => x.RoleClaims)
+                    .FirstOrDefaultAsync(x => x.Id == roleId, cancellationToken) :
+                await _dbContext.Roles
+                    .Include(x => x.RoleClaims)
+                    .FirstOrDefaultAsync(x => x.Id == roleId, cancellationToken);
 
             return role;
         }
@@ -92,8 +96,12 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<LinkRole> GetRoleByNameAsync(string roleName, bool noTracking = true, CancellationToken cancellationToken = default)
         {
             var role = noTracking ?
-                await _dbContext.Roles.AsNoTracking().FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken) :
-                await _dbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken);
+                await _dbContext.Roles.AsNoTracking()
+                    .Include(x => x.RoleClaims)
+                    .FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken) :
+                await _dbContext.Roles
+                    .Include(x => x.RoleClaims)
+                    .FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken);
 
             return role;
         }
