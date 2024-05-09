@@ -4,22 +4,23 @@ using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Account.Persistence.Repositories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
 using System.Diagnostics;
 using System.Security.Claims;
 
-namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
+namespace LantanaGroup.Link.Account.Application.Commands.Role
 {
-    public class UpdateClaims : IUpdateClaims
+    public class UpdateRoleClaims : IUpdateRoleClaims
     {
-        private readonly ILogger<UpdateClaims> _logger;
+        private readonly ILogger<UpdateRoleClaims> _logger;
         private readonly IRoleRepository _roleRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
 
-        public UpdateClaims(ILogger<UpdateClaims> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateRoleClaims(ILogger<UpdateRoleClaims> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
@@ -35,13 +36,24 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
             { 
                 var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {roleId} not found");
 
+                if (requestor is not null)
+                {
+                    role.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+                }
+
                 var currentClaims = await _roleRepository.GetClaimsAsync(role.Id, cancellationToken);
                 var addedClaims = claims.Except(currentClaims.Select(c => c.Value));
                 var removedClaims = currentClaims.Select(c => c.Value).Except(claims);
 
                 foreach (var claim in addedClaims)
                 {
-                    await _roleRepository.AddClaimAsync(role.Id, new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim), cancellationToken);
+                    var newClaim = new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
+                    var outcome = await _roleRepository.AddClaimAsync(role.Id, newClaim, cancellationToken);
+
+                    if (outcome)
+                    { 
+                        _logger.LogRoleClaimAssignment(role.Id, newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                    }
                 }
 
                 foreach (var claim in removedClaims)
@@ -49,7 +61,12 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
                     var roleClaim = currentClaims.FirstOrDefault(c => c.Value == claim);
                     if (roleClaim is not null)
                     {
-                        await _roleRepository.RemoveClaimAsync(role.Id, roleClaim, cancellationToken);
+                        var outcome = await _roleRepository.RemoveClaimAsync(role.Id, roleClaim, cancellationToken);
+
+                        if (outcome)
+                        {
+                            _logger.LogRoleClaimAssignment(role.Id, roleClaim.Type, roleClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                        }
                     }
                 }
 
@@ -58,14 +75,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role.UpdateClaims
                 if(addedClaims.Any() || removedClaims.Any())
                 {
                     changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", claims)));
-                }
-
-                if(requestor is not null)
-                {
-                    role.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
-                }
-         
-                await _roleRepository.UpdateAsync(role, cancellationToken);                
+                }             
 
                 _logger.LogRoleUpdated(role.Name ?? string.Empty, role.LastModifiedBy ?? string.Empty, _roleModelFactory.Create(role));
 

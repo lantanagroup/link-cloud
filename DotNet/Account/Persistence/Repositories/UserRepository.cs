@@ -1,16 +1,20 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
+using LantanaGroup.Link.Account.Infrastructure.Logging;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Persistence.Repositories
 {
     public class UserRepository : IUserRepository
     {
         private readonly AccountDbContext _dbContext;
+        private readonly ILogger<UserRepository> _logger;
 
-        public UserRepository(AccountDbContext dbContext)
+        public UserRepository(AccountDbContext dbContext, ILogger<UserRepository> logger)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<bool> CreateAsync(LinkUser entity, CancellationToken cancellationToken = default)
@@ -87,6 +91,86 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
+        public async Task<bool> AddClaimToUserAsync(string userId, Claim claim, CancellationToken cancellationToken = default)
+        {
+            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            if (user is null)
+            {
+                return false;
+            }
+
+            user.Claims.Add(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
+        }
+
+        public async Task<bool> RemoveClaimFromUserAsync(string userId, Claim claim, CancellationToken cancellationToken = default)
+        {
+            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            if (user is null)
+            {
+                return false;
+            }
+
+            user.Claims.Remove(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
+        }
+
+        public async Task<bool> AddClaimsToUserAsync(string userId, IEnumerable<Claim> claims, CancellationToken cancellationToken = default)
+        {
+            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            if (user is null)
+            {
+                return false;
+            }
+
+            int addedClaims = 0;
+            foreach (var claim in claims)
+            {
+                user.Claims.Add(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+                
+                if(await _dbContext.SaveChangesAsync(cancellationToken) > 0)
+                {
+                    _logger.LogUserClaimAssignment(userId, claim.Type, claim.Value, string.Empty);
+                    addedClaims++;
+                }
+                else
+                {
+                    _logger.LogUserClaimAssignmentException(userId, claim.Type, claim.Value, "Failed to add claim to user");
+                }
+            }
+
+            return addedClaims > 0;
+        }
+
+        public async Task<bool> RemoveClaimsFromUserAsync(string userId, IEnumerable<Claim> claims, CancellationToken cancellationToken = default)
+        {
+            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            if (user is null)
+            {
+                return false;
+            }
+
+            int removedClaims = 0;
+            foreach (var claim in claims)
+            {
+                user.Claims.Remove(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+
+                if (await _dbContext.SaveChangesAsync(cancellationToken) > 0)
+                {
+                    _logger.LogUserClaimRemoval(userId, claim.Type, claim.Value, string.Empty);
+                    removedClaims++;
+                }
+                else
+                {
+                    _logger.LogUserClaimRemovalException(userId, claim.Type, claim.Value, "Failed to remove claim from user");
+                }
+            }
+
+            return removedClaims > 0;
+        }
+
         public async Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default)
         {
             var users = await _dbContext.Users.AsNoTracking()
@@ -150,6 +234,6 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
                 .ToListAsync(cancellationToken);
 
             return roles;
-        }
+        }        
     }
 }
