@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Commands.Role;
-using LantanaGroup.Link.Account.Application.Models.Role;
+using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Application.Queries.Role;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 {
     public static class UpdateRoleClaims
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, RoleClaimsModel model,
+        public static async Task<IResult> Handle(HttpContext context, string id, LinkClaimsModel model,
             [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole queryRole, [FromServices] IUpdateRoleClaims command)
         {
             try
