@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private async void StartConsumerLoop(CancellationToken cancellationToken) {
             var config = new ConsumerConfig()
             {
-                GroupId = "QueryDispatchPatientEvent",
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using Quartz;
 using System.Text;
@@ -56,7 +57,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "SubmissionRetryService",
+                GroupId = SubmissionConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -109,7 +110,14 @@ public class CRUDCommandTests
             FacilityId = "test"
         };
 
-        var handler = new GetConfigurationEntityQueryHandler(logger.Object, context);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(s => s.GetService(typeof(NormalizationDbContext))).Returns(context);
+        var serviceScope = new Mock<IServiceScope>();
+        serviceScope.Setup(s => s.ServiceProvider).Returns(serviceProviderMock.Object);
+        var scopeFactory = new Mock<IServiceScopeFactory>();
+        scopeFactory.Setup(s => s.CreateScope()).Returns(serviceScope.Object);
+
+        var handler = new GetConfigurationEntityQueryHandler(logger.Object, scopeFactory.Object);
 
         try
         {
@@ -130,13 +138,20 @@ public class CRUDCommandTests
         var options = new DbContextOptionsBuilder<NormalizationDbContext>()
             .UseInMemoryDatabase(databaseName: "GetConfigurationEntityQuery_NoConfigExists")
             .Options;
+        var context = new NormalizationDbContext(options);
 
         var command = new GetConfigurationEntityQuery
         {
             FacilityId = "test"
         };
 
-        var handler = new GetConfigurationEntityQueryHandler(logger.Object, new NormalizationDbContext(options));
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(s => s.GetService(typeof(NormalizationDbContext))).Returns(context);
+        var serviceScope = new Mock<IServiceScope>();
+        serviceScope.Setup(s => s.ServiceProvider).Returns(serviceProviderMock.Object);
+        var scopeFactory = new Mock<IServiceScopeFactory>();
+        scopeFactory.Setup(s => s.CreateScope()).Returns(serviceScope.Object);
+        var handler = new GetConfigurationEntityQueryHandler(logger.Object, scopeFactory.Object);
 
         try
         {
