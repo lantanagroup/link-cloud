@@ -4,8 +4,8 @@ trigger:
     - dev
   paths:
     include:
-    - DotNet/MeasureEval/*
-    - DotNet/Shared/*
+    - Java/measureeval/*
+    - Java/shared/*
     exclude:
     - '*'
     
@@ -16,51 +16,41 @@ pool:
 
 variables:
 - group: Link_BOTW_Build_Package_Variables
-- name: project
-  value: 'DotNet/MeasureEval/MeasureEval.csproj'
-- name: testProject
-  value: 'DotNet/MeasureEvalUnitTests/MeasureEvalUnitTests.csproj'
-- name: registry-repo-Name
+- name: repositoryName
   value: 'link-measureeval'
 - name: dockerPath
-  value: '**/DotNet/MeasureEval/Dockerfile'
+  value: 'Java/measureeval/Dockerfile'
 - name: serviceName
-  value: 'MeasureEval'
+  value: 'measureeval'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 
 steps:
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: JavaToolInstaller@0
     inputs:
-      command: restore
-      projects: '$(project)'
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
-  - task: DotNetCoreCLI@2
+  - task: Maven@2
+    displayName: Maven Install
     inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
+      mavenPomFile: 'Java/pom.xml'
+      goals: install
+      options: '-pl measureeval -am'
   
-
   - task: Docker@2
-    displayName: "Build & Push MeasureEval Docker Image"
+    displayName: "Build & Push Audit Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
+      repository: $(repositoryName)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
         latest
         $(Build.BuildId)
-      buildContext: '$(Build.Repository.LocalPath)'
+      buildContext: 'Java/'
 
   - task: PublishPipelineArtifact@1
     inputs:

@@ -26,7 +26,7 @@ namespace QueryDispatchUnitTests
                 .ReturnsAsync(true);
 
             var result = await _controller.DeleteQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId);
-            Assert.IsType<OkObjectResult>(result.Result);
+            Assert.IsType<NoContentResult>(result.Result);
         }
 
         [Fact]
