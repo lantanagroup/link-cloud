@@ -612,6 +612,8 @@ services:
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.jpa.hibernate.ddl-auto: update
+      loki.enabled: true
+      loki.url: http://loki:3100
     ports:
       - "8075:8075"
     build:
