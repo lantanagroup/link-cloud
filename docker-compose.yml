@@ -1,58 +1,650 @@
 version: '3.4'
 
+#### services and ports
+## redis_cache: 6379
+## pg_db: 5432
+## mssql: 1433
+## mongo: 17017
+## loki: 3100
+## promtail: N/A
+## grafana: 3000
+## kafka_b: 9092, 9094
+## kafka-ui: 9095
+## rest-proxy: 8082
+## schema-registry: 8081
+## account: 8060
+## audit: 8062
+## bff: 8063
+## census: 8064
+## dataacquisition: 8065
+## demo-app: 8066
+## measureeval: 8067
+## normalization: 8068
+## notification: 8069
+## patientstoquery: 8070
+## querydispatch: 8071
+## report: 8072
+## submission: 8073
+## tenant: 8074
+## validation: 8075
+
 services:
+      
+  ###########################################
+  ### Redis Cache
+  ###########################################
+
+  redis_cache:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
+    volumes: 
+      - redis_cache:/data
+    networks:
+      - link-nw
+      
+  ###########################################
+  ### Databases
+  ###########################################
+  
+  pg_db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: ${LINK_DB_USER}
+      POSTGRES_PASSWORD: ${LINK_DB_PASS}
+      POSTGRES_DB: link-pg-db
+      POSTGRES_MULTIPLE_DATABASES: 'link-account'
+    ports:
+      - 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - link-nw
+  
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${LINK_DB_PASS}
+      - MSSQL_PID=Developer
+    ports:
+      - 1433:1433
+    volumes:
+      - mssql_data:/var/opt/mssql
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${LINK_DB_PASS} -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      retries: 10
+      start_period: 10s
+      timeout: 3s
+    networks:
+      - link-nw
+      
+  mssql_init:
+    image: mcr.microsoft.com/mssql-tools
+    environment:
+      LINK_DB_PASS: ${LINK_DB_PASS}
+    volumes:
+      - type: bind
+        source: create-dbs.sql
+        target: /create-dbs.sql
+    command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
+    depends_on:
+      - mssql
+    networks:
+      - link-nw
+      
+  mongo:
+    image: mongo:6-jammy
+    ports:
+      - '17017:27017'
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - link-nw
+      
+  ###########################################
+  ### Telemetry
+  ###########################################
+      
+  loki:
+    image: grafana/loki:2.9.0
+    hostname: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - link-nw
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - link-nw
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+        EOF
+        /run.sh
+    networks:
+      - link-nw
+      
+  ###########################################
+  ### KAFKA
+  ###########################################
+  
+  kafka_b:
+    image: bitnami/kafka:3.4
+    hostname: kafka_b
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_NUM_PARTITIONS=2
+    networks:
+      - link-nw
+      
+  kafka_init:
+    image: confluentinc/cp-kafka:6.1.1
+    depends_on:
+      - kafka_b
+    entrypoint: [ '/bin/sh', '-c' ]
+    networks:
+      - link-nw
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested-Retry --replication-factor 1 --partitions 1
+
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
+      "
+      
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 9095:8080
+    depends_on:
+      - kafka_b
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka_b:9094
+    networks:
+      - link-nw
+
+  rest-proxy:
+    image: confluentinc/cp-kafka-rest:latest
+    depends_on:
+      - kafka_b
+    ports:
+      - 8082:8082
+    hostname: rest-proxy
+    container_name: rest-proxy
+    environment:
+      KAFKA_REST_HOST_NAME: rest-proxy
+      KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
+      KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+    networks:
+      - link-nw
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    hostname: schema-registry
+    depends_on:
+      - kafka_b
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
+    networks:
+      - link-nw
+     
+  ###########################################
+  ### LINK
+  ###########################################
+
   account:
-    image: ${DOCKER_REGISTRY-}account
+    image: link-account
+    hostname: account_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Postgres__ConnectionString: Host=pg_db:5432;Database=link-account;Username=link-db-user;Password=link-db-pass;
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      ServiceRegistry: "{}"
+    ports:
+      - "8060:8060"
     build:
       context: .
-      dockerfile: Account/Dockerfile
+      dockerfile: DotNet/Account/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - loki
+      - pg_db
+      - kafka_init
 
-  api:
-    image: ${DOCKER_REGISTRY-}api
+  audit:
+    image: link-audit
+    hostname: audit_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8062:8062"
     build:
       context: .
-      dockerfile: Api/Dockerfile
-
-  tenant:
-    image: ${DOCKER_REGISTRY-}tenant
+      dockerfile: DotNet/Audit/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - loki
+      - kafka_init
+      - mssql
+      - mssql_init
+      
+  bff:
+    image: link-bff
+    hostname: bff_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      ServiceRegistry__AccountServiceUrl: http://account:8060
+      ConnectionStrings__Redis: redis_cache:6379
+      Authentication__EnableAnonymousAccess: true
+      ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
+      ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
+      ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
+      ReverseProxy__Clusters__DataAcquisitionService__Destinations__destination1__Address: http://dataacquisition:8065
+      ReverseProxy__Clusters__MeasureEvalService__Destinations__destination1__Address: http://measureeval:8067
+      ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
+      ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
+      ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
+      ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
+      ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
+    ports:
+      - "8063:8063"
     build:
       context: .
-      dockerfile: Tenant/Dockerfile
-
-  query:
-    image: ${DOCKER_REGISTRY-}query
+      dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - redis_cache
+      - account
+      - audit
+      - census
+      - dataacquisition
+      - measureeval
+      - normalization
+      - notification
+      - report
+      - submission
+      - tenant
+  
+  census:
+    image: link-census
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      AutoMigrate: true
+    ports:
+      - "8064:8064"
     build:
       context: .
-      dockerfile: Query/Dockerfile
+      dockerfile: DotNet/Census/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - loki
+      - kafka_init
+      - mssql_init
+      - tenant
 
-  validation:
-    image: ${DOCKER_REGISTRY-}validation
+  dataacquisition:
+    image: link-dataacquisition
+    hostname: dataacquisition_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
+      DatabaseProvider: SqlServer
+      ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8065:8065"
     build:
       context: .
-      dockerfile: Validation/Dockerfile
+      dockerfile: DotNet/DataAcquisition/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mssql_init
+      - loki
 
-  report:
-    image: ${DOCKER_REGISTRY-}report
+  demo-app:
+    image: link-demo-app
+    ports:
+      - "8066:80"
     build:
-      context: .
-      dockerfile: Report/Dockerfile
-
-  patientlist:
-    image: ${DOCKER_REGISTRY-}patientlist
-    build:
-      context: .
-      dockerfile: PatientList/Dockerfile
-
-  normalization:
-    image: ${DOCKER_REGISTRY-}normalization
-    build:
-      context: .
-      dockerfile: Normalization/Dockerfile
-
+      context: Web/DemoApp
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_b
 
   measureeval:
-    image: ${DOCKER_REGISTRY-}measureeval
+    image: link-measureeval
+    environment:
+      server.port: 8067
+      spring.data.mongodb.uri: mongodb://mongo:27017
+      spring.data.mongodb.database: link-measureeval
+      spring.kafka.bootstrap-servers: kafka_b:9094
+      spring.kafka.consumer.group-id: measureeval-events
+      spring.kafka.consumer.client-id: measureeval-client
+      spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
+      link.data-acquisition.base-url: http://dataacquisition:8065
+    ports:
+      - "8067:8067"
+    build:
+      context: Java/
+      dockerfile: measureeval/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mongo
+      - dataacquisition
+      
+  normalization:
+    image: link-normalization
+    hostname: normalization_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
+      DatabaseProvider: SqlServer
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+    ports:
+      - "8068:8068"
     build:
       context: .
-      dockerfile: MeasureEval/Dockerfile
+      dockerfile: DotNet/Normalization/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - loki
+      
+  notification:
+    image: link-notification
+    hostname: notification_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      DatabaseProvider: SqlServer
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
+      IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
+      Serilog__WriteTo__1__Args__uri: http://loki:3100
+    ports:
+      - "8069:8069"
+    build:
+      context: .
+      dockerfile: DotNet/Notification/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mssql_init
+      - loki
+      
+  patientstoquery:
+    image: link-patientquery
+    hostname: patientquery_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8070:8070"
+    build:
+      context: .
+      dockerfile: DotNet/PatientsToQuery/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - loki
+      
+  querydispatch:
+    image: link-querydispatch
+    hostname: querydispatch_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-querydispatch
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8071:8071"
+    build:
+      context: .
+      dockerfile: DotNet/QueryDispatch/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mongo
+      - loki
 
+  report:
+    image: link-report
+    hostname: report_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-report
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8072:8072"
+    build:
+      context: .
+      dockerfile: DotNet/Report/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mongo
+      - loki
+
+  submission:
+    image: link-submission
+    hostname: submission_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-submission
+      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8073:8073"
+    build:
+      context: .
+      dockerfile: DotNet/Submission/Dockerfile
+    networks:
+      - link-nw
+    volumes: 
+      - submission_data:/data/Submission
+    depends_on:
+      - kafka_init
+      - mongo
+      - loki
+
+  tenant:
+    image: link-tenant
+    hostname: tenant_svc
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+    ports:
+      - "8074:8074"
+    build:
+      context: .
+      dockerfile: DotNet/Tenant/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - loki
+      - mssql_init
+
+  validation:
+    image: link-validation
+    environment:
+      server.port: 8075
+      spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
+      spring.datasource.url: jdbc:sqlserver://;serverName=mssql;databaseName=link-validation;encrypt=true;trustServerCertificate=true
+      spring.datasource.username: sa
+      spring.datasource.password: ${LINK_DB_PASS}
+      spring.kafka.bootstrap-servers: kafka_b:9094
+      spring.jpa.hibernate.ddl-auto: update
+    ports:
+      - "8075:8075"
+    build:
+      context: Java/
+      dockerfile: validation/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      - kafka_init
+      - mssql_init
+
+networks:
+  link-nw:
+     
+volumes:
+  kafka_data:
+    driver: local
+  postgres_data:
+    driver: local
+  mssql_data:
+    driver: local
+  redis_cache:
+    driver: local
+  mongo_data:
+    driver: local
+  submission_data:
+    driver: local

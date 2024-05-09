@@ -37,7 +37,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
     public async Task<IEnumerable<BaseResponse>> Handle(ConsumePatientIdsAcquiredEventCommand request, CancellationToken cancellationToken)
     {
         /// 1. convert Fhir List to patient entities
-        /// 2. get existing census from mongo
+        /// 2. get existing census from database
         /// 3. compare:
         ///    - new patients need admitted date updated to DateTime.UtcNow
         ///    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow

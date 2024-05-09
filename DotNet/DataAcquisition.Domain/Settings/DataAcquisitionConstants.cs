@@ -7,11 +7,7 @@ public static class DataAcquisitionConstants
 
     public static class AppSettingsSectionNames
     {
-        public const string Mongo = "MongoDB";
-        public const string Redis = "Redis";
         public const string ServiceInformation = "ServiceInformation";
-        public const string Telemetry = "Telemetry";
-        public const string TenantApiSettings = "TenantApiSettings";
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         public const string DatabaseProvider = "DatabaseProvider";
         public const string DatabaseConnection = "SqlServer";
