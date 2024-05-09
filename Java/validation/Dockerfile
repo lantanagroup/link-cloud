@@ -17,4 +17,4 @@ WORKDIR /root
 
 COPY --from=build /root/validation/target/validation-*.jar validation.jar
 EXPOSE 31820
-CMD ["java", "--add-opens java.base/java.util=ALL-UNNAMED", "-jar", "validation.jar"]
+CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "validation.jar"]
