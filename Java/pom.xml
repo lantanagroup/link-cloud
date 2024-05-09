@@ -18,7 +18,8 @@
     <packaging>pom</packaging>
 
     <properties>
-        <hapi.version>7.0.0</hapi.version>
+        <cqf-fhir.version>3.0.0</cqf-fhir.version>
+        <hapi-fhir.version>7.0.0</hapi-fhir.version>
     </properties>
 
     <modules>
@@ -44,7 +45,7 @@
             <dependency>
                 <groupId>ca.uhn.hapi.fhir</groupId>
                 <artifactId>hapi-fhir-bom</artifactId>
-                <version>${hapi.version}</version>
+                <version>${hapi-fhir.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -52,7 +53,15 @@
             <dependency>
                 <groupId>ca.uhn.hapi.fhir</groupId>
                 <artifactId>hapi-fhir-caching-caffeine</artifactId>
-                <version>${hapi.version}</version>
+                <version>${hapi-fhir.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.opencds.cqf.fhir</groupId>
+                <artifactId>cqf-fhir-bom</artifactId>
+                <version>${cqf-fhir.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
