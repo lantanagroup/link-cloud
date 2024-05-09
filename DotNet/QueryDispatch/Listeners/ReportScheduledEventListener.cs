@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using Confluent.Kafka.Extensions.Diagnostics;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -62,7 +63,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private async void StartConsumerLoop(CancellationToken cancellationToken) {
 
             var config = new ConsumerConfig() { 
-                GroupId = "QueryDispatchReportScheduled",
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

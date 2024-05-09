@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/Report/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Report/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

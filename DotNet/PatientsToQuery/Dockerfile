@@ -1,6 +1,6 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
@@ -19,7 +19,6 @@ RUN dotnet publish "PatientsToQuery.csproj" -c Release -o /app/publish /p:UseApp
 
 FROM base AS final
 WORKDIR /app
-RUN apk add --no-cache rocksdb libstdc++
-RUN ln -s /usr/lib/librocksdb.so.7 /app/librocksdb.so
+RUN apt update && apt install -y libgflags-dev libsnappy-dev
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "PatientsToQuery.dll"]

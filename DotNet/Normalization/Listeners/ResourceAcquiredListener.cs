@@ -82,7 +82,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = "NormalizationService-ResourceAcquired",
+            GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
         using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: true);
@@ -120,7 +120,6 @@ public class ResourceAcquiredListener : BackgroundService
                             FacilityId = messageMetaData.facilityId
                         });
                     }
- 
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
@@ -220,6 +219,14 @@ public class ResourceAcquiredListener : BackgroundService
                                 new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, op.Value.GetType().Name)
                             });
                         }
+                    }
+                    catch(NoEntityFoundException ex)
+                    {
+                        var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
+
+                        _logger.LogError(ex, "An error was encountered processing Operation Commands for {facilityId}", messageMetaData.facilityId);
+                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                        kafkaConsumer.Commit(message);
                     }
                     catch (Exception ex)
                     {

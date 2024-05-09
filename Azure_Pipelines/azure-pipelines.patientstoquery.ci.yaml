@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/PatientsToQuery/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/PatientsToQuery/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'
