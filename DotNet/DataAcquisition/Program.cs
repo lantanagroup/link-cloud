@@ -9,7 +9,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
-using LantanaGroup.Link.DataAcquisition.HealthChecks;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
@@ -21,7 +20,6 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
@@ -32,13 +30,11 @@ using Quartz.Impl;
 using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
-using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Spi;
 using LantanaGroup.Link.DataAcquisition.Application.Factories;
@@ -133,10 +129,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         o.Address = new Uri("TBD on what to do here.");
     });
 
-    //Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
-
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
     builder.Services.AddSingleton<BasicAuth>();
@@ -223,6 +215,10 @@ static void RegisterServices(WebApplicationBuilder builder)
             }
         };
     });
+
+    //Add Health Check
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<DataAcquisitionDbContext>();
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
