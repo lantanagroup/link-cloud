@@ -293,7 +293,9 @@ static void SetupMiddleware(WebApplication app)
         app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
     }
 
-    //TODO: Discuss migrations rather than ensure created
+    // Auto migrate database
+    app.AutoMigrateEF<AuditDbContext>();
+    
     // Ensure database created (temporary), not for production
     using (var scope = app.Services.CreateScope())
     {
