@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -23,26 +22,30 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<RetryListener> _logger;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IRetryRepository _retryRepository;
+        //private readonly IRetryRepository _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            IRetryRepository retryRepository,
+            //IRetryRepository retryRepository,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
-            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory
+            )
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
+            //_retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
             _consumerSettings = consumerSettings ?? throw new ArgumentException(nameof(consumerSettings));
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
 
             _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
         }
@@ -63,6 +66,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+
                 consumer.Subscribe(new List<string>() { KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue() } );
 
                 _logger.LogInformation($"Started Query Dispatch Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
