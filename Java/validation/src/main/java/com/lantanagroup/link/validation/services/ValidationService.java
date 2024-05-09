@@ -3,6 +3,8 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.parser.DataFormatException;
+import ca.uhn.fhir.parser.IParser;
+import ca.uhn.fhir.parser.LenientErrorHandler;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
@@ -36,6 +38,7 @@ import java.util.concurrent.ForkJoinPool;
 @Service
 public class ValidationService {
     private static final Logger log = LoggerFactory.getLogger(ValidationService.class);
+    private final IParser parser;
 
     private final List<String> allowedResourceTypes = List.of("StructureDefinition", "ValueSet", "CodeSystem", "ImplementationGuide", "Measure", "Library");
     private final ArtifactService artifactService;
@@ -46,6 +49,9 @@ public class ValidationService {
     public ValidationService(ArtifactService artifactService, ResultRepository resultRepository) {
         this.artifactService = artifactService;
         this.resultRepository = resultRepository;
+
+        this.parser = FhirHelper.getContext().newJsonParser();
+        this.parser.setParserErrorHandler(new LenientErrorHandler(false));
 
         Executors.newSingleThreadExecutor().submit(this::initArtifacts);
     }
@@ -72,6 +78,8 @@ public class ValidationService {
                 case RESOURCE -> this.loadResource(a);
             }
         });
+
+        log.info("Done loading artifacts into validator");
     }
 
     public List<ResultModel> validate(Resource resource) {
@@ -122,7 +130,7 @@ public class ValidationService {
             throw new RuntimeException("Artifact is not an NPM package");
         }
 
-        log.info("Loading package {}", artifactEntity.getName());
+        log.info("Loading package into validator {}", artifactEntity.getName());
 
         try {
             InputStream stream = new ByteArrayInputStream(artifactEntity.getContent());
@@ -130,7 +138,7 @@ public class ValidationService {
             List<String> resourceNames = npmPackage.listResources(allowedResourceTypes);
 
             for (int i = 0; i < resourceNames.size(); i++) {
-                log.trace("Loading resource from package {}: {}", artifactEntity.getName(), resourceNames.get(i));
+                log.debug("Loading resource from package {}: {}", artifactEntity.getName(), resourceNames.get(i));
                 InputStream resourceContent = npmPackage.loadResource(resourceNames.get(i));
 
                 try {
@@ -162,7 +170,7 @@ public class ValidationService {
                 .replaceAll("&copy;", "");
 
         try {
-            Resource resource = FhirHelper.deserialize(json);
+            Resource resource = (Resource) this.parser.parseResource(json);
             this.prePopulatedValidationSupport.addResource(resource);
         } catch (DataFormatException e) {
             log.warn("Error loading resource {} with starting content {}", name, json.substring(0, 100), e);

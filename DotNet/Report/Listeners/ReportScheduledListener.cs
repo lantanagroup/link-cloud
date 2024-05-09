@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "ReportScheduledEvent",
+                GroupId = ReportConstants.ServiceName,
                 EnableAutoCommit = false
             };
 

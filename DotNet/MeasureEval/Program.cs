@@ -8,9 +8,9 @@ using LantanaGroup.Link.MeasureEval.Models;
 using LantanaGroup.Link.MeasureEval.Repository;
 using LantanaGroup.Link.MeasureEval.Services;
 using LantanaGroup.Link.MeasureEval.Settings;
-using LantanaGroup.Link.MeasureEval.Wrappers;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using OpenTelemetry.Metrics;
@@ -89,16 +89,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(nameof(MongoConnection)));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(nameof(KafkaConnection)));
 
-    // Add Kafka factories
-    builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
-    builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
-
     // Add custom services to the container.
-    builder.Services.AddSingleton<IKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage>, MeasureEvalKafkaWrapper<string, PatientDataNormalizedMessage, PatientDataEvaluatedKey, PatientDataEvaluatedMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientDataNormalizedMessage>, KafkaConsumerFactory<string, PatientDataNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>, KafkaProducerFactory<PatientDataEvaluatedKey, PatientDataEvaluatedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, NotificationMessage>, KafkaProducerFactory<string, NotificationMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+
     builder.Services.AddSingleton<IMeasureEvalReportService, MeasureEvalReportService>();
-    builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, Null, MeasureChanged>, KafkaWrapper<Ignore, Null, Null, MeasureChanged>>();
-    builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, string, NotificationMessage>, KafkaWrapper<Ignore, Null, string, NotificationMessage>>();
-    builder.Services.AddSingleton<IKafkaWrapper<Ignore, Null, string, AuditEventMessage>, KafkaWrapper<Ignore, Null, string, AuditEventMessage>>();
 
     //Add Listeners
     builder.Services.AddHostedService<PatientDataNormalizedListener>();

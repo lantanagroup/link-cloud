@@ -6,7 +6,7 @@ COPY measureeval/pom.xml ./
 RUN mvn dependency:go-offline
 
 COPY measureeval/ ./
-RUN mvn package
+RUN mvn clean package
 
 FROM eclipse-temurin:17-jre-alpine AS run
 

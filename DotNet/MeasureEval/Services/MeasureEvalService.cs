@@ -1,6 +1,6 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.MeasureEval.Models;
-using LantanaGroup.Link.Shared.Application.Wrappers;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Options;
 using System.Text;
 
@@ -11,14 +11,12 @@ namespace LantanaGroup.Link.MeasureEval.Services
         private readonly ILogger<MeasureEvalService> _logger;
         private readonly IOptions<MeasureEvalConfig> _measureEvalConfig;
         private readonly HttpClient httpClient;
-        private readonly IKafkaWrapper<Ignore, Null, Null, MeasureChanged> kafkaWrapper;
 
-        public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient httpClient, IKafkaWrapper<Ignore, Null, Null, MeasureChanged> kafkaWrapper, IOptions<MeasureEvalConfig> measureEvalConfig)
+        public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient httpClient, IOptions<MeasureEvalConfig> measureEvalConfig)
         {
             _logger = logger;
             this._measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
             this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
-            this.kafkaWrapper = kafkaWrapper ?? throw new ArgumentNullException(nameof(kafkaWrapper));
         }
 
 

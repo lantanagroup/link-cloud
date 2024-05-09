@@ -121,7 +121,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepository_SQL_Census>();
+    builder.Services.AddSingleton<IRetryRepository, RetryRepositorySQLCensus>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
@@ -206,6 +206,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    app.AutoMigrateEF<CensusContext>();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

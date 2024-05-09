@@ -21,13 +21,6 @@ namespace QueryDispatchUnitTests
         {
             _mocker = new AutoMocker();
 
-            var settings = _mocker.CreateInstance<TenantServiceRegistration>();
-            settings.CheckIfTenantExists = false;
-            _mocker.Use(settings);
-
-            var service = (ITenantApiService)_mocker.CreateInstance<TenantApiService>();
-            _mocker.Use(service);
-
             var _controller = _mocker.CreateInstance<QueryDispatchController>();
 
             var validModel = new QueryDispatchConfiguration
@@ -35,6 +28,10 @@ namespace QueryDispatchUnitTests
                 FacilityId = QueryDispatchTestsConstants.facilityId,
                 DispatchSchedules = new List<DispatchSchedule>()
             };
+
+            _mocker.GetMock<ITenantApiService>()
+                .Setup(x => x.CheckFacilityExists(QueryDispatchTestsConstants.facilityId, new CancellationToken()))
+                .ReturnsAsync(true);
 
             _mocker.GetMock<IGetQueryDispatchConfigurationQuery>()
                 .Setup(query => query.Execute(It.IsAny<string>()))
@@ -48,7 +45,7 @@ namespace QueryDispatchUnitTests
                 .Setup(command => command.Execute(It.IsAny<QueryDispatchConfigurationEntity>()));
 
             var result = await _controller.CreateQueryDispatchConfigurationAsync(validModel);
-            Assert.IsType<OkObjectResult>(result.Result);
+            Assert.IsType<CreatedResult>(result.Result);
         }
 
         [Fact]

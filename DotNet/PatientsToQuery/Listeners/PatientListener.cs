@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models;
 using static PatientsToQuery.Settings.PatientsToQueryConstants;
+using PatientsToQuery.Settings;
 
 namespace LantanaGroup.Link.PatientsToQuery.Listeners
 {
@@ -29,7 +30,7 @@ namespace LantanaGroup.Link.PatientsToQuery.Listeners
         {
             var config = new StreamConfig<StringSerDes, StringSerDes>()
             {
-                ApplicationId = "PatientsToQuery",
+                ApplicationId = ServiceName,
                 BootstrapServers = _kafkaConnection.Value.BootstrapServers.First(),
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 Guarantee = ProcessingGuarantee.EXACTLY_ONCE,
