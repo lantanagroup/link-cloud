@@ -42,9 +42,14 @@ public class QueryPlanRepository : BaseSqlConfigurationRepo<QueryPlan>, IQueryPl
 
         if (existingQueryPlan != null)
         {
-            Entity.Id = existingQueryPlan.Id;
-            Entity.CreateDate = existingQueryPlan.CreateDate;
-            _dbContext.QueryPlan.Update(Entity);
+            existingQueryPlan.InitialQueries = Entity.InitialQueries;
+            existingQueryPlan.SupplementalQueries = Entity.SupplementalQueries;
+            existingQueryPlan.PlanName = Entity.PlanName;
+            existingQueryPlan.ReportType = Entity.ReportType;
+            existingQueryPlan.EHRDescription = Entity.EHRDescription;
+            existingQueryPlan.LookBack = Entity.LookBack;
+            existingQueryPlan.ModifyDate = Entity.ModifyDate;
+            _dbContext.QueryPlan.Update(existingQueryPlan);
         }
         else
         {
