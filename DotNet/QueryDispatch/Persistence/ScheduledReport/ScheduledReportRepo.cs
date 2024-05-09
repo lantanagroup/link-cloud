@@ -1,26 +1,26 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using QueryDispatch.Domain.Context;
 
 namespace LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport
 {
-    public class ScheduledReportMongoRepo : BaseMongoRepository<ScheduledReportEntity>, IScheduledReportRepository
+    public class ScheduledReportRepo : BaseSqlConfigurationRepo<ScheduledReportEntity>, IScheduledReportRepository
     {
-        private readonly ILogger<ScheduledReportMongoRepo> _logger;
+        private readonly ILogger<ScheduledReportRepo> _logger;
+        private readonly QueryDispatchDbContext _dbContext;
 
-        public ScheduledReportMongoRepo(IOptions<MongoConnection> mongoSettings, ILogger<ScheduledReportMongoRepo> logger) : base(mongoSettings, logger) 
+        public ScheduledReportRepo(ILogger<ScheduledReportRepo> logger, QueryDispatchDbContext dbContext) : base(logger, dbContext) 
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
         public ScheduledReportEntity GetByFacilityId(string facilityId)
         {
             try
             {
-                var filter = Builders<ScheduledReportEntity>.Filter.Eq(x => x.FacilityId, facilityId);
-                ScheduledReportEntity entity = _collection.Find(filter).FirstOrDefault();
+                var entity = _dbContext.ScheduledReports.FirstOrDefault(x => x.FacilityId == facilityId);
                 return entity;
             }
             catch (Exception ex)
@@ -34,7 +34,8 @@ namespace LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport
         {
             try
             {
-                await _collection.ReplaceOneAsync(x => x.Id == scheduledReport.Id, scheduledReport);
+                _dbContext.ScheduledReports.Update(scheduledReport);
+                await _dbContext.SaveChangesAsync();
             }
             catch (Exception ex)
             {
