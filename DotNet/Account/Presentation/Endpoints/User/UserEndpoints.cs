@@ -181,6 +181,20 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                     Description = "Deactivates a user and makes them inactive"
                 });
 
+            userEndpoints.MapPut("/user/{id}/claims", UpdateUserClaims.Handle)
+                .Produces<LinkUserModel>(StatusCodes.Status200OK)
+                .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
+                .Produces(StatusCodes.Status403Forbidden)
+                .Produces(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status500InternalServerError)
+                .WithOpenApi(x => new OpenApiOperation(x)
+                {
+                    Summary = "Update user claims",
+                    Description = "Updates the claims for an existing user"
+                });
+
+
             #endregion
 
             _logger.LogApiRegistration(nameof(UserEndpoints));
