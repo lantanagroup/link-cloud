@@ -11,6 +11,10 @@
     </parent>
 
     <artifactId>measureeval</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Measure Eval Service</name>
+    <description>Microservice for producing measure reports from patient data</description>
 
     <dependencies>
         <dependency>
