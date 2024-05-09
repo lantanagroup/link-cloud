@@ -32,6 +32,22 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
+        public List<string> PatientResourceTypes = new List<string>()
+        {
+            "Account", "AdverseEvent", "AllergyIntolerance", "Appointment", "AppointmentResponse", "AuditEvent",
+            "Basic", "BodyStructure", "CarePlan", "CareTeam", "ChargeItem", "Claim", "ClaimResponse",
+            "ClinicalImpression", "Communication", "CommunicationRequest", "Composition", "Condition", "Consent",
+            "Coverage", "CoverageEligibilityRequest", "CoverageEligibilityResponse", "DetectedIssue", "DeviceRequest",
+            "DeviceUseStatement", "DiagnosticReport", "DocumentManifest", "DocumentReference", "Encounter",
+            "EnrollmentRequest", "EpisodeOfCare", "ExplanationOfBenefit", "FamilyMemberHistory", "Flag", "Goal",
+            "Group", "ImagingStudy", "Immunization", "ImmunizationEvaluation", "ImmunizationRecommendation", "Invoice",
+            "List", "MeasureReport", "Media", "MedicationAdministration", "MedicationDispense", "MedicationRequest",
+            "MedicationStatement", "MolecularSequence", "NutritionOrder", "Observation", "Patient", "Person",
+            "Procedure", "Provenance", "QuestionnaireResponse", "RelatedPerson", "RequestGroup", "ResearchSubject",
+            "RiskAssessment", "Schedule", "ServiceRequest", "Specimen", "SupplyDelivery", "SupplyRequest",
+            "VisionPrescription"
+        };
+
         public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IMediator mediator, IReportServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -40,7 +56,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
 
-        public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate, Bundle otherResources)
         {
             if (string.IsNullOrEmpty(facilityId))
                 throw new Exception($"GenerateBundle: no facilityId supplied");
@@ -50,7 +66,7 @@ namespace LantanaGroup.Link.Report.Core
 
             var entries = await _mediator.Send(new GetPatientSubmissionEntriesQuery() { FacilityId = facilityId, PatientId = patientId, StartDate = startDate, EndDate = endDate });
 
-            Bundle submissionBundle = new Bundle();
+            Bundle patientResourceBundle = new Bundle();
             foreach (var entry in entries)
             {
                 var measureReportScheduleId = entry.MeasureReportScheduleId;
@@ -82,7 +98,7 @@ namespace LantanaGroup.Link.Report.Core
                     continue;
                 }
 
-                var config = (await _mediator.Send(new SearchMeasureReportConfigQuery { FacilityId = facilityId, ReportType = schedule.ReportType})).FirstOrDefault();
+                var config = (await _mediator.Send(new SearchMeasureReportConfigQuery { FacilityId = facilityId, ReportType = schedule.ReportType })).FirstOrDefault();
 
                 if (config == null)
                     throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
@@ -94,14 +110,6 @@ namespace LantanaGroup.Link.Report.Core
                 );
 
                 string orgId = org?.Resource.Id ?? "";
-
-                // aggregate patient list
-                if (bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "List") is null)
-                {
-                    var pl = CreatePatientList(new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)), config.ReportType);
-                    bundle.AddResourceEntry(pl, GetFullUrl(pl));
-                }
-                
 
                 if (entry.ContainedResources is not null && entry.ContainedResources.Count > 0)
                 {
@@ -138,11 +146,6 @@ namespace LantanaGroup.Link.Report.Core
                 // Clean up the contained resources within the measure report
                 cleanupContainedResource(mr);
 
-                //_logger.LogDebug($"Adding MeasurReport with ID [{mr.Id}] (entry mongo _id: [{entry.Id}]) to aggregate.");
-
-                //// add to aggregate measure report
-                //AddToAggregateMeasureReport(bundle, mr, orgId);
-
                 if (config != null && config.BundlingType == BundlingType.SharedPatientLineLevel)
                     BundleSharedPatientLineLevel(bundle, mr);
                 else
@@ -150,7 +153,14 @@ namespace LantanaGroup.Link.Report.Core
 
                 foreach (var resource in bundle.GetResources())
                 {
-                    submissionBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                    if (PatientResourceTypes.Contains(resource.TypeName))
+                    {
+                        patientResourceBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                    }
+                    else
+                    {
+                        otherResources.AddResourceEntry(resource, GetFullUrl(resource));
+                    }
                 }
 
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
@@ -168,7 +178,7 @@ namespace LantanaGroup.Link.Report.Core
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                SubmissionBundle = submissionBundle
+                SubmissionBundle = patientResourceBundle
             };
 
             return patientSubmissionModel;
