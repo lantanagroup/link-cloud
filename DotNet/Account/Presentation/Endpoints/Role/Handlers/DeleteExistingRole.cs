@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Account.Application.Interfaces.Factories.Role;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -41,7 +42,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 
                 logger.LogRoleDeleted(roleMOdel.Name, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown", roleMOdel);
 
-                return Results.Ok();
+                return Results.NoContent();
             }
             catch (Exception ex)
             {

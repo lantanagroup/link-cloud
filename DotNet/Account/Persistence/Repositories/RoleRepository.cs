@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
         {
-            var role = await _dbContext.Roles.FindAsync(id, cancellationToken);
+            var role = await _dbContext.Roles.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
             if(role is null)
             {
                 return false;
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> AddClaimAsync(string roleId, Claim claim, CancellationToken cancellationToken = default)
         {
-            var role = await _dbContext.Roles.FindAsync(roleId, cancellationToken);
+            var role = await _dbContext.Roles.FindAsync([roleId], cancellationToken);
             if (role is null)
             {
                 return false;
@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> RemoveClaimAsync(string roleId, Claim claim, CancellationToken cancellationToken = default)
         {
-            var role = await _dbContext.Roles.FindAsync(roleId, cancellationToken);
+            var role = await _dbContext.Roles.FindAsync([roleId], cancellationToken);
             if (role is null)
             {
                 return false;

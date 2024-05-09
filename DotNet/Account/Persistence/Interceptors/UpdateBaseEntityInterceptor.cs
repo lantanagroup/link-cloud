@@ -26,11 +26,7 @@ namespace LantanaGroup.Link.Account.Persistence.Interceptors
                         break;
                     case EntityState.Modified:
                         entry.Property(p => p.LastModifiedOn).CurrentValue = DateTime.UtcNow;
-                        break;
-                    case EntityState.Deleted:
-                        entry.State = EntityState.Modified;
-                        entry.Property(p => p.LastModifiedOn).CurrentValue = DateTime.UtcNow;                        
-                        break;
+                        break;                   
                 }
             }
 
