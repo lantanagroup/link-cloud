@@ -303,7 +303,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: account-events
       Postgres__ConnectionString: Host=pg_db:5432;Database=link-account;Username=link-db-user;Password=link-db-pass;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
@@ -326,7 +325,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: audit-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8062:8062"
@@ -345,7 +343,22 @@ services:
     image: link-bff
     hostname: bff_svc
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Docker
+      KafkaConnection__BootstrapServers__0: kafka_b:9094
+      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      ServiceRegistry__AccountServiceUrl: http://account:8060
+      ConnectionStrings__Redis: redis_cache:6379
+      Authentication__EnableAnonymousAccess: true
+      ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
+      ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
+      ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
+      ReverseProxy__Clusters__DataAcquisitionService__Destinations__destination1__Address: http://dataacquisition:8065
+      ReverseProxy__Clusters__MeasureEvalService__Destinations__destination1__Address: http://measureeval:8067
+      ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
+      ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
+      ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
+      ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
+      ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
     ports:
       - "8063:8063"
     build:
@@ -354,11 +367,18 @@ services:
     networks:
       - link-nw
     depends_on:
-      - kafka_b
-      - tenant
-      - report
-      - normalization
+      - kafka_init
+      - redis_cache
+      - account
+      - audit
+      - census
       - dataacquisition
+      - measureeval
+      - normalization
+      - notification
+      - report
+      - submission
+      - tenant
   
   census:
     image: link-census
@@ -366,7 +386,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: census-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       AutoMigrate: true
@@ -392,7 +411,6 @@ services:
       DatabaseProvider: SqlServer
       ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: dataacquisition-events
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
@@ -449,7 +467,6 @@ services:
       AutoMigrate: true
       DatabaseProvider: SqlServer
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: normalization-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -472,7 +489,6 @@ services:
       DatabaseProvider: SqlServer
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: normalization-events
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
       IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
@@ -495,7 +511,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: patientquery-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8070:8070"
@@ -514,7 +529,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: patientquery-events
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-querydispatch
       Serilog__WriteTo__0__Args__uri: http://loki:3100
@@ -536,7 +550,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: patientquery-events
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
@@ -559,7 +572,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: patientquery-events
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-submission
       SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
@@ -586,7 +598,6 @@ services:
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      KafkaConnection__GroupId: tenant-events
       Serilog__WriteTo__0__Args__uri: http://loki:3100
     ports:
       - "8074:8074"
