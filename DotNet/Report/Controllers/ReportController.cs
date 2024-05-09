@@ -14,13 +14,15 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportController> _logger;
         private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IMediator _mediator;
 
-        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, IMediator mediator)
+        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, IMediator mediator, PatientReportSubmissionBundler patientReportSubmissionBundler)
         {
             _logger = logger;
             _bundler = bundler;
             _mediator = mediator;
+            _patientReportSubmissionBundler = patientReportSubmissionBundler;
         }
 
         /// <summary>
@@ -47,6 +49,33 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundle for ReportId {reportId}: {ex.Message}");
+                throw;
+            }
+        }
+
+        [HttpGet("GetSubmissionBundleForPatient")]
+        public async Task<JsonElement> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate, Bundle otherResources)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    BadRequest("Paramater facilityId is null or whitespace");
+                }
+
+                if (string.IsNullOrWhiteSpace(patientId))
+                {
+                    BadRequest("Paramater patientId is null or whitespace");
+                }
+
+                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate, otherResources);
+
+                var returnModel = new { PatientResourceBundle = submission, OtherResources = otherResources };
+                return JsonSerializer.SerializeToElement(returnModel, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
                 throw;
             }
         }

@@ -93,6 +93,16 @@ namespace LantanaGroup.Link.Report.Listeners
                             var value = consumeResult.Message.Value;
                             facilityId = key.FacilityId;
 
+                            if (string.IsNullOrWhiteSpace(key?.FacilityId))
+                            {
+                                throw new DeadLetterException("FacilityId is null or empty", AuditEventType.Submit);
+                            }
+
+                            if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
+                            {
+                                throw new DeadLetterException("ReportBundleId is null or empty", AuditEventType.Submit);
+                            }
+
                             // find existing report schedule
                             MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
 
