@@ -18,7 +18,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <hapi.version>7.0.2</hapi.version>
+        <hapi.version>7.0.0</hapi.version>
     </properties>
 
     <modules>
