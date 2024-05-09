@@ -17,4 +17,4 @@ WORKDIR /root
 
 COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
 EXPOSE 5135
-CMD ["java", "-jar", "measureeval.jar"]
+CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "measureeval.jar"]
