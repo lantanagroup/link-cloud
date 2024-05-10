@@ -214,7 +214,7 @@ public class FhirApiRepository : IFhirApiRepository
                 PatientId = patientId,
                 FacilityId = facilityId,
                 QueryType = queryType,
-                IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName == nameof(OperationOutcome)),
             }, cancellationToken);           
             
             return resultBundle;
@@ -374,7 +374,7 @@ public class FhirApiRepository : IFhirApiRepository
                     searchParams.Add(kvPair.Key, kvPair.Value);
                 }
 
-                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, queryPlanType);
+                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType);
                 if(result != null)
                 {
                     domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && (x.Resource.TypeName != nameof(OperationOutcome))).Select(x => (DomainResource)x.Resource).ToList());
