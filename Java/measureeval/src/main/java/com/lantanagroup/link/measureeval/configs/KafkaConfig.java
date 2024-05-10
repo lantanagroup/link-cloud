@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 
 @Configuration
 public class KafkaConfig {
+    // TODO: Replace this and StreamUtils.mapKeys with getDeserializers
     private static Pattern getPattern(String topic) {
         return Pattern.compile(Pattern.quote(topic));
     }

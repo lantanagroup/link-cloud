@@ -2,7 +2,9 @@ package com.lantanagroup.link.measureeval.records;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.measureeval.models.QueryType;
+import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -16,7 +18,9 @@ import java.util.List;
 @Getter
 @Setter
 public class ResourceNormalized {
+    @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
+
     private QueryType queryType;
     private IBaseResource resource;
 
