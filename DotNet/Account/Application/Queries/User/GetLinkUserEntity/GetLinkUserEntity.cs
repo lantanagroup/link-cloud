@@ -31,8 +31,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                     throw new ArgumentException("A user id is required");
                 }
 
-                var user = await _userRepository.GetUserAsync(id, cancellationToken: cancellationToken) ??
-                    throw new ApplicationException($"User with id {id} not found");
+                var user = await _userRepository.GetUserAsync(id, cancellationToken: cancellationToken);
 
                 return user;
             }

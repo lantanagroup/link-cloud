@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Link.Authorization.Infrastructure;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -58,10 +59,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     user.LastModifiedBy = requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
                 }
 
-                await _userRepository.UpdateAsync(user);
+                await _userRepository.UpdateAsync(user, cancellationToken);
 
                 //update user roles
-                var userRoles = await _userRepository.GetUserRoles(user.Id, cancellationToken);
+                var userRoles = user.UserRoles.Select(r => r.Role);
                 var currentRoles = userRoles.Select(r => r.Name);
                 var addedRoles = model.Roles.Except(currentRoles);
                 var removedRoles = currentRoles.Except(model.Roles);
@@ -110,6 +111,56 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     changes.Add(new PropertyChangeModel("Roles", string.Join(",", currentRoles), string.Join(",", model.Roles)));
                 }
 
+                //update user claims
+                var currentClaims = user.Claims.Select(c => c.ClaimValue);
+                var addedClaims = model.UserClaims.Except(currentClaims);
+                var removedClaims = currentClaims.Except(model.UserClaims);
+
+                if(addedClaims.Any())
+                {
+                    foreach(var claim in addedClaims)
+                    {
+                        if (!string.IsNullOrEmpty(claim))
+                        {
+                            Claim userClaim = new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
+                            var result = await _userRepository.AddClaimToUserAsync(user.Id, userClaim, cancellationToken);
+
+                            if (!result)
+                            {
+                                _logger.LogUserClaimAssignmentException(user.Id, userClaim.Type, userClaim.Value, "Failed to add claim while updating user.");
+                            }
+
+                            _logger.LogUserClaimAssignment(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+                        }
+
+                    }
+                }
+
+                if(removedClaims.Any())
+                {
+                    foreach(var claim in removedClaims)
+                    {
+                        if (!string.IsNullOrEmpty(claim))
+                        {
+                            Claim userClaim = new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
+                            var result = await _userRepository.RemoveClaimFromUserAsync(user.Id, userClaim, cancellationToken);
+
+                            if (!result)
+                            {
+                                _logger.LogUserClaimRemovalException(user.Id, userClaim.Type, userClaim.Value, "Failed to remove claim while updating user.");
+                            }
+
+                            _logger.LogUserClaimRemoval(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+                        }
+                    }
+                }
+
+                //capture claim changes
+                if (addedClaims.Any() || removedClaims.Any())
+                {
+                    changes.Add(new PropertyChangeModel("Claims", string.Join(",", currentClaims), string.Join(",", model.UserClaims)));
+                }
+
                 //generate audit event
                 var auditMessage = new AuditEventMessage
                 {
@@ -120,14 +171,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     User = requestor?.Identity?.Name ?? string.Empty,
                     Resource = typeof(LinkUser).Name,
                     PropertyChanges = changes,
-                    Notes = $"New user ({user.Id}) created by '{user.CreatedBy}'."
+                    Notes = $"User ({user.Id}) updated by '{user.CreatedBy}'."
                 };
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;

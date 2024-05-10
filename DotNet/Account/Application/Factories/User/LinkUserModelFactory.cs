@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 Facilities = user.Facilities ?? [],
                 Roles = user.UserRoles.Select(r => r.Role.Name ?? string.Empty).ToList() ?? [],
                 UserClaims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
-                RoleClaims = user.UserRoles.SelectMany(r => r.Role.RoleClaims).Select(c => c.ClaimValue ?? string.Empty).ToList() ?? []
+                RoleClaims = user.UserRoles.SelectMany(r => r.Role.RoleClaims).Select(c => c.ClaimValue ?? string.Empty).Distinct().ToList() ?? []
             };
 
             return model;

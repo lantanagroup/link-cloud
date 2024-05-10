@@ -4,6 +4,7 @@ using LantanaGroup.Link.Account.Application.Models.User;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using MongoDB.Driver;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Account.Application.Queries.User
@@ -35,8 +36,12 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
                 var user = await _userRepository.GetUserByEmailAsync(email, cancellationToken: cancellationToken);
 
-                LinkUserModel userModel = user is null ? throw new ApplicationException($"User with an email address of {email} was not found") 
-                    : _linkUserModelFactory.Create(user);
+                if(user == null)
+                {
+                    return null;
+                }
+
+                LinkUserModel userModel = _linkUserModelFactory.Create(user);
 
                 return userModel;
             }

@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Link.Authorization.Infrastructure;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -84,6 +85,25 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         }
 
                         _logger.LogUserAddedToRole(user.Id, role, user.CreatedBy ?? "Unknown");
+                    }                    
+                }           
+                
+                //Add any claims provided
+                if (model.UserClaims is not null)
+                {
+                    
+                    foreach (var claim in model.UserClaims)
+                    {
+                        Claim userClaim = new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim);
+
+                        result = await _userRepository.AddClaimToUserAsync(user.Id, userClaim, cancellationToken);
+                        if (!result)
+                        {
+                            _logger.LogUserClaimAssignmentException(user.Id, userClaim.Type, userClaim.Value, "Failed to add claim while creating user.");
+                        }
+
+                        _logger.LogUserClaimAssignment(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+
                     }                    
                 }
 
