@@ -21,10 +21,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeasureEval", "DotNet\MeasureEval\MeasureEval.csproj", "{371A3B98-4918-4725-AD93-65D7D18DEC1A}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeasureEvalTests", "DotNet\MeasureEvalTests\MeasureEvalTests.csproj", "{82A91203-9385-4123-9B94-6B1911A30915}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit", "DotNet\Audit\Audit.csproj", "{4C933C22-D465-41EF-B790-00E7F9098963}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Census", "DotNet\Census\Census.csproj", "{6837CD67-C54A-4A8C-9E4B-B27FA1A83E5C}"
@@ -101,14 +97,6 @@ Global
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Release|Any CPU.Build.0 = Release|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Release|Any CPU.ActiveCfg = Release|Any CPU
