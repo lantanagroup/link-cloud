@@ -13,6 +13,7 @@ using LantanaGroup.Link.Account.Infrastructure.Telemetry;
 using LantanaGroup.Link.Account.Persistence;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.Account.Persistence.Repositories;
+using LantanaGroup.Link.Account.Presentation.Endpoints.Claims;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Role;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User;
 using LantanaGroup.Link.Account.Settings;
@@ -144,6 +145,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add endpoints
     builder.Services.AddTransient<IApi, UserEndpoints>();
     builder.Services.AddTransient<IApi, RoleEndpoints>();
+    builder.Services.AddTransient<IApi, ClaimsEndpoints>();
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
