@@ -9,5 +9,7 @@
         CanViewResources,
         CanGenerateReports,
         CanGenerateEvents,
+        CanViewAccounts,
+        CanAdministerAccounts
     }
 }
