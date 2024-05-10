@@ -175,7 +175,7 @@ public class ResourceNormalizedConsumer {
             String correlationId,
             ResourceNormalized value,
             PatientReportingEvaluationStatus patientStatus) {
-        logger.debug("Retrieving query results from data acquisition service");
+        logger.debug("Retrieving query results from Data Acquisition");
         QueryResults queryResults =
                 dataAcquisitionClient.getQueryResults(facilityId, correlationId, value.getQueryType());
         if (patientStatus.getPatientId() == null) {
@@ -184,6 +184,7 @@ public class ResourceNormalizedConsumer {
         logger.debug("Creating patient status resources");
         queryResults.getQueryResults().stream()
                 .filter(queryResult -> queryResult.getQueryType() == value.getQueryType())
+                // TODO: Deduplicate
                 .map(queryResult -> {
                     PatientReportingEvaluationStatus.Resource resource =
                             new PatientReportingEvaluationStatus.Resource();
@@ -205,6 +206,7 @@ public class ResourceNormalizedConsumer {
                 .filter(_resource -> StringUtils.equals(_resource.getResourceId(), value.getResourceId()))
                 .filter(_resource -> _resource.getQueryType() == value.getQueryType())
                 .reduce(StreamUtils::toOnlyElement)
+                // TODO: Warn rather than throw
                 .orElseThrow();
         resource.setIsPatientResource(value.isPatientResource());
         resource.setNormalizationStatus(normalizationStatus);
@@ -259,6 +261,8 @@ public class ResourceNormalizedConsumer {
         logger.debug("Evaluating measures");
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasure(patientStatus, report, bundle);
+            // TODO: Strip LCR- prefix from IDs and references
+            // TODO: Replace evaluatedResource with references to contained
             switch (value.getQueryType()) {
                 case INITIAL -> updateReportability(patientStatus, report, measureReport);
                 case SUPPLEMENTAL -> produceResourceEvaluatedRecords(patientStatus, report, measureReport);
