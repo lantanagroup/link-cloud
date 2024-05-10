@@ -381,7 +381,7 @@ public class FhirApiRepository : IFhirApiRepository
                     searchParams.Add(kvPair.Key, kvPair.Value);
                 }
 
-                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType);
+                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType, patientId: patientIdReference);
                 if(result != null)
                 {
                     domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && (x.Resource.TypeName != nameof(OperationOutcome))).Select(x => (DomainResource)x.Resource).ToList());
