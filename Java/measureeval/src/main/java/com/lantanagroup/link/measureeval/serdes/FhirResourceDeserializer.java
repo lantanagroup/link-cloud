@@ -5,17 +5,18 @@ import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.parser.IParser;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import java.io.IOException;
 
-public class FhirResourceDeserializer<T extends IBaseResource> extends JsonDeserializer<T> {
+public class FhirResourceDeserializer<T extends IBaseResource> extends StdDeserializer<T> {
     private final Class<T> resourceType;
     private final FhirContext fhirContext;
 
     public FhirResourceDeserializer(Class<T> resourceType, FhirContext fhirContext) {
+        super(resourceType);
         this.resourceType = resourceType;
         this.fhirContext = fhirContext;
     }
