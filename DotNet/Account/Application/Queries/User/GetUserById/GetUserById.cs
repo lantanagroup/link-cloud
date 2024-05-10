@@ -35,8 +35,12 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 
                 var user = await _userRepository.GetUserAsync(id, cancellationToken: cancellationToken);
 
-                LinkUserModel userModel = user is null ? throw new ApplicationException($"User with an id of {id} was not found") 
-                    : _linkUserModelFactory.Create(user);
+                if (user is null)
+                {
+                    return null;
+                }
+
+                LinkUserModel userModel = _linkUserModelFactory.Create(user);
 
                 return userModel;
             }
