@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                 var users = await query.Execute(id, filters, context.RequestAborted);
 
-                logger.LogFindUsers(context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogSearchUsers(context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown", filters);
 
                 return Results.Ok(users);
             }
@@ -51,7 +51,21 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogFindUsersException(ex.Message);
+
+                // Create search filters
+                var filters = filterFactory.Create(
+                    searchText,
+                    null,
+                    filterRoleBy,
+                    filterClaimBy,
+                    false,
+                    false,
+                    sortBy,
+                    sortOrder,
+                    pageSize,
+                    pageNumber);
+
+                logger.LogSearchUsersException(ex.Message, filters);
                 throw;
             }            
         }

@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
+using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers;
@@ -111,7 +112,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                     Description = "Deletes an existing role"
                 });
          
-            roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)               
+            roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)
+                .AddEndpointFilter<ValidationFilter<LinkClaimsModel>>()
                 .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)

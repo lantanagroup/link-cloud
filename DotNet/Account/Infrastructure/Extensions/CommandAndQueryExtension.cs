@@ -21,6 +21,7 @@ namespace LantanaGroup.Link.Account.Infrastructure.Extensions
             services.AddTransient<IUpdateUserClaims, UpdateUserClaims>();
             services.AddTransient<IGetUserByid, GetUserById>();
             services.AddTransient<IGetUserByEmail, GetUserByEmail>();
+            services.AddTransient<IGetLinkUserEntity, GetLinkUserEntity>();
             services.AddTransient<IGetRoleUsers, GetRoleUsers>();
             services.AddTransient<IGetFacilityUsers, GetFacilityUsers>();
             services.AddTransient<ISearchUsers, SearchUsers>();
