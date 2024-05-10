@@ -15,6 +15,6 @@ public class FhirModule extends SimpleModule {
 
     private <T extends IBaseResource> void register(FhirContext fhirContext, Class<T> resourceType) {
         addDeserializer(resourceType, new FhirResourceDeserializer<>(resourceType, fhirContext));
-        addSerializer(resourceType, new FhirResourceSerializer<>(fhirContext));
+        addSerializer(resourceType, new FhirResourceSerializer<>(resourceType, fhirContext));
     }
 }
