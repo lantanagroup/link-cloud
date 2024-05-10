@@ -30,7 +30,10 @@ import org.springframework.kafka.support.KafkaUtils;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -43,6 +46,7 @@ public class ResourceNormalizedConsumer {
     private final MongoOperations mongoOperations;
     private final DataAcquisitionClient dataAcquisitionClient;
     private final MeasureEvaluatorCache measureEvaluatorCache;
+    private final MeasureReportNormalizer measureReportNormalizer;
     private final Predicate<MeasureReport> reportabilityPredicate;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
@@ -51,12 +55,14 @@ public class ResourceNormalizedConsumer {
             MongoOperations mongoOperations,
             DataAcquisitionClient dataAcquisitionClient,
             MeasureEvaluatorCache measureEvaluatorCache,
+            MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate) {
         this.mongoOperations = mongoOperations;
         this.dataAcquisitionClient = dataAcquisitionClient;
         this.measureEvaluatorCache = measureEvaluatorCache;
+        this.measureReportNormalizer = measureReportNormalizer;
         this.reportabilityPredicate = reportabilityPredicate;
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
         this.resourceEvaluatedTemplate = resourceEvaluatedTemplate;
@@ -261,8 +267,7 @@ public class ResourceNormalizedConsumer {
         logger.debug("Evaluating measures");
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasure(patientStatus, report, bundle);
-            // TODO: Strip LCR- prefix from IDs and references
-            // TODO: Replace evaluatedResource with references to contained
+            measureReportNormalizer.normalize(measureReport);
             switch (value.getQueryType()) {
                 case INITIAL -> updateReportability(patientStatus, report, measureReport);
                 case SUPPLEMENTAL -> produceResourceEvaluatedRecords(patientStatus, report, measureReport);
@@ -292,9 +297,6 @@ public class ResourceNormalizedConsumer {
                 report.getEndDate(),
                 patientStatus.getPatientId(),
                 bundle);
-        if (!measureReport.hasId()) {
-            measureReport.setId(UUID.randomUUID().toString());
-        }
         logger.debug("Population counts: {}", measureReport.getGroup().stream()
                 .flatMap(group -> group.getPopulation().stream())
                 .map(population -> String.format(
