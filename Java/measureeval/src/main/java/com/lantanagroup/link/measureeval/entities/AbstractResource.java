@@ -1,5 +1,7 @@
 package com.lantanagroup.link.measureeval.entities;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -18,7 +20,10 @@ public abstract class AbstractResource {
 
     private String facilityId;
     private ResourceType resourceType;
+
+    @JsonDeserialize(using = FhirIdDeserializer.class)
     private String resourceId;
+
     private IBaseResource resource;
 
     @CreatedDate

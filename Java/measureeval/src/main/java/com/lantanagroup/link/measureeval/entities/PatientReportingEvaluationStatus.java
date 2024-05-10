@@ -2,8 +2,10 @@ package com.lantanagroup.link.measureeval.entities;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.measureeval.models.NormalizationStatus;
 import com.lantanagroup.link.measureeval.models.QueryType;
+import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.ResourceType;
@@ -22,7 +24,9 @@ public class PatientReportingEvaluationStatus {
     private String id;
 
     private String facilityId;
+
     private String correlationId;
+    @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
     @JsonSetter(nulls = Nulls.AS_EMPTY)
@@ -55,7 +59,10 @@ public class PatientReportingEvaluationStatus {
     public static class Resource {
         private Boolean isPatientResource;
         private ResourceType resourceType;
+
+        @JsonDeserialize(using = FhirIdDeserializer.class)
         private String resourceId;
+
         private QueryType queryType;
         private NormalizationStatus normalizationStatus;
     }
