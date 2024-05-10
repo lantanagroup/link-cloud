@@ -205,17 +205,24 @@ public class FhirApiRepository : IFhirApiRepository
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
-            await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);          
+
+            if (resultBundle != null && resultBundle.Entry.Count > 0)
             {
-                ResourceId = resultBundle.Id,
-                ResourceType = resourceType,
-                CorrelationId = correlationId,
-                PatientId = patientId,
-                FacilityId = facilityId,
-                QueryType = queryType,
-                IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName != nameof(OperationOutcome)),
-            }, cancellationToken);           
+                foreach (var entry in resultBundle.Entry)
+                {
+                    await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+                    {
+                        ResourceId = entry.Resource.Id,
+                        ResourceType = entry.Resource.TypeName,
+                        CorrelationId = correlationId,
+                        PatientId = patientId,
+                        FacilityId = facilityId,
+                        QueryType = queryType,
+                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome))
+                    }, cancellationToken);
+                }
+            }
             
             return resultBundle;
         }
