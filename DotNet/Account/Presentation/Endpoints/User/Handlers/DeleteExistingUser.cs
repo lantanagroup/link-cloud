@@ -10,7 +10,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class DeleteExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id,
-            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IDeleteUser command)
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetLinkUserEntity queryUser, [FromServices] IDeleteUser command)
         {
             try
             {
@@ -22,7 +22,8 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 var requestor = context.User;
 
                 var user = await queryUser.Execute(id, cancellationToken: context.RequestAborted);
-                if (user is null)
+                //TODO: create query to check if usr is active instead of just exists
+                if (user is null || user.IsDeleted)
                 {
                     return Results.NotFound();
                 }

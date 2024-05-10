@@ -60,8 +60,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                                     signingCredentials: credentials
                                 );
 
-                var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-                activity?.AddTag("link.token", jwt);
+                var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
 
                 var userId = user.Claims.First(c => c.Type == "sub").Value;
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, userId);

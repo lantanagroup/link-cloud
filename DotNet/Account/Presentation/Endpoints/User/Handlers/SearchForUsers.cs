@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                 var users = await query.Execute(filters, context.RequestAborted);
 
-                logger.LogFindUsers(context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogSearchUsers(context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown", filters);
 
                 //add X-Pagination header for machine-readable pagination metadata
                 context.Response.Headers["X-Pagination"] = JsonSerializer.Serialize(users.Metadata);
@@ -53,7 +53,21 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogFindUsersException(ex.Message);
+
+                // Create search filters
+                var filters = filterFactory.Create(
+                    searchText,
+                    filterFacilityBy,
+                    filterRoleBy,
+                    filterClaimBy,
+                    includeDeactivatedUsers ?? false,
+                    includeDeletedUsers ?? false,
+                    sortBy,
+                    sortOrder,
+                    pageSize,
+                    pageNumber);
+
+                logger.LogSearchUsersException(ex.Message, filters);
                 throw;
             }           
         }

@@ -1,4 +1,5 @@
-﻿using static LantanaGroup.Link.Account.Settings.AccountConstants;
+﻿using LantanaGroup.Link.Account.Application.Models.User;
+using static LantanaGroup.Link.Account.Settings.AccountConstants;
 
 namespace LantanaGroup.Link.Account.Infrastructure.Logging
 {
@@ -153,13 +154,13 @@ namespace LantanaGroup.Link.Account.Infrastructure.Logging
             AccountLoggingIds.SearchUsers,
             LogLevel.Information,
             "A request to search users by {requestor} was successful.")]
-        public static partial void LogSearchUsers(this ILogger logger, string requestor);
+        public static partial void LogSearchUsers(this ILogger logger, string requestor, [LogProperties] UserSearchFilterRecord filters);
 
         [LoggerMessage(
             AccountLoggingIds.SearchUsersException,
             LogLevel.Error,
             "An exception occured while attempting to search users: {message}")]
-        public static partial void LogSearchUsersException(this ILogger logger, string message);
+        public static partial void LogSearchUsersException(this ILogger logger, string message, [LogProperties] UserSearchFilterRecord filters);
 
     }
 }
