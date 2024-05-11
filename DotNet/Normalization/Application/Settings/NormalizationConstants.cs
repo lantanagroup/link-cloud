@@ -10,8 +10,6 @@ public static class NormalizationConstants
         public const string ServiceInformation = "ServiceInformation";
         public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
         public const string DatabaseProvider = "DatabaseProvider";
-        public const string Redis = "Redis";
-        public const string Telemetry = "Telemetry";
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
     }
 

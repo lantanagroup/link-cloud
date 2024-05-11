@@ -134,9 +134,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
     }
 
-    // Add YARP (reverse proxy)
-    builder.Services.AddYarpProxy(builder.Configuration, options => options.Environment = builder.Environment);
-
     // Add health checks
     builder.Services.AddHealthChecks();    
 
@@ -240,6 +237,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
+
+    // Add YARP (reverse proxy)
+    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment);
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error); 
 
