@@ -14,7 +14,8 @@
             public const string Serilog = "Serilog";
             public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
-            public const string TenantApiSettings = "TenantApiSettings";            
+            public const string TenantApiSettings = "TenantApiSettings";
+            public const string UserManagement = "UserManagement";
         }
 
         public static class AccountLoggingIds
