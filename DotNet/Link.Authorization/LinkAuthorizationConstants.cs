@@ -17,5 +17,17 @@
             public const string LinkSystemAccount = "SystemAccount";
             public const string LinkAdministartor = "LinkAdministrator";            
         }
+
+        public static class AuthenticationSchemas
+        {
+            public const string LinkBearerToken = "link_bearer_token";
+        }
+
+        public static class LinkBearerService
+        {
+            public const string LinkBearerIssuer = "LinkServiceAdmin";
+            public const string LinkBearerAudience = "LinkSevices";
+            public const string LinkBearerKeyName = "link-bearer-key";
+        }
     }
 }
