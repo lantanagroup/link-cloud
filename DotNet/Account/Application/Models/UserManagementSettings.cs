@@ -1,8 +1,7 @@
 ﻿namespace LantanaGroup.Link.Account.Application.Models
 {
-    public class UserManagementConfig
+    public class UserManagementSettings
     {
         public bool EnableAutomaticUserActivation { get; set; } = true;
-        public bool SoftDeleteUsers { get; set; } = true;
     }
 }

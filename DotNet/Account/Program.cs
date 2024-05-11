@@ -4,6 +4,7 @@ using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Interfaces.Presentation;
+using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Application.Validators;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Extensions;
@@ -93,6 +94,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
 
     //add factories
     builder.Services.AddFactories();

@@ -1,24 +1,30 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
+using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.Account.Persistence.Repositories
 {
     public class UserRepository : IUserRepository
     {
-        private readonly AccountDbContext _dbContext;
         private readonly ILogger<UserRepository> _logger;
+        private readonly AccountDbContext _dbContext;
+        private readonly IOptions<UserManagementSettings> _userManagementOptions;
 
-        public UserRepository(AccountDbContext dbContext, ILogger<UserRepository> logger)
+        public UserRepository(ILogger<UserRepository> logger, AccountDbContext dbContext, IOptions<UserManagementSettings> userManagementOptions)
         {
-            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));            
+            _userManagementOptions = userManagementOptions ?? throw new ArgumentNullException(nameof(userManagementOptions));
         }
 
         public async Task<bool> CreateAsync(LinkUser entity, CancellationToken cancellationToken = default)
         {
+            entity.IsActive = _userManagementOptions.Value.EnableAutomaticUserActivation;          
+
             await _dbContext.Users.AddAsync(entity, cancellationToken);
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
