@@ -99,6 +99,7 @@ public class ResourceNormalizedConsumer {
             return;
         }
 
+        // TODO: Prevent duplicate evaluations?
         logger.info("Beginning measure evaluation");
         Bundle bundle = createBundle(patientStatus);
         evaluateMeasures(value, patientStatus, bundle);
@@ -190,7 +191,14 @@ public class ResourceNormalizedConsumer {
         logger.debug("Creating patient status resources");
         queryResults.getQueryResults().stream()
                 .filter(queryResult -> queryResult.getQueryType() == value.getQueryType())
-                // TODO: Deduplicate
+                .collect(Collectors.groupingBy(QueryResults.QueryResult::getIdElement)).entrySet().stream()
+                .map(entry -> {
+                    List<QueryResults.QueryResult> values = entry.getValue();
+                    if (values.size() > 1) {
+                        logger.warn("Multiple query results found: {}", entry.getKey());
+                    }
+                    return values.get(0);
+                })
                 .map(queryResult -> {
                     PatientReportingEvaluationStatus.Resource resource =
                             new PatientReportingEvaluationStatus.Resource();
@@ -212,8 +220,15 @@ public class ResourceNormalizedConsumer {
                 .filter(_resource -> StringUtils.equals(_resource.getResourceId(), value.getResourceId()))
                 .filter(_resource -> _resource.getQueryType() == value.getQueryType())
                 .reduce(StreamUtils::toOnlyElement)
-                // TODO: Warn rather than throw
-                .orElseThrow();
+                .orElseGet(() -> {
+                    logger.warn(
+                            "No patient status resource found: {}/{}",
+                            value.getResourceType(), value.getResourceId());
+                    return null;
+                });
+        if (resource == null) {
+            return;
+        }
         resource.setIsPatientResource(value.isPatientResource());
         resource.setNormalizationStatus(normalizationStatus);
     }
@@ -267,7 +282,6 @@ public class ResourceNormalizedConsumer {
         logger.debug("Evaluating measures");
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasure(patientStatus, report, bundle);
-            measureReportNormalizer.normalize(measureReport);
             switch (value.getQueryType()) {
                 case INITIAL -> updateReportability(patientStatus, report, measureReport);
                 case SUPPLEMENTAL -> produceResourceEvaluatedRecords(patientStatus, report, measureReport);
@@ -320,6 +334,7 @@ public class ResourceNormalizedConsumer {
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport) {
         logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
+        measureReportNormalizer.normalize(measureReport);
         List<Resource> resources = measureReport.getContained();
         measureReport.setContained(null);
         produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), measureReport);

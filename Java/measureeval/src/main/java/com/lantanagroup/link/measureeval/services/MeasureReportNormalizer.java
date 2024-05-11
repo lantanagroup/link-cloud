@@ -24,6 +24,7 @@ public class MeasureReportNormalizer {
         measureReport.getContained().forEach(this::normalizeContained);
         fhirContext.newTerser().getAllPopulatedChildElementsOfType(measureReport, Reference.class)
                 .forEach(this::normalizeReference);
+        // TODO: Ensure these are local references
         measureReport.setEvaluatedResource(measureReport.getContained().stream()
                 .map(Resource::getIdElement)
                 .map(Reference::new)
@@ -47,7 +48,10 @@ public class MeasureReportNormalizer {
                 id.getVersionIdPart());
     }
 
-    private String normalizeIdPart(String id) {
-        return id.replaceAll("(?i)^(#?)LCR-", "$1");
+    private String normalizeIdPart(String idPart) {
+        if (idPart == null) {
+            return null;
+        }
+        return idPart.replaceAll("(?i)^(#?)LCR-", "$1");
     }
 }
