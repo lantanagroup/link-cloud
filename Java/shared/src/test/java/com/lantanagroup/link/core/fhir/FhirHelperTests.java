@@ -1,6 +1,6 @@
 package com.lantanagroup.link.core.fhir;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class FhirHelperTests {
     @Test
