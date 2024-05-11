@@ -25,8 +25,12 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
 
             try
             {
-                var role = await _roleRepository.GetRoleByNameAsync(name, cancellationToken: cancellationToken) ?? 
-                    throw new ApplicationException($"Role with name {name} not found");
+                var role = await _roleRepository.GetRoleByNameAsync(name, cancellationToken: cancellationToken);
+
+                if (role == null)
+                {
+                    return null;
+                }
 
                 return _linkRoleModelFactory.Create(role);
             }
