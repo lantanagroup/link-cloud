@@ -12,6 +12,8 @@ import com.lantanagroup.link.measureeval.models.QueryType;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.records.ResourceNormalized;
+import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -20,10 +22,8 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Resource;
-import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaUtils;
@@ -37,13 +37,12 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static org.springframework.data.mongodb.core.query.Criteria.byExample;
-
 @Service
 public class ResourceNormalizedConsumer {
     private static final Logger logger = LoggerFactory.getLogger(ResourceNormalizedConsumer.class);
 
-    private final MongoOperations mongoOperations;
+    private final AbstractResourceRepository resourceRepository;
+    private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final DataAcquisitionClient dataAcquisitionClient;
     private final MeasureEvaluatorCache measureEvaluatorCache;
     private final MeasureReportNormalizer measureReportNormalizer;
@@ -52,14 +51,16 @@ public class ResourceNormalizedConsumer {
     private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
 
     public ResourceNormalizedConsumer(
-            MongoOperations mongoOperations,
+            AbstractResourceRepository resourceRepository,
+            PatientReportingEvaluationStatusRepository patientStatusRepository,
             DataAcquisitionClient dataAcquisitionClient,
             MeasureEvaluatorCache measureEvaluatorCache,
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate) {
-        this.mongoOperations = mongoOperations;
+        this.resourceRepository = resourceRepository;
+        this.patientStatusRepository = patientStatusRepository;
         this.dataAcquisitionClient = dataAcquisitionClient;
         this.measureEvaluatorCache = measureEvaluatorCache;
         this.measureReportNormalizer = measureReportNormalizer;
@@ -82,8 +83,8 @@ public class ResourceNormalizedConsumer {
         AbstractResource resource = Objects.requireNonNullElseGet(
                 retrieveResource(facilityId, value),
                 () -> createResource(facilityId, value));
-        updateResource(value, resource);
-        mongoOperations.save(resource);
+        resource.setResource(value.getResource());
+        resourceRepository.save(resource);
 
         logger.info("Beginning patient status update");
         PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(
@@ -93,7 +94,7 @@ public class ResourceNormalizedConsumer {
             updatePatientStatus(facilityId, correlationId, value, patientStatus);
         }
         updatePatientStatusResource(value, patientStatus, NormalizationStatus.NORMALIZED);
-        mongoOperations.save(patientStatus);
+        patientStatusRepository.save(patientStatus);
         if (!isReadyToEvaluate(patientStatus)) {
             logger.info("Not ready to evaluate; exiting");
             return;
@@ -105,24 +106,9 @@ public class ResourceNormalizedConsumer {
         evaluateMeasures(value, patientStatus, bundle);
     }
 
-    private AbstractResource retrieveResource(
-            boolean isPatientResource,
-            String facilityId,
-            ResourceType resourceType,
-            String resourceId) {
-        Class<? extends AbstractResource> entityType = isPatientResource ? PatientResource.class : SharedResource.class;
-        AbstractResource probe = isPatientResource ? new PatientResource() : new SharedResource();
-        probe.setFacilityId(facilityId);
-        probe.setResourceType(resourceType);
-        probe.setResourceId(resourceId);
-        return mongoOperations.query(entityType)
-                .matching(byExample(probe))
-                .oneValue();
-    }
-
     private AbstractResource retrieveResource(String facilityId, ResourceNormalized value) {
         logger.debug("Retrieving resource from database");
-        return retrieveResource(value.isPatientResource(), facilityId, value.getResourceType(), value.getResourceId());
+        return resourceRepository.findOne(facilityId, value);
     }
 
     private AbstractResource createResource(String facilityId, ResourceNormalized value) {
@@ -141,20 +127,9 @@ public class ResourceNormalizedConsumer {
         return resource;
     }
 
-    private void updateResource(ResourceNormalized value, AbstractResource resource) {
-        resource.setResource(value.getResource());
-    }
-
     private PatientReportingEvaluationStatus retrievePatientStatus(String facilityId, String correlationId) {
         logger.debug("Retrieving patient status from database");
-        PatientReportingEvaluationStatus probe = new PatientReportingEvaluationStatus();
-        probe.setFacilityId(facilityId);
-        probe.setCorrelationId(correlationId);
-        probe.setReports(null);
-        probe.setResources(null);
-        return mongoOperations.query(PatientReportingEvaluationStatus.class)
-                .matching(byExample(probe))
-                .oneValue();
+        return patientStatusRepository.findOne(facilityId, correlationId).orElse(null);
     }
 
     private PatientReportingEvaluationStatus createPatientStatus(
@@ -268,11 +243,7 @@ public class ResourceNormalizedConsumer {
 
     private AbstractResource retrieveResource(String facilityId, PatientReportingEvaluationStatus.Resource resource) {
         logger.trace("Retrieving resource: {}/{}", resource.getResourceType(), resource.getResourceId());
-        return retrieveResource(
-                resource.getIsPatientResource(),
-                facilityId,
-                resource.getResourceType(),
-                resource.getResourceId());
+        return resourceRepository.findOne(facilityId, resource);
     }
 
     private void evaluateMeasures(
@@ -326,7 +297,7 @@ public class ResourceNormalizedConsumer {
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport) {
         report.setReportable(reportabilityPredicate.test(measureReport));
-        mongoOperations.save(patientStatus);
+        patientStatusRepository.save(patientStatus);
     }
 
     private void produceResourceEvaluatedRecords(
