@@ -88,6 +88,14 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 };
             });
 
+            services.AddAuthorization(builder =>
+            {
+                builder.AddPolicy("AuthenticatedUser", pb => {
+                    pb.RequireAuthenticatedUser()
+                        .AddAuthenticationSchemes([LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken]);
+                });
+            });
+
             return services;
 
         }
