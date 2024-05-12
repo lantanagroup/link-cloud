@@ -8,11 +8,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
     internal class LocalSecretManager : ISecretManager
     {
         private readonly ILogger<LocalSecretManager> _logger;
+        private Dictionary<string, string> _secrets = [];
 
         public LocalSecretManager(ILogger<LocalSecretManager> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+            _secrets.Add(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, GenerateRandomKey(64));
             _logger.LogInformation("Local Secret Manager initialized");
         }
 
@@ -29,16 +31,28 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 
         public Task<bool> SetSecretAsync(string secretName, string secretValue, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(SetSecret(secretName, secretValue));
         }
 
-        private static string GetSecret(string secretName)
+        private string GetSecret(string secretKey)
         {
-            return secretName switch
+            return _secrets.TryGetValue(secretKey, out var secret) ? secret : null;
+        }
+
+        private bool SetSecret(string secretKey, string secretValue)
+        {
+            _secrets.TryGetValue(secretKey, out var secret);
+
+            if (secret is not null)
             {
-                LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName => GenerateRandomKey(256),
-                _ => throw new NotImplementedException()
-            };
+                _secrets[secretKey] = secretValue;
+            }
+            else
+            {
+                _secrets.Add(secretKey, secretValue);
+            }
+
+            return true;
         }
 
         private static string GenerateRandomKey(int size)

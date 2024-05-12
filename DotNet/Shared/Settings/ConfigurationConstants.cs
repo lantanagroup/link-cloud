@@ -18,5 +18,11 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string SqlServer = "SqlServer";
             public const string DatabaseConnection = "DatabaseConnection";
         }
+
+        public static class LinkDataProtectors
+        {
+            public const string LinkUser = "LinkUser";
+            public const string LinkSigningKey = "LinkSigningKey";
+        }
     }
 }
