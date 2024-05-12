@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Infrastructure;
+using Link.Authorization.Policies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Caching.Distributed;
@@ -89,12 +90,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 };
             });
 
-            services.AddAuthorization(builder =>
-            {
-                builder.AddPolicy("AuthenticatedUser", pb => {
-                    pb.RequireAuthenticatedUser()
-                        .AddAuthenticationSchemes([LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken]);
-                });
+            services.AddAuthorization(options => {
+                
+                //add polocies
+                options.AddPolicy("CanViewAccounts", AuthorizationPolicies.CanViewAccounts());
+                options.AddPolicy("CanAdministerAccounts", AuthorizationPolicies.CanAdministerAccounts());
+                options.AddPolicy("FacilityAccess", AuthorizationPolicies.FacilityAccess());
             });
 
             return services;

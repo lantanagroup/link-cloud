@@ -6,6 +6,7 @@
         CanViewNotifications,
         CanViewTenantConfigurations,
         CanEditTenantConfigurations,
+        CanAdministerAllTenants,
         CanViewResources,
         CanGenerateReports,
         CanGenerateEvents,

@@ -77,14 +77,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             }
 
             // Add role claims
-            var uniqueRoleClaims = account.Roles.Except(account.UserClaims);
+            var uniqueRoleClaims = account.RoleClaims.Except(account.UserClaims);
             foreach(var claim in uniqueRoleClaims)
             {
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
             }           
 
             // Add facility ids associated with the user
-            foreach (var facility in account.FacilityIds)
+            
+            foreach (var facility in account.Facilities)
             {
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Facility, facility));
             }
