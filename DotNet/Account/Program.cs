@@ -19,6 +19,7 @@ using LantanaGroup.Link.Account.Presentation.Endpoints.Role;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -104,6 +105,46 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(UserValidator));
+
+    //Add data protection
+    builder.Services.AddLinkDataProtection(options =>
+    {
+        options.Environment = builder.Environment;
+    });
+
+    //Add Redis     
+    builder.Services.AddRedisCache(options =>
+    {
+        options.Environment = builder.Environment;
+
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+
+        if (string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
+        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+    });
+
+    // Add Secret Manager
+    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    {
+        builder.Services.AddSecretManager(options =>
+        {
+            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
+        });
+    }
+
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        builder.Services.AddLinkBearerServiceAuthentication(options =>
+        {
+            options.Environment = builder.Environment;
+        });
+    }
+
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
