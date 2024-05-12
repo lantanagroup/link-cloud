@@ -71,6 +71,14 @@ namespace Link.Authorization.Policies
                 .Build();
         }
 
+        public static AuthorizationPolicy CanAdministerAllTenants()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAllTenants)])
+                .Build();
+        }
+
         public static AuthorizationPolicy CanViewResources()
         {
             return new AuthorizationPolicyBuilder()

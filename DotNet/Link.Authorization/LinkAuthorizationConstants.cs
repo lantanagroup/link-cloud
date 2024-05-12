@@ -17,6 +17,7 @@
             public const string LinkSystemAccount = "SystemAccount";
             public const string LinkAdministartor = "LinkAdministrator";
             public const string LinkTenantAdministrator = "CanAdministerAllTenants";
+            public const string FacilityAccess = "FacilityAccess";
         }
 
         public static class AuthenticationSchemas
