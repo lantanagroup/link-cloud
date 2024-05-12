@@ -8,6 +8,7 @@
         CanEditTenantConfigurations,
         CanAdministerAllTenants,
         CanViewResources,
+        CanViewReports,
         CanGenerateReports,
         CanGenerateEvents,
         CanViewAccounts,

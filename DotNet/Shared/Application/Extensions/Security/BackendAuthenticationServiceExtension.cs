@@ -96,6 +96,14 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 options.AddPolicy("CanViewAccounts", AuthorizationPolicies.CanViewAccounts());
                 options.AddPolicy("CanAdministerAccounts", AuthorizationPolicies.CanAdministerAccounts());
                 options.AddPolicy("FacilityAccess", AuthorizationPolicies.FacilityAccess());
+                options.AddPolicy("CanViewLogs", AuthorizationPolicies.CanViewLogs());
+                options.AddPolicy("CanViewNotifications", AuthorizationPolicies.CanViewNotifications());
+                options.AddPolicy("CanViewTenantConfigurations", AuthorizationPolicies.CanViewTenantConfigurations());
+                options.AddPolicy("CanEditTenantConfigurations", AuthorizationPolicies.CanEditTenantConfigurations());
+                options.AddPolicy("CanViewResources", AuthorizationPolicies.CanViewResources());
+                options.AddPolicy("CanViewReports", AuthorizationPolicies.CanViewReports());
+                options.AddPolicy("CanGenerateReports", AuthorizationPolicies.CanGenerateReports());
+                options.AddPolicy("CanGenerateEvents", AuthorizationPolicies.CanGenerateEvents());
             });
 
             return services;
