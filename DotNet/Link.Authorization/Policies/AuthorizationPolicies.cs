@@ -2,6 +2,7 @@
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Link.Authorization.Requirements.PermissiveAccessRequirement;
+using Link.Authorization.Permissions;
 
 namespace Link.Authorization.Policies
 {
@@ -12,15 +13,7 @@ namespace Link.Authorization.Policies
             return new AuthorizationPolicyBuilder()                
                 .AddRequirements(new PermissiveAccessRequirement())
                 .Build();
-        }
-
-        public static AuthorizationPolicy LinkAdminAccess()
-        {
-            return new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .RequireRole(LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
-                .Build();
-        }
+        }       
 
         public static AuthorizationPolicy FacilityAccess()
         {
@@ -34,7 +27,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewLogs)])
                 .Build();
         }
 
@@ -42,7 +35,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
 
@@ -50,7 +43,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
 
@@ -58,7 +51,23 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireRole([LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewAccounts()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewAccounts)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanAdministerAccounts()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAccounts)])
                 .Build();
         }
     }

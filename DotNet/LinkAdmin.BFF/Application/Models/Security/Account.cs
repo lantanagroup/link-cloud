@@ -8,7 +8,7 @@
         public string FirstName { get; set; } = default!;
         public string? MiddleName { get; set; }
         public string LastName { get; set; } = default!;
-        public List<string> FacilityIds { get; set; } = [];
+        public List<string> Facilities { get; set; } = [];
         public List<string> UserClaims { get; set; } = [];
         public List<string> RoleClaims { get; set; } = [];
         public List<string> Roles { get; set; } = [];
