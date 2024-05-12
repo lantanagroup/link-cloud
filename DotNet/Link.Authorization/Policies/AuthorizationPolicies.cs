@@ -23,6 +23,89 @@ namespace Link.Authorization.Policies
                 .Build();
         }
 
+        public static AuthorizationPolicy CanViewAccounts()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewAccounts)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanAdministerAccounts()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAccounts)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewLogs()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewLogs)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewNotifications()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewNotifications)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewTenantConfigurations()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewTenantConfigurations)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanEditTenantConfigurations()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewResources()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewResources)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanViewReports()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewReports)])
+                .Build();
+        }
+
+        public static AuthorizationPolicy CanGenerateReports()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanGenerateReports)])
+                .Build();
+        }     
+        
+        public static AuthorizationPolicy CanGenerateEvents()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanGenerateEvents)])
+                .Build();
+        }
+
+
+
+        //!** DEPRECATED **!
         public static AuthorizationPolicy CanViewAuditLogs()
         {
             return new AuthorizationPolicyBuilder()
@@ -54,21 +137,6 @@ namespace Link.Authorization.Policies
                 .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
-
-        public static AuthorizationPolicy CanViewAccounts()
-        {
-            return new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewAccounts)])
-                .Build();
-        }
-
-        public static AuthorizationPolicy CanAdministerAccounts()
-        {
-            return new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAccounts)])
-                .Build();
-        }
+        
     }
 }
