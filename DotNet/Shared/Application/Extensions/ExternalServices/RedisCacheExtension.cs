@@ -1,6 +1,8 @@
-﻿using StackExchange.Redis;
+﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServices
+namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
 {
     public static class RedisCacheExtension
     {

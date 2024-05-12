@@ -29,6 +29,9 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using System.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -118,21 +121,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Link Security
-    builder.Services.AddLinkGatewaySecurity(builder.Configuration, options =>
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
     {
-        options.Environment = builder.Environment;
-    });
+        builder.Services.AddLinkGatewaySecurity(builder.Configuration, options =>
+        {
+            options.Environment = builder.Environment;
+        });
+    }
 
     // Add Endpoints
-    builder.Services.AddTransient<IApi, AuthEndpoints>();
+    if (!allowAnonymousAccess)
+    {
+        builder.Services.AddTransient<IApi, AuthEndpoints>();
+
+        if (builder.Configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
+        {
+            builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
+        }
+    }    
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
-    }
-    if (builder.Configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
-    {
-        builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
-    }
+    }    
 
     // Add health checks
     builder.Services.AddHealthChecks();    
@@ -141,20 +152,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddEndpointsApiExplorer();    
     builder.Services.AddSwaggerGen(c =>
     {
-        #region Authentication Schemas
-        if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
+        if (!allowAnonymousAccess)
         {
-            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            #region Authentication Schemas
+            if (builder.Configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
             {
-                Description = $"Authorization using JWT",
-                Name = "Authorization",
-                Type = SecuritySchemeType.Http,
-                BearerFormat = "JWT",
-                In = ParameterLocation.Header,
-                Scheme = JwtBearerDefaults.AuthenticationScheme
-            });
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Description = $"Authorization using JWT",
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Scheme = JwtBearerDefaults.AuthenticationScheme
+                });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
                     new OpenApiSecurityScheme
@@ -168,32 +181,32 @@ static void RegisterServices(WebApplicationBuilder builder)
                     new List<string>()
                 }
             });
-        }
+            }
 
-        c.AddSecurityDefinition("OAuth", new OpenApiSecurityScheme
-        {
-            Description = $"Authorization using OAuth",
-            Name = "OAuth",
-            Type = SecuritySchemeType.OAuth2,
-            Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
-            Flows = new OpenApiOAuthFlows
+            c.AddSecurityDefinition("OAuth", new OpenApiSecurityScheme
             {
-                AuthorizationCode = new OpenApiOAuthFlow
-                {                    
-                    AuthorizationUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!),
-                    TokenUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!),
-                    Scopes = new Dictionary<string, string>
+                Description = $"Authorization using OAuth",
+                Name = "OAuth",
+                Type = SecuritySchemeType.OAuth2,
+                Scheme = LinkAdminConstants.AuthenticationSchemes.Oauth2,
+                Flows = new OpenApiOAuthFlows
+                {
+                    AuthorizationCode = new OpenApiOAuthFlow
+                    {
+                        AuthorizationUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization")!),
+                        TokenUrl = new Uri(builder.Configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token")!),
+                        Scopes = new Dictionary<string, string>
                     {
                         { "openid", "OpenId" },
                         { "profile", "Profile" },
                         { "email", "Email" }
                     }
+                    }
                 }
-            }
 
-        });
+            });
 
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
             {
                 new OpenApiSecurityScheme
@@ -211,7 +224,8 @@ static void RegisterServices(WebApplicationBuilder builder)
                 new List<string>()
             }
         });
-        #endregion
+            #endregion
+        }
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -285,9 +299,16 @@ static void SetupMiddleware(WebApplication app)
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
     app.UseCors(CorsConfig.DefaultCorsPolicyName);
-    app.UseAuthentication();
-    app.UseMiddleware<UserScopeMiddleware>();
-    app.UseAuthorization(); 
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+
+    if(!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+        app.UseAuthorization();
+    }    
 
     // Register endpoints
     app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
@@ -299,7 +320,7 @@ static void SetupMiddleware(WebApplication app)
         api.RegisterEndpoints(app);        
     }
 
-    if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
+    if (allowAnonymousAccess)
     {
         app.MapReverseProxy().AllowAnonymous();
     }

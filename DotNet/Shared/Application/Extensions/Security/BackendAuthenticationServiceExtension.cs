@@ -95,8 +95,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
         public class LinkBearerServiceOptions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
-            public string? Authority { get; set; } = null!;
-            public string? Audience { get; set; } = null!;
+            public string? Authority { get; set; } = LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
+            public string? Audience { get; set; } = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;
             public string NameClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Email;
             public string RoleClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Role;
             public string LinkPermissionType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions;
