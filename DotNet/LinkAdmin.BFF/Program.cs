@@ -72,7 +72,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
-    builder.Services.Configure<SecretManagerConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
 

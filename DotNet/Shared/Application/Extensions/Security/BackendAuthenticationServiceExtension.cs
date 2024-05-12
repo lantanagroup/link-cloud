@@ -25,7 +25,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             {
                 options.Authority = linkBearerServiceOptions.Authority;
                 options.Audience = linkBearerServiceOptions.Audience;
-                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();                
+                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {
