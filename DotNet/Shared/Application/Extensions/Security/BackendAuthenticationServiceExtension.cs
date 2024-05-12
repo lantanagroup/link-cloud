@@ -1,5 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,19 +25,24 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             {
                 options.Authority = linkBearerServiceOptions.Authority;
                 options.Audience = linkBearerServiceOptions.Audience;
-                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();
-                options.MapInboundClaims = false;
+                options.RequireHttpsMetadata = !linkBearerServiceOptions.Environment.IsDevelopment();                
 
                 options.TokenValidationParameters = new()
                 {
                     ValidIssuer = linkBearerServiceOptions.Authority,
+                    ValidAudience = linkBearerServiceOptions.Audience,
                     NameClaimType = linkBearerServiceOptions.NameClaimType,
-                    RoleClaimType = linkBearerServiceOptions.RoleClaimType,
-                    //avoid jwt confustion attacks (ie: circumvent token signature checking)
-                    ValidTypes = linkBearerServiceOptions.ValidTypes,
+                    RoleClaimType = linkBearerServiceOptions.RoleClaimType,                    
+                    ValidTypes = linkBearerServiceOptions.ValidTypes, //avoid jwt confustion attacks (ie: circumvent token signature checking)
+
+                    //configure validation of the token
+                    ValidateAudience = linkBearerServiceOptions.ValidateToken,
+                    ValidateIssuer = linkBearerServiceOptions.ValidateToken,
+                    ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken,                    
+
                     IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
-                    {
-                        //var protector = services.BuildServiceProvider().GetRequiredService<IDataProtectionProvider>().CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
+                    {                       
+                        var protector = services.BuildServiceProvider().GetRequiredService<IDataProtectionProvider>().CreateProtector(ConfigurationConstants.LinkDataProtectors.LinkSigningKey);
                         string bearerKey = string.Empty;
 
                         //check if bearer key is in cache, if not get it from the secret manager
@@ -55,13 +62,25 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                             }
 
                             //protect the bearer key and store it in the cache
-                            //cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
-                            cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                            if (linkBearerServiceOptions.ProtectKey)
+                            {
+                                cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                            }
+                            else
+                            {
+                                cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                            }                            
                         }
                         else
                         {
-                            //bearerKey = protector.Unprotect(cachedBearerKey);
-                            bearerKey = cachedBearerKey;
+                            if(linkBearerServiceOptions.ProtectKey)
+                            {
+                                bearerKey = protector.Unprotect(cachedBearerKey);
+                            }
+                            else
+                            {
+                                bearerKey = cachedBearerKey;
+                            }                   
                         }
 
                         return new[] { new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)) };
@@ -81,6 +100,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             public string NameClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Email;
             public string RoleClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Role;
             public string LinkPermissionType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions;
+            public bool ProtectKey { get; set; } = true;
+            public bool ValidateToken { get; set; } = true;
             public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];
         }
     }
