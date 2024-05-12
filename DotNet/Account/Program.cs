@@ -274,7 +274,15 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    app.UseMiddleware<UserScopeMiddleware>();
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+        app.UseAuthorization();
+    }
 
     // Register endpoints
     app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();

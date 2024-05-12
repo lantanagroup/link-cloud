@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 
             switch (secretManagerOptions.Manager)
             {
-                case "LocalSecretManager":
+                case "Local":
                     services.AddSingleton<ISecretManager, LocalSecretManager>();
                     break;
                 case "AzureKeyVault":
