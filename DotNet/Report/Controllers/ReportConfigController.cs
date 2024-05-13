@@ -71,6 +71,16 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpPost("Create")]
         public async Task<IActionResult> CreateReportConfig([FromBody] MeasureReportConfig config)
         {
+            if (string.IsNullOrWhiteSpace(config.FacilityId))
+            {
+                return BadRequest("No FacilityId was provided");
+            }
+
+            if (string.IsNullOrWhiteSpace(config.ReportType))
+            {
+                return BadRequest("No ReportType was provided");
+            }
+
             if (!await _tenantApiService.CheckFacilityExists(config.FacilityId))
             {
                 return BadRequest($"Tenant {config.FacilityId} does not exist.");
