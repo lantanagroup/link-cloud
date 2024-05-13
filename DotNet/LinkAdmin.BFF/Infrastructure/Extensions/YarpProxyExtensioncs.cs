@@ -5,16 +5,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 {
     public static class YarpProxyExtensioncs
     {
-        public static IServiceCollection AddYarpProxy(this IServiceCollection services, IConfiguration configuration, Action<ProxyOptions>? options = null)
+        public static IServiceCollection AddYarpProxy(this IServiceCollection services, IConfiguration configuration, Serilog.ILogger logger, Action<ProxyOptions>? options = null)
         {
             var proxyOptions = new ProxyOptions();
             options?.Invoke(proxyOptions);
 
             services.AddReverseProxy()
                 .LoadFromConfig(configuration.GetRequiredSection("ReverseProxy"))
-                .AddTransforms(builderContext => {
+                .AddTransforms(builderContext =>
+                {
+                    bool enableAnonymous = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
 
-                    if(!proxyOptions.Environment.IsDevelopment() || !configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
+                    if (proxyOptions.Environment.IsDevelopment() && enableAnonymous)
+                        logger.Error("Anonymous access is enabled in development mode. This is a security risk.");
+                    
+                    if (!enableAnonymous)
                     {
                         if (!string.IsNullOrEmpty(builderContext.Route.AuthorizationPolicy))
                         {

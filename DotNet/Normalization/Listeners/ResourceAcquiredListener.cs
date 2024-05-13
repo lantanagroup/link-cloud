@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using Microsoft.Extensions.Options;
@@ -81,7 +82,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = "NormalizationService-ResourceAcquired",
+            GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
         using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: true);
@@ -119,7 +120,6 @@ public class ResourceAcquiredListener : BackgroundService
                             FacilityId = messageMetaData.facilityId
                         });
                     }
- 
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
@@ -211,14 +211,22 @@ public class ResourceAcquiredListener : BackgroundService
                             };
 
                             _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
-                                new KeyValuePair<string, object?>("facility", messageMetaData.facilityId),
-                                new KeyValuePair<string, object?>("correlation.id", messageMetaData.correlationId),
-                                new KeyValuePair<string, object?>("patient", message.Message.Value.PatientId),
-                                new KeyValuePair<string, object?>("resource", operationCommandResult.Resource.TypeName),
-                                new KeyValuePair<string, object?>("query.type", message.Message.Value.QueryType),
-                                new KeyValuePair<string, object?>("normalization.operation", op.Value.GetType().Name)
+                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, operationCommandResult.Resource.TypeName),
+                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
+                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, op.Value.GetType().Name)
                             });
                         }
+                    }
+                    catch(NoEntityFoundException ex)
+                    {
+                        var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
+
+                        _logger.LogError(ex, "An error was encountered processing Operation Commands for {facilityId}", messageMetaData.facilityId);
+                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                        kafkaConsumer.Commit(message);
                     }
                     catch (Exception ex)
                     {

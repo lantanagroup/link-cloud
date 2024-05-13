@@ -21,22 +21,27 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<PatientEventListener> _logger;
         private readonly IKafkaConsumerFactory<string, PatientEventValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly ICreatePatientDispatchCommand _createPatientDispatchCommand;
-        private readonly IGetScheduledReportQuery _getScheduledReportQuery;
-        private readonly IGetQueryDispatchConfigurationQuery _getQueryDispatchConfigurationQuery;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
         private readonly ITransientExceptionHandler<string, PatientEventValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientEventValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public PatientEventListener(ILogger<PatientEventListener> logger, IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory, IQueryDispatchFactory queryDispatchFactory, ICreatePatientDispatchCommand createPatientDispatchCommand, IGetScheduledReportQuery getScheduledReportQuery, IGetQueryDispatchConfigurationQuery getQueryDispatchConfigurationQuery, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler, ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler) 
+        public PatientEventListener(
+            ILogger<PatientEventListener> logger, 
+            IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory, 
+            IQueryDispatchFactory queryDispatchFactory, 
+            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, 
+            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, 
+            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler, 
+            ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory
+            ) 
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _createPatientDispatchCommand = createPatientDispatchCommand;
-            _getScheduledReportQuery = getScheduledReportQuery;
-            _getQueryDispatchConfigurationQuery = getQueryDispatchConfigurationQuery;
+            _serviceScopeFactory = serviceScopeFactory;
             _auditProducerFactory = auditProducerFactory;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _transientExceptionHandler = transientExceptionHandler;
@@ -60,7 +65,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private async void StartConsumerLoop(CancellationToken cancellationToken) {
             var config = new ConsumerConfig()
             {
-                GroupId = "QueryDispatchPatientEvent",
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -81,6 +86,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                 try
                                 {
+                                    using var scope = _serviceScopeFactory.CreateScope();
+                                    var _createPatientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
+                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
+                                    var _getQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
+
                                     if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Patient Event", AuditEventType.Create);

@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/Submission/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Submission/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

@@ -42,6 +42,11 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
+
+    //Initialize activity source
+    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+    ServiceActivitySource.Initialize(version);
+
     // load external configuration source if specified
     var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
     if (!string.IsNullOrEmpty(externalConfigurationSource))
@@ -52,18 +57,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
             options.Environment = builder.Environment;
         });
-    }
-
-    // Add service information
-    var serviceInformation = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }      
+    }     
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -138,9 +132,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
     }
-
-    // Add YARP (reverse proxy)
-    builder.Services.AddYarpProxy(builder.Configuration, options => options.Environment = builder.Environment);
 
     // Add health checks
     builder.Services.AddHealthChecks();    
@@ -246,6 +237,9 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
+    // Add YARP (reverse proxy)
+    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment);
+
     //Serilog.Debugging.SelfLog.Enable(Console.Error); 
 
     //Add telemetry if enabled
@@ -253,7 +247,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
-        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
     });
 
     builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
@@ -279,11 +273,11 @@ static void SetupMiddleware(WebApplication app)
 
     // Configure swagger
     if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        var serviceInformation = app.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
+    {       
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
         app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Admin API");
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.RoutePrefix = "api/swagger";
         });
     }
 
@@ -295,7 +289,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization(); 
 
     // Register endpoints
-    app.MapGet("/", (HttpContext ctx) => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
+    app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
 
     var apis = app.Services.GetServices<IApi>();
     foreach (var api in apis)
@@ -314,7 +308,7 @@ static void SetupMiddleware(WebApplication app)
     }    
 
     // Map health check middleware
-    app.MapHealthChecks("/health", new HealthCheckOptions
+    app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");    

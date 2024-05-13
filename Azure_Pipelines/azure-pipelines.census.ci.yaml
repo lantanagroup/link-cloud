@@ -3,6 +3,12 @@ trigger:
     include:
     - DotNet/Census/*
     - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Census/*
+    - DotNet/Shared/*
 
 pool:
   vmImage: 'ubuntu-latest'

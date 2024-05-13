@@ -23,8 +23,8 @@ public class ArtifactController {
             operationId = "createOrUpdateArtifact"
     )
     @PutMapping("/{type}")
-    public void createOrUpdateArtifact(@PathVariable("type") ArtifactEntity.Types type, @RequestBody byte[] content) {
-        this.artifactService.createOrUpdateArtifact(type, content);
+    public void createOrUpdateArtifact(@PathVariable("type") ArtifactEntity.Types type, @RequestParam String name, @RequestBody byte[] content) {
+        this.artifactService.createOrUpdateArtifact(name, type, content);
     }
 
     @Operation(

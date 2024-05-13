@@ -3,9 +3,10 @@ using Flurl;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.MeasureEval.Models;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Wrappers;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using System.Text;
 
 namespace LantanaGroup.Link.MeasureEval.Services;
@@ -15,14 +16,14 @@ public class MeasureEvalReportService : IMeasureEvalReportService
     private readonly ILogger<MeasureEvalReportService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IOptions<MeasureEvalConfig> _measureEvalConfig;
-    private readonly IKafkaWrapper<Ignore, Null, string, NotificationMessage> _kafkaWrapper;
+    private readonly IKafkaProducerFactory<string, NotificationMessage> _notificationProducerFactory;
 
-    public MeasureEvalReportService(ILogger<MeasureEvalReportService> logger, HttpClient httpClient, IOptions<MeasureEvalConfig> measureEvalConfig, IKafkaWrapper<Ignore, Null, string, NotificationMessage> kafkaWrapper)
+    public MeasureEvalReportService(ILogger<MeasureEvalReportService> logger, HttpClient httpClient, IOptions<MeasureEvalConfig> measureEvalConfig, IKafkaProducerFactory<string, NotificationMessage> notificationProducerFactory)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(ILogger<MeasureEvalReportService>));
         this._httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
         this._measureEvalConfig = measureEvalConfig ?? throw new ArgumentNullException(nameof(MeasureEvalConfig));
-        this._kafkaWrapper = kafkaWrapper ?? throw new ArgumentNullException(nameof(kafkaWrapper));
+        this._notificationProducerFactory = notificationProducerFactory ?? throw new ArgumentNullException(nameof(notificationProducerFactory));
     }
 
     public MeasureReport? Evaluate(PatientDataNormalizedMessage message)
@@ -110,8 +111,9 @@ public class MeasureEvalReportService : IMeasureEvalReportService
 
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(correlationId));
 
-            await _kafkaWrapper.ProduceKafkaMessageAsync(KafkaTopic.NotificationRequested.ToString(), () =>
-                new Message<string, NotificationMessage>
+            using (var producer = _notificationProducerFactory.CreateProducer(new ProducerConfig()))
+            {
+                producer.Produce(KafkaTopic.NotificationRequested.ToString(), new Message<string, NotificationMessage>()
                 {
                     Key = Key,
                     Value = new NotificationMessage
@@ -124,6 +126,9 @@ public class MeasureEvalReportService : IMeasureEvalReportService
                     },
                     Headers = headers
                 });
+
+                producer.Flush();
+            }
 
             return null;
         }

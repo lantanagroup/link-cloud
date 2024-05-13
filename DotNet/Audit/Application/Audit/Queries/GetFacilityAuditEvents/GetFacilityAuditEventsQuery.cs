@@ -1,6 +1,9 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Audit.Application.Audit.Queries
@@ -23,7 +26,14 @@ namespace LantanaGroup.Link.Audit.Application.Audit.Queries
         /// <exception cref="ApplicationException"></exception>
         public async Task<PagedAuditModel> Execute(string facilityId, string? sortBy, SortOrder? sortOrder, int pageNumber, int PageSize, CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get All Audit Events Query");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Get All Audit Events Query",
+            [
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                new KeyValuePair<string, object?>(DiagnosticNames.SortBy, sortBy),
+                new KeyValuePair<string, object?>(DiagnosticNames.SortOrder, sortOrder),
+                new KeyValuePair<string, object?>(DiagnosticNames.PageSize, PageSize),
+                new KeyValuePair<string, object?>(DiagnosticNames.PageNumber, pageNumber)
+            ]);
 
             var (result, metadata) = await _datastore.GetByFacilityAsync(facilityId, sortBy, sortOrder, PageSize, pageNumber, cancellationToken);
 

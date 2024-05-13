@@ -32,6 +32,7 @@ using Serilog.Exceptions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Storage;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,7 +92,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
-    //builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -108,7 +108,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ResourceAcquiredMessage>, DeadLetterExceptionHandler<string, ResourceAcquiredMessage>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
-
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -156,11 +155,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddSingleton<RetryRepository>();
+    builder.Services.AddTransient<IRetryRepository, RetryRepository_SQL_Norm>();
 
-    builder.Services.AddSingleton<IJobFactory, JobFactory>();
-    builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<RetryJob>();
+    builder.Services.AddTransient<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
+    builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
 
@@ -175,9 +174,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
-    //Serilog.Debugging.SelfLog.Enable(Console.Error);  
-    // Add services to the container.
-
     //Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database");
@@ -190,8 +186,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
     builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
-
-    //builder.Services.AddSwaggerGen();
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
@@ -231,6 +225,8 @@ static void SetupMiddleware(WebApplication app)
     {
         app.MapGrpcReflectionService();
     }
+
+    app.AutoMigrateEF<NormalizationDbContext>();
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 

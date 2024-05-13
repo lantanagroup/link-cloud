@@ -59,8 +59,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-                options.LoginPath = "/login";
-                options.LogoutPath = "/logout";
+                options.LoginPath = "/api/login";
+                options.LogoutPath = "/api/logout";
             });
 
             //Add Oauth authorization scheme if enabled
@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             }
 
             // Add Link Bearer Token authorization schema if feature is enabled
-            if (configuration.GetValue<bool>("EnableBearerTokenFeature"))
+            if (configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
             {
                 if (!LinkAdminConstants.AuthenticationSchemes.LinkBearerToken.Equals(defaultChallengeScheme))
                     authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken);
@@ -150,6 +150,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
                     options.AllowedMethods = corsConfig.AllowedMethods;
                     options.AllowedOrigins = corsConfig.AllowedOrigins;
+                    options.AllowCredentials = corsConfig.AllowCredentials;
                 });
             }
             else

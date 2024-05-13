@@ -1,5 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Audit.Application.Interfaces
 {

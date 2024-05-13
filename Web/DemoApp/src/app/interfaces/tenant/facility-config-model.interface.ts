@@ -1,3 +1,5 @@
+import { PaginationMetadata } from "../../models/pagination-metadata.model";
+
 export interface IFacilityConfigModel {
   id?: string;
   facilityId: string;
@@ -13,4 +15,9 @@ export interface IScheduledTaskModel {
 export interface IReportTypeScheduleModel {
   reportType: string;
   scheduledTriggers: string[];
+}
+
+export class PagedFacilityConfigModel {
+  records: IFacilityConfigModel[] = [];
+  metadata: PaginationMetadata = new PaginationMetadata;
 }
