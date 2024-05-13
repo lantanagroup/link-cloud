@@ -21,6 +21,25 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             var linkBearerServiceOptions = new LinkBearerServiceOptions();
             options?.Invoke(linkBearerServiceOptions);
 
+            if(linkBearerServiceOptions.AllowAnonymous)
+            {             
+                services.AddAuthorizationBuilder()
+                   .AddPolicy("CanViewAccounts", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanAdministerAccounts", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("FacilityAccess", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanViewLogs", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanViewNotifications", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanViewTenantConfigurations", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanEditTenantConfigurations", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanViewResources", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanViewReports", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanGenerateReports", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("CanGenerateEvents", pb => { pb.RequireAssertion(context => true); });
+
+                return services;
+            }
+
+
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             services.AddAuthentication().AddJwtBearer(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken, options =>
             {
@@ -90,21 +109,18 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 };
             });
 
-            services.AddAuthorization(options => {
-                
-                //add polocies
-                options.AddPolicy("CanViewAccounts", AuthorizationPolicies.CanViewAccounts());
-                options.AddPolicy("CanAdministerAccounts", AuthorizationPolicies.CanAdministerAccounts());
-                options.AddPolicy("FacilityAccess", AuthorizationPolicies.FacilityAccess());
-                options.AddPolicy("CanViewLogs", AuthorizationPolicies.CanViewLogs());
-                options.AddPolicy("CanViewNotifications", AuthorizationPolicies.CanViewNotifications());
-                options.AddPolicy("CanViewTenantConfigurations", AuthorizationPolicies.CanViewTenantConfigurations());
-                options.AddPolicy("CanEditTenantConfigurations", AuthorizationPolicies.CanEditTenantConfigurations());
-                options.AddPolicy("CanViewResources", AuthorizationPolicies.CanViewResources());
-                options.AddPolicy("CanViewReports", AuthorizationPolicies.CanViewReports());
-                options.AddPolicy("CanGenerateReports", AuthorizationPolicies.CanGenerateReports());
-                options.AddPolicy("CanGenerateEvents", AuthorizationPolicies.CanGenerateEvents());
-            });
+            services.AddAuthorizationBuilder()
+                .AddPolicy("CanViewAccounts", AuthorizationPolicies.CanViewAccounts())
+                .AddPolicy("CanAdministerAccounts", AuthorizationPolicies.CanAdministerAccounts())
+                .AddPolicy("FacilityAccess", AuthorizationPolicies.FacilityAccess())
+                .AddPolicy("CanViewLogs", AuthorizationPolicies.CanViewLogs())
+                .AddPolicy("CanViewNotifications", AuthorizationPolicies.CanViewNotifications())
+                .AddPolicy("CanViewTenantConfigurations", AuthorizationPolicies.CanViewTenantConfigurations())
+                .AddPolicy("CanEditTenantConfigurations", AuthorizationPolicies.CanEditTenantConfigurations())
+                .AddPolicy("CanViewResources", AuthorizationPolicies.CanViewResources())
+                .AddPolicy("CanViewReports", AuthorizationPolicies.CanViewReports())
+                .AddPolicy("CanGenerateReports", AuthorizationPolicies.CanGenerateReports())
+                .AddPolicy("CanGenerateEvents", AuthorizationPolicies.CanGenerateEvents());
 
             return services;
 
@@ -113,6 +129,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
         public class LinkBearerServiceOptions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
+            public bool AllowAnonymous { get; set; } = false;
             public string? Authority { get; set; } = LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
             public string? Audience { get; set; } = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;
             public string NameClaimType { get; set; } = LinkAuthorizationConstants.LinkSystemClaims.Email;

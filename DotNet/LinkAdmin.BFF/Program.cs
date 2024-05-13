@@ -129,6 +129,15 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.Environment = builder.Environment;
         });
     }
+    else
+    {  
+        //create anonymous access
+        builder.Services.AddAuthorizationBuilder()        
+            .AddPolicy("AuthenticatedUser", pb =>
+            {
+                pb.RequireAssertion(context => true);
+            });
+    }
 
     // Add Endpoints
     if (!allowAnonymousAccess)
@@ -306,9 +315,9 @@ static void SetupMiddleware(WebApplication app)
     if(!allowAnonymousAccess)
     {
         app.UseAuthentication();
-        app.UseMiddleware<UserScopeMiddleware>();
-        app.UseAuthorization();
-    }    
+        app.UseMiddleware<UserScopeMiddleware>();        
+    }
+    app.UseAuthorization();
 
     // Register endpoints
     app.MapGet("/api/info", () => Results.Ok($"Welcome to {ServiceActivitySource.Instance.Name} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();

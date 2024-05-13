@@ -137,14 +137,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
-    if (!allowAnonymousAccess)
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
     {
-        builder.Services.AddLinkBearerServiceAuthentication(options =>
-        {
-            options.Environment = builder.Environment;
-        });
-    }
-
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+    });
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -280,9 +277,9 @@ static void SetupMiddleware(WebApplication app)
     if (!allowAnonymousAccess)
     {
         app.UseAuthentication();
-        app.UseMiddleware<UserScopeMiddleware>();
-        app.UseAuthorization();
+        app.UseMiddleware<UserScopeMiddleware>();        
     }
+    app.UseAuthorization();
 
     // Register endpoints
     app.MapGet("/api/account/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Version}!")).AllowAnonymous();
