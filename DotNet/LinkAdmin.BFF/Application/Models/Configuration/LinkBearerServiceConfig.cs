@@ -4,5 +4,6 @@
     {
         public bool EnableTokenGenrationEndpoint { get; set; }
         public string? LinkAdminEmail { get; set; }
+        public int TokenLifespan { get; set; } = 10;
     }
 }
