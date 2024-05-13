@@ -1,12 +1,13 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Normalization.Application.Models;
+using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
         private readonly IOptions<ServiceInformation> _serviceInformation;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly RetryRepository _retryRepository;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
@@ -31,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             IOptions<ServiceInformation> serviceInformation,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            RetryRepository retryRepository,
+            IServiceScopeFactory serviceScopeFactory,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
             _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
             _consumerSettings = consumerSettings ?? throw new ArgumentException(nameof(consumerSettings));
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -55,9 +56,12 @@ namespace LantanaGroup.Link.Normalization.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
+            var repository = _serviceScopeFactory.CreateScope().ServiceProvider
+                .GetRequiredService<IRetryRepository>();
+
             var config = new ConsumerConfig()
             {
-                GroupId = "NormalizationRetry",
+                GroupId = NormalizationConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -123,7 +127,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
 
                         var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
 
-                        await _retryRepository.AddAsync(retryEntity, cancellationToken);
+                        await repository.AddAsync(retryEntity, cancellationToken);
 
                         var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 

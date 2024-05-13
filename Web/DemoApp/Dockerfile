@@ -1,7 +1,5 @@
 FROM node:18-alpine AS build
 
-RUN apk add --no-cache --virtual .gyp build-base
-
 RUN mkdir /build
 
 WORKDIR /build

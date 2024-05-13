@@ -6,6 +6,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -72,9 +73,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 return jwt;
 
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
                 throw;
             }
             

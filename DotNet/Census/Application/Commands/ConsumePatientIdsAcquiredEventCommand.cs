@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using MediatR;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
@@ -36,7 +37,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
     public async Task<IEnumerable<BaseResponse>> Handle(ConsumePatientIdsAcquiredEventCommand request, CancellationToken cancellationToken)
     {
         /// 1. convert Fhir List to patient entities
-        /// 2. get existing census from mongo
+        /// 2. get existing census from database
         /// 3. compare:
         ///    - new patients need admitted date updated to DateTime.UtcNow
         ///    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow
@@ -56,8 +57,10 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                 patient.ModifyDate = DateTime.UtcNow;
                 patientUpdates.Add(patient);
 
-                _metrics.IncrementPatientIdentifiedCounter([ 
-                    new KeyValuePair<string, object?>("facility", request.FacilityId)                     
+                _metrics.IncrementPatientAdmittedCounter([ 
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Admit.ToString())
                 ]);
             }
         }
@@ -70,7 +73,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                 patient.IsDischarged = true;
                 patient.DischargeDate = DateTime.UtcNow;
                 patient.ModifyDate = DateTime.UtcNow;
-                patientUpdates.Add(patient);
+                patientUpdates.Add(patient);                
             }
         }
 
@@ -92,6 +95,12 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                     },
                     TopicName = KafkaTopic.PatientEvent.ToString()
                 });
+
+                _metrics.IncrementPatientDischargedCounter([
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString())
+                ]);
             }
         }
 

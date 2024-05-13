@@ -50,7 +50,7 @@ steps:
       tags: |
         latest
         $(Build.BuildId)
-      buildContext: '$(Build.Repository.LocalPath)'
+      buildContext: 'Java/'
 
   - task: PublishPipelineArtifact@1
     inputs:

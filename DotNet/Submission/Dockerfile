@@ -19,6 +19,5 @@ RUN dotnet publish "Submission.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-#RUN apk add --no-cache aspnetcore7-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Submission.dll"]

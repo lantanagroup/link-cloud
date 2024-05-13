@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using System.Threading;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
@@ -56,23 +57,35 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     public virtual void Add(T entity)
     {
-        throw new NotImplementedException();
+        _dbContext.Set<T>().Add(entity);
+
+        _dbContext.SaveChanges();
     }
 
     public virtual T Get(string id)
     {
-        throw new NotImplementedException();
+        return _dbContext.Set<T>().FirstOrDefault(o => o.Id == id);
     }
 
 
     public virtual T Update(T entity)
     {
-        throw new NotImplementedException();
+        _dbContext.Set<T>().Update(entity);
+
+        _dbContext.SaveChanges();
+
+        return entity;
     }
 
     public virtual void Delete(string id)
     {
-        throw new NotImplementedException();
+        var entity = _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefault();
+
+        if (entity is null) return;
+
+        _dbContext.Set<T>().Remove(entity);
+
+        _dbContext.SaveChanges();
     }
 
 }
