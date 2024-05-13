@@ -8,6 +8,7 @@ using Link.Authorization.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Link.Authorization.Permissions;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
@@ -57,8 +58,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             {
                 new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
-                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
-            };
+                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
+                new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkPermissions.CanViewAccounts))
+            };            
 
             var systemPrinciple = new ClaimsPrincipal(new ClaimsIdentity(claims));
 
