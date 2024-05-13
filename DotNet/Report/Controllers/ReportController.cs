@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         [HttpGet("GetSubmissionBundleForPatient")]
-        public async Task<JsonElement> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate, Bundle otherResources)
+        public async Task<JsonElement> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             try
             {
@@ -68,10 +68,9 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Paramater patientId is null or whitespace");
                 }
 
-                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate, otherResources);
+                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
 
-                var returnModel = new { PatientResourceBundle = submission, OtherResources = otherResources };
-                return JsonSerializer.SerializeToElement(returnModel, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                return JsonSerializer.SerializeToElement(submission, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
             }
             catch (Exception ex)
             {

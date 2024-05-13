@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.Report.Entities
         public string PatientId { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public Bundle SubmissionBundle { get; set; }
+        public string PatientResources { get; set; }
+        public string OtherResources { get; set;  }
     }
 }

@@ -9,6 +9,13 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using Hl7.Fhir.Model;
+using Task = System.Threading.Tasks.Task;
+using System.Text.Json;
+using Hl7.Fhir.Serialization;
+using System.Text.Json;
+using LantanaGroup.Link.Submission.Settings;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -105,36 +112,92 @@ namespace LantanaGroup.Link.Submission.Listeners
                             var dataAcqResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
                             var queryPlans = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
 
-                            foreach (var patientId in value.PatientIds)
-                            {
-                                foreach (var reportId in value.PatientReportIds[patientId])
-                                {
-                                    string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={reportId}";
-                                    var response = await httpClient.GetAsync(requestUrl, cancellationToken);
+                            Dictionary<string, Bundle> patientBundles = new Dictionary<string, Bundle>();
+                            Bundle otherResourcesBundle = new Bundle();
+                            var options = new JsonSerializerOptions().ForFhir();
 
-                                    var measureReportSubmissionBundle =
-                                        JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
-                                            await response.Content.ReadAsStringAsync(cancellationToken));
+                            foreach (var patientId in value.PatientIds.Distinct())
+                            {
+                                string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
+                                                    $"/GetSubmissionBundleForPatient?FacilityId={facilityId}&PatientId={patientId}&StartDate={key.StartDate}&EndDate={key.EndDate}";
+                                var response = await httpClient.GetAsync(requestUrl, cancellationToken);
+
+                                var patientSubmissionBundle =
+                                    JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
+                                        await response.Content.ReadAsStringAsync(cancellationToken));
+
+                                var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
+
+                                patientBundles.TryAdd(patientId, patientBundle);
+
+                                var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
+                                foreach (var resource in otherResources.GetResources())
+                                {
+                                    otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
                                 }
                             }
 
                             #region File IO
-                            //TODO Replace with new File IO
-                            //string facilityDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _fileSystemConfig.FilePath.Trim('/'), key.FacilityId);
-                            //if (!Directory.Exists(facilityDirectory))
-                            //{
-                            //    Directory.CreateDirectory(facilityDirectory);
-                            //}
 
-                            //var dtu = DateTime.UtcNow;
-                            //string fullFilePath = facilityDirectory + $"/submission_{value.MeasureReportScheduleId.Replace("-", "_")}.txt";
+                            //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
+                            //Per 2153, don't build with the trailing timestamp
+                            string submissionDiretory = Path.Combine(_submissionConfig.SubmissionDirectory,
+                                $"{facilityId}-{value.MeasureIds}-{key.StartDate.Value.ToShortDateString()}-{key.EndDate.Value.ToShortDateString()}");
+                            if (Directory.Exists(submissionDiretory))
+                            {
+                                Directory.Delete(submissionDiretory, true);
+                            }
 
-                            //await File.WriteAllTextAsync(fullFilePath, measureReportSubmissionBundle.SubmissionBundle, cancellationToken);
+                            Directory.CreateDirectory(submissionDiretory);
 
-                            //if (!File.Exists(fullFilePath))
-                            //{
-                            //    throw new TransientException($"{Name}: Bundle File Not Created", AuditEventType.Create);
-                            //}
+                            //Device
+                            string fileName = "sending-device.json";
+                            string contents = "{ \"Device\": \"NHSNLink\" }";
+
+                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+
+                            //Organization
+                            fileName = "sending-organization.json";
+                            contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
+
+                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+
+                            //Patient-List
+                            fileName = "patient-list.json";
+                            contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients.Select(p => p.PatientId), options);
+
+                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+
+                            //Query Plans
+                            fileName = "query-plan.yml";
+                            contents = queryPlans;
+
+                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+
+                            //Aggregates
+                            foreach (var aggregate in value.Aggregates)
+                            {
+                                fileName = $"aggregate-{aggregate.Measure}.json";
+                                contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
+
+                                await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            }
+
+                            //Patient Bundles
+                            foreach (var bundle in patientBundles)
+                            {
+                                fileName = $"patient-{bundle.Key}.json";
+                                contents = System.Text.Json.JsonSerializer.Serialize(bundle.Value, options);
+
+                                await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            }
+
+                            //Other Resources
+                            fileName = $"other-resources.json";
+                            contents = System.Text.Json.JsonSerializer.Serialize(otherResourcesBundle, options);
+
+                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            
                             #endregion
 
                         }, cancellationToken);
@@ -177,6 +240,16 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected string GetRelativeReference(Resource resource)
+        {
+            return string.Format("{0}/{1}", resource.TypeName, resource.Id);
+        }
+
+        protected string GetFullUrl(Resource resource)
+        {
+            return string.Format(SubmissionConstants.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
     }
 }

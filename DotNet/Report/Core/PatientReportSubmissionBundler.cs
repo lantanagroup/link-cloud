@@ -8,9 +8,11 @@ using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Serializers;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
 using MongoDB.Driver.Linq;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -56,7 +58,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
 
-        public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate, Bundle otherResources)
+        public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             if (string.IsNullOrEmpty(facilityId))
                 throw new Exception($"GenerateBundle: no facilityId supplied");
@@ -67,6 +69,7 @@ namespace LantanaGroup.Link.Report.Core
             var entries = await _mediator.Send(new GetPatientSubmissionEntriesQuery() { FacilityId = facilityId, PatientId = patientId, StartDate = startDate, EndDate = endDate });
 
             Bundle patientResourceBundle = new Bundle();
+            Bundle otherResources = new Bundle();   
             foreach (var entry in entries)
             {
                 var measureReportScheduleId = entry.MeasureReportScheduleId;
@@ -172,13 +175,15 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
+            var options = new JsonSerializerOptions().ForFhir();
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                SubmissionBundle = patientResourceBundle
+                PatientResources = JsonSerializer.Serialize(patientResourceBundle, options),
+                OtherResources = JsonSerializer.Serialize(otherResources, options),
             };
 
             return patientSubmissionModel;
