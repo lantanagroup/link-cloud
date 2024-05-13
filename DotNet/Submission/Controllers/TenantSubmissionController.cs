@@ -1,6 +1,4 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Managers;
+﻿using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Models.ApiModels;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,7 +19,6 @@ namespace LantanaGroup.Link.Submission.Controllers
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         [HttpGet]
         [Route("Find")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TenantSubmissionConfig))]
@@ -52,7 +49,6 @@ namespace LantanaGroup.Link.Submission.Controllers
         /// </summary>
         /// <param name="id"></param>
         /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         [HttpGet]
         [Route("Get")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TenantSubmissionConfig))]
@@ -78,6 +74,11 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
         }
 
+        /// <summary>
+        /// Delete the TenantSubmissionConfig for the provided TenantSubmissionConfig Id
+        /// </summary>
+        /// <param name="configId"></param>
+        /// <param name="cancellationToken"></param>
         [HttpDelete]
         [Route("Delete")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TenantSubmissionConfig))]
@@ -98,9 +99,13 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             catch {}
 
-            return Problem($"TenantSubmissionConfig {configId} not found.", statusCode: 304);
+            return NotFound($"TenantSubmissionConfig {configId} not found.");
         }
 
+        /// <summary>
+        /// Create a TenantSubmissionConfig
+        /// </summary>
+        /// <param name="tenantSubmissionConfig"></param>
         [HttpPost]
         [Route("Create")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(TenantSubmissionConfig))]
@@ -120,7 +125,11 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
         }
 
-
+        /// <summary>
+        /// Update an existing TenantSubmissionConfig
+        /// </summary>
+        /// <param name="tenantSubmissionConfig"></param>
+        /// <param name="cancellationToken"></param>
         [HttpPut]
         [Route("Update")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TenantSubmissionConfig))]
@@ -136,7 +145,7 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             else
             {
-                return Problem($"TenantSubmissionConfig {tenantSubmissionConfig.Id} not found.", statusCode: 304, type: typeof(TenantSubmissionConfig).ToString());
+                return NotFound($"TenantSubmissionConfig {tenantSubmissionConfig.Id} not found.");
             }
         }
     }
