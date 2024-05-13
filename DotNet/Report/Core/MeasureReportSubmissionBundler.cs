@@ -383,6 +383,7 @@ namespace LantanaGroup.Link.Report.Core
                 new CodeableConcept(ReportConstants.Bundle.OrganizationTypeSystem, "prov", "Healthcare Provider", null)
             };
 
+            //TODO: Replace this placeholder code?
             org.Name = "EHR Test On Prem"; // should be org name from config?
 
             org.Identifier.Add(new Identifier
