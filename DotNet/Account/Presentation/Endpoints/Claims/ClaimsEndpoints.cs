@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Claims.Handlers;
+using Link.Authorization.Permissions;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
@@ -24,6 +25,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
                 });
 
             roleEndpoints.MapGet("/claims", GetClaims.Handle)
+                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
                 .Produces<LinkClaimsModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
