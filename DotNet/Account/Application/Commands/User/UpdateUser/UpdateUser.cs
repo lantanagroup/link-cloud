@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -22,14 +23,16 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
         private readonly IRoleRepository _roleRepository;
+        private readonly IDistributedCache _cache;
 
-        public UpdateUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent, IRoleRepository roleRepository)
+        public UpdateUser(ILogger<CreateUser> logger, IUserRepository userRepository, IAccountServiceMetrics metrics, ICreateAuditEvent createAuditEvent, IRoleRepository roleRepository, IDistributedCache cache)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
             _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkUserModel model, CancellationToken cancellationToken = default)
@@ -88,7 +91,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if(removedRoles.Any())
                 {
-                    foreach (var role in addedRoles)
+                    foreach (var role in removedRoles)
                     {
                         if (!string.IsNullOrEmpty(role))
                         {
@@ -175,6 +178,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 };
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
+
+                //clear user cache              
+                var userKey = $"user:{user.Email}";
+                await _cache.RemoveAsync(userKey, cancellationToken);
 
                 return true;
             }

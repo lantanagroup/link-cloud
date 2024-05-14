@@ -56,6 +56,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<bool> AddRolesAsync(string userId, IEnumerable<LinkRole> roles, CancellationToken cancellationToken = default)
         {
             var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+
             if (user is null)
             {
                 return false;
@@ -71,19 +72,34 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> RemoveRoleAsync(string userId, LinkRole role, CancellationToken cancellationToken = default)
         {
-            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            var user = await _dbContext.Users
+                .Include(x => x.UserRoles)
+                .Where(x => x.Id == userId).FirstOrDefaultAsync(cancellationToken);
+
             if (user is null)
             {
                 return false;
             }
 
-            user.UserRoles.Remove(new LinkUserRole { UserId = userId, RoleId = role.Id });
+            var roleToRemove = user.UserRoles.FirstOrDefault(x => x.UserId == userId && x.RoleId == role.Id);
+            if (roleToRemove is not null)
+            {
+                user.UserRoles.Remove(roleToRemove);
+            }
+            else
+            {
+                return false;
+            }
+
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
         public async Task<bool> RemoveRolesAsync(string userId, IEnumerable<LinkRole> roles, CancellationToken cancellationToken = default)
         {
-            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            var user = await _dbContext.Users
+                .Include(x => x.UserRoles)
+                .Where(x => x.Id == userId).FirstOrDefaultAsync(cancellationToken);
+
             if (user is null)
             {
                 return false;
@@ -91,7 +107,16 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
             foreach (var role in roles)
             {
-                user.UserRoles.Remove(new LinkUserRole { UserId = userId, RoleId = role.Id });
+                
+                var roleToRemove = user.UserRoles.FirstOrDefault(x => x.UserId == userId && x.RoleId == role.Id);
+                if (roleToRemove is not null)
+                {
+                    user.UserRoles.Remove(roleToRemove);
+                }
+                else
+                {
+                    return false;
+                }
             }
 
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
@@ -100,6 +125,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<bool> AddClaimToUserAsync(string userId, Claim claim, CancellationToken cancellationToken = default)
         {
             var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+
             if (user is null)
             {
                 return false;
@@ -112,13 +138,23 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> RemoveClaimFromUserAsync(string userId, Claim claim, CancellationToken cancellationToken = default)
         {
-            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            var user = await _dbContext.Users
+                .Include(x => x.Claims)
+                .Where(x => x.Id == userId).FirstOrDefaultAsync(cancellationToken);
             if (user is null)
             {
                 return false;
             }
 
-            user.Claims.Remove(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+            var claimToRemove = user.Claims.FirstOrDefault(x => x.UserId == userId && x.ClaimType == claim.Type && x.ClaimValue == claim.Value);
+            if (claimToRemove is not null)
+            {
+                user.Claims.Remove(claimToRemove);
+            }
+            else
+            {
+                return false;
+            }
 
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
@@ -126,6 +162,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
         public async Task<bool> AddClaimsToUserAsync(string userId, IEnumerable<Claim> claims, CancellationToken cancellationToken = default)
         {
             var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+
             if (user is null)
             {
                 return false;
@@ -152,7 +189,10 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
 
         public async Task<bool> RemoveClaimsFromUserAsync(string userId, IEnumerable<Claim> claims, CancellationToken cancellationToken = default)
         {
-            var user = await _dbContext.Users.FindAsync([userId], cancellationToken: cancellationToken);
+            var user = await _dbContext.Users
+                .Include(x => x.Claims)
+                .Where(x => x.Id == userId).FirstOrDefaultAsync(cancellationToken);
+
             if (user is null)
             {
                 return false;
@@ -161,7 +201,15 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             int removedClaims = 0;
             foreach (var claim in claims)
             {
-                user.Claims.Remove(new LinkUserClaim { UserId = userId, ClaimType = claim.Type, ClaimValue = claim.Value });
+                var claimToRemove = user.Claims.FirstOrDefault(x => x.UserId == userId && x.ClaimType == claim.Type && x.ClaimValue == claim.Value);
+                if (claimToRemove is not null)
+                {
+                    user.Claims.Remove(claimToRemove);
+                }
+                else
+                {
+                    _logger.LogUserClaimRemovalException(userId, claim.Type, claim.Value, "Failed to remove claim from user");
+                }                
 
                 if (await _dbContext.SaveChangesAsync(cancellationToken) > 0)
                 {
