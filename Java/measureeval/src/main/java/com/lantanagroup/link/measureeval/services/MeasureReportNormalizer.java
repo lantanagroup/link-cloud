@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.measureeval.utils.FhirIdUtils;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Reference;
@@ -24,9 +25,9 @@ public class MeasureReportNormalizer {
         measureReport.getContained().forEach(this::normalizeContained);
         fhirContext.newTerser().getAllPopulatedChildElementsOfType(measureReport, Reference.class)
                 .forEach(this::normalizeReference);
-        // TODO: Ensure these are local references
         measureReport.setEvaluatedResource(measureReport.getContained().stream()
                 .map(Resource::getIdElement)
+                .map(id -> FhirIdUtils.setLocal(id, true))
                 .map(Reference::new)
                 .toList());
     }
@@ -41,11 +42,8 @@ public class MeasureReportNormalizer {
     }
 
     private IIdType normalizeId(IIdType id) {
-        return id.setParts(
-                id.getBaseUrl(),
-                id.getResourceType(),
-                normalizeIdPart(id.getIdPart()),
-                id.getVersionIdPart());
+        String idPart = normalizeIdPart(id.getIdPart());
+        return FhirIdUtils.setIdPart(id, idPart);
     }
 
     private String normalizeIdPart(String idPart) {
