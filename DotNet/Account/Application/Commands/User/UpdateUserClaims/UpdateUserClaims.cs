@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -18,13 +19,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly IUserRepository _userRepository;
         private readonly ILinkUserModelFactory _userModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
+        private readonly IDistributedCache _cache;
 
-        public UpdateUserClaims(ILogger<UpdateUserClaims> logger, IUserRepository userRepository, ILinkUserModelFactory userModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateUserClaims(ILogger<UpdateUserClaims> logger, IUserRepository userRepository, ILinkUserModelFactory userModelFactory, ICreateAuditEvent createAuditEvent, IDistributedCache cache)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _userModelFactory = userModelFactory ?? throw new ArgumentNullException(nameof(userModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, List<string> claims, CancellationToken cancellationToken = default)
@@ -92,9 +95,13 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
+                //clear user cache              
+                var userKey = $"user:{user.Email}";
+                await _cache.RemoveAsync(userKey, cancellationToken);
+
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 activity?.SetStatus(ActivityStatusCode.Error);
                 throw;
