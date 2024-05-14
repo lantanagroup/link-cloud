@@ -110,6 +110,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkDataProtection(options =>
     {
         options.Environment = builder.Environment;
+        options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
     //Add Redis     

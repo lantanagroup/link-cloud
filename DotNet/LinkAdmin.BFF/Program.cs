@@ -73,6 +73,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
 
@@ -86,7 +87,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHttpClient();
 
     // Add data protection
-    builder.Services.AddDataProtection().SetApplicationName("Link");
+    builder.Services.AddDataProtection().SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
     //TODO: https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview?view=aspnetcore-8.0
 
     // Add commands

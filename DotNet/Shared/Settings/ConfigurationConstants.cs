@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string CORS = "CORS";
             public const string AutoMigrate = "AutoMigrate";
             public const string DatabaseProvider = "DatabaseProvider";
+            public const string DataProtection = "DataProtection";
         }
 
         public static class DatabaseConnections

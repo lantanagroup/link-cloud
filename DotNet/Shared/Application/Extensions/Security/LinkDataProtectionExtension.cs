@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             if(linkDataProtectionOptions.Environment.IsDevelopment())
             {
                 services.AddDataProtection()
-                    .SetApplicationName("Link")
+                    .SetApplicationName(linkDataProtectionOptions.KeyRing)
                     .DisableAutomaticKeyGeneration();
             }       
           
@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
         public class LinkDataProtectionOptions
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
+            public string KeyRing { get; set; } = "Link";
         }
     }
 }
