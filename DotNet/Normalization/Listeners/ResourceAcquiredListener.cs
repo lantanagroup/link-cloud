@@ -109,7 +109,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, message.Message.Key);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     NormalizationConfig? config = null;
@@ -127,7 +127,7 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
@@ -141,7 +141,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     var operationCommandResult = new OperationCommandResult
@@ -235,7 +235,7 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     try
@@ -278,7 +278,7 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     kafkaConsumer.Commit(message);
