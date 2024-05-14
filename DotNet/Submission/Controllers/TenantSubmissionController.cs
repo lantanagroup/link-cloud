@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Submission.Application.Interfaces;
+﻿using Confluent.Kafka;
+using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Models.ApiModels;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             else
             {
-                return NotFound();
+                return Problem($"TenantSubmissionConfig for FacilityId {facilityId} not found.", statusCode: 304);
             }
         }
 
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             else
             {
-                return NotFound();
+                return Problem($"TenantSubmissionConfig {configId} not found.", statusCode: 304);
             }
         }
 
@@ -99,7 +100,7 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             catch {}
 
-            return NotFound($"TenantSubmissionConfig {configId} not found.");
+            return Problem($"TenantSubmissionConfig {configId} not found.", statusCode: 304);
         }
 
         /// <summary>
@@ -145,7 +146,7 @@ namespace LantanaGroup.Link.Submission.Controllers
             }
             else
             {
-                return NotFound($"TenantSubmissionConfig {tenantSubmissionConfig.Id} not found.");
+                return Problem($"TenantSubmissionConfig {tenantSubmissionConfig.Id} not found.", statusCode:304);
             }
         }
     }
