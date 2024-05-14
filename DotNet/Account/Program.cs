@@ -143,6 +143,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;
         options.AllowAnonymous = allowAnonymousAccess;
         options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
     });
 
     //Add persistence interceptors
