@@ -102,15 +102,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
 
                             var httpClient = _httpClient.CreateClient();
-                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl +
-                                                      $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
+                            string censusRequesturl = _submissionConfig.CensusUrl + $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                             var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
                             var admittedPatients =
                                 JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(
                                     await censusResponse.Content.ReadAsStringAsync(cancellationToken));
 
-                            string dataAcqRequestUrl = _submissionConfig.DataAcquisitionQueryPlanUrl +
-                                                       $"/{key.FacilityId}/QueryPlans";
+                            string dataAcqRequestUrl = _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
                             var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
                             var queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 
