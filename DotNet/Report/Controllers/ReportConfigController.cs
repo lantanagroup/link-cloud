@@ -180,15 +180,12 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="Id"></param>
         /// <returns></returns>
         [HttpDelete("Delete")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(bool))]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<bool>> DeleteReportConfig(string Id, CancellationToken cancellationToken = default)
         {
-
-            
-
             if (string.IsNullOrWhiteSpace(Id))
             {
                 return BadRequest("Id is null or white space.");
@@ -196,16 +193,16 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                var retVal = await _mediator.Send(new DeleteMeasureReportConfigCommand()
+                await _mediator.Send(new DeleteMeasureReportConfigCommand()
                 {
                     Id = Id
                 });
 
-                return Ok(retVal);
+                return Ok();
             }
             catch { }
 
-            return Problem($"TenantSubmissionConfig {configId} not found.", statusCode: 304);
+            return Problem($"MeasureReportConfig {Id} not found.", statusCode: 304);
         }
     }
 }
