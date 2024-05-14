@@ -4,6 +4,10 @@ using System.Collections.Immutable;
 
 namespace LantanaGroup.Link.Report.Core;
 
+/// <summary>
+/// This Class Generates the Aggregate bundle based on the provided individual MeasureReports.
+/// These Aggregate Bundles are part of the overall submission step.
+/// </summary>
 public class MeasureReportAggregator
 {
     private const string AggregateMeasureReportProfile =
