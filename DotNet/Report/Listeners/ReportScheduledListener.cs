@@ -117,34 +117,6 @@ namespace LantanaGroup.Link.Report.Listeners
                             var startDate = startDateOffset.UtcDateTime;
                             var endDate = endDateOffset.UtcDateTime;
 
-                            var scheduleTrigger = "";
-                            try
-                            {
-                                // There may eventually be a need to have the consumeResult.Message.Value contain a parameter indicating how often the job should run (Daily, Weekly, Monthly, etc)
-                                // This will schedule the job to run once a month on the day, hour and minute specified on the endDate.
-                                // However, when the job runs, it will delete itself from the schedule.
-                                var cronSchedule =
-                                    CronScheduleBuilder
-                                        .MonthlyOnDayAndHourAndMinute(endDate.Day, endDate.Hour, endDate.Minute)
-                                        .Build() as CronTriggerImpl;
-                                cronSchedule.StartTimeUtc = startDateOffset;
-                                cronSchedule.EndTimeUtc = endDateOffset;
-                                cronSchedule.SetNextFireTimeUtc(endDateOffset);
-
-                                scheduleTrigger = cronSchedule.CronExpressionString;
-                            }
-                            catch (Exception ex)
-                            {
-                                throw new DeadLetterException(
-                                    "ReportScheduledListener: Cron Schedule could not be created from provided dates.", AuditEventType.Create, ex.InnerException);
-                            }
-
-                            if (string.IsNullOrWhiteSpace(scheduleTrigger))
-                            {
-                                throw new DeadLetterException(
-                                    "ReportScheduledListener: scheduleTrigger is null or empty.", AuditEventType.Create);
-                            }
-
                             // create or update the consumed report schedule
                             var existing = await _mediator.Send(
                                 new FindMeasureReportScheduleForReportTypeQuery()
@@ -160,7 +132,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                 existing.FacilityId = key.FacilityId;
                                 existing.ReportStartDate = startDate;
                                 existing.ReportEndDate = endDate;
-                                existing.ScheduledTrigger = scheduleTrigger;
                                 existing.ReportType = key.ReportType;
 
                                 await _mediator.Send(new UpdateMeasureReportScheduleCommand()
@@ -168,11 +139,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportSchedule = existing
                                 }, cancellationToken);
 
-                                if (existing.ScheduledTrigger != scheduleTrigger)
-                                {
-                                    await MeasureReportScheduleService.RescheduleJob(existing,
-                                        await _schedulerFactory.GetScheduler(cancellationToken));
-                                }
+
+                                await MeasureReportScheduleService.RescheduleJob(existing,
+                                    await _schedulerFactory.GetScheduler(cancellationToken));
                             }
                             else
                             {
@@ -183,7 +152,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                         FacilityId = key.FacilityId,
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,
-                                        ScheduledTrigger = scheduleTrigger,
                                         ReportType = key.ReportType
                                     }
                                 }, cancellationToken);
@@ -197,8 +165,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -208,10 +175,15 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
+                    catch (TimeoutException ex)
+                    {
+                        var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                    }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
                     }
                     finally
                     {

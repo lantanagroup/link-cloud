@@ -49,10 +49,23 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpGet("facility/{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<MeasureReportConfig>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<IEnumerable<MeasureReportConfig>>> GetReportConfigForFacilityId(string facilityId)
         {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return BadRequest("FacilityId is null or empty");
+            }
+
             var  res = (await _mediator.Send(new GetFacilityMeasureReportConfigsQuery { FacilityId = facilityId })).ToList();
-            if (res == null) return NoContent();
+            if (res == null)
+            {
+                return Problem($"No MeasureReportConfigs found for FacilityId {facilityId}", statusCode: 304);
+            }
+
             var  list = res.Select(model => new MeasureReportConfig()
             {
                 Id = model.Id,
@@ -60,6 +73,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 ReportType = model.ReportType,
                 BundlingType = model.BundlingType.ToString()
             });
+
             return Ok(list);
         }
 
@@ -69,16 +83,15 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpPost("Create")]
-        public async Task<IActionResult> CreateReportConfig([FromBody] MeasureReportConfig config)
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(MeasureReportConfig))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<MeasureReportConfig>> CreateReportConfig([FromBody] MeasureReportConfig config)
         {
             if (string.IsNullOrWhiteSpace(config.FacilityId))
             {
-                return BadRequest("No FacilityId was provided");
-            }
-
-            if (string.IsNullOrWhiteSpace(config.ReportType))
-            {
-                return BadRequest("No ReportType was provided");
+                return BadRequest("FacilityId is null or empty");
             }
 
             if (!await _tenantApiService.CheckFacilityExists(config.FacilityId))
@@ -86,7 +99,12 @@ namespace LantanaGroup.Link.Report.Controllers
                 return BadRequest($"Tenant {config.FacilityId} does not exist.");
             }
 
-            BundlingType bundleType = BundlingType.Default;
+            if (string.IsNullOrWhiteSpace(config.ReportType))
+            {
+                return BadRequest("ReportType is null or empty");
+            }
+
+            BundlingType bundleType;
             var entity = new MeasureReportConfigModel()
             {
                 Id = Guid.NewGuid().ToString(),
@@ -102,17 +120,16 @@ namespace LantanaGroup.Link.Report.Controllers
 
             if (returned != null && !string.IsNullOrWhiteSpace(returned.Id))
             {
-                return Ok(entity);
+                return Created(returned.Id, returned);
             }
             else if (returned != null)
             {
-                return BadRequest(
-                    "ReportConfigController.CreateReportConfig: An error was encountered during creation.");
+                return Problem("Unable to create the MeasureReportConfig", statusCode: 304);
             }
             else
             {
-                return BadRequest(
-                    "ReportConfigController.CreateReportConfig: A MeasureReportConfig with that Id already exists");
+                return Problem(
+                    "ReportConfigController.CreateReportConfig: A MeasureReportConfig with that Id already exists", statusCode: 304);
             }
         }
 
@@ -122,6 +139,10 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpPut("Update")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MeasureReportConfigModel))]
+        [ProducesResponseType(StatusCodes.Status304NotModified, Type = typeof(MeasureReportConfigModel))]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MeasureReportConfigModel>> UpdateReportConfig([FromBody] MeasureReportConfig config)
         {
             if (!await _tenantApiService.CheckFacilityExists(config.FacilityId))
@@ -129,7 +150,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 return BadRequest($"Tenant {config.FacilityId} does not exist.");
             }
 
-            BundlingType bundleType = BundlingType.Default;
+            BundlingType bundleType;
             var entity = new MeasureReportConfigModel()
             {
                 Id = config.Id,
@@ -138,12 +159,19 @@ namespace LantanaGroup.Link.Report.Controllers
                 BundlingType = BundlingType.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
             };
 
-            await _mediator.Send(new UpdateMeasureReportConfigCommand
+            var updatedConfig = await _mediator.Send(new UpdateMeasureReportConfigCommand
             {
                 MeasureReportConfig = entity
             });
 
-            return entity;
+            if (updatedConfig != null)
+            {
+                return Ok(updatedConfig);
+            }
+            else
+            {
+                return Problem($"TenantSubmissionConfig {config.Id} not found.", statusCode: 304, type: typeof(MeasureReportConfig).ToString());
+            }
         }
 
         /// <summary>
@@ -152,14 +180,29 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="Id"></param>
         /// <returns></returns>
         [HttpDelete("Delete")]
-        public async Task<IActionResult> DeleteReportConfig(string Id)
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status304NotModified)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<bool>> DeleteReportConfig(string Id, CancellationToken cancellationToken = default)
         {
-            await _mediator.Send(new DeleteMeasureReportConfigCommand()
+            if (string.IsNullOrWhiteSpace(Id))
             {
-                Id = Id
-            });
-            
-            return Ok();
+                return BadRequest("Id is null or white space.");
+            }
+
+            try
+            {
+                await _mediator.Send(new DeleteMeasureReportConfigCommand()
+                {
+                    Id = Id
+                });
+
+                return Ok();
+            }
+            catch { }
+
+            return Problem($"MeasureReportConfig {Id} not found.", statusCode: 304);
         }
     }
 }

@@ -18,6 +18,7 @@ using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Core;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -32,19 +33,26 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
+        private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly MeasureReportAggregator _aggregator;
+        
         private string Name => this.GetType().Name;
 
         public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
+            MeasureReportSubmissionBundler bundler,
+            MeasureReportAggregator aggregator)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
-
+            _bundler = bundler;
+            _aggregator = aggregator;
+            
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
@@ -59,14 +67,6 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
-
-        private async Task<bool> readyForSubmission(string scheduleId)
-        {
-            var submissionEntries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = scheduleId });
-          
-            return  submissionEntries.All(x => x.ReadyForSubmission);
-        }
-
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
@@ -190,20 +190,36 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }, cancellationToken);
                                 }
 
-                                if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
+                                var submissionEntries = (await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id })).ToList();
+
+                                var allReady = submissionEntries.All(x => x.ReadyForSubmission);
+
+                                if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && allReady)
                                 {
+                                    var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
+
+                                    var parser = new FhirJsonParser();
+                                    List<MeasureReport> measureReports = submissionEntries
+                                        .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                                        .ToList();
+
                                     using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
+
                                     prod.Produce(nameof(KafkaTopic.SubmitReport),
                                         new Message<SubmissionReportKey, SubmissionReportValue>
                                         {
                                             Key = new SubmissionReportKey()
                                             {
                                                 FacilityId = schedule.FacilityId,
-                                                ReportType = schedule.ReportType
+                                                StartDate = schedule.ReportStartDate,
+                                                EndDate = schedule.ReportEndDate
                                             },
                                             Value = new SubmissionReportValue()
                                             {
-                                                MeasureReportScheduleId = schedule.Id
+                                                PatientIds = patientIds,
+                                                MeasureIds = string.Join("+", measureReports.Select(mr => mr.Measure).Distinct()),
+                                                Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                                Aggregates = _aggregator.Aggregate(measureReports)
                                             },
                                             Headers = new Headers
                                             {
@@ -221,8 +237,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -232,10 +247,15 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
+                    catch (TimeoutException ex)
+                    {
+                        var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                    }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(ex,facilityId, AuditEventType.Create);
                     }
                     finally
                     {

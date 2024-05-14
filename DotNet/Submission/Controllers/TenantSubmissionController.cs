@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.Submission.Controllers
         /// <param name="cancellationToken"></param>
         [HttpDelete]
         [Route("Delete")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TenantSubmissionConfig))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(bool))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]

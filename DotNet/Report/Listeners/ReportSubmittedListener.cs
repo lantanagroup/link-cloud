@@ -93,6 +93,16 @@ namespace LantanaGroup.Link.Report.Listeners
                             var value = consumeResult.Message.Value;
                             facilityId = key.FacilityId;
 
+                            if (string.IsNullOrWhiteSpace(key?.FacilityId))
+                            {
+                                throw new DeadLetterException("FacilityId is null or empty", AuditEventType.Submit);
+                            }
+
+                            if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
+                            {
+                                throw new DeadLetterException("ReportBundleId is null or empty", AuditEventType.Submit);
+                            }
+
                             // find existing report schedule
                             MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
 
@@ -140,8 +150,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -151,10 +160,15 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
+                    catch (TimeoutException ex)
+                    {
+                        var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                    }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
                     }
                     finally
                     {
