@@ -175,6 +175,12 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                     }
+                    catch (TimeoutException ex)
+                    {
+                        var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                    }
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
