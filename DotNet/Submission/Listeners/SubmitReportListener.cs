@@ -220,7 +220,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     foreach (var resource in bundle.GetResources())
                                     {
-                                        if (otherResourcesBundle.GetResources().Any(r => r.Id == resource.Id))
+                                        if (otherResourcesBundle.GetResources().All(r => r.Id != resource.Id))
                                         {
                                             otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
                                         }
