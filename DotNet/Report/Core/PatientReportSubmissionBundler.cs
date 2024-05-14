@@ -1,5 +1,4 @@
-﻿using Azure.Messaging.EventGrid.SystemEvents;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
@@ -8,14 +7,16 @@ using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Serializers;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
-using MongoDB.Driver.Linq;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Core
 {
+    /// <summary>
+    /// This Class is used to generate a bundle of a particular patients data for the provided facility and the report period.
+    /// This bundle will include data for all applicable Measure Reports as well as a separate bundle of all resources that are not strictly "Patient" resources.
+    /// </summary>
     public class PatientReportSubmissionBundler
     {
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
