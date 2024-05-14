@@ -83,103 +83,114 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             consumeResult = result;
 
-                            if (consumeResult == null)
+                            try
                             {
-                                throw new DeadLetterException(
-                                    $"{Name}: consumeResult is null", AuditEventType.Create);
-                            }
-
-                            var key = consumeResult.Message.Key;
-                            var value = consumeResult.Message.Value;
-                            facilityId = key.FacilityId;
-
-                            if (string.IsNullOrWhiteSpace(key?.FacilityId))
-                            {
-                                throw new DeadLetterException("FacilityId is null or empty", AuditEventType.Submit);
-                            }
-
-                            if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
-                            {
-                                throw new DeadLetterException("ReportBundleId is null or empty", AuditEventType.Submit);
-                            }
-
-                            // find existing report schedule
-                            MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleByBundleIdQuery { ReportBundleId = value.ReportBundleId });
-
-                            if (schedule is null)
-                            {
-                                throw new TransientException(
-                                    $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}", AuditEventType.Query);
-                            }
-
-                            // update report schedule with submitted date
-                            schedule.SubmittedDate = DateTime.UtcNow;
-                            await _mediator.Send(new UpdateMeasureReportScheduleCommand { ReportSchedule = schedule });
-
-                            // produce audit message signalling the report service acknowledged the report has been submitted
-                            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-                            string notes =
-                                $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
-                            var val = new AuditEventMessage
-                            {
-                                FacilityId = schedule.FacilityId,
-                                ServiceName = ReportConstants.ServiceName,
-                                Action = AuditEventType.Submit,
-                                EventDate = DateTime.UtcNow,
-                                Resource = typeof(MeasureReportScheduleModel).Name,
-                                Notes = notes
-                            };
-                            var headers = new Headers
-                            {
-                                { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                            };
-
-                            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                                new Message<string, AuditEventMessage>
+                                if (consumeResult == null)
                                 {
-                                    Value = val,
-                                    Headers = headers
-                                });
-                            producer.Flush();
+                                    throw new DeadLetterException(
+                                        $"{Name}: consumeResult is null", AuditEventType.Create);
+                                }
 
-                            _logger.LogInformation(notes);
+                                var key = consumeResult.Message.Key;
+                                var value = consumeResult.Message.Value;
+                                facilityId = key.FacilityId;
+
+                                if (string.IsNullOrWhiteSpace(key?.FacilityId))
+                                {
+                                    throw new DeadLetterException("FacilityId is null or empty", AuditEventType.Submit);
+                                }
+
+                                if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
+                                {
+                                    throw new DeadLetterException("ReportBundleId is null or empty",
+                                        AuditEventType.Submit);
+                                }
+
+                                // find existing report schedule
+                                MeasureReportScheduleModel schedule = await _mediator.Send(
+                                    new GetMeasureReportScheduleByBundleIdQuery
+                                        { ReportBundleId = value.ReportBundleId });
+
+                                if (schedule is null)
+                                {
+                                    throw new TransientException(
+                                        $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}",
+                                        AuditEventType.Query);
+                                }
+
+                                // update report schedule with submitted date
+                                schedule.SubmittedDate = DateTime.UtcNow;
+                                await _mediator.Send(new UpdateMeasureReportScheduleCommand
+                                    { ReportSchedule = schedule });
+
+                                // produce audit message signalling the report service acknowledged the report has been submitted
+                                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
+
+                                string notes =
+                                    $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
+                                var val = new AuditEventMessage
+                                {
+                                    FacilityId = schedule.FacilityId,
+                                    ServiceName = ReportConstants.ServiceName,
+                                    Action = AuditEventType.Submit,
+                                    EventDate = DateTime.UtcNow,
+                                    Resource = typeof(MeasureReportScheduleModel).Name,
+                                    Notes = notes
+                                };
+                                var headers = new Headers
+                                {
+                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                };
+
+                                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                                    new Message<string, AuditEventMessage>
+                                    {
+                                        Value = val,
+                                        Headers = headers
+                                    });
+                                producer.Flush();
+
+                                _logger.LogInformation(notes);
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TimeoutException ex)
+                            {
+                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                            }
+                            finally
+                            {
+                                consumer.Commit(consumeResult);
+                            }
 
                         }, cancellationToken);
                         
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                    }
-                    catch (TransientException ex)
-                    {
-                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                    }
-                    catch (TimeoutException ex)
-                    {
-                        var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
 
-                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        consumer.Commit();
                     }
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
-                    }
-                    finally
-                    {
-                        if (consumeResult != null)
-                        {
-                            consumer.Commit(consumeResult);
-                        }
-                        else
-                        {
-                            consumer.Commit();
-                        }
                     }
                 }
             }
