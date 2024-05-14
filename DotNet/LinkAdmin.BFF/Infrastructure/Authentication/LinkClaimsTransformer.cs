@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -17,18 +16,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
     public class LinkClaimsTransformer : IClaimsTransformation
     {
         private readonly ILogger<LinkClaimsTransformer> _logger;
-        private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IGetLinkAccount _getLinkAccount;
         private readonly IDistributedCache _cache;
         private readonly IDataProtectionProvider _dataProtectionProvider;
+        private readonly IOptions<DataProtectionSettings> _dataProtectionOptions;
 
-        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IOptions<ServiceRegistry> serviceRegistry, IGetLinkAccount getLinkAccount, IDistributedCache cache, IDataProtectionProvider dataProtectionProvider)
+        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, IDistributedCache cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
+            _dataProtectionOptions = dataProtectionOptions ?? throw new ArgumentNullException(nameof(dataProtectionOptions));
         }
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -43,10 +42,25 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             //check if account is in cache, if not get it from the account service
             var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkUser);
-            var cacheAccount = _cache.GetString(userKey);            
-            
-            Account? account = cacheAccount is not null ? JsonConvert.DeserializeObject<Account>(protector.Unprotect(cacheAccount)) :
-                await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);           
+            var cacheAccount = _cache.GetString(userKey);
+
+            Account? account;
+
+            if (cacheAccount is not null)
+            {
+                if (_dataProtectionOptions.Value.Enabled)
+                {
+                    account = JsonConvert.DeserializeObject<Account>(protector.Unprotect(cacheAccount));
+                }
+                else
+                {
+                    account = JsonConvert.DeserializeObject<Account>(cacheAccount);
+                }
+            }
+            else
+            { 
+                account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
+            }                             
 
             if (account is null) //if no account found, return an empty principal
             {
@@ -58,8 +72,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             // Cache the account for 5 minutes if it is not already in the cache
             if(cacheAccount is null)
-            {                
-                _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+            {
+                if (_dataProtectionOptions.Value.Enabled)
+                {
+                    _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                }
+                else
+                {
+                    _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                }                
             }                  
 
             // Remove the existing 'sub' claim and replace with link account id

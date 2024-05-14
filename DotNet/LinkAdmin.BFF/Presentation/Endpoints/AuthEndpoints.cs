@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
                 {
-                    RedirectUri = "/logout"
+                    RedirectUri = "/info"
                 },
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }
