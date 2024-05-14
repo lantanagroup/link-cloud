@@ -109,6 +109,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             {
                 var consumeResult = new ConsumeResult<string, string>();
 
+                consumeResult.Message = new Message<string, string>();
+
                 consumeResult.Message.Key = ex.Message;
                 consumeResult.Message.Value = ex.StackTrace;
                 consumeResult.Message.Headers = new Headers();
@@ -138,6 +140,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             {
                 var consumeResult = new ConsumeResult<string, string>();
 
+                consumeResult.Message = new Message<string, string>();
+                
                 consumeResult.Message.Key = ex.Message;
                 consumeResult.Message.Value = ex.StackTrace;
                 consumeResult.Message.Headers = new Headers();
@@ -165,11 +169,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
-                var pseudoResult = new ConsumeResult<string, string>();
+                var consumeResult = new ConsumeResult<string, string>();
 
-                pseudoResult.Message.Key = message;
-                pseudoResult.Message.Value = message;
-                pseudoResult.Message.Headers = new Headers();
+                consumeResult.Message = new Message<string, string>();
+
+                consumeResult.Message.Key = message;
+                consumeResult.Message.Value = message;
+                consumeResult.Message.Headers = new Headers();
 
                 var auditMessage = new AuditEventMessage
                 {
@@ -180,8 +186,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {message}",
                 };
 
-                ProduceAuditEvent(auditMessage, pseudoResult.Message.Headers);
-                ProduceNullConsumeResultDeadLetter(pseudoResult.Message.Key, pseudoResult.Message.Value, pseudoResult.Message.Headers, message);
+                ProduceAuditEvent(auditMessage, consumeResult.Message.Headers);
+                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
             }
             catch (Exception e)
             {
