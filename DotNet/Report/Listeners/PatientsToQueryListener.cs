@@ -86,7 +86,19 @@ namespace LantanaGroup.Link.Report.Listeners
                                 throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
                             }
 
+                            if (value == null || value.PatientIds == null)
+                            {
+                                throw new DeadLetterException(
+                                    $"{Name}: consumeResult.Value.PatientIds is null", AuditEventType.Create);
+                            }
+
                             var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
+
+                            if (!scheduledReports?.Any() ?? false)
+                            {
+                                throw new DeadLetterException($"{Name}: No Scheduled Reports found for facilityId: {key}", AuditEventType.Query);
+                            }
+
                             foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
                             {
                                 scheduledReport.PatientsToQuery = value.PatientIds;
