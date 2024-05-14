@@ -101,18 +101,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
                             }
 
-                            if (string.IsNullOrWhiteSpace(key.ReportType))
-                            {
-                                throw new DeadLetterException(
-                                    $"{Name}: ReportType is null or empty.", AuditEventType.Create);
-                            }
-
-                            if (string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
-                            {
-                                throw new DeadLetterException(
-                                    $"{Name}: MeasureReportScheduleId is null or empty.", AuditEventType.Create);
-                            }
-
                             var httpClient = _httpClient.CreateClient();
                             string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl +
                                                       $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
@@ -232,7 +220,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     foreach (var resource in bundle.GetResources())
                                     {
-                                        otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                                        if (otherResourcesBundle.GetResources().Any(r => r.Id == resource.Id))
+                                        {
+                                            otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                                        }
                                     }
                                 }
 
