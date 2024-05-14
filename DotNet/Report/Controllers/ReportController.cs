@@ -30,8 +30,11 @@ namespace LantanaGroup.Link.Report.Controllers
         /// </summary>
         /// <param name="reportId"></param>
         /// <returns></returns>
-        [HttpGet("GetSubmissionBundle")]
-        public async Task<JsonElement> GetSubmissionBundle(string reportId)
+        [HttpGet("Bundle/MeasureReport")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<JsonElement>> GetSubmissionBundle(string reportId)
         {
             try
             {
@@ -44,17 +47,28 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
 
-                return JsonSerializer.SerializeToElement(submission.SubmissionBundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                return Ok(JsonSerializer.SerializeToElement(submission.SubmissionBundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector)));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundle for ReportId {reportId}: {ex.Message}");
-                throw;
+                return Problem(ex.Message, statusCode: 500);
             }
         }
 
-        [HttpGet("GetSubmissionBundleForPatient")]
-        public async Task<JsonElement> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        /// <summary>
+        /// Returns a serialized PatientSubmissionModel containing all of the Patient level resources and Other resources
+        /// for all measure reports for the provided FacilityId, PatientId, and Reporting Period.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="patientId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        [HttpGet("Bundle/Patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<JsonElement>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             try
             {
@@ -69,13 +83,14 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
 
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
+                var serialized = JsonSerializer.SerializeToElement(submission, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
 
-                return JsonSerializer.SerializeToElement(submission, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                return Ok(serialized);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
-                throw;
+                return Problem(ex.Message, statusCode: 500);
             }
         }
     }
