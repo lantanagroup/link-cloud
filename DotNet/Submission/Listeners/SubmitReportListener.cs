@@ -231,9 +231,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 batch.ForEach(p => patientIds.Remove(p));
                             }
 
-                            //Other Resources
+                            #region Other Resources
                             fileName = "other-resources.json";
-                            contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
+                            contents = System.Text.Json.JsonSerializer.Serialize(otherResourcesBundle, options);
 
                             await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                 cancellationToken);
