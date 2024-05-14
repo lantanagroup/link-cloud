@@ -4,11 +4,13 @@ using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.Role;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
+using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -18,15 +20,19 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
     {
         private readonly ILogger<UpdateRole> _logger;
         private readonly IRoleRepository _roleRepository;
+        private readonly IUserRepository _userRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
+        private readonly IDistributedCache _cache;
 
-        public UpdateRole(ILogger<UpdateRole> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateRole(ILogger<UpdateRole> logger, IRoleRepository roleRepository, IUserRepository userRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent, IDistributedCache cache)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
-            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
+            _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));            
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, LinkRoleModel model, CancellationToken cancellationToken = default)
@@ -39,6 +45,12 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             try
             {
                 var role = await _roleRepository.GetRoleAsync(model.Id, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {model.Id} not found");
+
+                if (role is null)
+                {
+                    _logger.LogRoleUpdateException(model.Name, "Role not found", model);
+                    return false;
+                }
 
                 List<PropertyChangeModel> changes = GetRoleDiff(model, role);
 
@@ -96,6 +108,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 };
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
+
+                //clear user cache for any user with the role that has changed
+                if (!string.IsNullOrEmpty(role.Name))
+                {
+                    var users = await _userRepository.GetRoleUsersAsync(role.Name, cancellationToken);
+                    foreach (var user in users)
+                    {
+                        var userKey = $"user:{user.Email}";
+                        await _cache.RemoveAsync(userKey, cancellationToken);
+                    }
+                }
 
                 return true;
                 

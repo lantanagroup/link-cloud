@@ -7,6 +7,7 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Diagnostics;
 using System.Security.Claims;
 
@@ -16,15 +17,19 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
     {
         private readonly ILogger<UpdateRoleClaims> _logger;
         private readonly IRoleRepository _roleRepository;
+        private readonly IUserRepository _userRepository;
         private readonly ILinkRoleModelFactory _roleModelFactory;
         private readonly ICreateAuditEvent _createAuditEvent;
+        private readonly IDistributedCache _cache;
 
-        public UpdateRoleClaims(ILogger<UpdateRoleClaims> logger, IRoleRepository roleRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent)
+        public UpdateRoleClaims(ILogger<UpdateRoleClaims> logger, IRoleRepository roleRepository, IUserRepository userRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent, IDistributedCache cache)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, List<string> claims, CancellationToken cancellationToken = default)
@@ -32,8 +37,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
 
             try
-            { 
-                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken) ?? throw new ApplicationException($"Role with id {roleId} not found");
+            {
+                var role = await _roleRepository.GetRoleAsync(roleId, cancellationToken: cancellationToken);
+
+                if (role is null)
+                {
+                    _logger.LogRoleClaimAssignmentException(roleId, string.Join(",", claims), "Role not found");
+                    return false;
+                }
 
                 if (requestor is not null)
                 {
@@ -91,6 +102,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 };
 
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
+
+                //clear user cache for any user with the role that has changed
+                if (!string.IsNullOrEmpty(role.Name))
+                {
+                    var users = await _userRepository.GetRoleUsersAsync(role.Name, cancellationToken);
+                    foreach (var user in users)
+                    {
+                        var userKey = $"user:{user.Email}";
+                        await _cache.RemoveAsync(userKey, cancellationToken);
+                    }
+                }            
 
                 return true;
             }
