@@ -88,12 +88,22 @@ namespace LantanaGroup.Link.Submission.Listeners
                             var value = consumeResult.Message.Value;
                             facilityId = key.FacilityId;
 
-                            if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                string.IsNullOrWhiteSpace(key.ReportType) ||
-                                string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
+                            if (string.IsNullOrWhiteSpace(key.FacilityId))
                             {
                                 throw new DeadLetterException(
-                                    $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
+                                    $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
+                            }
+
+                            if (string.IsNullOrWhiteSpace(key.ReportType))
+                            {
+                                throw new DeadLetterException(
+                                    $"{Name}: ReportType is null or empty.", AuditEventType.Create);
+                            }
+
+                            if (string.IsNullOrWhiteSpace(value.MeasureReportScheduleId))
+                            {
+                                throw new DeadLetterException(
+                                    $"{Name}: MeasureReportScheduleId is null or empty.", AuditEventType.Create);
                             }
 
                             string requestUrl = _submissionConfig.ReportServiceUrl + $"?reportId={value.MeasureReportScheduleId}";
