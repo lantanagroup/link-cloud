@@ -6,5 +6,6 @@
         public string CensusAdmittedPatientsUrl { get; set; } = null!;
         public string DataAcquisitionQueryPlanUrl { get; set; } = null!;
         public string SubmissionDirectory { get; set; } = null!;
+        public int PatientBundleBatchSize { get; set; } = 1;
     }
 }

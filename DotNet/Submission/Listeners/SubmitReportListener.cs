@@ -1,5 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -9,14 +11,8 @@ using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using System.Collections.Generic;
-using Hl7.Fhir.Model;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
-using System.Text.Json;
-using Hl7.Fhir.Serialization;
-using System.Text.Json;
-using LantanaGroup.Link.Submission.Settings;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -34,8 +30,10 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         private string Name => this.GetType().Name;
 
-        public SubmitReportListener(ILogger<SubmitReportListener> logger, IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
-            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig, IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
+        public SubmitReportListener(ILogger<SubmitReportListener> logger,
+            IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
+            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig,
+            IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler)
         {
@@ -75,7 +73,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.SubmitReport));
-                _logger.LogInformation($"Started consumer for topic '{nameof(KafkaTopic.SubmitReport)}' at {DateTime.UtcNow}");
+                _logger.LogInformation(
+                    $"Started consumer for topic '{nameof(KafkaTopic.SubmitReport)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -101,113 +100,153 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 key.EndDate == null)
                             {
                                 throw new DeadLetterException(
-                                    $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
+                                    $"{Name}: One or more required Key/Value properties are null or empty.",
+                                    AuditEventType.Create);
                             }
 
                             var httpClient = _httpClient.CreateClient();
-                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl + $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
+                            string censusRequesturl = _submissionConfig.CensusAdmittedPatientsUrl +
+                                                      $"?facilityId={key.FacilityId}&startDate={key.StartDate}&endDate={key.EndDate}";
                             var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
-                            var admittedPatients = JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(await censusResponse.Content.ReadAsStringAsync(cancellationToken));
+                            var admittedPatients =
+                                JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(
+                                    await censusResponse.Content.ReadAsStringAsync(cancellationToken));
 
-                            string dataAcqRequestUrl = _submissionConfig.DataAcquisitionQueryPlanUrl + $"/{key.FacilityId}/QueryPlans";
-                            var dataAcqResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
-                            var queryPlans = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+                            string dataAcqRequestUrl = _submissionConfig.DataAcquisitionQueryPlanUrl +
+                                                       $"/{key.FacilityId}/QueryPlans";
+                            var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
+                            var queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 
-                            Dictionary<string, Bundle> patientBundles = new Dictionary<string, Bundle>();
                             Bundle otherResourcesBundle = new Bundle();
-                            var options = new JsonSerializerOptions().ForFhir();
-
-                            foreach (var patientId in value.PatientIds.Distinct())
-                            {
-                                string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
-                                                    $"/GetSubmissionBundleForPatient?FacilityId={facilityId}&PatientId={patientId}&StartDate={key.StartDate}&EndDate={key.EndDate}";
-                                var response = await httpClient.GetAsync(requestUrl, cancellationToken);
-
-                                var patientSubmissionBundle =
-                                    JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
-                                        await response.Content.ReadAsStringAsync(cancellationToken));
-
-                                var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
-
-                                patientBundles.TryAdd(patientId, patientBundle);
-
-                                var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
-                                foreach (var resource in otherResources.GetResources())
-                                {
-                                    otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
-                                }
-                            }
-
-                            #region File IO
 
                             //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                             //Per 2153, don't build with the trailing timestamp
-                            string submissionDiretory = Path.Combine(_submissionConfig.SubmissionDirectory,
+                            string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
                                 $"{facilityId}-{value.MeasureIds}-{key.StartDate.Value.ToShortDateString()}-{key.EndDate.Value.ToShortDateString()}");
-                            if (Directory.Exists(submissionDiretory))
+                            if (Directory.Exists(submissionDirectory))
                             {
-                                Directory.Delete(submissionDiretory, true);
+                                Directory.Delete(submissionDirectory, true);
                             }
 
-                            Directory.CreateDirectory(submissionDiretory);
+                            Directory.CreateDirectory(submissionDirectory);
 
-                            //Device
+                            var options = new JsonSerializerOptions().ForFhir();
+
+                            #region Device
                             string fileName = "sending-device.json";
                             string contents = "{ \"Device\": \"NHSNLink\" }";
 
-                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                cancellationToken);
+                            #endregion
 
-                            //Organization
+                            #region Organization
                             fileName = "sending-organization.json";
                             contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
 
-                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                cancellationToken);
+                            #endregion
 
-                            //Patient-List
+                            #region Patient List
                             fileName = "patient-list.json";
-                            contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients.Select(p => p.PatientId), options);
+                            contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients.Select(p => p.PatientId));
 
-                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                cancellationToken);
 
-                            //Query Plans
+                            admittedPatients.Clear();
+                            #endregion
+
+
+                            #region Query Plans
                             fileName = "query-plan.yml";
                             contents = queryPlans;
 
-                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                cancellationToken);
+                            #endregion
 
-                            //Aggregates
+                            #region Aggregates
                             foreach (var aggregate in value.Aggregates)
                             {
                                 fileName = $"aggregate-{aggregate.Measure}.json";
                                 contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
 
-                                await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                    cancellationToken);
                             }
 
-                            //Patient Bundles
-                            foreach (var bundle in patientBundles)
-                            {
-                                fileName = $"patient-{bundle.Key}.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(bundle.Value, options);
+                            value.Aggregates.Clear();
+                            #endregion
 
-                                await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
+                            #region Patient and Other Resources Bundles
+                            var patientIds = value.PatientIds.Distinct().ToList();
+                            value.PatientIds.Clear();
+
+                            var batchSize = _submissionConfig.PatientBundleBatchSize;
+
+                            while (patientIds.Any())
+                            {
+                                var otherResourcesBag = new SynchronizedCollection<Bundle>();
+
+                                List<string> batch;
+                                if (patientIds.Count > batchSize)
+                                {
+                                    batch = patientIds.Take(_submissionConfig.PatientBundleBatchSize).ToList();
+                                }
+                                else
+                                {
+                                    batch = patientIds;
+                                }
+
+                                var tasks = new List<Task>();
+
+                                foreach (var pid in batch)
+                                {
+                                    tasks.Add(Task.Run(async () =>
+                                    {
+                                        var otherResources = await CreatePatientBundleFiles(submissionDirectory,
+                                            pid,
+                                            facilityId,
+                                            key.StartDate.Value, key.EndDate.Value, cancellationToken);
+
+                                        otherResourcesBag.Add(otherResources);
+                                    }));
+                                }
+                                
+                                //Wait for our batch to be completed
+                                await Task.WhenAll(tasks);
+
+                                //move the OtherResources into the aggregate bundle
+                                foreach(var bundle in otherResourcesBag) 
+                                {
+                                    foreach (var resource in bundle.GetResources())
+                                    {
+                                        otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                                    }
+                                }
+
+                                //Remove these PatientIds from the list since they have been processed, before looping again
+                                batch.ForEach(p => patientIds.Remove(p));
                             }
 
                             //Other Resources
-                            fileName = $"other-resources.json";
-                            contents = System.Text.Json.JsonSerializer.Serialize(otherResourcesBundle, options);
+                            fileName = "other-resources.json";
+                            contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
 
-                            await File.WriteAllTextAsync(submissionDiretory + "/" + fileName, contents, cancellationToken);
-                            
+                            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                cancellationToken);
                             #endregion
 
                         }, cancellationToken);
-                        
+
                     }
                     catch (ConsumeException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException),
+                            facilityId);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -220,7 +259,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                     catch (Exception ex)
                     {
                         _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
+                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException),
+                            facilityId);
                     }
                     finally
                     {
@@ -251,6 +291,42 @@ namespace LantanaGroup.Link.Submission.Listeners
         protected string GetFullUrl(Resource resource)
         {
             return string.Format(SubmissionConstants.BundlingFullUrlFormat, GetRelativeReference(resource));
+        }
+        /// <summary>
+        /// Creates the Patient Bundle in the submission directory, and returns the 'OtherResources' bundle
+        /// that will be aggregated and written as one file to the SubmissionDirectory.
+        /// </summary>
+        /// <param name="submissionDirectory"></param>
+        /// <param name="patientId"></param>
+        /// <param name="facilityId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate,
+            DateTime endDate, CancellationToken cancellationToken)
+        {
+            var options = new JsonSerializerOptions().ForFhir();
+            var httpClient = _httpClient.CreateClient();
+
+            string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
+                                $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate}&EndDate={endDate}";
+            var response = await httpClient.GetAsync(requestUrl, cancellationToken);
+
+            var patientSubmissionBundle =
+                JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
+                    await response.Content.ReadAsStringAsync(cancellationToken));
+
+            var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
+
+            var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
+
+            string fileName = $"patient-{patientId}.json";
+            string contents = System.Text.Json.JsonSerializer.Serialize(patientBundle, options);
+
+            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+
+            return otherResources;
         }
     }
 }
