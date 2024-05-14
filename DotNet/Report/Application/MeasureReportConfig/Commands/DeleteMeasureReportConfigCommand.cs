@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands
             _repository = repository;
         }
 
-        public async Task<bool> Handle(DeleteMeasureReportConfigCommand request, CancellationToken cancellationToken)
+        public async Task Handle(DeleteMeasureReportConfigCommand request, CancellationToken cancellationToken)
         {
             await _repository.DeleteAsync(request.Id, cancellationToken);
         }
