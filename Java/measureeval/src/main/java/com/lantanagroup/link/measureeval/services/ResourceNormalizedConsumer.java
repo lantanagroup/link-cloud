@@ -305,11 +305,7 @@ public class ResourceNormalizedConsumer {
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport) {
         logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
-        measureReportNormalizer.normalize(measureReport);
-        List<Resource> resources = measureReport.getContained();
-        measureReport.setContained(null);
-        produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), measureReport);
-        for (Resource resource : resources) {
+        for (Resource resource : measureReportNormalizer.normalize(measureReport)) {
             produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
         }
     }
