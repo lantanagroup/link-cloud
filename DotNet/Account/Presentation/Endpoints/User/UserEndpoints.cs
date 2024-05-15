@@ -99,8 +99,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
 
             userEndpoints.MapGet("/users/facility/{id}", SearchForFacilityUsers.Handle)
                .RequireAuthorization([
-                   nameof(LinkPermissions.CanViewAccounts), 
-                   LinkAuthorizationConstants.LinkUserClaims.FacilityAccess
+                   nameof(LinkPermissions.CanViewAccounts)
                 ])
                .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
