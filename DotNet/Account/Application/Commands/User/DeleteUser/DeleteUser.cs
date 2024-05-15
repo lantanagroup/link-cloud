@@ -70,8 +70,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
-                {
-                    FacilityId = user.Facilities?.Count > 0 ? user.Facilities.FirstOrDefault() : string.Empty,
+                {                    
                     Action = AuditEventType.Delete,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,

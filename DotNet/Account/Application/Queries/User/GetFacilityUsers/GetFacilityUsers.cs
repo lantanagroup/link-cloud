@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Factories.User;
 using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Application.Models.User;
+using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -33,7 +34,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                     throw new ArgumentException("A facility id is required");
                 }
 
-                var users = await _userRepository.GetFacilityUsersAsync(facilityId, cancellationToken);
+                List<LinkUser>? users = null; //await _userRepository.GetFacilityUsersAsync(facilityId, cancellationToken);
 
                 if (users is null)
                 {

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Account.Migrations
 {
     [DbContext(typeof(AccountDbContext))]
-    [Migration("20240508095509_initial")]
+    [Migration("20240515145826_initial")]
     partial class initial
     {
         /// <inheritdoc />
@@ -94,9 +94,6 @@ namespace LantanaGroup.Link.Account.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("Facilities")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()

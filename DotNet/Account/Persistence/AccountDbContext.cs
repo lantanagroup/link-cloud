@@ -1,5 +1,9 @@
 ﻿using LantanaGroup.Link.Account.Domain.Entities;
+using LantanaGroup.Link.Account.Persistence.Extensions;
+using Link.Authorization.Infrastructure;
+using Link.Authorization.Permissions;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Emit;
 
 namespace LantanaGroup.Link.Account.Persistence
 {
@@ -16,7 +20,7 @@ namespace LantanaGroup.Link.Account.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {           
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AccountDbContext).Assembly);
-            base.OnModelCreating(modelBuilder);
+            base.OnModelCreating(modelBuilder);                       
         }
     }
 }

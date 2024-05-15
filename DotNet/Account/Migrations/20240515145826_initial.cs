@@ -38,7 +38,6 @@ namespace LantanaGroup.Link.Account.Migrations
                     FirstName = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
                     MiddleName = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
                     LastName = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
-                    Facilities = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     LastSeen = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),

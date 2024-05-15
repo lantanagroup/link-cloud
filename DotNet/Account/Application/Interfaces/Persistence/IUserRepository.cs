@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Account.Application.Interfaces.Persistence
         Task<bool> RemoveClaimsFromUserAsync(string userId, IEnumerable<Claim> claims, CancellationToken cancellationToken = default);
         Task<LinkUser> GetUserAsync(string id, bool noTracking = true, CancellationToken cancellationToken = default);
         Task<LinkUser> GetUserByEmailAsync(string email, bool noTracking = true, CancellationToken cancellationToken = default);
-        Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default);
+        //Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default);
         Task<IEnumerable<LinkUser>> GetRoleUsersAsync(string role, CancellationToken cancellationToken = default);
         Task<IEnumerable<LinkRole>> GetUserRoles(string userId, CancellationToken cancellationToken = default);
     }

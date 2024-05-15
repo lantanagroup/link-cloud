@@ -98,17 +98,17 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                    Description = "Searches for users with provided filters"
                });
 
-            userEndpoints.MapGet("/users/facility/{id}", SearchForFacilityUsers.Handle)
-               //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
-               .Produces<GroupedUserModel>(StatusCodes.Status200OK)
-               .Produces(StatusCodes.Status401Unauthorized)
-               .Produces(StatusCodes.Status403Forbidden)
-               .ProducesProblem(StatusCodes.Status500InternalServerError)
-               .WithOpenApi(x => new OpenApiOperation(x)
-               {
-                   Summary = "Search for users associated with a facility",
-                   Description = "Searches for facility users with provided filters"
-               });
+            //userEndpoints.MapGet("/users/facility/{id}", SearchForFacilityUsers.Handle)
+            //   //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
+            //   .Produces<GroupedUserModel>(StatusCodes.Status200OK)
+            //   .Produces(StatusCodes.Status401Unauthorized)
+            //   .Produces(StatusCodes.Status403Forbidden)
+            //   .ProducesProblem(StatusCodes.Status500InternalServerError)
+            //   .WithOpenApi(x => new OpenApiOperation(x)
+            //   {
+            //       Summary = "Search for users associated with a facility",
+            //       Description = "Searches for facility users with provided filters"
+            //   });
 
             #endregion
 

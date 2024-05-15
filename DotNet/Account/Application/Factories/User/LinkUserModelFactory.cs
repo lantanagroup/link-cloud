@@ -15,8 +15,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                MiddleName = user.MiddleName,
-                Facilities = user.Facilities ?? [],
+                MiddleName = user.MiddleName,                
                 Roles = user.UserRoles.Select(r => r.Role.Name ?? string.Empty).ToList() ?? [],
                 UserClaims = user.Claims.Select(c => c.ClaimValue ?? string.Empty).ToList() ?? [],
                 RoleClaims = user.UserRoles.SelectMany(r => r.Role.RoleClaims).Select(c => c.ClaimValue ?? string.Empty).Distinct().ToList() ?? []
@@ -25,7 +24,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
             return model;
         }
 
-        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? facilities, List<string>? roles, List<string>? userClaims, List<string>? roleClaims)
+        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? roles, List<string>? userClaims, List<string>? roleClaims)
         {
             LinkUserModel model = new()
             {
@@ -34,8 +33,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 Email = email ?? string.Empty,
                 FirstName = firstName ?? string.Empty,
                 LastName = lastName ?? string.Empty,
-                MiddleName = middleName ?? string.Empty,
-                Facilities = facilities ?? [],
+                MiddleName = middleName ?? string.Empty,                
                 Roles = roles ?? [],
                 UserClaims = userClaims ?? [],
                 RoleClaims = roleClaims ?? []

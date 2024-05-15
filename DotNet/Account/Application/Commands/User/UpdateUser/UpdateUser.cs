@@ -39,10 +39,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         {
             //generate tags for telemetry
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, model.Id)];            
-            foreach (var facility in model.Facilities)
-            {
-                var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility);
-            }
+            //foreach (var facility in model.Facilities)
+            //{
+            //    var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility);
+            //}
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("UdpateUser:Execute", tagList);
 
             try
@@ -167,7 +167,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 //generate audit event
                 var auditMessage = new AuditEventMessage
                 {
-                    FacilityId = model.Facilities.Count > 0 ? model.Facilities.FirstOrDefault() : string.Empty,
                     Action = AuditEventType.Update,
                     EventDate = DateTime.UtcNow,
                     UserId = user.LastModifiedBy,
