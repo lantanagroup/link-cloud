@@ -19,13 +19,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
         public void RegisterEndpoints(WebApplication app)
         {
             var roleEndpoints = app.MapGroup("/api/account/")
+                .RequireAuthorization([nameof(LinkSystemPermissions.IsLinkAdmin)])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Claim" } }
                 });
 
             roleEndpoints.MapGet("/claims", GetClaims.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkClaimsModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)

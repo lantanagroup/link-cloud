@@ -2,9 +2,9 @@
 {
     public static class LinkPermissionsProvider
     {
-        public static List<LinkPermissions> GetLinkPermissions()
+        public static List<LinkSystemPermissions> GetLinkPermissions()
         {
-            return Enum.GetValues(typeof(LinkPermissions)).OfType<LinkPermissions>().ToList();
+            return Enum.GetValues(typeof(LinkSystemPermissions)).OfType<LinkSystemPermissions>().ToList();
         }
     }
 }

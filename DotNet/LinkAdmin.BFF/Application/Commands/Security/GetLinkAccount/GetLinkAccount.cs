@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
-                new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkPermissions.CanViewAccounts))
+                new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.IsLinkAdmin))
             };            
 
             var systemPrinciple = new ClaimsPrincipal(new ClaimsIdentity(claims));

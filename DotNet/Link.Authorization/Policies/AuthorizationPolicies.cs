@@ -12,7 +12,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.IsLinkAdmin)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.IsLinkAdmin)])
                 .Build();
         }
 
@@ -35,7 +35,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewAccounts)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Build();
         }
 
@@ -43,7 +43,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAccounts)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Build();
         }
 
@@ -51,7 +51,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewLogs)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewLogs)])
                 .Build();
         }
 
@@ -59,7 +59,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewNotifications)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewNotifications)])
                 .Build();
         }
 
@@ -67,7 +67,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewTenantConfigurations)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewTenantConfigurations)])
                 .Build();
         }
 
@@ -75,7 +75,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
 
@@ -83,7 +83,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanAdministerAllTenants)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanAdministerAllTenants)])
                 .Build();
         }
 
@@ -91,7 +91,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewResources)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewResources)])
                 .Build();
         }
 
@@ -99,7 +99,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewReports)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewReports)])
                 .Build();
         }
 
@@ -107,7 +107,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanGenerateReports)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanGenerateReports)])
                 .Build();
         }     
         
@@ -115,7 +115,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanGenerateEvents)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanGenerateEvents)])
                 .Build();
         }
 
@@ -126,7 +126,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanViewLogs)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanViewLogs)])
                 .Build();
         }
 
@@ -134,7 +134,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
 
@@ -142,7 +142,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
 
@@ -150,7 +150,7 @@ namespace Link.Authorization.Policies
         {
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.CanEditTenantConfigurations)])
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanEditTenantConfigurations)])
                 .Build();
         }
         

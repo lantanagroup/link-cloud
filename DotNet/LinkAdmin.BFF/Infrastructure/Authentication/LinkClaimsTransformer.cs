@@ -91,6 +91,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Subject, account.Id));
             }
 
+            //add user roles
+            foreach (var role in account.Roles)
+            {
+                identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Role, role));
+            }
+
             //add user specified claims
             foreach (var claim in account.UserClaims)
             {
