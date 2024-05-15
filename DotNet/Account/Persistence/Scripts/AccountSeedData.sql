@@ -15,3 +15,4 @@ INSERT INTO RoleClaims(RoleId, ClaimType, ClaimValue) VALUES(@LinkUserRoleId, @L
 -- Add Seed Users
 --SET @UserId = NewID()
 --INSERT INTO Users(Id, Email, FirstName, LastName, CreatedOn, IsActive, IsDeleted) VALUES(@UserId, '<insertemail>', '<insertfirstname>', '<insertlastname>', GETDATE(), 1, 0)
+--INSERT INTO UserRoles(UserId, RoleId) VALUES(@UserId, @LinkUserRoleId)
