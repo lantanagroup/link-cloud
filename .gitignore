@@ -409,3 +409,20 @@ FodyWeavers.xsd
 **/target/
 DotNet/Audit/secrets.json
 /DotNet/Submission/appsettings.Development.json
+
+## Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.backup.*
+override.tf
+override.tf.json
+.terraformrc
+terraform.rc
+**/.terraform/plugins/*
+crash.log
+.terraform.lock.hcl
+*.tfvars*
+*.auto.tfvars
+*.auto.tfvars*
+*.tfplan

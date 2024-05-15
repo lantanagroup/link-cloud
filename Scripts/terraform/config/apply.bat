@@ -1,0 +1,1 @@
+terraform apply -var-file="%LINK_TF_ROOT%\config\dev.tfvars.json" -state="%LINK_TF_ROOT%\config\terraform.tfstate"
