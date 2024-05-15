@@ -34,7 +34,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                    .AddPolicy("CanViewResources", pb => { pb.RequireAssertion(context => true); })
                    .AddPolicy("CanViewReports", pb => { pb.RequireAssertion(context => true); })
                    .AddPolicy("CanGenerateReports", pb => { pb.RequireAssertion(context => true); })
-                   .AddPolicy("CanGenerateEvents", pb => { pb.RequireAssertion(context => true); });
+                   .AddPolicy("CanGenerateEvents", pb => { pb.RequireAssertion(context => true); })
+                   .AddPolicy("IsLinkAdmin", pb => { pb.RequireAssertion(context => true); });                    
 
                 return services;
             }
@@ -120,7 +121,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                 .AddPolicy("CanViewResources", AuthorizationPolicies.CanViewResources())
                 .AddPolicy("CanViewReports", AuthorizationPolicies.CanViewReports())
                 .AddPolicy("CanGenerateReports", AuthorizationPolicies.CanGenerateReports())
-                .AddPolicy("CanGenerateEvents", AuthorizationPolicies.CanGenerateEvents());
+                .AddPolicy("CanGenerateEvents", AuthorizationPolicies.CanGenerateEvents())
+                .AddPolicy("IsLinkAdmin", AuthorizationPolicies.IsLinkAdmin());
 
             return services;
 

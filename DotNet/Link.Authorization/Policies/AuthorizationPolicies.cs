@@ -8,6 +8,14 @@ namespace Link.Authorization.Policies
 {
     public static class AuthorizationPolicies
     {
+        public static AuthorizationPolicy IsLinkAdmin()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkPermissions.IsLinkAdmin)])
+                .Build();
+        }
+
         public static AuthorizationPolicy PermissiveAccess()
         {
             return new AuthorizationPolicyBuilder()                

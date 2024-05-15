@@ -12,6 +12,7 @@
         CanGenerateReports,
         CanGenerateEvents,
         CanViewAccounts,
-        CanAdministerAccounts
+        CanAdministerAccounts,
+        IsLinkAdmin,       
     }
 }
