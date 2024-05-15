@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
+import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
@@ -9,7 +10,6 @@ import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
-import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,56 +19,52 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/measure-definition")
 public class MeasureDefinitionController {
-    private final MongoOperations mongoOperations;
+    private final MeasureDefinitionRepository repository;
     private final MeasureDefinitionBundleValidator bundleValidator;
-    private final MeasureEvaluatorCache measureEvaluatorCache;
+    private final MeasureEvaluatorCache evaluatorCache;
 
     public MeasureDefinitionController(
-            MongoOperations mongoOperations,
+            MeasureDefinitionRepository repository,
             MeasureDefinitionBundleValidator bundleValidator,
-            MeasureEvaluatorCache measureEvaluatorCache) {
-        this.mongoOperations = mongoOperations;
+            MeasureEvaluatorCache evaluatorCache) {
+        this.repository = repository;
         this.bundleValidator = bundleValidator;
-        this.measureEvaluatorCache = measureEvaluatorCache;
+        this.evaluatorCache = evaluatorCache;
     }
 
     @GetMapping
     @JsonView(Views.Summary.class)
     public List<MeasureDefinition> getAll() {
-        return mongoOperations.findAll(MeasureDefinition.class);
+        return repository.findAll();
     }
 
     @GetMapping("/{id}")
     public MeasureDefinition getOne(@PathVariable String id) {
-        MeasureDefinition entity = mongoOperations.findById(id, MeasureDefinition.class);
-        if (entity == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        return entity;
+        return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     @PutMapping("/{id}")
     public MeasureDefinition put(@PathVariable String id, @RequestBody Bundle bundle) {
         bundleValidator.validate(bundle);
-        MeasureDefinition entity = mongoOperations.findById(id, MeasureDefinition.class);
-        if (entity == null) {
-            entity = new MeasureDefinition();
-            entity.setId(id);
-        }
+        MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
+            MeasureDefinition _entity = new MeasureDefinition();
+            _entity.setId(id);
+            return _entity;
+        });
         entity.setBundle(bundle);
-        mongoOperations.save(entity);
-        measureEvaluatorCache.remove(id);
+        repository.save(entity);
+        evaluatorCache.remove(id);
         return entity;
     }
 
     @PostMapping("/{id}/$evaluate")
     public MeasureReport evaluate(@PathVariable String id, @RequestBody Parameters parameters) {
-        MeasureEvaluator measureEvaluator = measureEvaluatorCache.get(id);
-        if (measureEvaluator == null) {
+        MeasureEvaluator evaluator = evaluatorCache.get(id);
+        if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         try {
-            return measureEvaluator.evaluate(parameters);
+            return evaluator.evaluate(parameters);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
