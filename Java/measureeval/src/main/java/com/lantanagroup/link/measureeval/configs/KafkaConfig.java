@@ -7,7 +7,6 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceAcquired;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.records.ResourceNormalized;
-import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
@@ -23,12 +22,14 @@ import org.springframework.kafka.support.serializer.*;
 
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Configuration
 public class KafkaConfig {
-    // TODO: Replace this and StreamUtils.mapKeys with getDeserializers
-    private static Pattern getPattern(String topic) {
-        return Pattern.compile(Pattern.quote(topic));
+    private static <T> Map<Pattern, T> byPattern(Map<String, T> map) {
+        return map.entrySet().stream().collect(Collectors.toMap(
+                entry -> Pattern.compile(Pattern.quote(entry.getKey())),
+                Map.Entry::getValue));
     }
 
     @Bean
@@ -41,9 +42,8 @@ public class KafkaConfig {
         Map<String, Deserializer<?>> deserializers = Map.of(
                 Topics.error(Topics.RESOURCE_ACQUIRED), new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED, new StringDeserializer());
-        return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(
-                StreamUtils.mapKeys(deserializers, KafkaConfig::getPattern),
-                new VoidDeserializer()));
+        return new ErrorHandlingDeserializer<>(
+                new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
 
     @Bean
@@ -51,9 +51,8 @@ public class KafkaConfig {
         Map<String, Deserializer<?>> deserializers = Map.of(
                 Topics.error(Topics.RESOURCE_ACQUIRED), new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
                 Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper));
-        return new ErrorHandlingDeserializer<>(new DelegatingByTopicDeserializer(
-                StreamUtils.mapKeys(deserializers, KafkaConfig::getPattern),
-                new VoidDeserializer()));
+        return new ErrorHandlingDeserializer<>(
+                new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }
 
     @Bean
@@ -73,9 +72,7 @@ public class KafkaConfig {
                 Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
                         objectMapper.constructType(ResourceEvaluated.Key.class),
                         objectMapper));
-        return new DelegatingByTopicSerializer(
-                StreamUtils.mapKeys(serializers, KafkaConfig::getPattern),
-                new VoidSerializer());
+        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
     }
 
     @Bean
@@ -87,9 +84,7 @@ public class KafkaConfig {
                 Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
                         objectMapper.constructType(ResourceEvaluated.class),
                         objectMapper));
-        return new DelegatingByTopicSerializer(
-                StreamUtils.mapKeys(serializers, KafkaConfig::getPattern),
-                new VoidSerializer());
+        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
     }
 
     @Bean

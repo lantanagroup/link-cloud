@@ -2,7 +2,7 @@ package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
-import org.springframework.data.mongodb.core.MongoOperations;
+import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -11,17 +11,17 @@ import java.util.Map;
 @Service
 public class MeasureEvaluatorCache {
     private final FhirContext fhirContext;
-    private final MongoOperations mongoOperations;
+    private final MeasureDefinitionRepository definitionRepository;
     private final Map<String, MeasureEvaluator> instancesById = new HashMap<>();
 
-    public MeasureEvaluatorCache(FhirContext fhirContext, MongoOperations mongoOperations) {
+    public MeasureEvaluatorCache(FhirContext fhirContext, MeasureDefinitionRepository definitionRepository) {
         this.fhirContext = fhirContext;
-        this.mongoOperations = mongoOperations;
+        this.definitionRepository = definitionRepository;
     }
 
     public MeasureEvaluator get(String id) {
         return instancesById.computeIfAbsent(id, _id -> {
-            MeasureDefinition measureDefinition = mongoOperations.findById(_id, MeasureDefinition.class);
+            MeasureDefinition measureDefinition = definitionRepository.findById(_id).orElse(null);
             if (measureDefinition == null) {
                 return null;
             }
