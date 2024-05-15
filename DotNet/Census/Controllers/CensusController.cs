@@ -1,10 +1,14 @@
-﻿using LantanaGroup.Link.Census.Application.Commands;
+﻿using System.Text.Json;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Controllers;
 
@@ -53,7 +57,7 @@ public class CensusController : Controller
     /// <param name="endDate"></param>
     /// <returns></returns>
     [HttpGet("history/admitted")]
-    public async Task<ActionResult<List<CensusPatientListEntity>>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    public async Task<ActionResult<JsonElement>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
     {
         try
         {
@@ -63,7 +67,20 @@ public class CensusController : Controller
                 StartDate = startDate,
                 EndDate = endDate
             });
-            return Ok(patients);
+
+
+            //TODO construct FhirList as return
+            var patientList = new Hl7.Fhir.Model.List();
+
+            foreach (var patient in patients)
+            {
+                var fhirPatient = new Patient();
+                fhirPatient.Id = patient.PatientId;
+            }
+
+            var options = new JsonSerializerOptions().ForFhir();
+
+            return Ok(JsonSerializer.SerializeToElement(patientList, options));
         }
         catch (Exception ex)
         {

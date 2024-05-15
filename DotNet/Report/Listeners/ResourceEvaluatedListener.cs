@@ -196,6 +196,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                         }, cancellationToken);
                                     }
 
+                                    //TODO Make sure this captures all the measure reports we want
+                                    //var schedules = await _mediator.Send(GetMeasure)
+                                    //Generate new command that gets all scheduledIds for the report period/facility
+                                    //iterate over and build list below
+
                                     var submissionEntries =
                                         (await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery()
                                         { MeasureReportScheduleId = schedule.Id })).ToList();

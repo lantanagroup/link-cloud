@@ -176,12 +176,17 @@ namespace LantanaGroup.Link.Report.Jobs
                                 Value = new SubmissionReportValue()
                                 {
                                     PatientIds = patientIds,
+                                    MeasureIds = string.Join("+",
+                                        measureReports.Select(mr => mr.Measure).Distinct()),
                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
                                     Aggregates = _aggregator.Aggregate(measureReports)
                                 },
                                 Headers = new Headers
                                 {
-                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                    {
+                                        "X-Correlation-Id",
+                                        Encoding.UTF8.GetBytes(Guid.NewGuid().ToString())
+                                    }
                                 }
                             });
 

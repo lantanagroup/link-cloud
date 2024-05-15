@@ -103,6 +103,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
                                 }
 
+                                //TODO Use ServiceRegistry
                                 var httpClient = _httpClient.CreateClient();
                                 string censusRequesturl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
@@ -133,8 +134,10 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 #region Device
 
+                                //TODO configurable device information
+                                //Name, Version (assembly info?), Link Admin
                                 string fileName = "sending-device.json";
-                                string contents = "{ \"Device\": \"NHSNLink\" }";
+                                string contents = "NHSNLink";
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
@@ -152,10 +155,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #endregion
 
                                 #region Patient List
-
                                 fileName = "patient-list.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(
-                                    admittedPatients.Select(p => p.PatientId));
+                                contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients, options);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
@@ -163,7 +164,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 admittedPatients.Clear();
 
                                 #endregion
-
 
                                 #region Query Plans
 
@@ -189,6 +189,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 value.Aggregates.Clear();
 
                                 #endregion
+
+                                //TODO Do Validation file building
 
                                 #region Patient and Other Resources Bundles
 
@@ -311,6 +313,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         {
             return string.Format(SubmissionConstants.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
+
         /// <summary>
         /// Creates the Patient Bundle in the submission directory, and returns the 'OtherResources' bundle
         /// that will be aggregated and written as one file to the SubmissionDirectory.
@@ -328,6 +331,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             var options = new JsonSerializerOptions().ForFhir();
             var httpClient = _httpClient.CreateClient();
 
+            //TODO use ServiceRegistry
             string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
                                 $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate}&EndDate={endDate}";
             var response = await httpClient.GetAsync(requestUrl, cancellationToken);
