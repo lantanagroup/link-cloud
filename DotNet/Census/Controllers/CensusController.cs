@@ -3,6 +3,7 @@ using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -39,9 +40,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Census History"), ex, "An exception occurred while attempting to get census history with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 
@@ -67,9 +68,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error encountered:\n{1}\n{2}", ex.Message, ex.InnerException);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Admitted Patients"), ex, "An exception occurred while attempting to get admitted patients with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }   
 
@@ -91,9 +92,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Current Census"), ex, "An exception occurred while attempting to get current census with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 
@@ -115,9 +116,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get All Patients For Facility"), ex, "An exception occurred while attempting to get All Patients For Facility with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 

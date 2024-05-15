@@ -32,6 +32,7 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Diagnostics;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -164,6 +165,26 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
+    builder.Services.AddProblemDetails(options => {
+        options.CustomizeProblemDetails = ctx =>
+        {
+            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+            {
+                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+            }
+            if (builder.Environment.IsDevelopment())
+            {
+                ctx.ProblemDetails.Extensions.Add("service", "Census");
+            }
+            else
+            {
+                ctx.ProblemDetails.Extensions.Remove("exception");
+            }
+        };
+    });
+
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
@@ -207,6 +228,15 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.AutoMigrateEF<CensusContext>();
+
+    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("Local", StringComparison.InvariantCultureIgnoreCase))
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
