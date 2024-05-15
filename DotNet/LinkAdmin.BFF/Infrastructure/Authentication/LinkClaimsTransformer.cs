@@ -112,10 +112,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             // Add facility ids associated with the user
             
-            foreach (var facility in account.Facilities)
-            {
-                identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Facility, facility));
-            }
+            //foreach (var facility in account.Facilities)
+            //{
+            //    identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Facility, facility));
+            //}
 
             return principal;
             

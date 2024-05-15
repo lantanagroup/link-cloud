@@ -44,7 +44,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     LastName = model.LastName,
                     UserName = model.Username,
                     Email = model.Email,
-                    Facilities = model.Facilities
                 };
 
                 //add created by if requestor is provided
@@ -112,7 +111,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 //generate audit event
                 var auditMessage = new AuditEventMessage
                 {                    
-                    FacilityId = model.Facilities.Count > 0 ? model.Facilities.FirstOrDefault() : string.Empty,
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     UserId = user.CreatedBy,

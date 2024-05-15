@@ -13,8 +13,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         public string Email { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
         public string? MiddleName { get; set; }
-        public string LastName { get; set; } = string.Empty;
-        public List<string>? Facilities { get; set; }       
+        public string LastName { get; set; } = string.Empty;     
         public DateTime? LastSeen { get; set; }
         public DateTime CreatedOn { get; set; }
         public string? CreatedBy { get; set; }

@@ -225,13 +225,13 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return removedClaims > 0;
         }
 
-        public async Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default)
-        {
-            var users = await _dbContext.Users.AsNoTracking()
-                .Where(x => x.Facilities != null && x.Facilities.Contains(facilityId)).ToListAsync(cancellationToken);
+        //public async Task<IEnumerable<LinkUser>> GetFacilityUsersAsync(string facilityId, CancellationToken cancellationToken = default)
+        //{
+        //    var users = await _dbContext.Users.AsNoTracking()
+        //        .Where(x => x.Facilities != null && x.Facilities.Contains(facilityId)).ToListAsync(cancellationToken);
 
-            return users;
-        }
+        //    return users;
+        //}
 
         public async Task<IEnumerable<LinkUser>> GetRoleUsersAsync(string role, CancellationToken cancellationToken = default)
         {

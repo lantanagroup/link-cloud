@@ -2,9 +2,9 @@
 {
     public class LinkUserModel
     {
-        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], [], []) { }
+        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
 
-        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims, List<string> facilities)
+        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims)
         {
             Id = id;
             Username = username;
@@ -15,7 +15,6 @@
             Roles = roles;
             UserClaims = userClaims;
             RoleClaims = roleClaims;
-            Facilities = facilities;
         }
 
         /// <summary>
@@ -72,10 +71,5 @@
         /// <example>["CanViewLogs"]</example>
         public List<string> RoleClaims { get; set; }
 
-        /// <summary>
-        /// The facilities the user has access to
-        /// </summary>
-        /// <example>["TestFacility01"]</example>
-        public List<string> Facilities { get; set; }
     }
 }

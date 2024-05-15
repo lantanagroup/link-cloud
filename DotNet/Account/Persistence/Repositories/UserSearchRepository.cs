@@ -35,10 +35,10 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             }
 
             //filter by facility
-            if (filterFacilityBy is not null && filterFacilityBy.Length > 0)
-            {
-                query = query.Where(x => x.Facilities != null && x.Facilities.Contains(filterFacilityBy));
-            }
+            //if (filterFacilityBy is not null && filterFacilityBy.Length > 0)
+            //{
+            //    query = query.Where(x => x.Facilities != null && x.Facilities.Contains(filterFacilityBy));
+            //}
 
             //filter by role
             if (filterRoleBy is not null && filterRoleBy.Length > 0)
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             var query = _dbContext.Users.AsNoTracking().AsQueryable();
 
             //filter by facility
-            query = query.Where(x => x.Facilities != null && x.Facilities.Contains(facilityId));
+            //query = query.Where(x => x.Facilities != null && x.Facilities.Contains(facilityId));
             query = query.Where(x => x.IsActive);
             query = query.Where(x => !x.IsDeleted);
 
