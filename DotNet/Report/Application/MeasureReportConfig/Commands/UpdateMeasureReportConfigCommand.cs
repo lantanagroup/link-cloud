@@ -24,17 +24,18 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands
         public async Task<MeasureReportConfigModel> Handle(UpdateMeasureReportConfigCommand request, CancellationToken cancellationToken)
         {
             var config = await _repository.GetAsync(request.MeasureReportConfig.Id, cancellationToken);
-            if (config== null)
+            if (config == null)
             {
-                throw new Exception($"No config found for {request.MeasureReportConfig.Id}");
+                return null;
             }
 
             config.FacilityId = request.MeasureReportConfig.FacilityId;
             config.ReportType = request.MeasureReportConfig.ReportType;
             config.BundlingType = request.MeasureReportConfig.BundlingType;
             config.ModifyDate = DateTime.UtcNow;
-            await _repository.UpdateAsync(config);
-            return config;
+
+            var updated = await _repository.UpdateAsync(config, cancellationToken);
+            return updated;
         }
     }
 }

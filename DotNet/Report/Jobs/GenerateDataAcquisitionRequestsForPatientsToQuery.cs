@@ -12,6 +12,10 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Quartz;
 using System.Text;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Core;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -23,16 +27,20 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _submissionProducerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IMediator _mediator;
+        private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly MeasureReportAggregator _aggregator;
 
         public GenerateDataAcquisitionRequestsForPatientsToQuery(ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger, 
             IKafkaProducerFactory<string, DataAcquisitionRequestedValue> dataAcquisitionProducerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, IMediator mediator)
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, IMediator mediator, MeasureReportSubmissionBundler bundler, MeasureReportAggregator aggregator)
         {
             _logger = logger;
             _dataAcquisitionProducerFactory = dataAcquisitionProducerFactory;
             _submissionProducerFactory = submissionProducerFactory;
             _schedulerFactory = schedulerFactory;
             _mediator = mediator;
+            _bundler = bundler;
+            _aggregator = aggregator;
         }
 
         private async Task<bool> readyForSubmission(string scheduleId)
@@ -135,29 +143,50 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
                 }
-                else if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && readyForSubmission(schedule.Id).Result)
+                else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {
-                    ProducerConfig producerConfig = new ProducerConfig()
+                    var submissionEntries = (await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery() { MeasureReportScheduleId = schedule.Id })).ToList();
+                    
+                    var parser = new FhirJsonParser();
+                    List<MeasureReport> measureReports = submissionEntries
+                        .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                        .ToList();
+
+                    var allReady = submissionEntries.All(x => x.ReadyForSubmission);
+
+                    if ((schedule.PatientsToQuery?.Count ?? 0) == 0 && allReady)
                     {
-                        ClientId = "Report_SubmissionReportScheduled"
-                    };
+                        var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
 
-                    using var submitReportProducer = _submissionProducerFactory.CreateProducer(producerConfig);
-                    submitReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
-                        new Message<SubmissionReportKey, SubmissionReportValue>
+                        var producerConfig = new ProducerConfig()
                         {
-                            Key = new SubmissionReportKey()
-                            {
-                                FacilityId = schedule.FacilityId,
-                                ReportType = schedule.ReportType
-                            },
-                            Value = new SubmissionReportValue()
-                            {
-                                MeasureReportScheduleId = schedule.Id
-                            }
-                        });
+                            ClientId = "Report_SubmissionReportScheduled"
+                        };
 
-                    submitReportProducer.Flush();
+                        using var prod = _submissionProducerFactory.CreateProducer(producerConfig);
+                        prod.Produce(nameof(KafkaTopic.SubmitReport),
+                            new Message<SubmissionReportKey, SubmissionReportValue>
+                            {
+                                Key = new SubmissionReportKey()
+                                {
+                                    FacilityId = schedule.FacilityId,
+                                    StartDate = schedule.ReportStartDate,
+                                    EndDate = schedule.ReportEndDate
+                                },
+                                Value = new SubmissionReportValue()
+                                {
+                                    PatientIds = patientIds,
+                                    Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                    Aggregates = _aggregator.Aggregate(measureReports)
+                                },
+                                Headers = new Headers
+                                {
+                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                }
+                            });
+
+                        prod.Flush();
+                    }
                 }
 
                 schedule.PatientsToQueryDataRequested = true;

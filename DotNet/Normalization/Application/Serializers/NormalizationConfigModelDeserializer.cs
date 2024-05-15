@@ -16,11 +16,7 @@ public class NormalizationConfigModelDeserializer
         var conceptMapOperation = new ConceptMapOperation();
         conceptMapOperation.FhirContext = jsonNode["FhirContext"]?.ToString();
         conceptMapOperation.FacilityId = facilityId;
-        conceptMapOperation.FhirConceptMap = JsonSerializer.Deserialize<ConceptMap>(jsonNode["FhirConceptMap"], 
-            new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings
-        {
-            Validator = null
-        }));
+        conceptMapOperation.FhirConceptMap = jsonNode["FhirConceptMap"];
 
         return conceptMapOperation;
     }
