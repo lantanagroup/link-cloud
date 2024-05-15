@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
         public void RegisterEndpoints(WebApplication app)
         {
             var userEndpoints = app.MapGroup("/api/account")
+                .RequireAuthorization([nameof(LinkSystemPermissions.IsLinkAdmin)])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "User" } }
@@ -32,7 +33,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
             #region Queries
 
             userEndpoints.MapGet("/user/{id}", GetUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkUserModel>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -46,7 +47,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/email/{email}", GetUserByEmail.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkUserModel>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -60,7 +61,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/facility/{id}", GetUsersByFacility.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -73,7 +74,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/user/role/{id}", GetUsersByRole.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -86,7 +87,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapGet("/users", SearchForUsers.Handle)
-               .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+               //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .Produces(StatusCodes.Status403Forbidden)
@@ -98,9 +99,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                });
 
             userEndpoints.MapGet("/users/facility/{id}", SearchForFacilityUsers.Handle)
-               .RequireAuthorization([
-                   nameof(LinkPermissions.CanViewAccounts)
-                ])
+               //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                .Produces<GroupedUserModel>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .Produces(StatusCodes.Status403Forbidden)
@@ -116,7 +115,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
             #region Commands
 
             userEndpoints.MapPost("/user", CreateNewUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
                 .Produces<LinkUserModel>(StatusCodes.Status201Created)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -130,7 +129,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPut("/user/{id}", UpdateExistingUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkUserModel>>()
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -144,7 +143,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapDelete("/user/{id}", DeleteExistingUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -158,7 +157,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPost("/user/{id}/recover", RecoverDeletedUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Produces<LinkUserModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -172,7 +171,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPost("/user/{id}/activate", ActivateExistingUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -186,7 +185,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPost("/user/{id}/deactivate", DeactivateExistingUser.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -200,7 +199,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
                 });
 
             userEndpoints.MapPut("/user/{id}/claims", UpdateUserClaims.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkClaimsModel>>()
                 .Produces<LinkUserModel>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)

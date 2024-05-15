@@ -22,6 +22,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
         public void RegisterEndpoints(WebApplication app)
         {
             var roleEndpoints = app.MapGroup("/api/account/")
+                .RequireAuthorization([nameof(LinkSystemPermissions.IsLinkAdmin)])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Role" } }
@@ -30,7 +31,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
             #region Queries
 
             roleEndpoints.MapGet("/role/{id}", GetRoleById.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -44,7 +45,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
             
             roleEndpoints.MapGet("/role/name/{name}", GetRoleByName.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -58,7 +59,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
             
             roleEndpoints.MapGet("/role", GetRoleList.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanViewAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanViewAccounts)])
                 .Produces<ListRoleModel>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -77,7 +78,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
             #region Commands
 
             roleEndpoints.MapPost("/role", CreateNewRole.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkRoleModel>>()
                 .Produces<LinkRoleModel>(StatusCodes.Status201Created)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -91,7 +92,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
 
             roleEndpoints.MapPut("/role/{id}", UpdateExistingRole.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkRoleModel>>()
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -106,7 +107,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
 
             roleEndpoints.MapDelete("/role/{id}", DeleteExistingRole.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .Produces(StatusCodes.Status204NoContent)
                 .Produces(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
@@ -120,7 +121,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
                 });
          
             roleEndpoints.MapPut("/role/{id}/claims", UpdateRoleClaims.Handle)
-                .RequireAuthorization([nameof(LinkPermissions.CanAdministerAccounts)])
+                //.RequireAuthorization([nameof(LinkSystemPermissions.CanAdministerAccounts)])
                 .AddEndpointFilter<ValidationFilter<LinkClaimsModel>>()
                 .Produces<LinkRoleModel>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
