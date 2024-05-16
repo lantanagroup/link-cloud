@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -108,7 +109,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                                 var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
                                 var admittedPatients =
-                                    JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(
+                                    JsonConvert.DeserializeObject<string>(
                                         await censusResponse.Content.ReadAsStringAsync(cancellationToken));
 
                                 string dataAcqRequestUrl =
@@ -129,7 +130,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 Directory.CreateDirectory(submissionDirectory);
 
-                                var options = new JsonSerializerOptions().ForFhir();
 
                                 #region Device
 
@@ -143,6 +143,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 #region Organization
 
+                                var options = new JsonSerializerOptions().ForFhir();
                                 fileName = "sending-organization.json";
                                 contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
 
@@ -154,14 +155,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #region Patient List
 
                                 fileName = "patient-list.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(
-                                    admittedPatients.Select(p => p.PatientId));
+                                contents = admittedPatients;
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
-
-                                admittedPatients.Clear();
-
                                 #endregion
 
 
