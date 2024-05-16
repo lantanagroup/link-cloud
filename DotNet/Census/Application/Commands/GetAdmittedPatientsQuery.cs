@@ -11,7 +11,7 @@ public class GetAdmittedPatientsQuery : IRequest<List<CensusPatientListEntity>>
     public DateTime EndDate { get; set; }
 }
 
-public class GetAdmittedPatientsQueryHandler : IRequestHandler<GetAdmittedPatientsQuery, IEnumerable<CensusPatientListEntity>>
+public class GetAdmittedPatientsQueryHandler : IRequestHandler<GetAdmittedPatientsQuery, List<CensusPatientListEntity>>
 {
     private readonly ILogger<GetAdmittedPatientsQueryHandler> _logger;
     private readonly ICensusPatientListRepository _repository;
@@ -22,7 +22,7 @@ public class GetAdmittedPatientsQueryHandler : IRequestHandler<GetAdmittedPatien
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     }
 
-    public async Task<IEnumerable<CensusPatientListEntity>> Handle(GetAdmittedPatientsQuery request, CancellationToken cancellationToken)
+    public async Task<List<CensusPatientListEntity>> Handle(GetAdmittedPatientsQuery request, CancellationToken cancellationToken)
     {
         List<CensusPatientListEntity> patients = null;
         if (request.StartDate != default && request.EndDate != default)
