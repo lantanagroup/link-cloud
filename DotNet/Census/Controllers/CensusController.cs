@@ -57,7 +57,7 @@ public class CensusController : Controller
     /// <param name="endDate"></param>
     /// <returns></returns>
     [HttpGet("history/admitted")]
-    public async Task<ActionResult<string>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
     {
         try
         {
@@ -87,8 +87,7 @@ public class CensusController : Controller
                 });
             }
 
-            var serialized = JsonSerializer.Serialize(fhirList, new JsonSerializerOptions().ForFhir());
-            return Ok(serialized);
+            return Ok(fhirList);
         }
         catch (Exception ex)
         {

@@ -12,7 +12,6 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -109,8 +108,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                                 var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
                                 var admittedPatients =
-                                    JsonConvert.DeserializeObject<string>(
-                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken));
+                                    System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
+                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken), new JsonSerializerOptions().ForFhir());
 
                                 string dataAcqRequestUrl =
                                     _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
@@ -155,7 +154,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #region Patient List
 
                                 fileName = "patient-list.json";
-                                contents = admittedPatients;
+                                contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients, options);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
