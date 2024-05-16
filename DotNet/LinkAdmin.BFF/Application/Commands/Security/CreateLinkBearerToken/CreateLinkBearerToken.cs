@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -23,21 +24,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
+        private readonly IOptions<LinkBearerServiceConfig> _linkBearerServiceConfig;
         private readonly ILinkAdminMetrics _metrics;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, ILinkAdminMetrics metrics)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkBearerServiceConfig> linkBearerServiceConfig, ILinkAdminMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
+            _linkBearerServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
         }
 
         public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
+
+            if(string.IsNullOrEmpty(_linkBearerServiceConfig.Value.Authority))
+            {
+                   throw new ArgumentNullException(nameof(_linkBearerServiceConfig.Value.Authority));
+            }
             
             try
             {
@@ -73,7 +81,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 
 
                 var token = new JwtSecurityToken(                                    
-                                    issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,
+                                    issuer: _linkBearerServiceConfig.Value.Authority,
                                     audience: LinkAdminConstants.LinkBearerService.LinkBearerAudience,
                                     claims: user.Claims,
                                     expires: DateTime.Now.AddMinutes(timespan),
