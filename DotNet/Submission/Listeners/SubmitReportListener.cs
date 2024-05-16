@@ -129,11 +129,19 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 Directory.CreateDirectory(submissionDirectory);
 
+                                var options = new JsonSerializerOptions().ForFhir();
 
                                 #region Device
 
+                                Hl7.Fhir.Model.Device device = new Device();
+                                device.DeviceName.Add(new Device.DeviceNameComponent()
+                                    {
+                                        Name = "Link"
+                                    }
+                                );
+
                                 string fileName = "sending-device.json";
-                                string contents = "{ \"Device\": \"NHSNLink\" }";
+                                string contents = System.Text.Json.JsonSerializer.Serialize(device, options);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
@@ -141,8 +149,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #endregion
 
                                 #region Organization
-
-                                var options = new JsonSerializerOptions().ForFhir();
                                 fileName = "sending-organization.json";
                                 contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
 
