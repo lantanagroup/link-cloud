@@ -1,6 +1,6 @@
 package com.lantanagroup.link.measureeval.repositories;
 
-import com.lantanagroup.link.measureeval.entities.AbstractResource;
+import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
@@ -19,13 +19,13 @@ public class AbstractResourceRepository {
         this.mongoOperations = mongoOperations;
     }
 
-    public AbstractResource findOne(
+    public AbstractResourceEntity findOne(
             String facilityId,
             boolean isPatientResource,
             ResourceType resourceType,
             String resourceId) {
-        Class<? extends AbstractResource> entityType;
-        AbstractResource probe;
+        Class<? extends AbstractResourceEntity> entityType;
+        AbstractResourceEntity probe;
         if (isPatientResource) {
             entityType = PatientResource.class;
             probe = new PatientResource();
@@ -41,15 +41,15 @@ public class AbstractResourceRepository {
                 .oneValue();
     }
 
-    public AbstractResource findOne(String facilityId, ResourceNormalized source) {
+    public AbstractResourceEntity findOne(String facilityId, ResourceNormalized source) {
         return findOne(facilityId, source.isPatientResource(), source.getResourceType(), source.getResourceId());
     }
 
-    public AbstractResource findOne(String facilityId, PatientReportingEvaluationStatus.Resource source) {
+    public AbstractResourceEntity findOne(String facilityId, PatientReportingEvaluationStatus.Resource source) {
         return findOne(facilityId, source.getIsPatientResource(), source.getResourceType(), source.getResourceId());
     }
 
-    public <T extends AbstractResource> T save(T entity) {
+    public <T extends AbstractResourceEntity> T save(T entity) {
         return mongoOperations.save(entity);
     }
 }

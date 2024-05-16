@@ -1,6 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.AbstractResource;
+import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
@@ -80,7 +80,7 @@ public class ResourceNormalizedConsumer {
                 KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId());
 
         logger.info("Beginning resource update");
-        AbstractResource resource = Objects.requireNonNullElseGet(
+        AbstractResourceEntity resource = Objects.requireNonNullElseGet(
                 retrieveResource(facilityId, value),
                 () -> createResource(facilityId, value));
         resource.setResource(value.getResource());
@@ -106,14 +106,14 @@ public class ResourceNormalizedConsumer {
         evaluateMeasures(value, patientStatus, bundle);
     }
 
-    private AbstractResource retrieveResource(String facilityId, ResourceNormalized value) {
+    private AbstractResourceEntity retrieveResource(String facilityId, ResourceNormalized value) {
         logger.debug("Retrieving resource from database");
         return resourceRepository.findOne(facilityId, value);
     }
 
-    private AbstractResource createResource(String facilityId, ResourceNormalized value) {
+    private AbstractResourceEntity createResource(String facilityId, ResourceNormalized value) {
         logger.debug("Resource not found; creating");
-        AbstractResource resource;
+        AbstractResourceEntity resource;
         if (value.isPatientResource()) {
             PatientResource patientResource = new PatientResource();
             patientResource.setPatientId(value.getPatientId());
@@ -227,13 +227,13 @@ public class ResourceNormalizedConsumer {
         Bundle bundle = new Bundle();
         bundle.setType(Bundle.BundleType.COLLECTION);
         retrieveResources(patientStatus).stream()
-                .map(AbstractResource::getResource)
+                .map(AbstractResourceEntity::getResource)
                 .map(Resource.class::cast)
                 .forEachOrdered(resource -> bundle.addEntry().setResource(resource));
         return bundle;
     }
 
-    private List<AbstractResource> retrieveResources(PatientReportingEvaluationStatus patientStatus) {
+    private List<AbstractResourceEntity> retrieveResources(PatientReportingEvaluationStatus patientStatus) {
         logger.debug("Retrieving resources");
         return patientStatus.getResources().stream()
                 .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
@@ -241,7 +241,9 @@ public class ResourceNormalizedConsumer {
                 .toList();
     }
 
-    private AbstractResource retrieveResource(String facilityId, PatientReportingEvaluationStatus.Resource resource) {
+    private AbstractResourceEntity retrieveResource(
+            String facilityId,
+            PatientReportingEvaluationStatus.Resource resource) {
         logger.trace("Retrieving resource: {}/{}", resource.getResourceType(), resource.getResourceId());
         return resourceRepository.findOne(facilityId, resource);
     }
