@@ -4,7 +4,7 @@ import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.stereotype.Repository;
@@ -41,7 +41,7 @@ public class AbstractResourceRepository {
                 .oneValue();
     }
 
-    public AbstractResourceEntity findOne(String facilityId, ResourceNormalized source) {
+    public AbstractResourceEntity findOne(String facilityId, AbstractResourceRecord source) {
         return findOne(facilityId, source.isPatientResource(), source.getResourceType(), source.getResourceId());
     }
 
