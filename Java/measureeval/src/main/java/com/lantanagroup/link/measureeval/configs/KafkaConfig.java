@@ -40,7 +40,7 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.error(Topics.RESOURCE_ACQUIRED), new StringDeserializer(),
+                Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
@@ -49,7 +49,7 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.error(Topics.RESOURCE_ACQUIRED), new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
+                Topics.RESOURCE_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
                 Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper));
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
