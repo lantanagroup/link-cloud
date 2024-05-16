@@ -14,7 +14,7 @@ import java.util.Date;
 
 @Getter
 @Setter
-public abstract class AbstractResource {
+public abstract class AbstractResourceEntity {
     @Id
     private String id;
 
