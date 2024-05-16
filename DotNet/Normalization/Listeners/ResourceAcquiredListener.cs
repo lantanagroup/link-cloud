@@ -220,14 +220,6 @@ public class ResourceAcquiredListener : BackgroundService
                             });
                         }
                     }
-                    catch(NoEntityFoundException ex)
-                    {
-                        var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
-
-                        _logger.LogError(ex, "An error was encountered processing Operation Commands for {facilityId}", messageMetaData.facilityId);
-                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
-                        kafkaConsumer.Commit(message);
-                    }
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
