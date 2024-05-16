@@ -5,14 +5,14 @@ import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class MeasureEvaluatorCache {
     private final FhirContext fhirContext;
     private final MeasureDefinitionRepository definitionRepository;
-    private final Map<String, MeasureEvaluator> instancesById = new HashMap<>();
+    private final Map<String, MeasureEvaluator> instancesById = new ConcurrentHashMap<>();
 
     public MeasureEvaluatorCache(FhirContext fhirContext, MeasureDefinitionRepository definitionRepository) {
         this.fhirContext = fhirContext;
