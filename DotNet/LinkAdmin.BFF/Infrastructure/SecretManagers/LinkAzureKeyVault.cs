@@ -1,7 +1,7 @@
 ﻿using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.SecretManagers
