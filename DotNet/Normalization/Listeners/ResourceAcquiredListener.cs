@@ -97,9 +97,6 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     message = result;
 
-                    //if (message == null)
-                    //    continue;
-
                     (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
                     try
                     {
@@ -126,6 +123,22 @@ public class ResourceAcquiredListener : BackgroundService
 
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
+                        kafkaConsumer.Commit(message);
+                        return;
+                    }
+
+                    if (config == null)
+                    {
+                        var errorMessage = $"No facility configuration found for {messageMetaData.facilityId}";
+                        _transientExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
+                        kafkaConsumer.Commit(message);
+                        return;
+                    }
+
+                    if(config.OperationSequence == null || config.OperationSequence.Count == 0)
+                    {
+                        var errorMessage = $"No operation sequence found for {messageMetaData.facilityId}";
+                        _deadLetterExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
                         kafkaConsumer.Commit(message);
                         return;
                     }
