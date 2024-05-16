@@ -1,10 +1,12 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -20,18 +22,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
+        private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly ILinkAdminMetrics _metrics;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, ILinkAdminMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
         }
 
-        //TODO: Add back data protection once key persience is implemented
         public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
@@ -45,12 +48,29 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 {
 
                     bearerKey = await _secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
-                    //_cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
-                    _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+
+                    if (_dataProtectionSettings.Value.Enabled)
+                    {
+                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                    }
+                    else
+                    {
+                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                    }                             
                 }
 
-                //var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey))), SecurityAlgorithms.HmacSha512Signature);
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)), SecurityAlgorithms.HmacSha512Signature);
+                byte[] encodedKey = [];
+                if (_dataProtectionSettings.Value.Enabled)
+                {
+                    encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
+                }
+                else
+                {
+                    encodedKey = Encoding.UTF8.GetBytes(bearerKey);
+                }
+
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512Signature);
+                
 
                 var token = new JwtSecurityToken(                                    
                                     issuer: LinkAdminConstants.LinkBearerService.LinkBearerIssuer,
@@ -60,8 +80,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                                     signingCredentials: credentials
                                 );
 
-                var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-                activity?.AddTag("link.token", jwt);
+                var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
 
                 var userId = user.Claims.First(c => c.Type == "sub").Value;
                 _logger.LogLinkAdminTokenGenerated(DateTime.UtcNow, userId);
