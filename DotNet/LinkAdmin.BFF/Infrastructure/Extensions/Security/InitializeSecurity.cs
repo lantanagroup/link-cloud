@@ -123,8 +123,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             services.AddLinkBearerServiceAuthentication(options =>
             {
                 options.Environment = securityServiceOptions.Environment;
-                options.Authority = LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
-                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;
+                options.Authority = configuration.GetValue<string>("LinkBearerService:Authority") ?? LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
+                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;              
             });
 
             // Add Authorization
