@@ -130,7 +130,7 @@ public class ResourceAcquiredListener : BackgroundService
                     if (config == null)
                     {
                         var errorMessage = $"No facility configuration found for {messageMetaData.facilityId}";
-                        _deadLetterExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
+                        _transientExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
                         kafkaConsumer.Commit(message);
                         return;
                     }
