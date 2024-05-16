@@ -108,8 +108,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                                 var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
                                 var admittedPatients =
-                                    JsonConvert.DeserializeObject<List<CensusAdmittedPatient>>(
-                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken));
+                                    System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
+                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken), new JsonSerializerOptions().ForFhir());
 
                                 string dataAcqRequestUrl =
                                     _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
@@ -133,8 +133,15 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 #region Device
 
+                                Hl7.Fhir.Model.Device device = new Device();
+                                device.DeviceName.Add(new Device.DeviceNameComponent()
+                                    {
+                                        Name = "Link"
+                                    }
+                                );
+
                                 string fileName = "sending-device.json";
-                                string contents = "{ \"Device\": \"NHSNLink\" }";
+                                string contents = System.Text.Json.JsonSerializer.Serialize(device, options);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
@@ -142,7 +149,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #endregion
 
                                 #region Organization
-
                                 fileName = "sending-organization.json";
                                 contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
 
@@ -154,14 +160,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #region Patient List
 
                                 fileName = "patient-list.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(
-                                    admittedPatients.Select(p => p.PatientId));
+                                contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients, options);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
-
-                                admittedPatients.Clear();
-
                                 #endregion
 
 
