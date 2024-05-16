@@ -35,6 +35,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
+using System.Configuration;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -144,7 +145,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.AllowAnonymous = allowAnonymousAccess;
-        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:ValidateToken");
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
         options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
     });
 
