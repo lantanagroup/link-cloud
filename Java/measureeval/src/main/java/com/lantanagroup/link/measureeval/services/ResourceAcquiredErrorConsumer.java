@@ -4,8 +4,8 @@ import com.lantanagroup.link.measureeval.kafka.Headers;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.models.NormalizationStatus;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
+import com.lantanagroup.link.measureeval.records.ResourceAcquired;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
 import java.util.function.Predicate;
 
 @Service
-public class ResourceNormalizedConsumer extends AbstractResourceConsumer<ResourceNormalized> {
-    public ResourceNormalizedConsumer(
+public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<ResourceAcquired> {
+    public ResourceAcquiredErrorConsumer(
             AbstractResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
             DataAcquisitionClient dataAcquisitionClient,
@@ -41,13 +41,13 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
 
     @Override
     protected NormalizationStatus getNormalizationStatus() {
-        return NormalizationStatus.NORMALIZED;
+        return NormalizationStatus.ERROR;
     }
 
-    @KafkaListener(topics = Topics.RESOURCE_NORMALIZED)
+    @KafkaListener(topics = Topics.RESOURCE_ACQUIRED_ERROR)
     public void consume(
             @Header(Headers.CORRELATION_ID) String correlationId,
-            ConsumerRecord<String, ResourceNormalized> record) {
+            ConsumerRecord<String, ResourceAcquired> record) {
         doConsume(correlationId, record);
     }
 }
