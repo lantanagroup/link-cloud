@@ -83,7 +83,8 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
 
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
-                var serialized = JsonSerializer.SerializeToElement(submission, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+
+                var serialized = JsonSerializer.SerializeToElement(submission);
 
                 return Ok(serialized);
             }
