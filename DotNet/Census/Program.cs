@@ -33,6 +33,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using Hl7.Fhir.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -138,6 +139,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.ForFhir();
     });
 
     builder.Services.AddGrpc();

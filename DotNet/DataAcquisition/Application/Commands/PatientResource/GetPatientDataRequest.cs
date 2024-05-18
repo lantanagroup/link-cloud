@@ -166,8 +166,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 {
                     var message = $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
                     _logger.LogError(message);
-                    await GenerateAuditMessage(message, request, scheduledReport.ReportType);
-                    return null;
+                    throw;
                 }
             }  
         }
