@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class PatientResource extends AbstractResource {
+public class PatientResource extends AbstractResourceEntity {
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 }

@@ -15,71 +15,51 @@ namespace AccountUnitTests
     {
         public AccountTestsHelper() { }
 
-        public AccountModel CreateTestAccount()
+        public LinkUser CreateTestAccount()
         {
-            return new AccountModel()
+            return new LinkUser()
             {
-                Id = new Guid(AccountTestsConstants.accountId),
-                Username = "testUser",
-                EmailAddress = AccountTestsConstants.email,
+                Id = AccountTestsConstants.accountId,
+                UserName = "testUser",
+                Email = AccountTestsConstants.email,
                 FirstName = "Tester",
-                LastName = "McTesterson",
-                Groups = new List<GroupModel>(),
-                Roles = new List<RoleModel>(),
+                LastName = "McTesterson",               
+                UserRoles = new List<LinkUserRole>(),
                 LastSeen = DateTime.Now
             };
-        }
+        }       
 
-        public GroupModel CreateTestGroup()
+        public LinkRole CreateTestRole()
         {
-            return new GroupModel()
+            return new LinkRole()
             {
-                Id = new Guid(AccountTestsConstants.groupId)
+                Id = AccountTestsConstants.roleId,
+                Name = "TestRole"
             };
         }
 
-        public RoleModel CreateTestRole()
+        public void AccountDbSetSetup(Mock<DbSet<LinkUser>> dbSet, List<LinkUser> accounts)
         {
-            return new RoleModel()
-            {
-                Id = new Guid(AccountTestsConstants.roleId)
-            };
-        }
+            dbSet.As<IAsyncEnumerable<LinkUser>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
+                .Returns(new TestAsyncEnumerator<LinkUser>(accounts.GetEnumerator()));
 
-        public void AccountDbSetSetup(Mock<DbSet<AccountModel>> dbSet, List<AccountModel> accounts)
+            dbSet.As<IQueryable<LinkUser>>().Setup(m => m.Provider)
+                .Returns(new TestAsyncQueryProvider<LinkUser>(accounts.AsQueryable().Provider));
+            dbSet.As<IQueryable<LinkUser>>().Setup(m => m.Expression).Returns(accounts.AsQueryable().Expression);
+            dbSet.As<IQueryable<LinkUser>>().Setup(m => m.ElementType).Returns(accounts.AsQueryable().ElementType);
+            dbSet.As<IQueryable<LinkUser>>().Setup(m => m.GetEnumerator()).Returns(accounts.GetEnumerator());
+        }       
+
+        public void RoleDbSetSetup(Mock<DbSet<LinkRole>> dbSet, List<LinkRole> roles)
         {
-            dbSet.As<IAsyncEnumerable<AccountModel>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
-                .Returns(new TestAsyncEnumerator<AccountModel>(accounts.GetEnumerator()));
+            dbSet.As<IAsyncEnumerable<LinkRole>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
+                .Returns(new TestAsyncEnumerator<LinkRole>(roles.GetEnumerator()));
 
-            dbSet.As<IQueryable<AccountModel>>().Setup(m => m.Provider)
-                .Returns(new TestAsyncQueryProvider<AccountModel>(accounts.AsQueryable().Provider));
-            dbSet.As<IQueryable<AccountModel>>().Setup(m => m.Expression).Returns(accounts.AsQueryable().Expression);
-            dbSet.As<IQueryable<AccountModel>>().Setup(m => m.ElementType).Returns(accounts.AsQueryable().ElementType);
-            dbSet.As<IQueryable<AccountModel>>().Setup(m => m.GetEnumerator()).Returns(accounts.GetEnumerator());
-        }
-
-        public void GroupDbSetSetup(Mock<DbSet<GroupModel>> dbSet, List<GroupModel> groups)
-        {
-            dbSet.As<IAsyncEnumerable<GroupModel>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
-                .Returns(new TestAsyncEnumerator<GroupModel>(groups.GetEnumerator()));
-
-            dbSet.As<IQueryable<GroupModel>>().Setup(m => m.Provider)
-                .Returns(new TestAsyncQueryProvider<GroupModel>(groups.AsQueryable().Provider));
-            dbSet.As<IQueryable<GroupModel>>().Setup(m => m.Expression).Returns(groups.AsQueryable().Expression);
-            dbSet.As<IQueryable<GroupModel>>().Setup(m => m.ElementType).Returns(groups.AsQueryable().ElementType);
-            dbSet.As<IQueryable<GroupModel>>().Setup(m => m.GetEnumerator()).Returns(groups.GetEnumerator());
-        }
-
-        public void RoleDbSetSetup(Mock<DbSet<RoleModel>> dbSet, List<RoleModel> roles)
-        {
-            dbSet.As<IAsyncEnumerable<RoleModel>>().Setup(m => m.GetAsyncEnumerator(It.IsAny<CancellationToken>()))
-                .Returns(new TestAsyncEnumerator<RoleModel>(roles.GetEnumerator()));
-
-            dbSet.As<IQueryable<RoleModel>>().Setup(m => m.Provider)
-                .Returns(new TestAsyncQueryProvider<RoleModel>(roles.AsQueryable().Provider));
-            dbSet.As<IQueryable<RoleModel>>().Setup(m => m.Expression).Returns(roles.AsQueryable().Expression);
-            dbSet.As<IQueryable<RoleModel>>().Setup(m => m.ElementType).Returns(roles.AsQueryable().ElementType);
-            dbSet.As<IQueryable<RoleModel>>().Setup(m => m.GetEnumerator()).Returns(roles.GetEnumerator());
+            dbSet.As<IQueryable<LinkRole>>().Setup(m => m.Provider)
+                .Returns(new TestAsyncQueryProvider<LinkRole>(roles.AsQueryable().Provider));
+            dbSet.As<IQueryable<LinkRole>>().Setup(m => m.Expression).Returns(roles.AsQueryable().Expression);
+            dbSet.As<IQueryable<LinkRole>>().Setup(m => m.ElementType).Returns(roles.AsQueryable().ElementType);
+            dbSet.As<IQueryable<LinkRole>>().Setup(m => m.GetEnumerator()).Returns(roles.GetEnumerator());
         }
     }
 }

@@ -108,7 +108,7 @@ public class QueryListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
-                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new DeadLetterException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
                                 }
 
                                 if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
