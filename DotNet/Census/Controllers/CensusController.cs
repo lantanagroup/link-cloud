@@ -30,7 +30,12 @@ public class CensusController : Controller
     /// Gets Patient List history for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientCensusHistoricEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history")]
     public async Task<ActionResult<List<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
     {
@@ -56,7 +61,12 @@ public class CensusController : Controller
     /// <param name="facilityId"></param>
     /// <param name="startDate"></param>
     /// <param name="endDate"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history/admitted")]
     public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
     {
@@ -96,13 +106,18 @@ public class CensusController : Controller
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
             throw;
         }
-    }   
+    }
 
     /// <summary>
     /// Gets the current census for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("current")]
     public async Task<ActionResult<List<CensusPatientListEntity>>> GetCurrentCensus(string facilityId)
     {
@@ -126,7 +141,12 @@ public class CensusController : Controller
     /// Gets all patient list records for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    //// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("all")]
     public async Task<ActionResult<List<CensusPatientListEntity>>> GetAllPatientsForFacility(string facilityId)
     {
