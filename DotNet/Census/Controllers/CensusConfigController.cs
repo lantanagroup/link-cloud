@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Commands;
+﻿using Census.Domain.Entities;
+using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Census.Application.Settings;
@@ -40,10 +41,10 @@ public class CensusConfigController : Controller
         {
             return BadRequest("ScheduledTrigger is required.");
         }
-
+        CensusConfigEntity entity = null;
         try
         {
-            await _mediator.Send(new CreateCensusConfigCommand
+            entity = await _mediator.Send(new CreateCensusConfigCommand
             {
                 CensusConfigEntity = censusConfig
             });
@@ -61,7 +62,7 @@ public class CensusConfigController : Controller
             throw;
         }
 
-        return Created();
+        return Created(entity.Id.ToString(), entity);
     }
 
     /// <summary>
