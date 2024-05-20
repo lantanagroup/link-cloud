@@ -61,7 +61,7 @@ public class CensusConfigController : Controller
             throw;
         }
 
-        return Accepted();
+        return Created();
     }
 
     /// <summary>
@@ -138,7 +138,7 @@ public class CensusConfigController : Controller
             return NotFound();
         }
 
-        return Ok(configResponse);
+        return NoContent();
     }
 
     /// <summary>
@@ -162,7 +162,7 @@ public class CensusConfigController : Controller
             throw;
         }
 
-        return Ok();
+        return NoContent();
     }
 
     [ApiExplorerSettings(IgnoreApi = true)]
