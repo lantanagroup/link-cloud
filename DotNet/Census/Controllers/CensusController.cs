@@ -6,6 +6,7 @@ using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Task = System.Threading.Tasks.Task;
@@ -29,7 +30,12 @@ public class CensusController : Controller
     /// Gets Patient List history for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientCensusHistoricEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history")]
     public async Task<ActionResult<List<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
     {
@@ -43,9 +49,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Census History"), ex, "An exception occurred while attempting to get census history with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 
@@ -55,7 +61,12 @@ public class CensusController : Controller
     /// <param name="facilityId"></param>
     /// <param name="startDate"></param>
     /// <param name="endDate"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history/admitted")]
     public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate = default, DateTime endDate = default)
     {
@@ -91,17 +102,22 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error encountered:\n{1}\n{2}", ex.Message, ex.InnerException);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Admitted Patients"), ex, "An exception occurred while attempting to get admitted patients with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
-    }   
+    }
 
     /// <summary>
     /// Gets the current census for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("current")]
     public async Task<ActionResult<List<CensusPatientListEntity>>> GetCurrentCensus(string facilityId)
     {
@@ -115,9 +131,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Current Census"), ex, "An exception occurred while attempting to get current census with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 
@@ -125,7 +141,12 @@ public class CensusController : Controller
     /// Gets all patient list records for a facility.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    //// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CensusPatientListEntity>))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("all")]
     public async Task<ActionResult<List<CensusPatientListEntity>>> GetAllPatientsForFacility(string facilityId)
     {
@@ -139,9 +160,9 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "Get All Patients For Facility"), ex, "An exception occurred while attempting to get All Patients For Facility with an id of {id}", facilityId);
             await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
+            throw;
         }
     }
 
