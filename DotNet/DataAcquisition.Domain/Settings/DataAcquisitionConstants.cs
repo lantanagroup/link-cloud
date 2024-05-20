@@ -10,7 +10,6 @@ public static class DataAcquisitionConstants
         public const string ServiceInformation = "ServiceInformation";
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
         public const string DatabaseProvider = "DatabaseProvider";
-        public const string DatabaseConnection = "SqlServer";
         public const string Serilog = "Serilog";
     }
 

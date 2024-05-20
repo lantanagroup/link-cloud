@@ -7,6 +7,9 @@ version: '3.4'
 ## mongo: 17017
 ## loki: 3100
 ## grafana: 3000
+## otel-collector: 4317
+## tempo: 4417
+## prometheus: 9090
 ## kafka_b: 9092, 9094
 ## kafka-ui: 9095
 ## rest-proxy: 8082
@@ -113,10 +116,55 @@ services:
       
   loki:
     image: grafana/loki:2.9.0
-    hostname: loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - link-nw
+      
+  otel-collector:
+    image: otel/opentelemetry-collector:0.88.0
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./docker-compose.collector.yml:/etc/otel-collector-config.yaml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OTLP gRPC receiver
+      - "55679:55679" # zpages extension
+    networks:
+      - link-nw
+      
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - link-nw
+    depends_on:
+      - otel-collector
+
+  tempo:
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    container_name: tempo
+    hostname: tempo
+    volumes:
+      - ./docker-compose.tempo.yml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+      - "4417:4417"
+    healthcheck:
+      interval: 5s
+      retries: 10
+      test: wget --no-verbose --tries=1 --spider http://localhost:3200/status || exit 1
     networks:
       - link-nw
 
@@ -128,25 +176,8 @@ services:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    entrypoint:
-      - sh
-      - -euc
-      - |
-        mkdir -p /etc/grafana/provisioning/datasources
-        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
-        apiVersion: 1
-        datasources:
-        - name: Loki
-          type: loki
-          access: proxy
-          orgId: 1
-          url: http://loki:3100
-          basicAuth: false
-          isDefault: true
-          version: 1
-          editable: false
-        EOF
-        /run.sh
+    volumes:
+      - ./docker-compose.grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
       
@@ -156,7 +187,6 @@ services:
   
   kafka_b:
     image: bitnami/kafka:3.4
-    hostname: kafka_b
     ports:
       - "9092:9092"
       - "9094:9094"
@@ -263,7 +293,6 @@ services:
       - kafka_b
     ports:
       - 8082:8082
-    hostname: rest-proxy
     container_name: rest-proxy
     environment:
       KAFKA_REST_HOST_NAME: rest-proxy
@@ -274,7 +303,6 @@ services:
 
   schema-registry:
     image: confluentinc/cp-schema-registry:latest
-    hostname: schema-registry
     depends_on:
       - kafka_b
     ports:
@@ -291,13 +319,15 @@ services:
 
   account:
     image: link-account
-    hostname: account_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       Postgres__ConnectionString: Host=pg_db:5432;Database=link-account;Username=link-db-user;Password=link-db-pass;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8060:8060"
     build:
@@ -308,16 +338,19 @@ services:
     depends_on:
       - loki
       - pg_db
+      - otel-collector
       - kafka_init
 
   audit:
     image: link-audit
-    hostname: audit_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8062:8062"
     build:
@@ -327,12 +360,12 @@ services:
       - link-nw
     depends_on:
       - loki
+      - otel-collector
       - kafka_init
       - mssql_init
       
   bff:
     image: link-bff
-    hostname: bff_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -350,6 +383,9 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8063:8063"
     build:
@@ -359,6 +395,7 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - redis_cache
       - account
       - audit
@@ -380,6 +417,9 @@ services:
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       AutoMigrate: true
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8064:8064"
     build:
@@ -390,12 +430,12 @@ services:
     depends_on:
       - loki
       - kafka_init
+      - otel-collector
       - mssql_init
       - tenant
 
   dataacquisition:
     image: link-dataacquisition
-    hostname: dataacquisition_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       AutoMigrate: true
@@ -404,6 +444,9 @@ services:
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8065:8065"
     build:
@@ -413,6 +456,7 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - mssql_init
       - loki
 
@@ -452,7 +496,6 @@ services:
       
   normalization:
     image: link-normalization
-    hostname: normalization_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       AutoMigrate: true
@@ -461,6 +504,9 @@ services:
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8068:8068"
     build:
@@ -470,11 +516,11 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - loki
       
   notification:
     image: link-notification
-    hostname: notification_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       DatabaseProvider: SqlServer
@@ -484,6 +530,9 @@ services:
       IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
       IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
       Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8069:8069"
     build:
@@ -493,16 +542,19 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - mssql_init
       - loki
       
   patientstoquery:
     image: link-patientquery
-    hostname: patientquery_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8070:8070"
     build:
@@ -512,17 +564,20 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - loki
       
   querydispatch:
     image: link-querydispatch
-    hostname: querydispatch_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-querydispatch
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8071:8071"
     build:
@@ -532,12 +587,12 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - mongo
       - loki
 
   report:
     image: link-report
-    hostname: report_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -545,6 +600,9 @@ services:
       MongoDB__DatabaseName: link-report
       ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8072:8072"
     build:
@@ -554,12 +612,12 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - mongo
       - loki
 
   submission:
     image: link-submission
-    hostname: submission_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -567,6 +625,9 @@ services:
       MongoDB__DatabaseName: link-submission
       SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8073:8073"
     build:
@@ -578,18 +639,21 @@ services:
       - submission_data:/data/Submission
     depends_on:
       - kafka_init
+      - otel-collector
       - mongo
       - loki
 
   tenant:
     image: link-tenant
-    hostname: tenant_svc
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8074:8074"
     build:
@@ -599,6 +663,7 @@ services:
       - link-nw
     depends_on:
       - kafka_init
+      - otel-collector
       - loki
       - mssql_init
 
@@ -612,6 +677,8 @@ services:
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.jpa.hibernate.ddl-auto: update
+      loki.enabled: true
+      loki.url: http://loki:3100
     ports:
       - "8075:8075"
     build:
