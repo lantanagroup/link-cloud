@@ -5,6 +5,7 @@ import com.lantanagroup.link.validation.model.PatientEvaluatedModel;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -12,6 +13,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.CommonErrorHandler;
 
 @Configuration
+@ConfigurationPropertiesScan("com.lantanagroup.link.shared.config")
 public class ValidationApplicationConfig extends BaseSpringConfig {
     @Bean
     ConcurrentKafkaListenerContainerFactory<String, PatientEvaluatedModel> kafkaListenerContainerFactory(
