@@ -28,7 +28,16 @@ public class CensusConfigController : Controller
     /// Creates a CensusConfig for o given censusConfig
     /// </summary>
     /// <param name="censusConfig"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 201
+    ///     Bad Facility ID: 404
+    ///     Missing Facility ID: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CensusConfigModel censusConfig)
     {
@@ -69,7 +78,12 @@ public class CensusConfigController : Controller
     /// Returns the CensusConfig for a given facilityId
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CensusConfigModel))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("{facilityId}")]
     public async Task<ActionResult<CensusConfigModel>> Get(string facilityId)
     {
@@ -92,7 +106,15 @@ public class CensusConfigController : Controller
     /// </summary>
     /// <param name="censusConfig"></param>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 204
+    ///     Bad Scheduled Trigger: 400
+    ///     Missing Facility ID: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
     public async Task<ActionResult<CensusConfigModel>> Put([FromBody] CensusConfigModel censusConfig, string facilityId)
     {
@@ -146,7 +168,12 @@ public class CensusConfigController : Controller
     /// Deletes the CensusConfig for a given facilityId
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 204
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpDelete("{facilityId}")]
     public async Task<IActionResult> Delete(string facilityId)
     {
