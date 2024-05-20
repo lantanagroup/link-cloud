@@ -7,8 +7,14 @@
 # ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
 # ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"${ARTIFACTS_ENDPOINT}\", \"password\":\"${ACCESS_TOKEN}\"}]}"
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
 WORKDIR /app
+
+ENV \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
+
 EXPOSE 80
 EXPOSE 443
 
@@ -16,6 +22,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Account/Account.csproj", "DotNet/Account/"]
+COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
 RUN dotnet restore "DotNet/Account/Account.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Account"

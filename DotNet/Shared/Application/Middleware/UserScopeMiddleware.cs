@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Shared.Application.Middleware
 {

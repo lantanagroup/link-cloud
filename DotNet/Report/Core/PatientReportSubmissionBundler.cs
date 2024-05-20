@@ -426,19 +426,6 @@ namespace LantanaGroup.Link.Report.Core
             return org;
         }
 
-
-        protected Bundle.EntryComponent GetAggregatePatientList(Bundle bundle, string measureCanonical)
-        {
-
-            return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "List"
-                && ((List)e.Resource).Identifier is not null
-                && ((List)e.Resource).Identifier.Any(i => i.System == ReportConstants.Bundle.MainSystem && i.Value == GetMeasureIdFromCanonical(measureCanonical))
-                && e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
-                && e.Resource.Meta.Profile.Contains(ReportConstants.Bundle.CensusProfileUrl)
-            );
-
-        }
-
         protected List CreatePatientList(FhirDateTime reportStart, FhirDateTime reportEnd, string measureCanonical)
         {
             List list = new List();
@@ -457,26 +444,6 @@ namespace LantanaGroup.Link.Report.Core
 
             return list;
         }
-
-        protected void AddPatientReferenceToList(Bundle bundle, Patient patient, string measureCanonical)
-        {
-            var listEntry = GetAggregatePatientList(bundle, measureCanonical);
-
-            if (listEntry is null)
-            {
-                throw new Exception("Patient census list not present in the provided bundle.");
-            }
-
-            List list = (List)listEntry.Resource;
-
-            string refVal = GetRelativeReference(patient);
-            var res = list.Entry.FirstOrDefault(l => l.Item.Reference == refVal);
-            if (res is null)
-            {
-                list.Entry.Add(new List.EntryComponent() { Item = new ResourceReference(refVal) });
-            }
-        }
-
 
 
         protected Bundle.EntryComponent GetAggregateMeasureReport(Bundle bundle, string measureCanonical)
@@ -620,13 +587,6 @@ namespace LantanaGroup.Link.Report.Core
         /// <returns>Bundle.EntryComponent with the newly added measure report</returns>
         protected Bundle.EntryComponent AddMeasureReportToBundle(Bundle bundle, MeasureReport measureReport)
         {
-
-            // ensure patient in this measure report is in the aggregate patient list
-            var patient = measureReport.Contained.FirstOrDefault(c => c.TypeName == "Patient");
-            if (patient is not null)
-                AddPatientReferenceToList(bundle, (Patient)patient, measureReport.Measure);
-
-
             Bundle.EntryComponent entry;
 
             // find existing matching measure report

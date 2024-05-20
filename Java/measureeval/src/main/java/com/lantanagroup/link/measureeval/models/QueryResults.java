@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
+import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.ResourceType;
 
 import java.util.ArrayList;
@@ -29,5 +30,9 @@ public class QueryResults {
         private String resourceId;
 
         private QueryType queryType;
+
+        public IdType getIdElement() {
+            return new IdType(resourceType.name(), resourceId);
+        }
     }
 }

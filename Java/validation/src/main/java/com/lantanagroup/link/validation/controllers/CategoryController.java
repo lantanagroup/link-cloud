@@ -50,6 +50,7 @@ public class CategoryController {
     @Operation(summary = "Get all categories")
     @GetMapping
     public List<CategoryEntity> getCategories() {
+        String val = System.getProperty("loki.enabled");
         return this.categoryRepository.findAll()
                 .stream().peek(category -> category.setRequireAllRuleSets(null))
                 .toList();

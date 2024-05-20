@@ -1,11 +1,8 @@
-﻿using Google.Protobuf.WellKnownTypes;
-using Hl7.FhirPath.Sprache;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
@@ -66,11 +63,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         }
 
         public IResult Login(HttpContext context)
-        {
-            //TODO: DI authentication schema options from settings
+        {            
            var RedirectLink = "/api/info";
            var referer = context.Request.Headers.Referer.ToString();
-           referer = (referer.ToString().IndexOf("/") > 0) ? referer.Substring(0, referer.LastIndexOf("/")): referer;
+           referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
 
             // if referer is not empty then set RedirectUri changes to referer + "/dashboard"
             if (!String.IsNullOrEmpty(referer))
@@ -94,9 +90,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public IResult Logout(HttpContext context)
         {
             var referer = context.Request.Headers.Referer.ToString();
-            referer = (referer.ToString().IndexOf("/") > 0) ? referer.Substring(0, referer.LastIndexOf("/")) : referer;
+            referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
 
-            if (!String.IsNullOrEmpty(referer))
+            if (!string.IsNullOrEmpty(referer))
             {
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
@@ -106,7 +102,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }
             else
-             return Results.Ok(new { Message = "Successfully logged out of Link Admin!" });
+            {
+                context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
+                return Results.SignOut(properties: new AuthenticationProperties
+                {
+                    RedirectUri = "/info"
+                },
+                 authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
+            }
         }
           
         
