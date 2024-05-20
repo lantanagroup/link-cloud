@@ -8,6 +8,7 @@ using Link.Authorization.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Link.Authorization.Permissions;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 {
@@ -57,8 +58,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             {
                 new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
-                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor)
-            };
+                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
+                new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.IsLinkAdmin))
+            };            
 
             var systemPrinciple = new ClaimsPrincipal(new ClaimsIdentity(claims));
 
@@ -74,7 +76,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
 
             //send the request to the account service
-            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/email/{accountId}", cancellationToken);
+            var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/user/email/{accountId}", cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

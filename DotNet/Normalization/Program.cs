@@ -15,8 +15,8 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
@@ -30,9 +30,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using Microsoft.EntityFrameworkCore.Storage;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -124,8 +122,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
-            case "SqlServer":
-                string? connectionString = builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseConnectionString);
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
