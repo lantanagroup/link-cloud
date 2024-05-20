@@ -19,17 +19,21 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
         private readonly ILogger<QueryDispatchJob> _logger;
         private readonly IKafkaProducerFactory<string, DataAcquisitionRequestedValue> _acquisitionProducerFactory;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
-        private readonly IDeletePatientDispatchCommand _deletePatientDispatchCommand;
-   
-        public QueryDispatchJob(ILogger<QueryDispatchJob> logger, IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IDeletePatientDispatchCommand deletePatientDispatchCommand)
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        public QueryDispatchJob(
+            ILogger<QueryDispatchJob> logger, 
+            IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory,
+            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, 
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _acquisitionProducerFactory = acquisitionProducerFactory ?? throw new ArgumentNullException(nameof(acquisitionProducerFactory));
             _auditProducerFactory = auditProducerFactory ?? throw new ArgumentNullException(nameof(auditProducerFactory));
-            _deletePatientDispatchCommand = deletePatientDispatchCommand;
+            _serviceScopeFactory = serviceScopeFactory;
         }
-        
-        public Task Execute(IJobExecutionContext context)
+
+        public async Task Execute(IJobExecutionContext context)
         {
             JobDataMap triggerMap = context.Trigger.JobDataMap!;
             PatientDispatchEntity patientDispatchEntity = (PatientDispatchEntity)triggerMap["PatientDispatchEntity"];
@@ -43,6 +47,9 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             {
                 try
                 {
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var _deletePatientDispatchCommand = scope.ServiceProvider.GetRequiredService<IDeletePatientDispatchCommand>();
+
                     DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                     {
                         PatientId = patientDispatchEntity.PatientId,
@@ -76,11 +83,11 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                     _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: { patientDispatchEntity.FacilityId }");
 
-                    _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+                    await _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Failed to generate a Data Acquisition Requested event", ex);
+                    _logger.LogError(ex, "Failed to generate a Data Acquisition Requested event");
                 }
             }
 
@@ -110,8 +117,6 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 producer.Flush();
             }
-
-            return Task.CompletedTask;
         }
     }
 }

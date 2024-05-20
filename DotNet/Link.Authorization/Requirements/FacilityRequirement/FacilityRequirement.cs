@@ -10,13 +10,13 @@ namespace Link.Authorization.Infrastructure.Requirements
     {
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, FacilityRequirement requirement, string facilityId)
         {
-            //check if user has an admin claim
-            if (context.User.HasClaim(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.Role))
+            //check if user has CanAdministerAllTenants claim
+            if (context.User.HasClaim(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions))
             {
-                var isAdmin = context.User.FindAll(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.Role)
-                        .Any(x => x.Value.Equals(LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor, StringComparison.OrdinalIgnoreCase));
+                var isTenantAdmin = context.User.FindAll(c => c.Type == LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions)
+                        .Any(x => x.Value.Equals(LinkAuthorizationConstants.LinkUserClaims.LinkTenantAdministrator, StringComparison.OrdinalIgnoreCase));
 
-                if (isAdmin)
+                if (isTenantAdmin)
                 {
                     context.Succeed(requirement);
                     return Task.CompletedTask;

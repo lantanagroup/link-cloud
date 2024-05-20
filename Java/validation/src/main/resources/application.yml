@@ -1,3 +1,5 @@
+artifact:
+  init: true
 server:
   port: 31820
 springdoc:
@@ -12,7 +14,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:7080/realms/master
+          issuer-uri: ''
   #datasource:
   #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
   #  username: link-user
@@ -25,7 +27,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.SQLServerDialect
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ''
     consumer:
       group-id: validation
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer

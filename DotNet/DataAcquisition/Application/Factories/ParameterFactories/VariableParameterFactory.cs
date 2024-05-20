@@ -31,8 +31,8 @@ public class VariableParameterFactory
     private static string CalculateLookBackStartDate(VariableParameter parameter, ScheduledReport scheduledReport, string lookback)
     {
         TimeSpan ts = XmlConvert.ToTimeSpan(lookback);
-        var success = DateTime.TryParseExact(scheduledReport.StartDate, "yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var date);
-
+        var success = DateTime.TryParse(scheduledReport.StartDate, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var date);
+        
         if (!success)
         {
             throw new Exception("Unable to parse ScheduledReport.StartDate");
@@ -48,7 +48,7 @@ public class VariableParameterFactory
 
     private static string ConvertDateTimeStringToUTCFormat(VariableParameter parameter, string dateTimeString, string field)
     {
-        var success = DateTime.TryParseExact(dateTimeString, "yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var date);
+        var success = DateTime.TryParse(dateTimeString, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var date);
 
         if (!success)
         {

@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using Confluent.Kafka.Extensions.Diagnostics;
+using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -19,33 +20,27 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<ReportScheduledEventListener> _logger;
         private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly ICreateScheduledReportCommand _createScheduledReportCommand;
-        private readonly IGetScheduledReportQuery _getScheduledReportQuery;
-        private readonly IUpdateScheduledReportCommand _updateScheduledReportQuery;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
         private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public ReportScheduledEventListener(
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory, 
-            ICreateScheduledReportCommand createScheduledReportCommand, 
-            IGetScheduledReportQuery getReportScheduledQuery, 
-            IUpdateScheduledReportCommand updateScheduledReportQuery,
             IKafkaProducerFactory<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
-            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler) 
+            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory) 
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _createScheduledReportCommand = createScheduledReportCommand;
-            _getScheduledReportQuery = getReportScheduledQuery;
-            _updateScheduledReportQuery = updateScheduledReportQuery;
             _auditProducerFactory = auditProducer;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
+            _serviceScopeFactory = serviceScopeFactory;
 
             _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
@@ -62,7 +57,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private async void StartConsumerLoop(CancellationToken cancellationToken) {
 
             var config = new ConsumerConfig() { 
-                GroupId = "QueryDispatchReportScheduled",
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -84,6 +79,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                 try
                                 {
+                                    using var scope = _serviceScopeFactory.CreateScope();
+                                    var _createScheduledReportCommand = scope.ServiceProvider.GetRequiredService<ICreateScheduledReportCommand>();
+                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
+                                    var _updateScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IUpdateScheduledReportCommand>();
+
                                     if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Report Scheduled event", AuditEventType.Create);

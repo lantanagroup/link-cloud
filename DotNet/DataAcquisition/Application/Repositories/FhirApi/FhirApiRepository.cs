@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuer
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using MediatR;
 using System.Net.Http.Headers;
 
@@ -156,8 +157,9 @@ public class FhirApiRepository : IFhirApiRepository
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>("facility", facilityId),           
-            new KeyValuePair<string, object?>("resource", "Patient")
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),  
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
         ]);
 
         var fhirClient = GenerateFhirClient(baseUrl);
@@ -197,23 +199,30 @@ public class FhirApiRepository : IFhirApiRepository
         try
         {
             using var _ = _metrics.MeasureDataRequestDuration([
-                new KeyValuePair<string, object?>("facility", facilityId),
-                new KeyValuePair<string, object?>("patient", patientId),
-                new KeyValuePair<string, object?>("query.type", queryType),
-                new KeyValuePair<string, object?>("resource", resourceType)
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+                new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
-            await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);          
+
+            if (resultBundle != null && resultBundle.Entry.Count > 0)
             {
-                ResourceId = resultBundle.Id,
-                ResourceType = resourceType,
-                CorrelationId = correlationId,
-                PatientId = patientId,
-                FacilityId = facilityId,
-                QueryType = queryType,
-                IsSuccessful = !resultBundle.Entry.Any(x => x.Resource.TypeName != nameof(OperationOutcome)),
-            }, cancellationToken);           
+                foreach (var entry in resultBundle.Entry)
+                {
+                    await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+                    {
+                        ResourceId = entry.Resource.Id,
+                        ResourceType = entry.Resource.TypeName,
+                        CorrelationId = correlationId,
+                        PatientId = patientId,
+                        FacilityId = facilityId,
+                        QueryType = queryType,
+                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome))
+                    }, cancellationToken);
+                }
+            }
             
             return resultBundle;
         }
@@ -235,43 +244,57 @@ public class FhirApiRepository : IFhirApiRepository
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>("facility", facilityId),
-            new KeyValuePair<string, object?>("patient", patientId),
-            new KeyValuePair<string, object?>("query.type", queryType),
-            new KeyValuePair<string, object?>("resource", resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
         ]);
 
-        DomainResource? readResource = resourceType switch
-        {
-            nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
-            nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
-            nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
-            nameof(Location) => await fhirClient.ReadAsync<Location>(id),
-            nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
-            nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
-            nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
-            nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
-            nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
-            nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
-            nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
-            nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
-            _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
-        };
+        DomainResource? readResource = null;
 
-        await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+        try
         {
-            ResourceId = id,
-            ResourceType = resourceType,
-            CorrelationId = correlationId,
-            PatientId = patientId,
-            FacilityId = facilityId,
-            QueryType = queryType,
-            IsSuccessful = readResource is not OperationOutcome,
-        }, cancellationToken);
+            readResource = resourceType switch
+            {
+                nameof(Condition) => await fhirClient.ReadAsync<Condition>(id),
+                nameof(Coverage) => await fhirClient.ReadAsync<Coverage>(id),
+                nameof(Encounter) => await fhirClient.ReadAsync<Encounter>(id),
+                nameof(Location) => await fhirClient.ReadAsync<Location>(id),
+                nameof(Medication) => await fhirClient.ReadAsync<Medication>(id),
+                nameof(MedicationRequest) => await fhirClient.ReadAsync<MedicationRequest>(id),
+                nameof(Observation) => await fhirClient.ReadAsync<Observation>(id),
+                nameof(Patient) => await fhirClient.ReadAsync<Patient>(TEMPORARYPatientIdPart(id)),
+                nameof(Procedure) => await fhirClient.ReadAsync<Procedure>(id),
+                nameof(ServiceRequest) => await fhirClient.ReadAsync<ServiceRequest>(id),
+                nameof(Specimen) => await fhirClient.ReadAsync<Specimen>(id),
+                nameof(List) => await fhirClient.ReadAsync<List>($"{fhirClient.Endpoint}/List/{id}"),
+                _ => throw new Exception($"Resource Type {resourceType} not configured for Read operation."),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "error encountered retrieving fhir resource.");
+            throw;
+        }
 
-        if (readResource is not OperationOutcome)
+
+        if (readResource != null)
         {
-            IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+            await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+            {
+                ResourceId = id,
+                ResourceType = resourceType,
+                CorrelationId = correlationId,
+                PatientId = patientId,
+                FacilityId = facilityId,
+                QueryType = queryType,
+                IsSuccessful = readResource is not OperationOutcome,
+            }, cancellationToken);
+
+            if (readResource is not OperationOutcome)
+            {
+                IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+            } 
         }
         
 
@@ -358,7 +381,7 @@ public class FhirApiRepository : IFhirApiRepository
                     searchParams.Add(kvPair.Key, kvPair.Value);
                 }
 
-                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, queryPlanType);
+                var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType);
                 if(result != null)
                 {
                     domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && (x.Resource.TypeName != nameof(OperationOutcome))).Select(x => (DomainResource)x.Resource).ToList());
@@ -389,10 +412,10 @@ public class FhirApiRepository : IFhirApiRepository
     private void IncrementResourceAcquiredMetric(string? patientIdReference, string? facilityId, string? queryType, string resourceType)
     {
         _metrics.IncrementResourceAcquiredCounter([
-            new KeyValuePair<string, object?>("facility", facilityId),
-            new KeyValuePair<string, object?>("patient", patientIdReference), //TODO: Can we keep this?
-            new KeyValuePair<string, object?>("query.type", queryType),
-            new KeyValuePair<string, object?>("resource", resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientIdReference), //TODO: Can we keep this?
+            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
         ]);
     }
 }

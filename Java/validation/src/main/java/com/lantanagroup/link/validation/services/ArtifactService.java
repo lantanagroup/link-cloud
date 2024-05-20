@@ -1,21 +1,18 @@
 package com.lantanagroup.link.validation.services;
 
-import com.lantanagroup.link.shared.fhir.FhirHelper;
+import com.lantanagroup.link.validation.config.ArtifactConfig;
 import com.lantanagroup.link.validation.entities.ArtifactEntity;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
-import org.hl7.fhir.r4.model.ImplementationGuide;
-import org.hl7.fhir.r4.model.Resource;
-import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ArtifactService {
@@ -23,15 +20,18 @@ public class ArtifactService {
 
     private final ArtifactRepository repository;
 
-    public ArtifactService(ArtifactRepository repository) {
+    public ArtifactService(ArtifactRepository repository, ArtifactConfig artifactConfig) {
         this.repository = repository;
 
-        this.initArtifacts(ArtifactEntity.Types.PACKAGE);
-        this.initArtifacts(ArtifactEntity.Types.RESOURCE);
+        if (artifactConfig.isInit()) {
+            this.initArtifacts(ArtifactEntity.Types.PACKAGE);
+            this.initArtifacts(ArtifactEntity.Types.RESOURCE);
+        } else {
+            log.info("Skipping artifact initialization due to configuration");
+        }
     }
 
-    public void createOrUpdateArtifact(ArtifactEntity.Types type, byte[] content) {
-        String name = this.getArtifactName(type, content);
+    public void createOrUpdateArtifact(String name, ArtifactEntity.Types type, byte[] content) {
         List<ArtifactEntity> artifactEntities = this.repository.findByTypeAndName(type, name);
 
         if (artifactEntities.size() > 1) {
@@ -85,71 +85,38 @@ public class ArtifactService {
         }
 
         for (org.springframework.core.io.Resource resourceResource : resources) {
-            String extension = resourceResource.getFilename().substring(resourceResource.getFilename().lastIndexOf(".") + 1);
-            File file;
+            String extension = Objects.requireNonNull(resourceResource.getFilename())
+                    .substring(resourceResource.getFilename().lastIndexOf(".") + 1)
+                    .toLowerCase();
+            String fileName = new File(resourceResource.getFilename())
+                    .getName();
 
-            try {
-                file = resourceResource.getFile();
-            } catch (IOException e) {
-                log.error("Error getting file for resource in class resources {}", resourceResource.getFilename(), e);
-                continue;
-            }
-
-            if (file.isDirectory()) {
+            if (StringUtils.isEmpty(fileName) || StringUtils.isEmpty(extension)) {
                 continue;
             } else if (!extensions.contains(extension.toLowerCase())) {
                 log.warn("Unexpected file name {} for type {} in class resources", resourceResource.getFilename(), type);
                 continue;
             }
 
+            // Remove the file extension and remove the "CodeSystem-" or "ValueSet-" prefix
+            fileName = fileName.substring(0, resourceResource.getFilename().lastIndexOf("."))
+                    .replaceFirst("^(CodeSystem|ValueSet)-", "");
+
             log.info("Loading resource {}", resourceResource.getFilename());
 
             try {
                 byte[] resourceContent = resourceResource.getContentAsByteArray();
-                String resourceName = this.getArtifactName(type, resourceContent);
 
-                if (this.repository.findByTypeAndName(type, resourceName).isEmpty()) {
+                if (this.repository.findByTypeAndName(type, fileName).isEmpty()) {
                     ArtifactEntity artifactEntity = new ArtifactEntity();
                     artifactEntity.setType(type);
-                    artifactEntity.setName(resourceName);
+                    artifactEntity.setName(fileName);
                     artifactEntity.setContent(resourceContent);
                     this.repository.save(artifactEntity);
                 }
             } catch (IOException e) {
                 log.error("Error get content for resource in class resources {}", resourceResource.getFilename(), e);
             }
-        }
-    }
-
-    private String getArtifactName(ArtifactEntity.Types type, byte[] content) {
-        switch (type) {
-            case RESOURCE:
-                String contentString = new String(content);
-                Resource resource = FhirHelper.deserialize(contentString);
-                if (resource != null) {
-                    return resource.getIdElement().getIdPart();
-                } else {
-                    throw new RuntimeException("Invalid FHIR resource");
-                }
-            case PACKAGE:
-                try {
-                    NpmPackage npmPackage = NpmPackage.fromPackage(new ByteArrayInputStream(content));
-                    List<String> igFileName = npmPackage.listResources("ImplementationGuide");
-
-                    if (igFileName.isEmpty()) {
-                        throw new RuntimeException("No ImplementationGuide found in package");
-                    } else if (igFileName.size() > 1) {
-                        log.warn("Multiple ImplementationGuides found in package, using the first one");
-                    }
-
-                    InputStream is = npmPackage.loadResource(igFileName.get(0));
-                    ImplementationGuide ig = (ImplementationGuide) FhirHelper.deserialize(is);
-                    return ig.getIdElement().getIdPart();
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to parse artifact package", e);
-                }
-            default:
-                throw new RuntimeException("Unknown artifact type");
         }
     }
 }

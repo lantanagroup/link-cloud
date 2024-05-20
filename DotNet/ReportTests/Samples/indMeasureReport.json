@@ -1,0 +1,95 @@
+﻿{
+  "resourceType": "MeasureReport",
+  "id": "5dc86ee9-552159cd-8efd9ab9",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/extension-measureScoring",
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/measure-scoring",
+            "code": "cohort",
+            "display": "Cohort"
+          }
+        ]
+      }
+    }
+  ],
+  "status": "complete",
+  "type": "individual",
+  "measure": "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation|0.0.011",
+  "subject": {
+    "reference": "Patient/Pt1ACH"
+  },
+  "date": "2024-03-14T00:52:32+00:00",
+  "reporter": {
+    "reference": "Organization/73568170-0e7f-4b16-8eae-ec699b8d77cf"
+  },
+  "period": {
+    "start": "2024-01-01T00:00:00+00:00",
+    "end": "2024-01-31T23:59:59+00:00"
+  },
+  "improvementNotation": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/measure-improvement-notation",
+        "code": "increase"
+      }
+    ]
+  },
+  "group": [
+    {
+      "population": [
+        {
+          "id": "initial-population",
+          "code": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-population",
+                "code": "initial-population",
+                "display": "Initial Population"
+              }
+            ]
+          },
+          "count": 3
+        }
+      ],
+      "measureScore": {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+            "valueCode": "unknown"
+          }
+        ]
+      }
+    }
+  ],
+  "evaluatedResource": [
+    {
+      "reference": "Encounter/En3ACH"
+    },
+    {
+      "reference": "Encounter/En2ACH"
+    },
+    {
+      "reference": "Observation/Ob1ACH"
+    },
+    {
+      "reference": "Encounter/En1ACH"
+    },
+    {
+      "reference": "Encounter/En5ACH"
+    },
+    {
+      "reference": "Patient/Pt1ACH"
+    },
+    {
+      "reference": "Location/Location1ACH"
+    }
+  ]
+}

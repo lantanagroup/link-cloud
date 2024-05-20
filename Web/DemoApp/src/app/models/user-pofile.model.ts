@@ -17,3 +17,13 @@ export class UserProfile implements IUserProfile {
     this.roles = roles;
   }
 }
+
+export class UserClaims {
+  type: string;
+  value: string;
+
+  constructor(type: string, value: string) {
+    this.type = type;
+    this.value = value;
+  }
+}

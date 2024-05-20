@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     options.EnableMetrics = telemetryConfig.EnableMetrics;
                     options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";
                     options.EnableRuntimeInstrumentation = telemetryConfig.EnableRuntimeInstrumentation;
+                    options.InstrumentEntityFramework = telemetryConfig.InstrumentEntityFramework;
 
                     //configure OTEL Collector
                     options.EnableOtelCollector = telemetryConfig.EnableOtelCollector;

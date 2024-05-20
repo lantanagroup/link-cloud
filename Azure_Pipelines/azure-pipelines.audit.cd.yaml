@@ -8,6 +8,8 @@ trigger:
     - DotNet/Shared/*
     exclude:
     - '*'
+    
+pr: none
 
 pool:
   vmImage: 'ubuntu-latest'

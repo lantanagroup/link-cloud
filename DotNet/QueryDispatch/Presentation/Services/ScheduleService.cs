@@ -12,9 +12,8 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
     {
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IJobFactory _jobFactory;
-        private readonly IGetAllQueryDispatchConfigurationQuery _getAllQueryDispatchConfigurationQuery;
-        private readonly IGetAllPatientDispatchQuery _getAllPatientDispatchQuery;
         private readonly ILogger<DeletePatientDispatchCommand> _logger;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
 
@@ -23,13 +22,16 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             _topicJobs.Add(KafkaTopic.ReportScheduled.ToString(), typeof(QueryDispatchJob));
         }
 
-        public ScheduleService(ISchedulerFactory schedulerFactory, IJobFactory jobFactory, IGetAllQueryDispatchConfigurationQuery getAllQueryDispatchConfigurationQuery, IGetAllPatientDispatchQuery getAllPatientDispatchQuery, ILogger<DeletePatientDispatchCommand> logger)
+        public ScheduleService(
+            ISchedulerFactory schedulerFactory, 
+            IJobFactory jobFactory, 
+            ILogger<DeletePatientDispatchCommand> logger, 
+            IServiceScopeFactory serviceScopeFactory)
         {
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
-            _getAllQueryDispatchConfigurationQuery = getAllQueryDispatchConfigurationQuery;
-            _getAllPatientDispatchQuery = getAllPatientDispatchQuery;
             _logger = logger;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public IScheduler Scheduler { get; set; }
@@ -38,6 +40,10 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
         {
             try
             {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
+                var _getAllPatientDispatchQuery = scope.ServiceProvider.GetRequiredService<IGetAllPatientDispatchQuery>();
+
                 Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
                 Scheduler.JobFactory = _jobFactory;
 
