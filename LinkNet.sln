@@ -71,6 +71,8 @@ Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DemoApp", "Web\DemoApp\Demo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAcquisition.Domain", "DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj", "{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -195,6 +197,10 @@ Global
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0ED93DF-7502-4D26-87A4-1E09C3420C33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0ED93DF-7502-4D26-87A4-1E09C3420C33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0ED93DF-7502-4D26-87A4-1E09C3420C33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0ED93DF-7502-4D26-87A4-1E09C3420C33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

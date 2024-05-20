@@ -7,8 +7,14 @@
 # ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
 # ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"${ARTIFACTS_ENDPOINT}\", \"password\":\"${ACCESS_TOKEN}\"}]}"
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
 WORKDIR /app
+
+ENV \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
+
 EXPOSE 80
 EXPOSE 443
 

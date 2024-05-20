@@ -33,6 +33,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using Hl7.Fhir.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,9 +97,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         switch (builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider))
         {
-            case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection))
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString =
+                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                        .DatabaseConnection);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+                
+                options.UseSqlServer(connectionString)
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
@@ -138,6 +145,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.ForFhir();
     });
 
     builder.Services.AddGrpc();

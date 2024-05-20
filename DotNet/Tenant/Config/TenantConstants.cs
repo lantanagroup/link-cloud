@@ -12,7 +12,6 @@ namespace LantanaGroup.Link.Tenant.Config
             public const string EnableSwagger = "EnableSwagger";
             public const string Serilog = "Serilog";
             public const string DatabaseProvider = "DatabaseProvider";
-            public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
         }
 
         public static class TenantLoggingIds

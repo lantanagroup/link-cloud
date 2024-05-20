@@ -159,8 +159,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
         {          
-            case "SqlServer":
-                string? connectionString = builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseConnectionString);
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString =
+                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                        .DatabaseConnection);
                 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");

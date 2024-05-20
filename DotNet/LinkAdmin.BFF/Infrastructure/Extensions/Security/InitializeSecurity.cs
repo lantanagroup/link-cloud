@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Link.Authorization.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication;
 
@@ -115,19 +116,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 });
             }
 
-            // Add Link Bearer Token authorization schema if feature is enabled
-            if (configuration.GetValue<bool>("LinkBearerService:EnableTokenGenrationEndpoint"))
-            {
-                if (!LinkAdminConstants.AuthenticationSchemes.LinkBearerToken.Equals(defaultChallengeScheme))
-                    authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.LinkBearerToken);
+            // Add Link Bearer Token authorization schema
+            if (!LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken.Equals(defaultChallengeScheme))
+                authSchemas.Add(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken);
 
-                services.AddLinkBearerServiceAuthentication(options =>
-                {
-                    options.Environment = securityServiceOptions.Environment;
-                    options.Authority = LinkAdminConstants.LinkBearerService.LinkBearerIssuer;
-                    options.Audience = LinkAdminConstants.LinkBearerService.LinkBearerAudience;
-                });
-            }
+            services.AddLinkBearerServiceAuthentication(options =>
+            {
+                options.Environment = securityServiceOptions.Environment;
+                options.Authority = configuration.GetValue<string>("LinkBearerService:Authority") ?? LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
+                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;              
+            });
 
             // Add Authorization
             services.AddAuthorization(builder =>

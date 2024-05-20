@@ -1,22 +1,22 @@
-﻿using LantanaGroup.Link.Account.Repositories;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Account.Infrastructure.Health
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        protected readonly DataContext _dataContext;
+        protected readonly DbContext _dbContext;
 
-        public DatabaseHealthCheck(DataContext dataContext)
-        {            
-            _dataContext = dataContext ?? throw new ArgumentNullException(nameof(dataContext));
+        public DatabaseHealthCheck(DbContext dbContext)
+        {
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             try
             {
-                bool outcome = await _dataContext.Database.CanConnectAsync();
+                bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
 
                 if (outcome)
                 {
