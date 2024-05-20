@@ -1,10 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Attributes;
-using LantanaGroup.Link.Report.Serializers;
-using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Entities
 {

@@ -3,6 +3,7 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Moq;
 using Moq.AutoMock;
 using Task = System.Threading.Tasks.Task;
@@ -27,7 +28,7 @@ namespace LantanaGroup.Link.AuditUnitTests
         private const string User = "Admin Joe";
         private static readonly string Action = AuditEventType.Create.ToString();
         private const string Resource = "Account(8ddb2379-aef0-4ebc-895f-48753c412caa)";
-        private static readonly List<PropertyChangeModel> PropertyChanges = new List<PropertyChangeModel>() { new PropertyChangeModel() { PropertyName = "FirstName", InitialPropertyValue = "Richard", NewPropertyValue = "Rich" } };
+        private static readonly List<PropertyChangeModel> PropertyChanges = [new PropertyChangeModel() { PropertyName = "FirstName", InitialPropertyValue = "Richard", NewPropertyValue = "Rich" }];
         private const string Notes = "";
 
         [SetUp]

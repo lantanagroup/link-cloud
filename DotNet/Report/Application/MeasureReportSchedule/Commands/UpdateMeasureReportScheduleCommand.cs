@@ -31,12 +31,11 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands
             schedule.FacilityId = request.ReportSchedule.FacilityId;
             schedule.ReportStartDate = request.ReportSchedule.ReportStartDate;
             schedule.ReportEndDate = request.ReportSchedule.ReportEndDate;
-            schedule.ScheduledTrigger = request.ReportSchedule.ScheduledTrigger;
             schedule.PatientsToQuery = request.ReportSchedule.PatientsToQuery;
             schedule.SubmittedDate = request.ReportSchedule.SubmittedDate;
             schedule.PatientsToQueryDataRequested = request.ReportSchedule.PatientsToQueryDataRequested;
             schedule.ModifyDate = DateTime.UtcNow;
-            await _repository.UpdateAsync(schedule);
+            await _repository.UpdateAsync(schedule, cancellationToken);
             return schedule;
         }
     }

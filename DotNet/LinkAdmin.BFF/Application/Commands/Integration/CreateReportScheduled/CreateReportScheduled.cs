@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -75,6 +76,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     catch (Exception ex)
                     {
                         Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                        Activity.Current?.RecordException(ex);
                         _logger.LogKafkaProducerException(correlationId, ex.Message);
                         throw;
                     }
@@ -84,6 +86,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.RecordException(ex);
                 _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
                 throw;
             }

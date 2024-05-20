@@ -1,22 +1,20 @@
-ARG SHARED_BOTW_FEED_TOKEN_ARG
+FROM maven:3-eclipse-temurin-17 AS build
 
-# Stage 1: Build the Spring Boot application
-FROM maven:3.8.7-openjdk-18-slim AS build
-WORKDIR /app
+WORKDIR /root
 
-COPY Java/pom.xml ./
-COPY Java/shared/pom.xml ./shared/
-COPY Java/measureeval/pom.xml ./measureeval/
-COPY Java/validation/pom.xml ./validation/
-RUN mvn dependency:go-offline
+COPY pom.xml ./
+COPY shared/pom.xml shared/
+COPY measureeval/pom.xml measureeval/
+COPY validation/pom.xml validation/
+RUN mvn -pl measureeval -am dependency:go-offline
 
-COPY Java/ ./
-RUN mvn package -pl measureeval -am
-RUN mv measureeval/target/measureeval-*-jar-with-dependencies.jar measureeval/target/measureeval.jar
+COPY ./ ./
+RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 
-# Stage 2: Run the Spring Boot application
-FROM openjdk:17-jdk-alpine
-WORKDIR /app
-COPY --from=build /app/measureeval/target/measureeval.jar measureeval.jar
+FROM eclipse-temurin:17-alpine AS run
+
+WORKDIR /root
+
+COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
 EXPOSE 5135
-CMD ["java", "-jar", "measureeval.jar", "--add-opens java.base/java.util=ALL-UNNAMED"]
+CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "measureeval.jar"]

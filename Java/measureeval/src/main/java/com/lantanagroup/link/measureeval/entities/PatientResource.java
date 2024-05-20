@@ -1,25 +1,13 @@
 package com.lantanagroup.link.measureeval.entities;
 
-import org.hl7.fhir.r4.model.ResourceType;
-import org.springframework.data.annotation.Id;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.time.Instant;
-
-public class PatientResource {
-    @Id
-    private String id;
-
-    private String tenantId;
-
+@Getter
+@Setter
+public class PatientResource extends AbstractResourceEntity {
+    @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
-
-    private ResourceType resourceType;
-
-    private String resourceId;
-
-    private PatientResourceStages stage;
-
-    private String resourceJson;
-
-    private Instant timestamp;
 }

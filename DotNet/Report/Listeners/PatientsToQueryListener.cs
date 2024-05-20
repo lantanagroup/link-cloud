@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "PatientsToQueryEvent",
+                GroupId = ReportConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -71,64 +71,90 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             consumeResult = result;
 
-                            if (consumeResult == null)
+                            try
                             {
-                                throw new DeadLetterException(
-                                    $"{Name}: consumeResult is null", AuditEventType.Create);
-                            }
-
-                            var key = consumeResult.Message.Key;
-                            var value = consumeResult.Message.Value;
-                            facilityId = key;
-
-                            if (string.IsNullOrWhiteSpace(key))
-                            {
-                                throw new DeadLetterException($"{Name}: key value is null or empty", AuditEventType.Create);
-                            }
-
-                            var scheduledReports = await _mediator.Send(new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key }, cancellationToken);
-                            foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
-                            {
-                                scheduledReport.PatientsToQuery = value.PatientIds;
-
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                if (consumeResult == null)
                                 {
-                                    ReportSchedule = scheduledReport
+                                    throw new DeadLetterException(
+                                        $"{Name}: consumeResult is null", AuditEventType.Create);
+                                }
 
-                                }, cancellationToken);
+                                var key = consumeResult.Message.Key;
+                                var value = consumeResult.Message.Value;
+                                facilityId = key;
+
+                                if (string.IsNullOrWhiteSpace(key))
+                                {
+                                    throw new DeadLetterException($"{Name}: key value is null or empty",
+                                        AuditEventType.Create);
+                                }
+
+                                if (value == null || value.PatientIds == null)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: consumeResult.Value.PatientIds is null", AuditEventType.Create);
+                                }
+
+                                var scheduledReports = await _mediator.Send(
+                                    new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key },
+                                    cancellationToken);
+
+                                if (!scheduledReports?.Any() ?? false)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: No Scheduled Reports found for facilityId: {key}", AuditEventType.Query);
+                                }
+
+                                foreach (var scheduledReport in scheduledReports.Where(sr =>
+                                             !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
+                                {
+                                    scheduledReport.PatientsToQuery = value.PatientIds;
+
+                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                    {
+                                        ReportSchedule = scheduledReport
+
+                                    }, cancellationToken);
+                                }
                             }
+                            catch (DeadLetterException ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TimeoutException ex)
+                            {
+                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
 
+                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                            }
+                            finally
+                            {
+                                consumer.Commit(consumeResult);
+                            }
                         }, cancellationToken);
-                        
+
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                    }
-                    catch (TransientException ex)
-                    {
-                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        consumer.Commit();
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
-                    }
-                    finally
-                    {
-                        if (consumeResult != null)
-                        {
-                            consumer.Commit(consumeResult);
-                        }
-                        else
-                        {
-                            consumer.Commit();
-                        }
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
                     }
                 }
             }

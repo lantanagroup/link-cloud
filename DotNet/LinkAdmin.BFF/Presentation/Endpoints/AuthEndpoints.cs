@@ -1,5 +1,4 @@
-﻿using Hl7.FhirPath.Sprache;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
@@ -22,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public void RegisterEndpoints(WebApplication app)
         {
-            var authEndpoints = app.MapGroup("/")
+            var authEndpoints = app.MapGroup("/api")
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {                    
                     Tags = new List<OpenApiTag> { new() { Name = "Auth" } }
@@ -63,14 +62,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             _logger.LogApiRegistration(nameof(AuthEndpoints));
         }
 
-        public IResult Login()
-        {
-            //TODO: DI authentication schema options from settings
+        public IResult Login(HttpContext context)
+        {            
+           var RedirectLink = "/api/info";
+           var referer = context.Request.Headers.Referer.ToString();
+           referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
+
+            // if referer is not empty then set RedirectUri changes to referer + "/dashboard"
+            if (!String.IsNullOrEmpty(referer))
+            {
+                RedirectLink = referer + "/dashboard";
+            }
             return Results.Challenge(
-                properties: new AuthenticationProperties { 
-                    RedirectUri = "/" 
-                },                
-                authenticationSchemes: [ _authSchemaOptions.Value.DefaultChallengeScheme ]);
+                properties: new AuthenticationProperties
+                {
+                    RedirectUri = RedirectLink, 
+                },
+                authenticationSchemes: [_authSchemaOptions.Value.DefaultChallengeScheme]); 
         }
 
         public IResult GetUser(HttpContext context)
@@ -81,8 +89,27 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public IResult Logout(HttpContext context)
         {
-            context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
-            return Results.Ok(new { Message = "Successfully logged out of Link Admin!" });
+            var referer = context.Request.Headers.Referer.ToString();
+            referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
+
+            if (!string.IsNullOrEmpty(referer))
+            {
+                context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
+                return Results.SignOut(properties: new AuthenticationProperties
+                {
+                    RedirectUri = referer + "/logout"
+                },
+                 authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
+            }
+            else
+            {
+                context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
+                return Results.SignOut(properties: new AuthenticationProperties
+                {
+                    RedirectUri = "/info"
+                },
+                 authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
+            }
         }
           
         

@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
@@ -122,7 +123,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
     builder.Services.AddSingleton<ReportRepository>();
     builder.Services.AddSingleton<PatientsToQueryRepository>();
-    builder.Services.AddSingleton<RetryRepository>();
+    builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
 
     // Add controllers
     builder.Services.AddControllers();
@@ -161,6 +162,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<RetryScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
+    builder.Services.AddTransient<PatientReportSubmissionBundler>();
+    builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     #region Exception Handling

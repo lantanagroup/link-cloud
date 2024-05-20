@@ -13,7 +13,6 @@ namespace LantanaGroup.Link.Report.Entities
         public string FacilityId { get; set; } = string.Empty;
         public DateTime ReportStartDate { get; set; }
         public DateTime ReportEndDate { get; set; }
-        public string ScheduledTrigger { get; set; } = string.Empty;
         public List<string>? PatientsToQuery { get; set; }
         public DateTime? SubmittedDate { get; set; }
         public bool? PatientsToQueryDataRequested { get; set; } = false;

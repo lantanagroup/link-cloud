@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using Microsoft.Extensions.Options;
@@ -81,7 +82,7 @@ public class ResourceAcquiredListener : BackgroundService
     {
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
-            GroupId = "NormalizationService-ResourceAcquired",
+            GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
         using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: true);
@@ -96,9 +97,6 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     message = result;
 
-                    //if (message == null)
-                    //    continue;
-
                     (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
                     try
                     {
@@ -108,7 +106,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, message.Message.Key);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     NormalizationConfig? config = null;
@@ -119,7 +117,6 @@ public class ResourceAcquiredListener : BackgroundService
                             FacilityId = messageMetaData.facilityId
                         });
                     }
- 
                     catch (Exception ex)
                     {
                         var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
@@ -127,7 +124,23 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
+                    }
+
+                    if (config == null)
+                    {
+                        var errorMessage = $"No facility configuration found for {messageMetaData.facilityId}";
+                        _transientExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
+                        kafkaConsumer.Commit(message);
+                        return;
+                    }
+
+                    if(config.OperationSequence == null || config.OperationSequence.Count == 0)
+                    {
+                        var errorMessage = $"No operation sequence found for {messageMetaData.facilityId}";
+                        _deadLetterExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
+                        kafkaConsumer.Commit(message);
+                        return;
                     }
 
                     var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
@@ -141,7 +154,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     var operationCommandResult = new OperationCommandResult
@@ -211,12 +224,12 @@ public class ResourceAcquiredListener : BackgroundService
                             };
 
                             _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
-                                new KeyValuePair<string, object?>("facility", messageMetaData.facilityId),
-                                new KeyValuePair<string, object?>("correlation.id", messageMetaData.correlationId),
-                                new KeyValuePair<string, object?>("patient", message.Message.Value.PatientId),
-                                new KeyValuePair<string, object?>("resource", operationCommandResult.Resource.TypeName),
-                                new KeyValuePair<string, object?>("query.type", message.Message.Value.QueryType),
-                                new KeyValuePair<string, object?>("normalization.operation", op.Value.GetType().Name)
+                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
+                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, operationCommandResult.Resource.TypeName),
+                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
+                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, op.Value.GetType().Name)
                             });
                         }
                     }
@@ -227,7 +240,7 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     try
@@ -270,7 +283,7 @@ public class ResourceAcquiredListener : BackgroundService
                         _logger.LogError(errorMessage, ex);
                         _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
                         kafkaConsumer.Commit(message);
-                        //continue;
+                        return;
                     }
 
                     kafkaConsumer.Commit(message);

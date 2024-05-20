@@ -14,7 +14,7 @@
             public const string Serilog = "Serilog";
             public const string EnableSwagger = "EnableSwagger";
             public const string SecretManagement = "SecretManagement";
-            public const string LinkBearerService = "LinkBearerServiceConfig";
+            public const string LinkBearerService = "LinkBearerService";
         }
 
         public static class AuthenticationSchemes

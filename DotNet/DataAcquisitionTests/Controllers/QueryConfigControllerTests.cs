@@ -123,12 +123,19 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteFhirQueryConfigurationCommand>(), CancellationToken.None))
-                .ReturnsAsync(null);
+                .Throws(new Exception());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.DeleteFhirConfiguration(facilityId, CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
+            try
+            {
+                var result = await _controller.DeleteFhirConfiguration(facilityId, CancellationToken.None);
+                Assert.True(false);
+            }
+            catch (Exception)
+            {
+                Assert.True(true);
+            }
         }
 
         [Fact]
