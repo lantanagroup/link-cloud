@@ -1,7 +1,7 @@
 ﻿
 namespace LantanaGroup.Link.Shared.Settings
 {
-    public class ConfigurationConstants
+    public static class ConfigurationConstants
     {
         public static class AppSettings
         {
@@ -11,12 +11,12 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string CORS = "CORS";
             public const string AutoMigrate = "AutoMigrate";
             public const string DatabaseProvider = "DatabaseProvider";
+            public const string SqlServerDatabaseProvider = "SqlServer";
             public const string DataProtection = "DataProtection";
         }
 
         public static class DatabaseConnections
         {
-            public const string SqlServer = "SqlServer";
             public const string DatabaseConnection = "DatabaseConnection";
         }
 

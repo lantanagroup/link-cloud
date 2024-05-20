@@ -8,7 +8,6 @@ public static class NormalizationConstants
     public static class AppSettingsSectionNames
     {
         public const string ServiceInformation = "ServiceInformation";
-        public const string DatabaseConnectionString = "ConnectionStrings:DatabaseConnection";
         public const string DatabaseProvider = "DatabaseProvider";
         public const string ExternalConfigurationSource = "ExternalConfigurationSource";
     }
