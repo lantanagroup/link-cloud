@@ -8,10 +8,10 @@ variable "measure_eval_label" {
 }
 
 ## Service Variables
-variable "measure_eval_mongo_connection_string" {
+variable "measure_eval_db_connection_string" {
   description = "The MongoDB connection string to use for the MeasureEval service"
 }
-variable "measure_eval_mongo_database" {
+variable "measure_eval_db_name" {
   description = "The MongoDB database name to use for the MeasureEval service"
 }
 
@@ -21,7 +21,7 @@ variable "measure_eval_mongo_database" {
 
 resource "azurerm_key_vault_secret" "measure_eval_kv_mongo_connection_string" {
   name         = "measure-eval-mongo-connection-string"
-  value        = var.measure_eval_mongo_connection_string
+  value        = var.measure_eval_db_connection_string
   key_vault_id = data.azurerm_key_vault.current.id
 }
 
@@ -44,7 +44,7 @@ resource "azurerm_app_configuration_key" "measure_eval_ac_mongo_connection_strin
 resource "azurerm_app_configuration_key" "measure_eval_ac_mongo_database" {
   key                    = "/spring/data/mongodb/database"
   type                   = "kv"
-  value                  = var.measure_eval_mongo_database
+  value                  = var.measure_eval_db_name
   configuration_store_id = data.azurerm_app_configuration.current.id
   
   depends_on = [

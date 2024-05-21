@@ -9,6 +9,7 @@ provider "azurerm" {
 variable "subscription_id" {}
 variable "resource_group_name" {}
 variable "key_vault_name" {}
+variable "key_vault_uri" {}
 variable "app_config_name" {}
 variable "redis_connection" {
   description = "The host:port of the redis server"
@@ -34,6 +35,7 @@ variable "kafka_api_version_request" {
 variable "kafka_bootstrap_servers" {
   description = "JSON array of bootstrap server IPs or hostnames. I.E.: ['10.24.10.1:9092', 'some.bootstrap.server.local:9094']"
 }
+variable "otel_collector_endpoint" {}
 
 ##########
 # Data
@@ -85,9 +87,10 @@ resource "azurerm_app_configuration_key" "global_ac_kafka_api_version_request" {
 }
 
 resource "azurerm_app_configuration_key" "global_ac_kafka_bootstrap_server" {
-  key                    = "KafkaConnection:BootstrapServers:0"
+  key                    = "KafkaConnection:BootstrapServers"
   type                   = "kv"
-  value                  = ""
+  value                  = var.kafka_bootstrap_servers
+  content_type           = "application/json"
   configuration_store_id = data.azurerm_app_configuration.current.id
 }
 
@@ -116,4 +119,39 @@ resource "azurerm_app_configuration_key" "global_ac_redis_password" {
   depends_on = [
 	azurerm_key_vault_secret.validation_kv_db_password
   ]
+}
+
+resource "azurerm_app_configuration_key" "global_ac_secret_mgmt_enabled" {
+  key                    = "SecretManagement:Enabled"
+  type                   = "kv"
+  value					 = "true"
+  configuration_store_id = data.azurerm_app_configuration.current.id
+}
+
+resource "azurerm_app_configuration_key" "global_ac_secret_mgmt_manager" {
+  key                    = "SecretManagement:Manager"
+  type                   = "kv"
+  value					 = "AzureKeyVault"
+  configuration_store_id = data.azurerm_app_configuration.current.id
+}
+
+resource "azurerm_app_configuration_key" "global_ac_secret_mgmt_manager_uri" {
+  key                    = "SecretManagement:ManagerUri"
+  type                   = "kv"
+  value					 = "https://nhsn-dev-kv-link-cl.vault.azure.net/"
+  configuration_store_id = data.azurerm_app_configuration.current.id
+}
+
+resource "azurerm_app_configuration_key" "global_ac_telementry_otel_enabled" {
+  key                    = "Telemetry:EnableOtelCollector"
+  type                   = "kv"
+  value					 = "true"
+  configuration_store_id = data.azurerm_app_configuration.current.id
+}
+
+resource "azurerm_app_configuration_key" "global_ac_telementry_otel_endpoint" {
+  key                    = "Telemetry:OtelCollectorEndpoint"
+  type                   = "kv"
+  value					 = "http://collector"
+  configuration_store_id = data.azurerm_app_configuration.current.id
 }
