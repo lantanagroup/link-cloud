@@ -16,15 +16,26 @@ public static class SqlServerRegistration
 
             switch (builder.Configuration.GetValue<string>(ConfigurationConstants.AppSettings.DatabaseProvider))
             {
-                case "SqlServer":
+                case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
                     {
                         if (useUpdateBaseEntityInterceptor)
-                            options.UseSqlServer(
-                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection))
+                        {
+                            string? connectionString =
+                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                                    .DatabaseConnection);
+
+                            if (string.IsNullOrEmpty(connectionString))
+                                throw new InvalidOperationException("Database connection string is null or empty.");
+                            
+                            options.UseSqlServer(connectionString)
                                 .AddInterceptors(updateBaseEntityInterceptor);
+                        }
                         else
+                        {
                             options.UseSqlServer(
-                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+                                builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                                    .DatabaseConnection));
+                        }
                     }
                     break;
                 default:

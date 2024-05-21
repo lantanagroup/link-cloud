@@ -97,6 +97,23 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     message = result;
 
+                    if(message.Key == null || string.IsNullOrWhiteSpace(message.Key))
+                    {
+                        _logger.LogError("FacilityId/Message Key is null or empty. Skipping message.");
+                        _deadLetterExceptionHandler.HandleException(message, string.Empty, AuditEventType.Create, "Key is null or Empty.");
+                        kafkaConsumer.Commit(message);
+                        return;
+                    }
+
+                    if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
+                    {
+                        var errorMessage = "Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.";
+                        _logger.LogError(errorMessage);
+                        _deadLetterExceptionHandler.HandleException(message, string.Empty, AuditEventType.Create, errorMessage);
+                        kafkaConsumer.Commit(message);
+                        return;
+                    }
+
                     (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
                     try
                     {
@@ -345,7 +362,7 @@ public class ResourceAcquiredListener : BackgroundService
         var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
 
         if (cIBytes == null || cIBytes.Length == 0)
-            return (facilityId, string.Empty);
+            throw new MissingCorrelationIdException();
 
 
         var correlationId = Encoding.UTF8.GetString(cIBytes);
