@@ -213,6 +213,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
 
+                                        var serializedAggregates = new List<string>();
+                                        foreach (var agg in _aggregator.Aggregate(measureReports))
+                                        {
+                                            serializedAggregates.Add(JsonSerializer.Serialize(agg, new JsonSerializerOptions().ForFhir()));
+                                        }
+
                                         prod.Produce(nameof(KafkaTopic.SubmitReport),
                                             new Message<SubmissionReportKey, SubmissionReportValue>
                                             {
@@ -228,7 +234,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     MeasureIds = string.Join("+",
                                                         measureReports.Select(mr => mr.Measure).Distinct()),
                                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
-                                                    Aggregates = _aggregator.Aggregate(measureReports)
+                                                    Aggregates = serializedAggregates
                                                 },
                                                 Headers = new Headers
                                                 {
