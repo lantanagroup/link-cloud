@@ -104,8 +104,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 var httpClient = _httpClient.CreateClient();
+                                string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
-                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
+                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
                                 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
