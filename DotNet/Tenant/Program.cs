@@ -113,9 +113,15 @@ namespace Tenant
 
                 switch (builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseProvider))
                 {
-                    case "SqlServer":
-                        options.UseSqlServer(
-                            builder.Configuration.GetValue<string>(TenantConstants.AppSettingsSectionNames.DatabaseConnectionString))
+                    case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                        string? connectionString =
+                            builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                                .DatabaseConnection);
+
+                        if (string.IsNullOrEmpty(connectionString))
+                            throw new InvalidOperationException("Database connection string is null or empty.");
+                        
+                        options.UseSqlServer(connectionString)
                            .AddInterceptors(updateBaseEntityInterceptor);
                         break;
                     default:
