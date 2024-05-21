@@ -104,12 +104,27 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 var httpClient = _httpClient.CreateClient();
-                                string censusRequesturl = _submissionConfig.CensusUrl +
+                                string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
-                                var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
-                                var admittedPatients =
-                                    System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken), new JsonSerializerOptions().ForFhir());
+                                
+                                _logger.LogTrace("Requesting census from Census service: " + censusRequestUrl);
+                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
+                                var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+                                List? admittedPatients = null;
+
+                                try
+                                {
+                                    admittedPatients =
+                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
+                                            censusContent,
+                                            new JsonSerializerOptions().ForFhir());
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
+                                    _logger.LogTrace("Census service response: " + censusContent);
+                                    throw;
+                                }
 
                                 string dataAcqRequestUrl =
                                     _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
