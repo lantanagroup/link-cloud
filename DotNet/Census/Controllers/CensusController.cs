@@ -80,6 +80,8 @@ public class CensusController : Controller
             });
 
             var fhirList = new Hl7.Fhir.Model.List();
+            fhirList.Status = List.ListStatus.Current;
+            fhirList.Mode = ListMode.Snapshot;
             fhirList.Extension.Add(new Extension()
             {
                 Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
