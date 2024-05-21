@@ -94,7 +94,7 @@ public class CensusController : Controller
             {
                 fhirList.Entry.Add(new List.EntryComponent()
                 {
-                    Item = new ResourceReference("Patient/" + patient.PatientId)
+                    Item = new ResourceReference(patient.PatientId.StartsWith("Patient/") ? patient.PatientId : "Patient/" + patient.PatientId)
                 });
             }
 
