@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.Value.ToShortDateString()}-{key.EndDate.Value.ToShortDateString()}");
+                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
                                 if (Directory.Exists(submissionDirectory))
                                 {
                                     Directory.Delete(submissionDirectory, true);
