@@ -107,10 +107,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                                 
-                                _logger.LogTrace("Requesting census from Census service: " + censusRequestUrl);
+                                _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
                                 List? admittedPatients = null;
+
+                                if (!censusResponse.IsSuccessStatusCode)
+                                    throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
 
                                 try
                                 {
@@ -122,7 +125,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 catch (Exception ex)
                                 {
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                                    _logger.LogTrace("Census service response: " + censusContent);
+                                    _logger.LogDebug("Census service response: " + censusContent);
                                     throw;
                                 }
 
