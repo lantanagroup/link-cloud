@@ -107,10 +107,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
                                 
-                                _logger.LogTrace("Requesting census from Census service: " + censusRequestUrl);
+                                _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
                                 List? admittedPatients = null;
+
+                                if (!censusResponse.IsSuccessStatusCode)
+                                    throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
 
                                 try
                                 {
@@ -122,7 +125,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 catch (Exception ex)
                                 {
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                                    _logger.LogTrace("Census service response: " + censusContent);
+                                    _logger.LogDebug("Census service response: " + censusContent);
                                     throw;
                                 }
 
@@ -136,7 +139,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.Value.ToShortDateString()}-{key.EndDate.Value.ToShortDateString()}");
+                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
                                 if (Directory.Exists(submissionDirectory))
                                 {
                                     Directory.Delete(submissionDirectory, true);
@@ -237,7 +240,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate.Value, key.EndDate.Value, cancellationToken);
+                                                key.StartDate, key.EndDate, cancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
