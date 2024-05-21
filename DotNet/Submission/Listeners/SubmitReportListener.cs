@@ -222,7 +222,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate.Value, key.EndDate.Value, cancellationToken);
+                                                key.StartDate, key.EndDate, cancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
