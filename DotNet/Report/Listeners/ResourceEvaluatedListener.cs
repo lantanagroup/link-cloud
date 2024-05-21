@@ -19,6 +19,10 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Application.Resources.Queries;
+using LantanaGroup.Link.Report.Application.Resources.Commands;
+using LantanaGroup.Link.Report.Domain.Enums;
+using Microsoft.AspNetCore.Razor.Hosting;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -158,13 +162,32 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
                                         AuditEventType.Create);
                                 }
-                                else if (resource.TypeName == "MeasureReport")
+
+                                if (resource.TypeName == "MeasureReport")
                                 {
                                     entry.AddMeasureReport((MeasureReport)resource);
                                 }
                                 else
                                 {
-                                    entry.AddContainedResource(resource);
+                                    //TODO: DANIEL - Rather than using the exist command, return IRseource and use that
+                                    bool resourceExists = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
+
+
+                                    if (resourceExists)
+                                    {
+                                        
+                                    }
+                                    else
+                                    {
+                                        await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
+                                    }
+
+
+                                    //todo: daniel - add command that updates or inserts based on both shared and partient resources
+                                    //if (existingResource == null && isPatientResourceType)
+                                    //{
+                                    //    await _mediator.Send(new CreatePatientResourceCommand(key.FacilityId, value.PatientId, resource));
+                                    //}
                                 }
 
                                 if (entry.Id == null)
@@ -243,32 +266,32 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
-                                #endregion
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                            }
-                            catch (TimeoutException ex)
-                            {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                    #endregion
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
-                            }
-                            finally
-                            {
-                                consumer.Commit(consumeResult);
-                            }
+                                }
+                                catch (DeadLetterException ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                }
+                                catch (TransientException ex)
+                                {
+                                    _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                }
+                                catch (TimeoutException ex)
+                                {
+                                    var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                                    _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                }
+                                finally
+                                {
+                                    consumer.Commit(consumeResult);
+                                }
                         }, cancellationToken);
-
                     }
                     catch (ConsumeException ex)
                     {

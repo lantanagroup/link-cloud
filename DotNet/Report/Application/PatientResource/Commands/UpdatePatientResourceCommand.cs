@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Repositories;
 using MediatR;
@@ -7,30 +8,35 @@ using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Application.PatientResource.Commands
 {
-    public class CreatePatientResourceCommand : IRequest<PatientResourceModel>
+    public class UpdatePatientResourceCommand : IRequest<PatientResourceModel>
     {
         public string FacilityId { get; private set; }
         public string PatientId { get; private set; }
         public Resource Resource { get; private set; }
 
-        public CreatePatientResourceCommand(string facilityId, string patientId, Resource resource) { 
+        public UpdatePatientResourceCommand(string facilityId, string patientId, Resource resource) { 
             FacilityId = facilityId;
             PatientId = patientId;
             Resource = resource;
         }
     }
 
-    public class CreatePatientResourceCommandHandler : IRequestHandler<CreatePatientResourceCommand, PatientResourceModel>
+    public class UpdatePatientResourceCommandHandler : IRequestHandler<UpdatePatientResourceCommand, PatientResourceModel>
     {
         private readonly PatientResourceRepository _repository;
+        private readonly IMediator _mediator;
 
-        public CreatePatientResourceCommandHandler(PatientResourceRepository repository) 
+        public UpdatePatientResourceCommandHandler(PatientResourceRepository repository, IMediator mediator) 
         { 
             _repository = repository;
+            _mediator = mediator;
         }
 
-        public async Task<PatientResourceModel> Handle(CreatePatientResourceCommand request, CancellationToken cancellationToken)
+        public async Task<PatientResourceModel> Handle(UpdatePatientResourceCommand request, CancellationToken cancellationToken)
         {
+            
+
+
             var patientResource = new PatientResourceModel()
             {
                 CreateDate = DateTime.UtcNow,
