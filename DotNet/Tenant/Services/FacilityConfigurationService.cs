@@ -345,18 +345,17 @@ namespace LantanaGroup.Link.Tenant.Services
 
                     // validate the reportype is one of the known values
                     if (!MeasureDefinitionTypeValidation.Validate(reportTypeSchedule.ReportType))
-                        {
-                            throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
-                        }
+                    {
+                        throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
+                    }
+                    
                     // check if the report type was set-up in Measure Evaluation Service
                     if (_measureConfig.Value.CheckIfMeasureExists)
                     {
                         if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
                             throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
-                        string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measureDef/{reportTypeSchedule.ReportType}";
-
-
+                        string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportTypeSchedule.ReportType}";
                         var response = _httpClient.GetAsync(requestUrl).Result;
 
                         // check respone status code
