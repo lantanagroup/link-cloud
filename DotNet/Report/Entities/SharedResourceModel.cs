@@ -3,10 +3,11 @@
 namespace LantanaGroup.Link.Report.Entities
 {
     [BsonCollection("sharedResource")]
-    public class SharedResourceModel
+    public class SharedResourceModel : ReportEntity
     {
         public string FacilityId { get; set; }
-        public string Reference { get; set; }
+        public string ResourceId { get; set; }
+        public string ResourceType { get; set; }
         public string Resource { get; set; }
     }
 }
