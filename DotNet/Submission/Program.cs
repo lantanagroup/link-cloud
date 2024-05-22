@@ -33,6 +33,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Submission.Application.Config;
 using Serilog.Settings.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
