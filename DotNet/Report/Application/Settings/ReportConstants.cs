@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Report.Settings
             public const string Telemetry = "TelemetryConfig";
             public const string TenantApiSettings = "TenantApiSettings";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
+            public const string EnableSwagger = "EnableSwagger";
         }
 
         public static class Bundle
