@@ -1,6 +1,7 @@
 ﻿using PatientsToQuery.Application.Models;
 using PatientsToQuery.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace PatientsToQuery.Application.Services
 {

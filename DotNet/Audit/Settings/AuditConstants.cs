@@ -11,7 +11,6 @@
             public const string DatabaseProvider = "DatabaseProvider";            
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string Serilog = "Serilog";
-            public const string EnableSwagger = "EnableSwagger";
         }
 
         public static class AuditExceptionMessages 

@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Notification.Infrastructure
 {
