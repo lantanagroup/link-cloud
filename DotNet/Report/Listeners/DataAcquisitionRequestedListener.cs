@@ -121,39 +121,44 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                //TODO: Daniel - Add error handling
-                                _logger.LogError(ex, "Error processing message.");
-                                //await _deadLetterExceptionHandler.HandleException(consumeResult, ex, cancellationToken);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                //TODO: Daniel - Add error handling
-                                _logger.LogError(ex, "Error processing message.");
+                                _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message, AuditEventType.Create), facilityId);
                             }
-
-
+                            finally
+                            {
+                                consumer.Commit(consumeResult);
+                            }
                         }, cancellationToken);
                     }
-                    catch (DeadLetterException ex)
+                    catch (ConsumeException ex)
                     {
-                        //TODO: Daniel - Add error handling
-                        _logger.LogError(ex, "Error processing message.");
-                        //await _deadLetterExceptionHandler.HandleException(consumeResult, ex, cancellationToken);
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                        consumer.Commit();
                     }
                     catch (Exception ex)
                     {
-                        //TODO: Daniel - Add error handling
-                        _logger.LogError(ex, "Error processing message.");
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException("test", AuditEventType.Create, ex.InnerException), facilityId);
+                        consumer.Commit();
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
-                _logger.LogInformation("Consumer loop cancelled.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing message.");
+                _logger.LogError(ex, $"Operation Canceled: {ex.Message}");
+                consumer.Close();
+                consumer.Dispose();
             }
         }
     }
