@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Converters;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.SerDes
@@ -12,7 +13,15 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
             string jsonContent = System.Text.Encoding.Default.GetString(data.ToArray());
             
             var options = new JsonSerializerOptions();
-            options.PropertyNameCaseInsensitive = true;
+
+            options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
+            {
+                DisableBase64Decoding = false,
+                Validator = null
+            });           
+
+            options.AllowTrailingCommas = true;
+            options.PropertyNameCaseInsensitive = true;            
             
             return JsonSerializer.Deserialize<T>(jsonContent, options);
         }
