@@ -44,6 +44,7 @@ using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Impl;
 using Quartz;
 using LantanaGroup.Link.Audit.Application.Retry.Commands;
+using LantanaGroup.Link.Shared.Application.Models;
 using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
 
@@ -288,12 +289,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>(AuditConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        var serviceInformation = app.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Audit Service"));
-    }
+    app.ConfigureSwagger();
 
     // Auto migrate database
     app.AutoMigrateEF<AuditDbContext>();

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using LantanaGroup.Link.DemoApiGateway.Application.models;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DemoApiGateway.Infrastructure
 {

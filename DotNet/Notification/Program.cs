@@ -38,6 +38,7 @@ using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -276,13 +277,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        var serviceInformation = app.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Notification Service"));
-    }
-
+    app.ConfigureSwagger();
     app.UseRouting();
     app.UseCors("CorsPolicy");
     app.UseAuthentication();

@@ -9,7 +9,6 @@ namespace LantanaGroup.Link.Tenant.Config
             public const string ServiceInformation = "ServiceInformation";
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string MeasureConfig = "MeasureConfig";
-            public const string EnableSwagger = "EnableSwagger";
             public const string Serilog = "Serilog";
             public const string DatabaseProvider = "DatabaseProvider";
         }

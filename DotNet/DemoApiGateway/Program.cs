@@ -23,9 +23,12 @@ using LantanaGroup.Link.DemoApiGateway.Services.Client.DataAcquisition;
 using LantanaGroup.Link.DemoApiGateway.Services.Client.Normalization;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Link.Authorization.Requirements;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -256,12 +259,7 @@ static void SetupMiddleware(WebApplication app)
     app.UseHeaderPropagation();
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
-    {
-        var serviceInformation = app.Configuration.GetSection(GatewayConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Demo API Gateway v1"));
-    }
+    app.ConfigureSwagger();
 
     app.UseRouting();
     app.UseCors("CorsPolicy");

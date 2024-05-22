@@ -11,6 +11,7 @@ using Azure.Identity;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models;
 using PatientsToQuery.Application.Interfaces;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
