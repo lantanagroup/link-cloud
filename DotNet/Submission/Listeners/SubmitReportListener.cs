@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
+using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -61,6 +62,30 @@ namespace LantanaGroup.Link.Submission.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
+        private string GetMeasureShortName(string measure)
+        {
+            // If a URL, may contain |0.1.2 representing the version at the end of the URL
+            // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
+            string measureWithoutVersion = measure.Contains("|") ? 
+                measure.Substring(0, measure.LastIndexOf("|", StringComparison.Ordinal)) : 
+                measure;
+            
+            if (this._submissionConfig.MeasureUrls.TryGetValue(measureWithoutVersion, out string? urlShortName))
+            {
+                return urlShortName;
+            }
+            else if (this._submissionConfig.MeasureIds.TryGetValue(measureWithoutVersion, out string? idShortName))
+            {
+                return idShortName;
+            }
+            else
+            {
+                _logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
+            }
+            
+            return $"{measure.GetHashCode():X}";
+        }
+
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
@@ -104,12 +129,31 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 var httpClient = _httpClient.CreateClient();
-                                string censusRequesturl = _submissionConfig.CensusUrl +
-                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate}&endDate={key.EndDate}";
-                                var censusResponse = await httpClient.GetAsync(censusRequesturl, cancellationToken);
-                                var admittedPatients =
-                                    System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                        await censusResponse.Content.ReadAsStringAsync(cancellationToken), new JsonSerializerOptions().ForFhir());
+                                string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+                                string censusRequestUrl = _submissionConfig.CensusUrl +
+                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
+                                
+                                _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
+                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
+                                var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+                                List? admittedPatients = null;
+
+                                if (!censusResponse.IsSuccessStatusCode)
+                                    throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
+
+                                try
+                                {
+                                    admittedPatients =
+                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
+                                            censusContent,
+                                            new JsonSerializerOptions().ForFhir());
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
+                                    _logger.LogDebug("Census service response: " + censusContent);
+                                    throw;
+                                }
 
                                 string dataAcqRequestUrl =
                                     _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
@@ -117,11 +161,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 
                                 Bundle otherResourcesBundle = new Bundle();
+                                
+                                string measureShortNames = value.MeasureIds.Split(",")
+                                    .Select(GetMeasureShortName)
+                                    .Aggregate((a, b) => $"{a}+{b}");
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.Value.ToShortDateString()}-{key.EndDate.Value.ToShortDateString()}");
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
                                 if (Directory.Exists(submissionDirectory))
                                 {
                                     Directory.Delete(submissionDirectory, true);
@@ -181,7 +229,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 foreach (var aggregate in value.Aggregates)
                                 {
-                                    fileName = $"aggregate-{aggregate.Measure}.json";
+                                    string measureShortName = this.GetMeasureShortName(aggregate.Measure);
+                                    fileName = $"aggregate-{measureShortName}.json";
                                     contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
@@ -222,7 +271,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate.Value, key.EndDate.Value, cancellationToken);
+                                                key.StartDate, key.EndDate, cancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
