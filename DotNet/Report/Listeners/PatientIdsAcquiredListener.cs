@@ -18,16 +18,16 @@ namespace LantanaGroup.Link.Report.Listeners
     public class PatientIdsAcquiredListener : BackgroundService
     {
         private readonly ILogger<PatientIdsAcquiredListener> _logger;
-        private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<string, string> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+        private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
         private readonly IMediator _mediator;
 
         private string Name => this.GetType().Name;
 
-        public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
-          ITransientExceptionHandler<string, string> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IMediator mediator ) 
+        public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
+          ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
+          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IMediator mediator ) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<string, string>? consumeResult = null;
+                    ConsumeResult<string, PatientIdsAcquiredValue>? consumeResult = null;
                     string facilityId = string.Empty;
 
                     try
@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var key = consumeResult.Message.Key;
-                                var patientIdsList = DeserializePatientIdsAcquired(consumeResult.Message.Value);
+                                var value = consumeResult.Message.Value;
                                 facilityId = key;
 
                                 if (string.IsNullOrWhiteSpace(key))
@@ -85,7 +85,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         AuditEventType.Create);
                                 }
 
-                                if (patientIdsList == null)
+                                if (value.PatientIds == null)
                                 {
                                     throw new DeadLetterException(
                                         $"{Name}: consumeResult.Value.PatientIds is null", AuditEventType.Create);
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         scheduledReport.PatientsToQuery = new List<string>();
                                     }
 
-                                    foreach (var patientId in patientIdsList.Entry)
+                                    foreach (var patientId in value.PatientIds.Entry)
                                     {
                                         if (scheduledReport.PatientsToQuery.Contains(patientId.Item.Reference))
                                         {
@@ -170,19 +170,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 _logger.LogError(ex, "Error processing message.");
             }
-        }
-
-        private List DeserializePatientIdsAcquired(string jsonContent)
-        {
-            //Code taken from Census to properly deserialize the Fhir list. Need to dig into why we need to do this.
-            jsonContent = jsonContent.Replace("\t", string.Empty).Replace("\n", string.Empty);
-         
-            byte[] byteArray = Encoding.UTF8.GetBytes(jsonContent);
-            MemoryStream stream = new MemoryStream(byteArray);
-            var doc = System.Text.Json.JsonDocument.Parse(stream);
-            doc.RootElement.TryGetProperty("PatientIds", out var patientids);
-            var patientidsStr = patientids.ToString();
-            return new FhirJsonParser().Parse<List>(patientidsStr);
         }
     }
 }

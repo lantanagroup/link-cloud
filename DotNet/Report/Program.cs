@@ -103,6 +103,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient <IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
     
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
@@ -192,7 +193,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
 
     //PatientIdsAcquired Listener
-    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIdsAcquiredValue>, TransientExceptionHandler<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue>, DeadLetterExceptionHandler<string, PatientIdsAcquiredValue>>();
 
     //DataAcquisitionRequested Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
