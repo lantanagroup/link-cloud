@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Quartz;
 using System.Text;
+using System.Text.Json;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
@@ -164,6 +165,13 @@ namespace LantanaGroup.Link.Report.Jobs
                         };
 
                         using var prod = _submissionProducerFactory.CreateProducer(producerConfig);
+
+                        var serializedAggregates = new List<string>();
+                        foreach (var agg in _aggregator.Aggregate(measureReports))
+                        {
+                            serializedAggregates.Add(JsonSerializer.Serialize(agg, new JsonSerializerOptions().ForFhir()));
+                        }
+
                         prod.Produce(nameof(KafkaTopic.SubmitReport),
                             new Message<SubmissionReportKey, SubmissionReportValue>
                             {
@@ -177,7 +185,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 {
                                     PatientIds = patientIds,
                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
-                                    Aggregates = _aggregator.Aggregate(measureReports)
+                                    Aggregates = serializedAggregates
                                 },
                                 Headers = new Headers
                                 {

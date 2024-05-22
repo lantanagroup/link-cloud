@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -200,8 +201,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 foreach (var aggregate in value.Aggregates)
                                 {
-                                    fileName = $"aggregate-{aggregate.Measure}.json";
-                                    contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
+                                    var agg = System.Text.Json.JsonSerializer.Deserialize<MeasureReport>(aggregate, options);
+                                    fileName = $"aggregate-{agg.Measure}.json";
+                                    contents = aggregate;
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
