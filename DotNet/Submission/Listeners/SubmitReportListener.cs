@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using System.Text.Json;
 using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
+using Quartz.Util;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -69,14 +70,12 @@ namespace LantanaGroup.Link.Submission.Listeners
             string measureWithoutVersion = measure.Contains("|") ? 
                 measure.Substring(0, measure.LastIndexOf("|", StringComparison.Ordinal)) : 
                 measure;
-            
-            if (this._submissionConfig.MeasureUrls.TryGetValue(measureWithoutVersion, out string? urlShortName))
+
+            var urlShortName = _submissionConfig.MeasureNames.FirstOrDefault(x => x.Url == measureWithoutVersion || x.MeasureId == measureWithoutVersion)?.ShortName;
+
+            if(!string.IsNullOrWhiteSpace(urlShortName))
             {
                 return urlShortName;
-            }
-            else if (this._submissionConfig.MeasureIds.TryGetValue(measureWithoutVersion, out string? idShortName))
-            {
-                return idShortName;
             }
             else
             {
