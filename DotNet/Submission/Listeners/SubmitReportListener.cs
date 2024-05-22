@@ -12,6 +12,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
+using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -59,6 +60,30 @@ namespace LantanaGroup.Link.Submission.Listeners
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
+        }
+
+        private string GetMeasureShortName(string measure)
+        {
+            // If a URL, may contain |0.1.2 representing the version at the end of the URL
+            // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
+            string measureWithoutVersion = measure.Contains("|") ? 
+                measure.Substring(0, measure.LastIndexOf("|", StringComparison.Ordinal)) : 
+                measure;
+            
+            if (this._submissionConfig.MeasureUrls.TryGetValue(measureWithoutVersion, out string? urlShortName))
+            {
+                return urlShortName;
+            }
+            else if (this._submissionConfig.MeasureIds.TryGetValue(measureWithoutVersion, out string? idShortName))
+            {
+                return idShortName;
+            }
+            else
+            {
+                _logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
+            }
+            
+            return $"{measure.GetHashCode():X}";
         }
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
@@ -136,11 +161,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 
                                 Bundle otherResourcesBundle = new Bundle();
+                                
+                                string measureShortNames = value.MeasureIds.Split(",")
+                                    .Select(GetMeasureShortName)
+                                    .Aggregate((a, b) => $"{a}+{b}");
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{value.MeasureIds}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
                                 if (Directory.Exists(submissionDirectory))
                                 {
                                     Directory.Delete(submissionDirectory, true);
@@ -200,7 +229,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 foreach (var aggregate in value.Aggregates)
                                 {
-                                    fileName = $"aggregate-{aggregate.Measure}.json";
+                                    string measureShortName = this.GetMeasureShortName(aggregate.Measure);
+                                    fileName = $"aggregate-{measureShortName}.json";
                                     contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
