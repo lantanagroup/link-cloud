@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using System.Threading;
 
@@ -36,6 +37,11 @@ namespace LantanaGroup.Link.Report.Listeners
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue();
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.DataAcquisitionRequested) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -145,12 +151,16 @@ namespace LantanaGroup.Link.Report.Listeners
                         }
 
                         _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException("test", AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
+                        {
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                 }
             }

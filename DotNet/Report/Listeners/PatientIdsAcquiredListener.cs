@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
 using System.Text;
 
@@ -32,8 +33,15 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
-            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
             _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
+
+            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = KafkaTopic.PatientIDsAcquiredRetry.GetStringValue();
+
+            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
         }
 
         protected override System.Threading.Tasks.Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,6 +77,8 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 consumeResult = result;
+
+                                throw new DeadLetterException("test", AuditEventType.Create);
 
                                 if (consumeResult == null)
                                 {
@@ -154,21 +164,28 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
-                        _logger.LogError(ex, "Error consuming message.");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing message.");
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
+                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
+                        {
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 _logger.LogInformation("Consumer loop cancelled.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing message.");
             }
         }
     }
