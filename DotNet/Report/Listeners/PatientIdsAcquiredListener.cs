@@ -101,14 +101,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                         $"{Name}: No Scheduled Reports found for facilityId: {key}", AuditEventType.Query);
                                 }
 
-                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault())) 
+                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
                                 {
                                     if (scheduledReport.PatientsToQuery == null)
                                     {
                                         scheduledReport.PatientsToQuery = new List<string>();
                                     }
 
-                                    foreach (var patientId in patientIdsList.Entry) 
+                                    foreach (var patientId in patientIdsList.Entry)
                                     {
                                         if (scheduledReport.PatientsToQuery.Contains(patientId.Item.Reference))
                                         {
@@ -118,23 +118,35 @@ namespace LantanaGroup.Link.Report.Listeners
                                         scheduledReport.PatientsToQuery.Add(patientId.Item.Reference);
                                     }
 
-                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                    try
                                     {
-                                        ReportSchedule = scheduledReport
+                                        await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                        {
+                                            ReportSchedule = scheduledReport
 
-                                    }, cancellationToken);
+                                        }, cancellationToken);
+                                    }
+                                    catch (Exception)
+                                    {
+                                        throw new TransientException("Failed to update ReportSchedule", AuditEventType.Create);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)
                             {
-                                //TODO: Daniel - Add error handling
-                                _logger.LogError(ex, "Error processing message.");
-                                //await _deadLetterExceptionHandler.HandleException(consumeResult, ex, cancellationToken);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                //TODO: Daniel - Add error handling
-                                _logger.LogError(ex, "Error processing message.");
+                                _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message, AuditEventType.Create), facilityId);
+                            }
+                            finally 
+                            {
+                                consumer.Commit(consumeResult);
                             }
 
 
@@ -163,11 +175,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private List DeserializePatientIdsAcquired(string jsonContent)
         {
             //Code taken from Census to properly deserialize the Fhir list. Need to dig into why we need to do this.
-            jsonContent = jsonContent.Replace("\t", string.Empty);
-            jsonContent = jsonContent.Replace("\n", string.Empty);
+            jsonContent = jsonContent.Replace("\t", string.Empty).Replace("\n", string.Empty);
          
             byte[] byteArray = Encoding.UTF8.GetBytes(jsonContent);
-         
             MemoryStream stream = new MemoryStream(byteArray);
             var doc = System.Text.Json.JsonDocument.Parse(stream);
             doc.RootElement.TryGetProperty("PatientIds", out var patientids);
