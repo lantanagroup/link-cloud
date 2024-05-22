@@ -378,8 +378,10 @@ namespace LantanaGroup.Link.Submission.Listeners
             var options = new JsonSerializerOptions().ForFhir();
             var httpClient = _httpClient.CreateClient();
 
+            string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+
             string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
-                                $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate}&EndDate={endDate}";
+                                $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
             var response = await httpClient.GetAsync(requestUrl, cancellationToken);
 
             var patientSubmissionBundle =
