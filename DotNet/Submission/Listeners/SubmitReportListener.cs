@@ -1,5 +1,4 @@
-﻿using System.Net;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -7,15 +6,14 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
-using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
-using Quartz.Util;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
