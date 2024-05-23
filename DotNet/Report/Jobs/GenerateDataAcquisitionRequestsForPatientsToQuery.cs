@@ -177,6 +177,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 {
                                     PatientIds = patientIds,
                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                    MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                     Aggregates = _aggregator.Aggregate(measureReports)
                                 },
                                 Headers = new Headers
