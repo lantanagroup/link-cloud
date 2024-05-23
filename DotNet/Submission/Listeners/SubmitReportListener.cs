@@ -161,7 +161,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 Bundle otherResourcesBundle = new Bundle();
                                 
-                                string measureShortNames = value.MeasureIds.Split(",")
+                                string measureShortNames = value.MeasureIds
                                     .Select(GetMeasureShortName)
                                     .Aggregate((a, b) => $"{a}+{b}");
 
