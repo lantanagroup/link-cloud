@@ -159,7 +159,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<ReportSubmittedListener>();
-    builder.Services.AddHostedService<PatientsToQueryListener>();
     builder.Services.AddHostedService<PatientIdsAcquiredListener>();
     builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
     builder.Services.AddHostedService<RetryListener>();
