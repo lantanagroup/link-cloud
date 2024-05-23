@@ -8,12 +8,12 @@ using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
 
-public class CreateCensusConfigCommand : IRequest
+public class CreateCensusConfigCommand : IRequest<CensusConfigEntity>
 {
     public CensusConfigModel CensusConfigEntity { get; set; }
 }
 
-public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConfigCommand>
+public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConfigCommand, CensusConfigEntity>
 {
     private readonly ILogger<CreateCensusConfigCommandHandler> _logger;
     private readonly ICensusConfigRepository _censusConfigService;
@@ -32,7 +32,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
         _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
     }
 
-    public async Task Handle(CreateCensusConfigCommand request, CancellationToken cancellationToken)
+    public async Task<CensusConfigEntity> Handle(CreateCensusConfigCommand request, CancellationToken cancellationToken)
     {
         if (await _tenantApiService.CheckFacilityExists(request.CensusConfigEntity.FacilityId, cancellationToken) == false)
         {
@@ -100,5 +100,6 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
                 throw;
             }
         }
+        return existingEntity;
     }
 }

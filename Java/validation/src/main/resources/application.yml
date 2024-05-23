@@ -1,5 +1,8 @@
 artifact:
   init: true
+loki:
+  enabled: false
+  url: ''
 server:
   port: 31820
 springdoc:

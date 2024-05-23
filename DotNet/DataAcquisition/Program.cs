@@ -99,8 +99,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
-    SQLServerEFExtension.AddSQLServerEF_DataAcq(builder);
-
+    builder.AddSQLServerEF_DataAcq();
 
     builder.Services.AddHttpClient("FhirHttpClient")
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
