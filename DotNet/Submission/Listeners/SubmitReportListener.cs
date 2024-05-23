@@ -455,7 +455,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 var otherResources = patientSubmissionBundle.OtherResources;
 
                 string fileName = $"patient-{patientId}.json";
-                string contents = JsonSerializer.Serialize(patientSubmissionBundle.PatientResources);
+                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
 
                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
 
