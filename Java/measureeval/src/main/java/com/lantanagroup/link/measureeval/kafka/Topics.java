@@ -5,4 +5,6 @@ public class Topics {
     public static final String RESOURCE_ACQUIRED_ERROR = "ResourceAcquired-Error";
     public static final String RESOURCE_EVALUATED = "ResourceEvaluated";
     public static final String RESOURCE_NORMALIZED = "ResourceNormalized";
+    public static final String RESOURCE_NORMALIZED_ERROR = "ResourceNormalized-Error";
+    public static final String RESOURCE_NORMALIZED_RETRY = "ResourceNormalized-Retry";
 }
