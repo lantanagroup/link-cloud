@@ -87,16 +87,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var value = consumeResult.Message.Value;
                                 facilityId = key;
 
-                                if (string.IsNullOrWhiteSpace(key))
+                                if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null || string.IsNullOrWhiteSpace(value.PatientId))
                                 {
-                                    throw new DeadLetterException($"{Name}: key value is null or empty",
-                                        AuditEventType.Create);
-                                }
-
-                                if (value == null)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: consumeResult.Value.PatientIds is null", AuditEventType.Create);
+                                    throw new DeadLetterException("Invalid Data Acquisition Requested Event", AuditEventType.Create);
                                 }
 
                                 var scheduledReports = await _mediator.Send(
