@@ -11,11 +11,7 @@ using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using System.Text.Json;
-using Hl7.Fhir.Introspection;
-using LantanaGroup.Link.Shared.Application.Converters;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
