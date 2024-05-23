@@ -278,8 +278,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             cancellationToken);
                                     }
 
-                                    value.Aggregates.Clear();
-
                                     #endregion
                                 }
                                 catch (IOException ioException)
