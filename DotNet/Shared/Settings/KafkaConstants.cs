@@ -11,6 +11,7 @@
             public const string ExceptionFacilityId = "X-Exception-Facility-Id";
             public const string ExceptionService = "X-Exception-Service";
             public const string ExceptionMessage = "X-Exception-Message";
+            public const string RetryExceptionMessage = "X-Retry-Exception-Message";
         }
     }
 }
