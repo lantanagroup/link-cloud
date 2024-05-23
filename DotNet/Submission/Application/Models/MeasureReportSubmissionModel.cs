@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Submission.Application.Models
         public string PatientId { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string PatientResources { get; set; }
-        public string OtherResources { get; set; }
+        public Bundle? PatientResources { get; set; }
+        public Bundle? OtherResources { get; set; }
     }
 }
