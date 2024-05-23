@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 if (consumeResult.Message.Headers == null)
                     consumeResult.Message.Headers = new Headers();
 
-                if (consumeResult.Message.Headers.Any(h => h.Key == message))
+                if (!consumeResult.Message.Headers.Any(h => h.Key == message))
                 {
                     consumeResult.Message.Headers.Add(new Header(message, Encoding.UTF8.GetBytes(string.Empty)));
                 }
@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 if (consumeResult.Message.Headers == null)
                     consumeResult.Message.Headers = new Headers();
 
-                if (consumeResult.Message.Headers.Any(h => h.Key == ex.Message))
+                if (!consumeResult.Message.Headers.Any(h => h.Key == ex.Message))
                 {
                     consumeResult.Message.Headers.Add(new Header(ex.Message, Encoding.UTF8.GetBytes(ex?.StackTrace ?? string.Empty)));
                 }
