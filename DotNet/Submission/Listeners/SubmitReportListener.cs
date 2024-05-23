@@ -441,8 +441,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 }
 
                 var resultString = await response.Content.ReadAsStringAsync(cancellationToken);
-                var patientSubmissionBundle =
-                    System.Text.Json.JsonSerializer.Deserialize<MeasureReportSubmissionModel>(resultString, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+                var patientSubmissionBundle = System.Text.Json.JsonSerializer.Deserialize<MeasureReportSubmissionModel>(resultString);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
