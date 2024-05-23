@@ -438,9 +438,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var resultString = await response.Content.ReadAsStringAsync(cancellationToken);
-
-                var patientSubmissionBundle = System.Text.Json.JsonSerializer.Deserialize<MeasureReportSubmissionModel>(resultString);
+                var patientSubmissionBundle = (MeasureReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(MeasureReportSubmissionModel), cancellationToken);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
@@ -451,12 +449,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
 
-                var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
+                var patientBundle = patientSubmissionBundle.PatientResources;
 
-                var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
+                var otherResources = patientSubmissionBundle.OtherResources;
 
                 string fileName = $"patient-{patientId}.json";
-                string contents = patientSubmissionBundle.PatientResources;
+                string contents = JsonSerializer.Serialize(patientSubmissionBundle.PatientResources);
 
                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
 

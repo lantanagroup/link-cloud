@@ -69,8 +69,8 @@ namespace LantanaGroup.Link.Report.Core
 
             var entries = await _mediator.Send(new GetPatientSubmissionEntriesQuery() { FacilityId = facilityId, PatientId = patientId, StartDate = startDate, EndDate = endDate });
 
-            Bundle patientResourceBundle = new Bundle();
-            Bundle otherResources = new Bundle();   
+            Bundle patientResourceBundle = CreateNewBundle();
+            Bundle otherResources = CreateNewBundle();  
             foreach (var entry in entries)
             {
                 var measureReportScheduleId = entry.MeasureReportScheduleId;
@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.Report.Core
                 if (submission is null)
                 {
                     submission = new MeasureReportSubmissionModel { MeasureReportScheduleId = measureReportScheduleId };
-                    bundle = CreateNewBundle(schedule);
+                    bundle = CreateNewBundle();
                 }
                 else
                 {
@@ -176,15 +176,14 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                PatientResources = JsonSerializer.Serialize(patientResourceBundle, options),
-                OtherResources = JsonSerializer.Serialize(otherResources, options)
+                PatientResources = patientResourceBundle,
+                OtherResources = otherResources
             };
 
             return patientSubmissionModel;
@@ -324,7 +323,7 @@ namespace LantanaGroup.Link.Report.Core
             return measureReport;
         }
 
-        protected Bundle CreateNewBundle(MeasureReportScheduleModel reportSchedule)
+        protected Bundle CreateNewBundle()
         {
             Bundle bundle = new Bundle();
             bundle.Meta = new Meta
@@ -335,10 +334,6 @@ namespace LantanaGroup.Link.Report.Core
             bundle.Identifier = new Identifier(ReportConstants.Bundle.IdentifierSystem, "urn:uuid:" + Guid.NewGuid());
             bundle.Type = Bundle.BundleType.Collection;
             bundle.Timestamp = DateTime.UtcNow;
-
-            // add organization entry
-            var org = CreateOrganization(reportSchedule.FacilityId);
-            bundle.AddResourceEntry(org, GetFullUrl(org));
 
             return bundle;
         }
@@ -376,75 +371,6 @@ namespace LantanaGroup.Link.Report.Core
                 return measureCanonical.Substring(index + 1);
             }
         }
-
-
-        public Organization CreateOrganization(String facilityId)
-        {
-            Organization org = new Organization();
-            org.Meta = new Meta
-            {
-                Profile = new string[] { ReportConstants.Bundle.SubmittingOrganizationProfile }
-            };
-            org.Active = true;
-            org.Id = Guid.NewGuid().ToString(); // or National Provider Identifier (NPI) from config?
-            org.Type = new List<CodeableConcept>
-            {
-                new CodeableConcept(ReportConstants.Bundle.OrganizationTypeSystem, "prov", "Healthcare Provider", null)
-            };
-
-            org.Name = "EHR Test On Prem"; // should be org name from config?
-
-            org.Identifier.Add(new Identifier
-            {
-                System = ReportConstants.Bundle.CdcOrgIdSystem,
-                Value = facilityId // CDC org ID from config
-            });
-
-            // TODO: should phone and email be in config?
-            // if phone and email not configured add data absent extension
-            org.Telecom = new List<ContactPoint>
-            {
-                new ContactPoint
-                {
-                    Extension = new List<Extension>{ new Extension(ReportConstants.Bundle.DataAbsentReasonExtensionUrl, new Code(ReportConstants.Bundle.DataAbsentReasonUnknownCode) ) }
-                }
-            };
-
-            // TODO: should be only if address is in config?
-            // if no address configured add data absent extension
-            org.Address = new List<Address>
-            {
-                new Address
-                {
-                    Extension = new List<Extension>{ new Extension(ReportConstants.Bundle.DataAbsentReasonExtensionUrl, new Code(ReportConstants.Bundle.DataAbsentReasonUnknownCode) ) }
-                }
-            };
-
-
-
-
-            return org;
-        }
-
-        protected List CreatePatientList(FhirDateTime reportStart, FhirDateTime reportEnd, string measureCanonical)
-        {
-            List list = new List();
-            list.Id = Guid.NewGuid().ToString();
-            list.Meta = new Meta
-            {
-                Profile = new List<string> { ReportConstants.Bundle.CensusProfileUrl }
-            };
-            list.AddExtension(ReportConstants.Bundle.ApplicablePeriodExtensionUrl, new Period()
-            {
-                StartElement = reportStart,
-                EndElement = reportEnd
-            });
-
-            list.Identifier.Add(new Identifier(ReportConstants.Bundle.MainSystem, GetMeasureIdFromCanonical(measureCanonical)));
-
-            return list;
-        }
-
 
         protected Bundle.EntryComponent GetAggregateMeasureReport(Bundle bundle, string measureCanonical)
         {
