@@ -13,6 +13,8 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
+using Hl7.Fhir.Introspection;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -392,9 +394,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
+                var resultString = await response.Content.ReadAsStringAsync(cancellationToken);
                 var patientSubmissionBundle =
-                    JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
-                        await response.Content.ReadAsStringAsync(cancellationToken));
+                    System.Text.Json.JsonSerializer.Deserialize<MeasureReportSubmissionModel>(resultString, new JsonSerializerOptions().ForFhir());
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
