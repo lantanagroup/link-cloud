@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<string>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             try
             {
@@ -85,9 +85,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
 
-                var serialized = JsonSerializer.Serialize(submission);
-
-                return Ok(serialized);
+                return Ok(submission);
             }
             catch (Exception ex)
             {
