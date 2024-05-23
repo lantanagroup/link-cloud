@@ -79,16 +79,7 @@ namespace LantanaGroup.Link.Report.Core
                     throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
                 var submission = await _mediator.Send(new FindMeasureReportSubmissionByScheduleQuery { MeasureReportScheduleId = measureReportScheduleId });
-                Bundle bundle;
-                if (submission is null)
-                {
-                    submission = new MeasureReportSubmissionModel { MeasureReportScheduleId = measureReportScheduleId };
-                    bundle = CreateNewBundle();
-                }
-                else
-                {
-                    bundle = submission.SubmissionBundle;
-                }
+                Bundle bundle = submission == null ? CreateNewBundle() : submission.SubmissionBundle;
 
                 var parser = new FhirJsonParser();
                 MeasureReport mr;
