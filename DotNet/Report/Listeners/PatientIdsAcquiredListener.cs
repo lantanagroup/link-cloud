@@ -174,9 +174,11 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce)
             {
-                _logger.LogInformation("Consumer loop cancelled.");
+                _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
+                consumer.Close();
+                consumer.Dispose();
             }
         }
     }
