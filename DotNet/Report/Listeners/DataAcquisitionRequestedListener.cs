@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -90,6 +91,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null || string.IsNullOrWhiteSpace(value.PatientId))
                                 {
                                     throw new DeadLetterException("Invalid Data Acquisition Requested Event", AuditEventType.Create);
+                                }
+
+                                if (value.QueryType.ToLower() != QueryType.Initial.ToString().ToLower())
+                                {
+                                    return;
                                 }
 
                                 var scheduledReports = await _mediator.Send(
