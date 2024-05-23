@@ -11,6 +11,7 @@ using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
@@ -209,7 +210,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 string fileName;
                                 string contents;
-                                var options = new JsonSerializerOptions().ForFhir();
+                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -228,7 +229,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     fileName = "sending-device.json";
-                                    contents = System.Text.Json.JsonSerializer.Serialize(device, options);
+                                    contents = await fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
@@ -238,7 +239,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Organization
 
                                     fileName = "sending-organization.json";
-                                    contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
+                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
@@ -248,7 +249,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Patient List
 
                                     fileName = "patient-list.json";
-                                    contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients, options);
+                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
@@ -271,7 +272,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     {
                                         string measureShortName = this.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
-                                        contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
+                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                             cancellationToken);
@@ -295,14 +296,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     var otherResourcesBag = new SynchronizedCollection<Bundle>();
 
-                                    List<string> batch;
+                                    List<string> batch = new List<string>();
                                     if (patientIds.Count > batchSize)
                                     {
-                                        batch = patientIds.Take(_submissionConfig.PatientBundleBatchSize).ToList();
+                                        batch.AddRange(patientIds.Take(_submissionConfig.PatientBundleBatchSize).ToList());
                                     }
                                     else
                                     {
-                                        batch = patientIds;
+                                        batch.AddRange(patientIds);
                                     }
 
                                     var tasks = new List<Task>();
@@ -340,7 +341,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(otherResourcesBundle, options);
+                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
