@@ -1,5 +1,5 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Report.Application.Models
 {
@@ -8,6 +8,7 @@ namespace LantanaGroup.Link.Report.Application.Models
     {
         public string PatientId { get; set; } = string.Empty;
         public List<ScheduledReport> ScheduledReports { get; set; }
+        public string QueryType { get; set; } = Domain.Enums.QueryType.Initial.ToString();
     }
 
     public class ScheduledReport

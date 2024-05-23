@@ -102,7 +102,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-
+    builder.Services.AddTransient <IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
+    
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Producers
@@ -115,6 +117,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>, KafkaProducerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientsToQueryValue>, KafkaProducerFactory<string, PatientsToQueryValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
 
     // Add repositories
     builder.Services.AddSingleton<MeasureReportConfigRepository>();
@@ -158,10 +161,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<ReportSubmittedListener>();
-    builder.Services.AddHostedService<PatientsToQueryListener>();
-    builder.Services.AddHostedService<MeasureReportScheduleService>();
+    builder.Services.AddHostedService<PatientIdsAcquiredListener>();
+    builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
     builder.Services.AddHostedService<RetryListener>();
+
     builder.Services.AddHostedService<RetryScheduleService>();
+    builder.Services.AddHostedService<MeasureReportScheduleService>();
 
     builder.Services.AddTransient<MeasureReportSubmissionBundler>();
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
@@ -187,6 +192,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Retry Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+
+    //PatientIdsAcquired Listener
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIdsAcquiredValue>, TransientExceptionHandler<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue>, DeadLetterExceptionHandler<string, PatientIdsAcquiredValue>>();
+
+    //DataAcquisitionRequested Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
+
     #endregion
 
     // Logging using Serilog
