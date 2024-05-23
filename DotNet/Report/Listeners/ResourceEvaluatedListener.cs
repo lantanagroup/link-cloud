@@ -239,8 +239,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 Value = new SubmissionReportValue()
                                                 {
                                                     PatientIds = patientIds,
-                                                    MeasureIds = string.Join("+",
-                                                        measureReports.Select(mr => mr.Measure).Distinct()),
+                                                    MeasureIds =  measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
                                                     Aggregates = _aggregator.Aggregate(measureReports)
                                                 },

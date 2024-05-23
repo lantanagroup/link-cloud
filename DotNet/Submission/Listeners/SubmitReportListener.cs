@@ -6,15 +6,14 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Text.Json;
-using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
-using Quartz.Util;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -161,7 +160,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 Bundle otherResourcesBundle = new Bundle();
                                 
-                                string measureShortNames = value.MeasureIds.Split(",")
+                                string measureShortNames = value.MeasureIds
                                     .Select(GetMeasureShortName)
                                     .Aggregate((a, b) => $"{a}+{b}");
 
@@ -375,29 +374,52 @@ namespace LantanaGroup.Link.Submission.Listeners
         private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate,
             DateTime endDate, CancellationToken cancellationToken)
         {
-            var options = new JsonSerializerOptions().ForFhir();
+            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             var httpClient = _httpClient.CreateClient();
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
             string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
                                 $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
-            var response = await httpClient.GetAsync(requestUrl, cancellationToken);
 
-            var patientSubmissionBundle =
-                JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
-                    await response.Content.ReadAsStringAsync(cancellationToken));
+            try
+            {
+                var response = await httpClient.GetAsync(requestUrl, cancellationToken);
 
-            var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception(
+                        $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
+                }
 
-            var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
+                var patientSubmissionBundle =
+                    JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
+                        await response.Content.ReadAsStringAsync(cancellationToken));
 
-            string fileName = $"patient-{patientId}.json";
-            string contents = System.Text.Json.JsonSerializer.Serialize(patientBundle, options);
+                if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
+                {
+                    throw new Exception(
+                        @$"One or More Required Objects are null: 
+                                        patientSubmissionBundle: {patientSubmissionBundle == null}
+                                        patientSubmissionBundle.PatientResources: {patientSubmissionBundle?.PatientResources == null}
+                                        patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
+                }
 
-            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+                var patientBundle = patientSubmissionBundle.PatientResources;
 
-            return otherResources;
+                var otherResources = patientSubmissionBundle.OtherResources;
+
+                string fileName = $"patient-{patientId}.json";
+                string contents = System.Text.Json.JsonSerializer.Serialize(patientBundle, options);
+
+                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+
+                return otherResources;
+            }
+            catch (Exception ex)
+            {
+                throw new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+            }
         }
     }
 }
