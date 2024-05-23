@@ -16,6 +16,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -91,7 +92,8 @@ namespace LantanaGroup.Link.Report.Jobs
                                         EndDate = schedule.ReportEndDate,
                                         ReportType = schedule.ReportType
                                     }
-                                }
+                                },
+                                QueryType = QueryType.Initial.ToString(),
                             };
 
                             var headers = new Headers
@@ -177,6 +179,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 {
                                     PatientIds = patientIds,
                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                    MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                     Aggregates = _aggregator.Aggregate(measureReports)
                                 },
                                 Headers = new Headers
