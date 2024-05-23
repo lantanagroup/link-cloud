@@ -91,6 +91,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
+                if (consumeResult.Message.Headers == null)
+                    consumeResult.Message.Headers = new Headers();
+
                 if (consumeResult.Message.Headers.Any(h => h.Key == ex.Message))
                 {
                     consumeResult.Message.Headers.Add(new Header(ex.Message, Encoding.UTF8.GetBytes(ex?.StackTrace ?? string.Empty)));
