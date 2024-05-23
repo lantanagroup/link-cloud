@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
                 }
 
-                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(ex.Message));
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(ex.Message + Environment.NewLine + ex.StackTrace));
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
