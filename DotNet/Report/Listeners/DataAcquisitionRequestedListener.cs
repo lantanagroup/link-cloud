@@ -111,11 +111,18 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     scheduledReport.PatientsToQuery.Remove(value.PatientId);
 
-                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                    try
                                     {
-                                        ReportSchedule = scheduledReport
+                                        await _mediator.Send(new UpdateMeasureReportScheduleCommand()
+                                        {
+                                            ReportSchedule = scheduledReport
 
-                                    }, cancellationToken);
+                                        }, cancellationToken);
+                                    } 
+                                    catch (Exception)
+                                    {
+                                        throw new TransientException("Failed to update ReportSchedule", AuditEventType.Create);
+                                    }
                                 }
                             }
                             catch (DeadLetterException ex)
