@@ -169,25 +169,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
-                                    //TODO: DANIEL - Rather than using the exist command, return IRseource and use that
-                                    bool resourceExists = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
+                                    var existingReportResource = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
 
-
-                                    if (resourceExists)
+                                    if (existingReportResource != null)
                                     {
-                                        
+                                        await _mediator.Send(new UpdateResourceCommand(existingReportResource, resource));
                                     }
                                     else
                                     {
                                         await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
                                     }
-
-
-                                    //todo: daniel - add command that updates or inserts based on both shared and partient resources
-                                    //if (existingResource == null && isPatientResourceType)
-                                    //{
-                                    //    await _mediator.Send(new CreatePatientResourceCommand(key.FacilityId, value.PatientId, resource));
-                                    //}
                                 }
 
                                 if (entry.Id == null)

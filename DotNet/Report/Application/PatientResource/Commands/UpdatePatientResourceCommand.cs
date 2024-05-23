@@ -10,44 +10,30 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Commands
 {
     public class UpdatePatientResourceCommand : IRequest<PatientResourceModel>
     {
-        public string FacilityId { get; private set; }
-        public string PatientId { get; private set; }
-        public Resource Resource { get; private set; }
+        public PatientResourceModel PatientResource { get; private set; }
+        public Resource UpdatedResource { get; private set; }
 
-        public UpdatePatientResourceCommand(string facilityId, string patientId, Resource resource) { 
-            FacilityId = facilityId;
-            PatientId = patientId;
-            Resource = resource;
+        public UpdatePatientResourceCommand(PatientResourceModel patientResource, Resource updatedResource) { 
+            PatientResource = patientResource;
+            UpdatedResource = updatedResource;
         }
     }
 
     public class UpdatePatientResourceCommandHandler : IRequestHandler<UpdatePatientResourceCommand, PatientResourceModel>
     {
         private readonly PatientResourceRepository _repository;
-        private readonly IMediator _mediator;
 
-        public UpdatePatientResourceCommandHandler(PatientResourceRepository repository, IMediator mediator) 
+        public UpdatePatientResourceCommandHandler(PatientResourceRepository repository) 
         { 
             _repository = repository;
-            _mediator = mediator;
         }
 
         public async Task<PatientResourceModel> Handle(UpdatePatientResourceCommand request, CancellationToken cancellationToken)
         {
+            request.PatientResource.ModifyDate = DateTime.UtcNow;
+            request.PatientResource.Resource = JsonSerializer.Serialize(request.UpdatedResource, new JsonSerializerOptions().ForFhir());
             
-
-
-            var patientResource = new PatientResourceModel()
-            {
-                CreateDate = DateTime.UtcNow,
-                FacilityId = request.FacilityId,
-                PatientId = request.PatientId,
-                Resource = JsonSerializer.Serialize<Resource>(request.Resource, new JsonSerializerOptions().ForFhir()),
-                ResourceType = request.Resource.TypeName,
-                ResourceId = request.Resource.Id
-            };
-            
-            await _repository.AddAsync(patientResource);
+            var patientResource = await _repository.UpdateAsync(request.PatientResource);
 
             return patientResource;
         }

@@ -1,10 +1,11 @@
-﻿using LantanaGroup.Link.Report.Domain.Enums;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Repositories;
 using MediatR;
 
 namespace LantanaGroup.Link.Report.Application.Resources.Queries
 {
-    public class GetResourceQuery : IRequest<bool>
+    public class GetResourceQuery : IRequest<IReportResource>
     {
         public string FacilityId { get; private set; }
         public string PatientId { get; private set; }
@@ -20,7 +21,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Queries
         }
     }
 
-    public class ResourceExistsCommandHandler : IRequestHandler<GetResourceQuery, bool>
+    public class ResourceExistsCommandHandler : IRequestHandler<GetResourceQuery, IReportResource>
     {
         private readonly PatientResourceRepository _patientResourceRepository;
         private readonly SharedResourceRepository _sharedResourceRepository;
@@ -31,7 +32,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Queries
             _sharedResourceRepository = sharedResourceRepository;
         }
 
-        public async Task<bool> Handle(GetResourceQuery request, CancellationToken cancellationToken)
+        public async Task<IReportResource> Handle(GetResourceQuery request, CancellationToken cancellationToken)
         {
             bool isPatientResourceType = PatientResourceProvider.GetPatientResourceTypes().Any(x => x == request.ResourceType);
 
@@ -39,12 +40,12 @@ namespace LantanaGroup.Link.Report.Application.Resources.Queries
             {
                 var patientResource = await _patientResourceRepository.GetAsync(request.FacilityId, request.PatientId, request.ResourceId, request.ResourceType);
 
-                return patientResource != null;
+                return patientResource;
             }
 
             var sharedResource = await _sharedResourceRepository.GetAsync(request.FacilityId, request.ResourceId, request.ResourceType);
 
-            return sharedResource != null;
+            return sharedResource;
         }
     }
 }
