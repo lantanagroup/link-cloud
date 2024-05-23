@@ -176,15 +176,15 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
-            var options = new JsonSerializerOptions().ForFhir();
+            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                PatientResources = patientResourceBundle,
-                OtherResources = otherResources
+                PatientResources = JsonSerializer.Serialize(patientResourceBundle, options),
+                OtherResources = JsonSerializer.Serialize(otherResources, options)
             };
 
             return patientSubmissionModel;
