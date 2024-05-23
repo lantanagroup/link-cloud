@@ -6,15 +6,14 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
+using StackExchange.Redis;
 using System.Text.Json;
-using LantanaGroup.Link.Submission.Application.Config;
 using Task = System.Threading.Tasks.Task;
-using Quartz.Util;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -67,13 +66,13 @@ namespace LantanaGroup.Link.Submission.Listeners
         {
             // If a URL, may contain |0.1.2 representing the version at the end of the URL
             // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
-            string measureWithoutVersion = measure.Contains("|") ? 
-                measure.Substring(0, measure.LastIndexOf("|", StringComparison.Ordinal)) : 
+            string measureWithoutVersion = measure.Contains("|") ?
+                measure.Substring(0, measure.LastIndexOf("|", StringComparison.Ordinal)) :
                 measure;
 
             var urlShortName = _submissionConfig.MeasureNames.FirstOrDefault(x => x.Url == measureWithoutVersion || x.MeasureId == measureWithoutVersion)?.ShortName;
 
-            if(!string.IsNullOrWhiteSpace(urlShortName))
+            if (!string.IsNullOrWhiteSpace(urlShortName))
             {
                 return urlShortName;
             }
@@ -81,7 +80,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 _logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
             }
-            
+
             return $"{measure.GetHashCode():X}";
         }
 
@@ -127,11 +126,36 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
                                 }
 
+
+                                if (value.PatientIds == null || value.PatientIds.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: PatientIds is null or contains no elements.", AuditEventType.Create);
+                                }
+
+                                if (value.MeasureIds == null || value.MeasureIds.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: MeasureIds is null or contains no elements.", AuditEventType.Create);
+                                }
+
+                                if (value.Organization == null)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: Organization is null.", AuditEventType.Create);
+                                }
+
+                                if (value.Aggregates == null || value.Aggregates.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: Aggregates is null or contains no elements.", AuditEventType.Create);
+                                }
+
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
-                                
+
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -151,99 +175,120 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
                                     _logger.LogDebug("Census service response: " + censusContent);
-                                    throw;
+                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
+                                        AuditEventType.Query, ex.InnerException);
                                 }
 
-                                string dataAcqRequestUrl =
-                                    _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
-                                var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
-                                var queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
+                                string queryPlans = string.Empty;
+                                try
+                                {
+                                    string dataAcqRequestUrl =
+                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
+                                    var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
+                                    queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
+
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error retrieving Query Plans from Data Acquisition service.");
+                                    _logger.LogDebug("Data Acquisition service response: " + censusContent);
+                                    throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
+                                        AuditEventType.Query, ex.InnerException);
+                                }
 
                                 Bundle otherResourcesBundle = new Bundle();
-                                
-                                string measureShortNames = value.MeasureIds.Split(",")
+
+                                string measureShortNames = value.MeasureIds
                                     .Select(GetMeasureShortName)
                                     .Aggregate((a, b) => $"{a}+{b}");
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
+                                dtFormat = "yyyyMMddTHHmmss";
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToShortDateString()}-{key.EndDate.ToShortDateString()}");
-                                if (Directory.Exists(submissionDirectory))
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}");
+
+                                string fileName;
+                                string contents;
+                                var fhirSerializer = new FhirJsonSerializer();
+                                try
                                 {
-                                    Directory.Delete(submissionDirectory, true);
-                                }
+                                    if (Directory.Exists(submissionDirectory))
+                                    {
+                                        Directory.Delete(submissionDirectory, true);
+                                    }
 
-                                Directory.CreateDirectory(submissionDirectory);
+                                    Directory.CreateDirectory(submissionDirectory);
 
-                                var options = new JsonSerializerOptions().ForFhir();
+                                    #region Device
 
-                                #region Device
-
-                                Hl7.Fhir.Model.Device device = new Device();
-                                device.DeviceName.Add(new Device.DeviceNameComponent()
+                                    Hl7.Fhir.Model.Device device = new Device();
+                                    device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
                                         Name = "Link"
-                                    }
-                                );
+                                    });
 
-                                string fileName = "sending-device.json";
-                                string contents = System.Text.Json.JsonSerializer.Serialize(device, options);
-
-                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
-
-                                #endregion
-
-                                #region Organization
-                                fileName = "sending-organization.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(value.Organization, options);
-
-                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
-
-                                #endregion
-
-                                #region Patient List
-
-                                fileName = "patient-list.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(admittedPatients, options);
-
-                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
-                                #endregion
-
-
-                                #region Query Plans
-
-                                fileName = "query-plan.yml";
-                                contents = queryPlans;
-
-                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
-
-                                #endregion
-
-                                #region Aggregates
-
-                                foreach (var aggregate in value.Aggregates)
-                                {
-                                    string measureShortName = this.GetMeasureShortName(aggregate.Measure);
-                                    fileName = $"aggregate-{measureShortName}.json";
-                                    contents = System.Text.Json.JsonSerializer.Serialize(aggregate, options);
+                                    fileName = "sending-device.json";
+                                    contents = await fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
+
+                                    #endregion
+
+                                    #region Organization
+
+                                    fileName = "sending-organization.json";
+                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
+
+                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                        cancellationToken);
+
+                                    #endregion
+
+                                    #region Patient List
+
+                                    fileName = "patient-list.json";
+                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
+
+                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                        cancellationToken);
+
+                                    #endregion
+
+                                    #region Query Plans
+
+                                    fileName = "query-plan.json";
+                                    contents = queryPlans;
+
+                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                        cancellationToken);
+
+                                    #endregion
+
+                                    #region Aggregates
+
+                                    foreach (var aggregate in value.Aggregates)
+                                    {
+                                        string measureShortName = this.GetMeasureShortName(aggregate.Measure);
+                                        fileName = $"aggregate-{measureShortName}.json";
+                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
+
+                                        await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
+                                            cancellationToken);
+                                    }
+
+                                    #endregion
                                 }
-
-                                value.Aggregates.Clear();
-
-                                #endregion
+                                catch (IOException ioException)
+                                {
+                                    throw new TransientException(ioException.Message, AuditEventType.Submit,
+                                        ioException.InnerException);
+                                }
 
                                 #region Patient and Other Resources Bundles
 
                                 var patientIds = value.PatientIds.Distinct().ToList();
-                                value.PatientIds.Clear();
 
                                 var batchSize = _submissionConfig.PatientBundleBatchSize;
 
@@ -251,14 +296,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     var otherResourcesBag = new SynchronizedCollection<Bundle>();
 
-                                    List<string> batch;
+                                    List<string> batch = new List<string>();
                                     if (patientIds.Count > batchSize)
                                     {
-                                        batch = patientIds.Take(_submissionConfig.PatientBundleBatchSize).ToList();
+                                        batch.AddRange(patientIds.Take(_submissionConfig.PatientBundleBatchSize).ToList());
                                     }
                                     else
                                     {
-                                        batch = patientIds;
+                                        batch.AddRange(patientIds);
                                     }
 
                                     var tasks = new List<Task>();
@@ -296,7 +341,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = System.Text.Json.JsonSerializer.Serialize(otherResourcesBundle, options);
+                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                     cancellationToken);
@@ -375,29 +420,51 @@ namespace LantanaGroup.Link.Submission.Listeners
         private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate,
             DateTime endDate, CancellationToken cancellationToken)
         {
-            var options = new JsonSerializerOptions().ForFhir();
+            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
             var httpClient = _httpClient.CreateClient();
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
             string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
                                 $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
-            var response = await httpClient.GetAsync(requestUrl, cancellationToken);
 
-            var patientSubmissionBundle =
-                JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(
-                    await response.Content.ReadAsStringAsync(cancellationToken));
+            try
+            {
+                var response = await httpClient.GetAsync(requestUrl, cancellationToken);
 
-            var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception(
+                        $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
+                }
 
-            var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
+                var patientSubmissionBundle = (MeasureReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(MeasureReportSubmissionModel), cancellationToken);
 
-            string fileName = $"patient-{patientId}.json";
-            string contents = System.Text.Json.JsonSerializer.Serialize(patientBundle, options);
+                if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
+                {
+                    throw new Exception(
+                        @$"One or More Required Objects are null: 
+                                        patientSubmissionBundle: {patientSubmissionBundle == null}
+                                        patientSubmissionBundle.PatientResources: {patientSubmissionBundle?.PatientResources == null}
+                                        patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
+                }
 
-            await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+                var patientBundle = patientSubmissionBundle.PatientResources;
 
-            return otherResources;
+                var otherResources = patientSubmissionBundle.OtherResources;
+
+                string fileName = $"patient-{patientId}.json";
+                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
+
+                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+
+                return otherResources;
+            }
+            catch (Exception ex)
+            {
+                throw new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+            }
         }
     }
 }
