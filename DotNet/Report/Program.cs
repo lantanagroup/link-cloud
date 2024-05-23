@@ -225,11 +225,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-
-    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.ToLower() == "local")
+    if (app.Configuration.GetValue<bool>(ReportConstants.AppSettingsSectionNames.EnableSwagger))
     {
         app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Report Service v1"));
     }
 
     //map health check middleware

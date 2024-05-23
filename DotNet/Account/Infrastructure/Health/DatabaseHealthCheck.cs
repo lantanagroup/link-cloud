@@ -1,13 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using LantanaGroup.Link.Account.Persistence;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Account.Infrastructure.Health
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        protected readonly DbContext _dbContext;
+        protected readonly AccountDbContext _dbContext;
 
-        public DatabaseHealthCheck(DbContext dbContext)
+        public DatabaseHealthCheck(AccountDbContext dbContext)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
