@@ -56,10 +56,12 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 if (consumeResult.Message.Headers == null)
                     consumeResult.Message.Headers = new Headers();
 
-                if (!consumeResult.Message.Headers.Any(h => h.Key == message))
+                if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
                 {
-                    consumeResult.Message.Headers.Add(new Header(message, Encoding.UTF8.GetBytes(string.Empty)));
+                    consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
                 }
+
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message));
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId);
@@ -98,15 +100,17 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
                 };
 
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
                 if (consumeResult.Message.Headers == null)
                     consumeResult.Message.Headers = new Headers();
 
-                if (!consumeResult.Message.Headers.Any(h => h.Key == ex.Message))
+                if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
                 {
-                    consumeResult.Message.Headers.Add(new Header(ex.Message, Encoding.UTF8.GetBytes(ex?.StackTrace ?? string.Empty)));
+                    consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
                 }
+
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(ex.Message));
+
+                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId);
