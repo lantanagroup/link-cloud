@@ -52,6 +52,15 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 };
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+
+                if (consumeResult.Message.Headers == null)
+                    consumeResult.Message.Headers = new Headers();
+
+                if (consumeResult.Message.Headers.Any(h => h.Key == message))
+                {
+                    consumeResult.Message.Headers.Add(new Header(message, Encoding.UTF8.GetBytes(string.Empty)));
+                }
+
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId);
             }
