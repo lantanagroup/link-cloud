@@ -176,7 +176,6 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
-            var options = new JsonSerializerOptions().ForFhir();
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
