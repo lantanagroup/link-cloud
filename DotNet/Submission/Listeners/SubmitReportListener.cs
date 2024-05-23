@@ -128,6 +128,31 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
                                 }
 
+
+                                if (value.PatientIds == null || value.PatientIds.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: PatientIds is null or contains no elements.", AuditEventType.Create);
+                                }
+
+                                if (value.MeasureIds == null || value.MeasureIds.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: MeasureIds is null or contains no elements.", AuditEventType.Create);
+                                }
+
+                                if (value.Organization == null)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: Organization is null.", AuditEventType.Create);
+                                }
+
+                                if (value.Aggregates == null || value.Aggregates.Count == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: Aggregates is null or contains no elements.", AuditEventType.Create);
+                                }
+
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
