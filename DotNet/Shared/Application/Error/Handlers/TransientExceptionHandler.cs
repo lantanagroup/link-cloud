@@ -53,18 +53,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                if (consumeResult.Message.Headers == null)
-                    consumeResult.Message.Headers = new Headers();
-
-                if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
-                {
-                    consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
-                }
-
-                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message));
-
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId);
+                    consumeResult.Message.Headers, facilityId, message);
             }
             catch (Exception e)
             {
@@ -100,20 +90,10 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
                 };
 
-                if (consumeResult.Message.Headers == null)
-                    consumeResult.Message.Headers = new Headers();
-
-                if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
-                {
-                    consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
-                }
-
-                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(ex.Message + Environment.NewLine + ex.StackTrace));
-
                 ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId);
+                    consumeResult.Message.Headers, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
@@ -133,7 +113,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId)
+        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId, string message = "", string stackTrace = "")
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
@@ -141,10 +121,14 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
+            headers ??= new Headers();
+
             if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
+
+            headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message + Environment.NewLine + stackTrace));
 
             if (!string.IsNullOrEmpty(facilityId) && !headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
             {
