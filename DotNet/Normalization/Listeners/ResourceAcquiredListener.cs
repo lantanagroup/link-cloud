@@ -305,14 +305,10 @@ public class ResourceAcquiredListener : BackgroundService
                     catch (DeadLetterException ex)
                     {
                         _deadLetterExceptionHandler.HandleException(message, ex, message.Key);
-                        kafkaConsumer.Commit(message);
-                        return;
                     }
                     catch (TransientException ex)
                     {
                         _transientExceptionHandler.HandleException(message, ex, message.Key);
-                        kafkaConsumer.Commit(message);
-                        return;
                     }
                     catch (Exception ex)
                     {
@@ -328,13 +324,11 @@ public class ResourceAcquiredListener : BackgroundService
                         };
 
                         _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), message.Message.Key);
-                        kafkaConsumer.Commit(message);
-
-                        return;
                     }
-
-                    kafkaConsumer.Commit(message);
-
+                    finally
+                    {
+                        kafkaConsumer.Commit(message);
+                    }
                 }, cancellationToken);
             }
             catch (OperationCanceledException)
