@@ -137,6 +137,7 @@ public class KafkaConfig {
                 .includeTopic(Topics.RESOURCE_NORMALIZED)
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
+                .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
                 .create(template);
     }
