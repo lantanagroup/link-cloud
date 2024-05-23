@@ -98,14 +98,6 @@ namespace LantanaGroup.Link.Report.Core
                 if (config == null)
                     throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
 
-                // ensure aggregate patient list and measure report entries are created for reach measure
-                var org = bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "Organization"
-                                                           && (e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
-                                                               && e.Resource.Meta.Profile.Contains(ReportConstants.Bundle.SubmittingOrganizationProfile))
-                );
-
-                string orgId = org?.Resource.Id ?? "";
-
                 if (entry.ContainedResources is not null && entry.ContainedResources.Count > 0)
                 {
                     if (mr.Contained == null) mr.Contained = new List<Resource>();
@@ -161,7 +153,6 @@ namespace LantanaGroup.Link.Report.Core
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", measureReportScheduleId),
-                    new KeyValuePair<string, object?>("submitting.organization", orgId),
                     new KeyValuePair<string, object?>("measure", mr.Measure),
                     new KeyValuePair<string, object?>("bundling.type", config?.BundlingType)
                 });
