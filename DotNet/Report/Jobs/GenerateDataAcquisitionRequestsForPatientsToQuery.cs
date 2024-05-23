@@ -16,6 +16,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -91,7 +92,8 @@ namespace LantanaGroup.Link.Report.Jobs
                                         EndDate = schedule.ReportEndDate,
                                         ReportType = schedule.ReportType
                                     }
-                                }
+                                },
+                                QueryType = QueryType.Initial.ToString(),
                             };
 
                             var headers = new Headers
