@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
         [HttpGet("Bundle/Patient")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
