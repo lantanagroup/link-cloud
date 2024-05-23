@@ -183,8 +183,8 @@ namespace LantanaGroup.Link.Report.Core
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                PatientResources = JsonSerializer.Serialize(patientResourceBundle, options),
-                OtherResources = JsonSerializer.Serialize(otherResources, options),
+                PatientResources = patientResourceBundle,
+                OtherResources = otherResources
             };
 
             return patientSubmissionModel;
