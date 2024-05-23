@@ -11,10 +11,7 @@ using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using System.Text.Json;
-using Hl7.Fhir.Introspection;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -423,6 +420,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             DateTime endDate, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+
             var httpClient = _httpClient.CreateClient();
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
@@ -441,6 +439,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                 }
 
                 var resultString = await response.Content.ReadAsStringAsync(cancellationToken);
+
                 var patientSubmissionBundle = System.Text.Json.JsonSerializer.Deserialize<MeasureReportSubmissionModel>(resultString);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
@@ -452,12 +451,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
 
-                var patientBundle = patientSubmissionBundle.PatientResources;
+                var patientBundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.PatientResources, options);
 
-                var otherResources = patientSubmissionBundle.OtherResources;
+                var otherResources = System.Text.Json.JsonSerializer.Deserialize<Bundle>(patientSubmissionBundle.OtherResources, options);
 
                 string fileName = $"patient-{patientId}.json";
-                string contents = System.Text.Json.JsonSerializer.Serialize(patientBundle, options);
+                string contents = patientSubmissionBundle.PatientResources;
 
                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
 
