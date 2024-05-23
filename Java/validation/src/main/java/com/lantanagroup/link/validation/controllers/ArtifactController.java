@@ -3,12 +3,14 @@ package com.lantanagroup.link.validation.controllers;
 import com.lantanagroup.link.validation.entities.ArtifactEntity;
 import com.lantanagroup.link.validation.services.ArtifactService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/artifact")
+@SecurityRequirement(name = "bearer-key")
 public class ArtifactController {
     private final ArtifactService artifactService;
 

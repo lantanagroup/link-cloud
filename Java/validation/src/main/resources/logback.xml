@@ -37,13 +37,17 @@
         </then>
     </if>
 
-    <root level="INFO">
-        <appender-ref ref="STDOUT" />
-
-        <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
-            <then>
+    <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
+        <then>
+            <root level="INFO">
+                <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI" />
-            </then>
-        </if>
-    </root>
+            </root>
+        </then>
+        <else>
+            <root level="INFO">
+                <appender-ref ref="STDOUT"/>
+            </root>
+        </else>
+    </if>
 </configuration>
