@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Attributes;
 using MongoDB.Bson;
 using System.Text.Json.Nodes;
@@ -6,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace LantanaGroup.Link.Report.Entities
 {
     [BsonCollection("patientResource")]
-    public class PatientResourceModel : ReportEntity
+    public class PatientResourceModel : ReportEntity, IReportResource
     {
         public string FacilityId { get; set; }
         public string PatientId { get; set; }

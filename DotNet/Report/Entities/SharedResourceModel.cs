@@ -1,9 +1,10 @@
-﻿using LantanaGroup.Link.Report.Attributes;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
 {
     [BsonCollection("sharedResource")]
-    public class SharedResourceModel : ReportEntity
+    public class SharedResourceModel : ReportEntity, IReportResource
     {
         public string FacilityId { get; set; }
         public string ResourceId { get; set; }
