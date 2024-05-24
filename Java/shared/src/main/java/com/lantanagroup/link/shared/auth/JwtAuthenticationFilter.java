@@ -1,7 +1,6 @@
-package com.lantanagroup.link.measureeval.auth;
+package com.lantanagroup.link.shared.auth;
 
 import com.azure.security.keyvault.secrets.SecretClient;
-import com.lantanagroup.link.measureeval.services.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;

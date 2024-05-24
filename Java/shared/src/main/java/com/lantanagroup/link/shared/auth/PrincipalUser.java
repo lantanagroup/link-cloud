@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.auth;
+package com.lantanagroup.link.shared.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Getter;

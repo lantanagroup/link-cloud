@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.configs;
+package com.lantanagroup.link.shared.auth;
 
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.security.keyvault.secrets.SecretClient;

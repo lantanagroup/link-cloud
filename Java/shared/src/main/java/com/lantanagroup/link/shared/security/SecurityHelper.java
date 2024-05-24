@@ -1,14 +1,16 @@
 package com.lantanagroup.link.shared.security;
 
+import com.lantanagroup.link.shared.auth.JwtAuthenticationEntryPoint;
+import com.lantanagroup.link.shared.auth.JwtAuthenticationFilter;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 public class SecurityHelper {
-    public static SecurityFilterChain build(HttpSecurity http) throws Exception {
+  /*  public static SecurityFilterChain build(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests -> {
@@ -25,6 +27,7 @@ public class SecurityHelper {
                             .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll();
                     authorizeRequests.anyRequest().authenticated();
                 })
+
                 .oauth2ResourceServer(resourceServer -> {
                     resourceServer.jwt(Customizer.withDefaults());
                 })
@@ -33,6 +36,20 @@ public class SecurityHelper {
                 });
         return http.build();
     }
+*/
+  public static SecurityFilterChain build(HttpSecurity http, JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter) throws Exception {
+    http.csrf(AbstractHttpConfigurer::disable).addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
+            .authorizeRequests().
+            requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/health").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api-docs/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
+            //requestMatchers("/api/**").access("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')").and().exceptionHandling(ex -> ex.authenticationEntryPoint(point)  - done in the specific end points using annotations for more granular control
+            .requestMatchers("/api/**").authenticated().and().exceptionHandling(ex -> ex.authenticationEntryPoint(point))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    return http.build();
+  }
+
 
     public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
         return http
