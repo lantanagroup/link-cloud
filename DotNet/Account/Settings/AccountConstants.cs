@@ -8,7 +8,6 @@
         {
             public const string ExternalConfigurationSource = "ExternalConfigurationSource";
             public const string DatabaseProvider = "DatabaseProvider";
-            public const string EnableSwagger = "EnableSwagger";
             public const string UserManagement = "UserManagement";
         }
 

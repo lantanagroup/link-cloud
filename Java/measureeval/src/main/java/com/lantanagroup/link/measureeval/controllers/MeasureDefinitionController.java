@@ -7,6 +7,8 @@ import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
@@ -18,6 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/measure-definition")
+@SecurityRequirement(name = "bearer-key")
 public class MeasureDefinitionController {
     private final MeasureDefinitionRepository repository;
     private final MeasureDefinitionBundleValidator bundleValidator;
@@ -34,16 +37,19 @@ public class MeasureDefinitionController {
 
     @GetMapping
     @JsonView(Views.Summary.class)
+    @Operation(summary = "Get all measure definitions", tags = {"Measure Definitions"})
     public List<MeasureDefinition> getAll() {
         return repository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@PathVariable String id) {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition put(@PathVariable String id, @RequestBody Bundle bundle) {
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
@@ -58,6 +64,7 @@ public class MeasureDefinitionController {
     }
 
     @PostMapping("/{id}/$evaluate")
+    @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     public MeasureReport evaluate(@PathVariable String id, @RequestBody Parameters parameters) {
         MeasureEvaluator evaluator = evaluatorCache.get(id);
         if (evaluator == null) {

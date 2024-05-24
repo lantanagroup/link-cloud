@@ -1,6 +1,7 @@
 ﻿using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace QueryDispatch.Application.Services
 {

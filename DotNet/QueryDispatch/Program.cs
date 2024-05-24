@@ -43,6 +43,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using QueryDispatch.Domain.Context;
 using QueryDispatch.Persistence.Retry;
@@ -250,11 +251,7 @@ app.Run();
 static void SetupMiddleware(WebApplication app)
 {
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "QueryDispatch Service v1"));
-    }
+    app.ConfigureSwagger();
 
     if (app.Environment.IsDevelopment())
     {

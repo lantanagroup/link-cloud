@@ -26,6 +26,7 @@ using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace Tenant
 {
@@ -226,11 +227,7 @@ namespace Tenant
         static void SetupMiddleware(WebApplication app)
         {
             // Configure the HTTP request pipeline.
-            if (app.Configuration.GetValue<bool>(TenantConstants.AppSettingsSectionNames.EnableSwagger))
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Tenant Service v1"));
-            }
+            app.ConfigureSwagger();
 
             app.UseRouting();            
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
