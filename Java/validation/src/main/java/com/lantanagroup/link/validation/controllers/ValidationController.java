@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.controllers;
 import com.lantanagroup.link.validation.model.ResultModel;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/validation")
+@SecurityRequirement(name = "bearer-key")
 public class ValidationController {
     private static final Logger log = LoggerFactory.getLogger(ValidationController.class);
 

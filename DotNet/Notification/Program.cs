@@ -38,6 +38,7 @@ using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -162,10 +163,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         
         switch (builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseProvider))
         {
-            case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString))
-                .AddInterceptors(updateBaseEntityInterceptor);                    
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString =
+                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+                
+                options.UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);                    
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -271,13 +277,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        var serviceInformation = app.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Notification Service"));
-    }
-
+    app.ConfigureSwagger();
     app.UseRouting();
     app.UseCors("CorsPolicy");
     app.UseAuthentication();

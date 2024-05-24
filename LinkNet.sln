@@ -21,10 +21,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeasureEval", "DotNet\MeasureEval\MeasureEval.csproj", "{371A3B98-4918-4725-AD93-65D7D18DEC1A}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeasureEvalTests", "DotNet\MeasureEvalTests\MeasureEvalTests.csproj", "{82A91203-9385-4123-9B94-6B1911A30915}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit", "DotNet\Audit\Audit.csproj", "{4C933C22-D465-41EF-B790-00E7F9098963}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Census", "DotNet\Census\Census.csproj", "{6837CD67-C54A-4A8C-9E4B-B27FA1A83E5C}"
@@ -42,8 +38,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotificationTests", "DotNet\NotificationTests\NotificationTests.csproj", "{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QueryDispatch", "DotNet\QueryDispatch\QueryDispatch.csproj", "{DC424202-1A59-436D-9849-A13925298109}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PatientsToQuery", "DotNet\PatientsToQuery\PatientsToQuery.csproj", "{8F758015-546B-4654-98A1-E96D1CE71B5E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Submission", "DotNet\Submission\Submission.csproj", "{CD9F987F-E553-4050-AC48-C32B55D75C3F}"
 EndProject
@@ -69,9 +63,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Web", "Web", "{C98B4989-107
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DemoApp", "Web\DemoApp\DemoApp.esproj", "{472A561B-EF7F-467E-96ED-1FB130E43292}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAcquisition.Domain", "DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj", "{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj", "{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -103,14 +97,6 @@ Global
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4630539F-43B5-4E83-A279-29BBAA627856}.Release|Any CPU.Build.0 = Release|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{371A3B98-4918-4725-AD93-65D7D18DEC1A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{82A91203-9385-4123-9B94-6B1911A30915}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C933C22-D465-41EF-B790-00E7F9098963}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -147,10 +133,6 @@ Global
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8F758015-546B-4654-98A1-E96D1CE71B5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8F758015-546B-4654-98A1-E96D1CE71B5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8F758015-546B-4654-98A1-E96D1CE71B5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8F758015-546B-4654-98A1-E96D1CE71B5E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CD9F987F-E553-4050-AC48-C32B55D75C3F}.Release|Any CPU.ActiveCfg = Release|Any CPU

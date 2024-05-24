@@ -5,6 +5,12 @@ logging:
 server:
   port: 5135
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 spring:
   application:
     name: measureeval

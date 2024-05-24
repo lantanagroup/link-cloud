@@ -3,6 +3,8 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+secrets.json
+
 # User-specific files
 *.rsuser
 *.suo
@@ -407,5 +409,4 @@ FodyWeavers.xsd
 
 ## Maven
 **/target/
-DotNet/Audit/secrets.json
 /DotNet/Submission/appsettings.Development.json

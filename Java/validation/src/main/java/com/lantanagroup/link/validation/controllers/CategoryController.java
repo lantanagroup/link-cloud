@@ -8,6 +8,7 @@ import com.lantanagroup.link.validation.model.LatestCategoryRuleSetsModel;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleSetsRepository;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.transaction.Transactional;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/category")
+@SecurityRequirement(name = "bearer-key")
 public class CategoryController {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(CategoryController.class);
 
@@ -31,7 +33,7 @@ public class CategoryController {
         this.categoryRuleSetsRepository = categoryRuleSetsRepository;
     }
 
-    @Operation(summary = "Create or update a category")
+    @Operation(summary = "Create or update a category", tags = {"Categories"})
     @PostMapping
     public void createOrUpdateCategory(@RequestBody CategoryEntity category) {
         if (StringUtils.isEmpty(category.getId())) {
@@ -47,15 +49,16 @@ public class CategoryController {
         this.categoryRepository.save(category);
     }
 
-    @Operation(summary = "Get all categories")
+    @Operation(summary = "Get all categories", tags = {"Categories"})
     @GetMapping
     public List<CategoryEntity> getCategories() {
+        String val = System.getProperty("loki.enabled");
         return this.categoryRepository.findAll()
                 .stream().peek(category -> category.setRequireAllRuleSets(null))
                 .toList();
     }
 
-    @Operation(summary = "Get the latest version of rules for a category by ID")
+    @Operation(summary = "Get the latest version of rules for a category by ID", tags = {"Categories"})
     @GetMapping("/{categoryId}/rules")
     public LatestCategoryRuleSetsModel getCategoryRules(@PathVariable String categoryId) {
         CategoryRuleSetsEntity entity = this.categoryRuleSetsRepository.getLatestCategoryRules(categoryId);
@@ -72,7 +75,7 @@ public class CategoryController {
         return model;
     }
 
-    @Operation(summary = "Create or update rule sets for a category by ID")
+    @Operation(summary = "Create or update rule sets for a category by ID", tags = {"Categories"})
     @PostMapping("/{categoryId}/rules")
     public void createOrUpdateCategoryRules(@PathVariable String categoryId, @RequestBody CategoryRuleSetsModel categoryRuleSets) {
         if (StringUtils.isEmpty(categoryId)) {
@@ -104,7 +107,7 @@ public class CategoryController {
         this.categoryRuleSetsRepository.save(entity);       // Always save a new category rule set version
     }
 
-    @Operation(summary = "Get the history of rule sets for a category by ID")
+    @Operation(summary = "Get the history of rule sets for a category by ID", tags = {"Categories"})
     @GetMapping("/{categoryId}/rules/history")
     public List<LatestCategoryRuleSetsModel> getCategoryRulesHistory(@PathVariable String categoryId) {
         return this.categoryRuleSetsRepository.findByCategoryId(categoryId)
@@ -120,7 +123,7 @@ public class CategoryController {
                 .toList();
     }
 
-    @Operation(summary = "Bulk save categories and their rule sets")
+    @Operation(summary = "Bulk save categories and their rule sets", tags = {"Categories"})
     @PostMapping("/bulk")
     @Transactional
     public void bulkSaveCategories(@RequestBody List<BulkSaveCategory> categories) {
@@ -168,7 +171,7 @@ public class CategoryController {
         }
     }
 
-    @Operation(summary = "Delete a category by ID")
+    @Operation(summary = "Delete a category by ID", tags = {"Categories"})
     @DeleteMapping("/{categoryId}")
     @Transactional
     public void deleteCategory(@PathVariable String categoryId) {

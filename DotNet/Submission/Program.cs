@@ -33,6 +33,8 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Submission.Application.Config;
 using Serilog.Settings.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -203,11 +205,7 @@ static void SetupMiddleware(WebApplication app)
     //app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>("EnableSwagger"))
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Submission Service v1"));
-    }
+    app.ConfigureSwagger();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
