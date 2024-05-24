@@ -25,8 +25,8 @@ export class AppConfigService {
   async loadConfig(): Promise<void> {
     try {
       this.config = await this.http.get<AppConfig>('/assets/app.config.json').toPromise();
-    } catch (ex) {
-      throw new Error('Failed to acquire app configuration: ' + ex);
+    } catch (ex: any) {
+      throw new Error('Failed to acquire app configuration: ' + (ex.message || ex));
     }
 
     try {
@@ -61,7 +61,7 @@ export class AppConfigService {
       redirectUri: this.getRedirectUri(),
       loginUrl: this.getLoginUrl(),
 
-      // The SPA's id. The SPA is registerd with this id at the auth-server 
+      // The SPA's id. The SPA is registerd with this id at the auth-server
       clientId: this.config.idpClientId,
 
       dummyClientSecret: this.config.idpClientSecret,
