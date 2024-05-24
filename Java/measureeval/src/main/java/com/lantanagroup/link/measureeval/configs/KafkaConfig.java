@@ -42,7 +42,20 @@ public class KafkaConfig {
                 Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED, new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer());
+                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer(),
+                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.Key.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.REPORT_SCHEDULED_ERROR, new JsonDeserializer<>(ReportScheduled.Key.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.REPORT_SCHEDULED_RETRY, new JsonDeserializer<>(ReportScheduled.Key.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType)
+                );
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new StringDeserializer()));
     }
@@ -65,6 +78,18 @@ public class KafkaConfig {
                 Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.REPORT_SCHEDULED, new JsonDeserializer<>(ReportScheduled.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.REPORT_SCHEDULED_ERROR, new JsonDeserializer<>(ReportScheduled.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.REPORT_SCHEDULED_RETRY, new JsonDeserializer<>(ReportScheduled.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType));
 
         return new ErrorHandlingDeserializer<>(
@@ -78,6 +103,9 @@ public class KafkaConfig {
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
+            case Topics.REPORT_SCHEDULED -> new ObjectMapper().constructType(ReportScheduled.class);
+            case Topics.REPORT_SCHEDULED_ERROR -> new ObjectMapper().constructType(ReportScheduled.class);
+            case Topics.REPORT_SCHEDULED_RETRY -> new ObjectMapper().constructType(ReportScheduled.class);
             default -> new ObjectMapper().constructType(Object.class);
         };
     }
@@ -97,6 +125,7 @@ public class KafkaConfig {
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
+                ReportScheduled.Key.class, new JsonSerializer<>(objectMapper.constructType(ReportScheduled.Key.class), objectMapper),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
         );
@@ -110,6 +139,7 @@ public class KafkaConfig {
                 ResourceNormalized.class, new JsonSerializer<>(objectMapper.constructType(ResourceNormalized.class), objectMapper).noTypeInfo(),
                 DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
                 AbstractResourceRecord.class, new JsonSerializer<>(objectMapper.constructType(AbstractResourceRecord.class), objectMapper).noTypeInfo(),
+                ReportScheduled.class, new JsonSerializer<>(objectMapper.constructType(ReportScheduled.class), objectMapper).noTypeInfo(),
                 String.class, new StringSerializer(),
                 byte[].class, new ByteArraySerializer(),
                 LinkedHashMap.class, new JsonSerializer<>(objectMapper.constructType(LinkedHashMap.class), objectMapper).noTypeInfo()
@@ -135,6 +165,21 @@ public class KafkaConfig {
                 .maxAttempts(5)
                 .concurrency(1)
                 .includeTopic(Topics.RESOURCE_NORMALIZED)
+                .retryTopicSuffix("-Retry")
+                .dltSuffix("-Error")
+                .useSingleTopicForSameIntervals()
+                .doNotAutoCreateRetryTopics()
+                .create(template);
+    }
+
+    @Bean
+    public RetryTopicConfiguration reportScheduledRetryTopic(KafkaTemplate<ReportScheduled.Key, ReportScheduled> template) {
+        return RetryTopicConfigurationBuilder
+                .newInstance()
+                .fixedBackOff(3000)
+                .maxAttempts(5)
+                .concurrency(1)
+                .includeTopic(Topics.REPORT_SCHEDULED)
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
                 .useSingleTopicForSameIntervals()

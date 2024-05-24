@@ -7,4 +7,7 @@ public class Topics {
     public static final String RESOURCE_NORMALIZED = "ResourceNormalized";
     public static final String RESOURCE_NORMALIZED_ERROR = "ResourceNormalized-Error";
     public static final String RESOURCE_NORMALIZED_RETRY = "ResourceNormalized-Retry";
+    public static final String REPORT_SCHEDULED = "ReportScheduled";
+    public static final String REPORT_SCHEDULED_ERROR = "ReportScheduled-Error";
+    public static final String REPORT_SCHEDULED_RETRY = "ReportScheduled-Retry";
 }
