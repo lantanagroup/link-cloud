@@ -49,6 +49,7 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+
         <dependency>
             <groupId>com.azure.spring</groupId>
             <artifactId>spring-cloud-azure-appconfiguration-config-web</artifactId>
@@ -86,6 +87,32 @@
         </dependency>
 
         <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>3.8.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId> <!-- or jjwt-gson if Gson is preferred -->
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.opencds.cqf.fhir</groupId>
             <artifactId>cqf-fhir-cr</artifactId>
         </dependency>
@@ -95,6 +122,7 @@
             <artifactId>cqf-fhir-jackson</artifactId>
             <type>pom</type>
         </dependency>
+
     </dependencies>
 
     <build>
