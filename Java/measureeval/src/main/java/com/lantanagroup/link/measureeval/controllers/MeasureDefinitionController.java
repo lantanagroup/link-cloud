@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.lantanagroup.link.measureeval.auth.PrincipalUser;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.serdes.Views;
@@ -11,6 +12,9 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -34,17 +38,20 @@ public class MeasureDefinitionController {
 
     @GetMapping
     @JsonView(Views.Summary.class)
-    public List<MeasureDefinition> getAll() {
+    @PreAuthorize("hasRole('LinkUser')")
+    public List<MeasureDefinition> getAll(@AuthenticationPrincipal UserDetails user) {
         return repository.findAll();
     }
 
     @GetMapping("/{id}")
-    public MeasureDefinition getOne(@PathVariable String id) {
+    @PreAuthorize("hasRole('LinkUser')")
+    public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     @PutMapping("/{id}")
-    public MeasureDefinition put(@PathVariable String id, @RequestBody Bundle bundle) {
+    @PreAuthorize("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')")
+    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
             MeasureDefinition _entity = new MeasureDefinition();
@@ -58,7 +65,8 @@ public class MeasureDefinitionController {
     }
 
     @PostMapping("/{id}/$evaluate")
-    public MeasureReport evaluate(@PathVariable String id, @RequestBody Parameters parameters) {
+    @PreAuthorize("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')")
+    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
         MeasureEvaluator evaluator = evaluatorCache.get(id);
         if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
