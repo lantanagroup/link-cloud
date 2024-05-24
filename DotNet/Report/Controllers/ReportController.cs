@@ -2,6 +2,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Converters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<JsonElement>> GetSubmissionBundle(string reportId)
+        public async Task<ActionResult<MeasureReportSubmissionModel>> GetSubmissionBundle(string reportId)
         {
             try
             {
@@ -47,7 +48,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
 
-                return Ok(JsonSerializer.SerializeToElement(submission.SubmissionBundle, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector)));
+                return Ok(submission);
             }
             catch (Exception ex)
             {
@@ -65,10 +66,10 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
         [HttpGet("Bundle/Patient")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<JsonElement>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             try
             {
@@ -84,9 +85,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
 
-                var serialized = JsonSerializer.SerializeToElement(submission);
-
-                return Ok(serialized);
+                return Ok(submission);
             }
             catch (Exception ex)
             {

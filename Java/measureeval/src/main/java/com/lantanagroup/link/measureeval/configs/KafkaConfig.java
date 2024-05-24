@@ -1,25 +1,24 @@
 package com.lantanagroup.link.measureeval.configs;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
 import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.records.ResourceAcquired;
-import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.*;
+import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.ConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
+import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
 import org.springframework.kafka.support.serializer.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -41,18 +40,46 @@ public class KafkaConfig {
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
                 Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED, new StringDeserializer());
+                Topics.RESOURCE_NORMALIZED, new StringDeserializer(),
+                Topics.RESOURCE_NORMALIZED_ERROR, new StringDeserializer(),
+                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
-                new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
+                new DelegatingByTopicDeserializer(byPattern(deserializers), new StringDeserializer()));
     }
 
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCE_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceAcquired.class, objectMapper),
-                Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper));
+                Topics.RESOURCE_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceAcquired.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.RESOURCE_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType));
+
         return new ErrorHandlingDeserializer<>(
-                new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
+                new DelegatingByTopicDeserializer(byPattern(deserializers), new JsonDeserializer<Object>().trustedPackages("*").ignoreTypeHeaders().typeResolver(KafkaConfig::resolveType)));
+    }
+
+    public static JavaType resolveType(String topic, byte[] data, Headers headers){
+        return switch(topic){
+            case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
+            case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
+            case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
+            case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
+            case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
+            default -> new ObjectMapper().constructType(Object.class);
+        };
     }
 
     @Bean
@@ -67,24 +94,27 @@ public class KafkaConfig {
 
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
-        Map<String, Serializer<?>> serializers = Map.of(
-                Topics.DATA_ACQUISITION_REQUESTED, new StringSerializer(),
-                Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
-                        objectMapper.constructType(ResourceEvaluated.Key.class),
-                        objectMapper));
-        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
+        Map<Class<?>, Serializer<?>> serializers = Map.of(
+                String.class, new StringSerializer(),
+                ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
+                Object.class, new JsonSerializer<>(),
+                byte[].class, new ByteArraySerializer()
+        );
+        return new DelegatingByTypeSerializer(serializers);
     }
 
     @Bean
     public Serializer<?> valueSerializer(ObjectMapper objectMapper) {
-        Map<String, Serializer<?>> serializers = Map.of(
-                Topics.DATA_ACQUISITION_REQUESTED, new JsonSerializer<>(
-                        objectMapper.constructType(DataAcquisitionRequested.class),
-                        objectMapper),
-                Topics.RESOURCE_EVALUATED, new JsonSerializer<>(
-                        objectMapper.constructType(ResourceEvaluated.class),
-                        objectMapper));
-        return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
+        Map<Class<?>, Serializer<?>> serializers = Map.of(
+                ResourceAcquired.class, new JsonSerializer<>(objectMapper.constructType(ResourceAcquired.class), objectMapper).noTypeInfo(),
+                ResourceNormalized.class, new JsonSerializer<>(objectMapper.constructType(ResourceNormalized.class), objectMapper).noTypeInfo(),
+                DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
+                AbstractResourceRecord.class, new JsonSerializer<>(objectMapper.constructType(AbstractResourceRecord.class), objectMapper).noTypeInfo(),
+                String.class, new StringSerializer(),
+                byte[].class, new ByteArraySerializer(),
+                LinkedHashMap.class, new JsonSerializer<>(objectMapper.constructType(LinkedHashMap.class), objectMapper).noTypeInfo()
+        );
+        return new DelegatingByTypeSerializer(serializers);
     }
 
     @Bean
@@ -95,5 +125,20 @@ public class KafkaConfig {
             Serializer<?> valueSerializer) {
         Map<String, Object> producerProperties = properties.buildProducerProperties(sslBundles.getIfAvailable());
         return new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
+    }
+
+    @Bean
+    public RetryTopicConfiguration resourceNormalizedRetryTopic(KafkaTemplate<String, ResourceNormalized> template) {
+        return RetryTopicConfigurationBuilder
+                .newInstance()
+                .fixedBackOff(3000)
+                .maxAttempts(5)
+                .concurrency(1)
+                .includeTopic(Topics.RESOURCE_NORMALIZED)
+                .retryTopicSuffix("-Retry")
+                .dltSuffix("-Error")
+                .useSingleTopicForSameIntervals()
+                .doNotAutoCreateRetryTopics()
+                .create(template);
     }
 }

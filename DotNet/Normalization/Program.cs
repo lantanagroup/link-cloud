@@ -30,6 +30,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Models;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -122,8 +123,8 @@ static void RegisterServices(WebApplicationBuilder builder)
             builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
-            case "SqlServer":
-                string? connectionString = builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseConnectionString);
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
@@ -207,11 +208,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    //if (app.Environment.IsDevelopment())
-    //{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    //}
+    app.ConfigureSwagger();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

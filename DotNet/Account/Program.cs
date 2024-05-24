@@ -160,8 +160,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         var dbProvider = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
-            case "SqlServer":
-                string? connectionString = builder.Configuration.GetValue<string>(AccountConstants.AppSettingsSectionNames.DatabaseConnectionString);
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
 
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
@@ -299,14 +299,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure swagger
-    if (app.Configuration.GetValue<bool>(AccountConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        app.UseSwagger(opts => { opts.RouteTemplate = "api/account/swagger/{documentname}/swagger.json"; });
-        app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/api/account/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
-            opts.RoutePrefix = "api/account/swagger";
-        });
-    }
+    app.ConfigureSwagger();
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);

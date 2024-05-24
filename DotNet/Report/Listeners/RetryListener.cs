@@ -72,7 +72,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     KafkaTopic.ReportScheduledRetry.GetStringValue(), 
                     KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), 
                     KafkaTopic.ReportSubmittedRetry.GetStringValue(), 
-                    KafkaTopic.PatientsToQueryRetry.GetStringValue() 
+                    KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(),
+                    KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
                 });
 
                 _logger.LogInformation($"Started Report Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");

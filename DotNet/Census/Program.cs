@@ -32,8 +32,10 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Diagnostics;
 using System.Reflection;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,9 +99,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         switch (builder.Configuration.GetValue<string>(CensusConstants.AppSettings.DatabaseProvider))
         {
-            case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetConnectionString(CensusConstants.AppSettings.DatabaseConnection))
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString =
+                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
+                        .DatabaseConnection);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+                
+                options.UseSqlServer(connectionString)
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
             default:
@@ -166,6 +174,26 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
+    builder.Services.AddProblemDetails(options => {
+        options.CustomizeProblemDetails = ctx =>
+        {
+            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
+            {
+                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
+            }
+            if (builder.Environment.IsDevelopment())
+            {
+                ctx.ProblemDetails.Extensions.Add("service", "Census");
+            }
+            else
+            {
+                ctx.ProblemDetails.Extensions.Remove("exception");
+            }
+        };
+    });
+
     builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
@@ -195,12 +223,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 static void SetupMiddleware(WebApplication app)
 {
     app.AutoMigrateEF<CensusContext>();
-    
-    //if (app.Environment.IsDevelopment())
-    //{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    //}
+
+    app.ConfigureSwagger();
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {
@@ -209,6 +233,15 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.AutoMigrateEF<CensusContext>();
+
+    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("Local", StringComparison.InvariantCultureIgnoreCase))
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
