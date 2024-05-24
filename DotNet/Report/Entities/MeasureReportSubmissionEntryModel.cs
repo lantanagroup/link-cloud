@@ -1,6 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Attributes;
+using LantanaGroup.Link.Report.Domain.Enums;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
@@ -19,8 +21,10 @@ namespace LantanaGroup.Link.Report.Entities
 
         public class ContainedResource
         {
+            //TODO: Daniel - Maybe enum instead of bool
+            public bool IsPatientResource { get; set; }
             public string Reference { get; set; } = string.Empty;
-            public string Resource { get; set; }
+            public string DocumentId { get; set; }
         }
 
         public  void AddMeasureReport(MeasureReport measureReport)
@@ -35,34 +39,60 @@ namespace LantanaGroup.Link.Report.Entities
                     continue;
                 }
 
+                bool isPatientResourceType = PatientResourceProvider.GetPatientResourceTypes().Any(x => x == evaluatedResource.TypeName);
+
                 ContainedResources.Add(new ContainedResource
                 {
-                    Reference = evaluatedResource.Reference
+                    Reference = evaluatedResource.Reference,
+                    IsPatientResource = isPatientResourceType
                 });
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && !string.IsNullOrWhiteSpace(MeasureReport));
 
         }
 
-        public void AddContainedResource(Resource resource) 
+
+        public void UpdateContainedResource(IReportResource reportResource)
         {
-            var containedResource = ContainedResources.Where(x => x.Reference == resource.TypeName + "/" + resource.Id).FirstOrDefault();
+            var containedResource = ContainedResources.Where(x => x.DocumentId == reportResource.GetId()).FirstOrDefault();
 
             if (containedResource == null)
             {
-                ContainedResources.Add(new ContainedResource
+                ContainedResources.Add(new ContainedResource()
                 {
-                    Reference = resource.TypeName + "/" + resource.Id,
-                    Resource =  new FhirJsonSerializer().SerializeToString(resource)
-                }); 
+                    DocumentId = reportResource.GetId(),
+                    IsPatientResource = reportResource.IsPatientResource(),
+                    Reference = "" //TODO: Daniel - Need to add
+                });
             }
             else
             {
-                containedResource.Resource =  new FhirJsonSerializer().SerializeToString(resource);
+                containedResource.DocumentId = reportResource.GetId();
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && !string.IsNullOrWhiteSpace(MeasureReport));
         }
+
+
+        //public void AddContainedResource(Resource resource) 
+        //{
+        //    var containedResource = ContainedResources.Where(x => x.Reference == resource.TypeName + "/" + resource.Id).FirstOrDefault();
+
+        //    if (containedResource == null)
+        //    {
+        //        ContainedResources.Add(new ContainedResource
+        //        {
+        //            Reference = resource.TypeName + "/" + resource.Id,
+        //            Resource =  new FhirJsonSerializer().SerializeToString(resource)
+        //        }); 
+        //    }
+        //    else
+        //    {
+        //        containedResource.Resource =  new FhirJsonSerializer().SerializeToString(resource);
+        //    }
+
+        //    ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
+        //}
     }
 }

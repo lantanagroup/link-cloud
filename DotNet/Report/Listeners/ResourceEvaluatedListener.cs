@@ -179,6 +179,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
                                     }
+
+                                    
                                 }
 
                                 if (entry.Id == null)

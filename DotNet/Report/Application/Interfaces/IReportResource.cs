@@ -2,5 +2,7 @@
 {
     public interface IReportResource
     {
+        public string GetId();
+        public bool IsPatientResource();
     }
 }
