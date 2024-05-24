@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Report.Services
 {

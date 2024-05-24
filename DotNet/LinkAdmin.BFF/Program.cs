@@ -297,14 +297,10 @@ static void SetupMiddleware(WebApplication app)
     //app.UseHttpsRedirection();
 
     // Configure swagger
-    if (app.Configuration.GetValue<bool>(LinkAdminConstants.AppSettingsSectionNames.EnableSwagger))
-    {       
-        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
-        app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
-            opts.RoutePrefix = "api/swagger";
-        });
-    }
+    app.ConfigureSwagger(opts =>
+    {
+        opts.RouteTemplate = "api/swagger/{documentname}/swagger.json";
+    });
 
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();

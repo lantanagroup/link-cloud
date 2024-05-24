@@ -17,7 +17,7 @@
                 </http>
                 <format>
                     <label>
-                        <pattern>app=link-cloud,component=Validation</pattern>
+                        <pattern>app=link-cloud,component=MeasureEval</pattern>
                         <readMarkers>true</readMarkers>
                     </label>
                     <message>
@@ -41,7 +41,7 @@
         <then>
             <root level="INFO">
                 <appender-ref ref="STDOUT"/>
-                <appender-ref ref="LOKI" />
+                <appender-ref ref="LOKI"/>
             </root>
         </then>
         <else>

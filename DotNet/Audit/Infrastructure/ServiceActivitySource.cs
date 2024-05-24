@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Audit.Infrastructure
 {

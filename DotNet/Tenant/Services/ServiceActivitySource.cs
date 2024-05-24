@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Models;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Tenant.Services
 {

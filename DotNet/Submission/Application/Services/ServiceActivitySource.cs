@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Submission.Application.Services
 {
