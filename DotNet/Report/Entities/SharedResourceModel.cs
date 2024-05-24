@@ -10,5 +10,15 @@ namespace LantanaGroup.Link.Report.Entities
         public string ResourceId { get; set; }
         public string ResourceType { get; set; }
         public string Resource { get; set; }
+
+        public string GetId()
+        {
+            return this.Id;
+        }
+
+        public bool IsPatientResource()
+        {
+            return false;
+        }
     }
 }
