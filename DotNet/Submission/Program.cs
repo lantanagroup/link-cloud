@@ -163,7 +163,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(c =>
+    {
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        c.IncludeXmlComments(xmlPath);
+    });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -200,10 +205,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    app.UseProblemDetails();
-
-    //app.UseOpenTelemetryPrometheusScrapingEndpoint();
-
     // Configure the HTTP request pipeline.
     app.ConfigureSwagger();
 
@@ -215,10 +216,9 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    //app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
-    //app.UseAuthorization();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
+    app.MapControllers();
+    app.UseProblemDetails();
 }
 
 #endregion
