@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Commands
             {
                 CreateDate = DateTime.UtcNow,
                 FacilityId = request.FacilityId,
-                Resource = JsonSerializer.Serialize<Resource>(request.Resource, new JsonSerializerOptions().ForFhir()),
+                Resource = request.Resource, //JsonSerializer.Serialize<Resource>(request.Resource, new JsonSerializerOptions().ForFhir()),
                 ResourceType = request.Resource.TypeName,
                 ResourceId = request.Resource.Id
 

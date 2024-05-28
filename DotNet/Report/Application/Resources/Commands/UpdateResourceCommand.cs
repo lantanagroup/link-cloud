@@ -7,19 +7,19 @@ using MediatR;
 
 namespace LantanaGroup.Link.Report.Application.Resources.Commands
 {
-    public class UpdateResourceCommand : IRequest<IReportResource>
+    public class UpdateResourceCommand : IRequest<IFacilityResource>
     {
-        public IReportResource ReportResource { get; private set; }
+        public IFacilityResource ReportResource { get; private set; }
         public Resource UpdatedResource { get; private set; }
 
-        public UpdateResourceCommand(IReportResource reportResource, Resource updatedResource) 
+        public UpdateResourceCommand(IFacilityResource reportResource, Resource updatedResource) 
         { 
             ReportResource = reportResource;
             UpdatedResource = updatedResource;
         }
     }
 
-    public class UpdateResourceCommandHandler : IRequestHandler<UpdateResourceCommand, IReportResource>
+    public class UpdateResourceCommandHandler : IRequestHandler<UpdateResourceCommand, IFacilityResource>
     {
         private readonly IMediator _mediator;
 
@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Commands
             _mediator = mediator;
         }
 
-        public async Task<IReportResource> Handle(UpdateResourceCommand request, CancellationToken cancellationToken)
+        public async Task<IFacilityResource> Handle(UpdateResourceCommand request, CancellationToken cancellationToken)
         {
             if (request.GetType() == typeof(PatientResourceModel))
             {

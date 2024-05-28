@@ -23,6 +23,7 @@ using LantanaGroup.Link.Report.Application.Resources.Queries;
 using LantanaGroup.Link.Report.Application.Resources.Commands;
 using LantanaGroup.Link.Report.Domain.Enums;
 using Microsoft.AspNetCore.Razor.Hosting;
+using LantanaGroup.Link.Report.Application.Interfaces;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -169,18 +170,20 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
+                                    IFacilityResource returnedResource = null;
+
                                     var existingReportResource = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
 
                                     if (existingReportResource != null)
                                     {
-                                        await _mediator.Send(new UpdateResourceCommand(existingReportResource, resource));
+                                        returnedResource = await _mediator.Send(new UpdateResourceCommand(existingReportResource, resource));
                                     }
                                     else
                                     {
-                                        await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
+                                        returnedResource = await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
                                     }
 
-                                    
+                                    entry.UpdateContainedResource(returnedResource);
                                 }
 
                                 if (entry.Id == null)
@@ -224,7 +227,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         var parser = new FhirJsonParser();
                                         List<MeasureReport> measureReports = submissionEntries
-                                            .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                                            .Select(e => e.MeasureReport)
                                             .ToList();
 
                                         using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);

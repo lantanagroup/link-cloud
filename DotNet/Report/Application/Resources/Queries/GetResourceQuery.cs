@@ -5,7 +5,7 @@ using MediatR;
 
 namespace LantanaGroup.Link.Report.Application.Resources.Queries
 {
-    public class GetResourceQuery : IRequest<IReportResource>
+    public class GetResourceQuery : IRequest<IFacilityResource>
     {
         public string FacilityId { get; private set; }
         public string PatientId { get; private set; }
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Queries
         }
     }
 
-    public class ResourceExistsCommandHandler : IRequestHandler<GetResourceQuery, IReportResource>
+    public class ResourceExistsCommandHandler : IRequestHandler<GetResourceQuery, IFacilityResource>
     {
         private readonly PatientResourceRepository _patientResourceRepository;
         private readonly SharedResourceRepository _sharedResourceRepository;
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Queries
             _sharedResourceRepository = sharedResourceRepository;
         }
 
-        public async Task<IReportResource> Handle(GetResourceQuery request, CancellationToken cancellationToken)
+        public async Task<IFacilityResource> Handle(GetResourceQuery request, CancellationToken cancellationToken)
         {
             bool isPatientResourceType = PatientResourceProvider.GetPatientResourceTypes().Any(x => x == request.ResourceType);
 

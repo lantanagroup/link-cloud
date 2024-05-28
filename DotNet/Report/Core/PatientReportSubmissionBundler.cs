@@ -5,10 +5,13 @@ using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
+using LantanaGroup.Link.Report.Application.PatientResource.Queries;
+using LantanaGroup.Link.Report.Application.SharedResource.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
+using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Core
@@ -82,16 +85,13 @@ namespace LantanaGroup.Link.Report.Core
                 Bundle bundle = submission == null ? CreateNewBundle() : submission.SubmissionBundle;
 
                 var parser = new FhirJsonParser();
-                MeasureReport mr;
-                try
+
+                if (entry.MeasureReport == null) 
                 {
-                    mr = parser.Parse<MeasureReport>(entry.MeasureReport);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"{nameof(MeasureReportSubmissionModel)} with ID {entry.Id} could not be parsed into a valid MeasureReport.", ex);
                     continue;
                 }
+
+                MeasureReport mr = entry.MeasureReport;                
 
                 var config = (await _mediator.Send(new SearchMeasureReportConfigQuery { FacilityId = facilityId, ReportType = schedule.ReportType })).FirstOrDefault();
 
@@ -102,13 +102,27 @@ namespace LantanaGroup.Link.Report.Core
                 {
                     if (mr.Contained == null) mr.Contained = new List<Resource>();
 
-                    entry.ContainedResources.ForEach(r =>
+                    entry.ContainedResources.ForEach(async r =>
                     {
+                        if (r.DocumentId == null) return;
+
+                        IFacilityResource facilityResource = null!;
+
+                        if (r.IsPatientResource)
+                        {
+                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(facilityId, patientId, r.ResourceType, r.ResourceId));
+                        }
+                        else
+                        {
+                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(facilityId, r.ResourceType, r.ResourceId));
+                        }
+
                         Resource resource = null!;
-                        if (r.Resource == null) return;
+
                         try
                         {
-                            resource = parser.Parse<Resource>(r.Resource);
+                            resource = facilityResource.Resource();
+                            //resource = parser.Parse<Resource>(r.Resource);
                             mr.Contained.Add(resource);
                         }
                         catch (Exception ex)

@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Commands
         public async Task<PatientResourceModel> Handle(UpdatePatientResourceCommand request, CancellationToken cancellationToken)
         {
             request.PatientResource.ModifyDate = DateTime.UtcNow;
-            request.PatientResource.Resource = JsonSerializer.Serialize(request.UpdatedResource, new JsonSerializerOptions().ForFhir());
+            request.PatientResource.Resource = request.UpdatedResource; //JsonSerializer.Serialize(request.UpdatedResource, new JsonSerializerOptions().ForFhir());
             
             var patientResource = await _repository.UpdateAsync(request.PatientResource);
 
