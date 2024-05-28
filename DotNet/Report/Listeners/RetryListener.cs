@@ -72,7 +72,6 @@ namespace LantanaGroup.Link.Report.Listeners
                     KafkaTopic.ReportScheduledRetry.GetStringValue(), 
                     KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), 
                     KafkaTopic.ReportSubmittedRetry.GetStringValue(), 
-                    KafkaTopic.PatientsToQueryRetry.GetStringValue(),
                     KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(),
                     KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
                 });

@@ -20,7 +20,7 @@ public class BaseSpringConfig {
 
     @Bean
     SecurityFilterChain web(HttpSecurity http) throws Exception {
-        return SecurityHelper.build(http);
+        return SecurityHelper.buildAnonymous(http);
     }
 
     @Bean

@@ -107,6 +107,7 @@
             <artifactId>commons-compiler</artifactId>
         </dependency>
 
+        <!-- for logback to use conditional expressions -->
         <dependency>
             <groupId>org.codehaus.janino</groupId>
             <artifactId>janino</artifactId>

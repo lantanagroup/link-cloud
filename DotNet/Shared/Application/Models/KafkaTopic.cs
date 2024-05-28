@@ -46,7 +46,6 @@ public enum KafkaTopic
     ResourceEvaluated,
     ReportSubmitted,
     BundleEvalRequested,
-    PatientsToQuery,
     SubmitReport,
     [StringValue("ResourceEvaluated-Retry")]
     ResourceEvaluatedRetry,
@@ -54,8 +53,6 @@ public enum KafkaTopic
     ReportSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
-    [StringValue("PatientsToQuery-Retry")]
-    PatientsToQueryRetry,
     [StringValue("SubmitReport-Retry")]
     SubmitReportRetry,
     [StringValue("ReportScheduled-Retry")]

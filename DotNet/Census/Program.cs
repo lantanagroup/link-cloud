@@ -35,6 +35,7 @@ using Serilog.Exceptions;
 using System.Diagnostics;
 using System.Reflection;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -222,12 +223,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 static void SetupMiddleware(WebApplication app)
 {
     app.AutoMigrateEF<CensusContext>();
-    
-    //if (app.Environment.IsDevelopment())
-    //{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    //}
+
+    app.ConfigureSwagger();
 
     if (app.Configuration.GetValue<bool>("AllowReflection"))
     {

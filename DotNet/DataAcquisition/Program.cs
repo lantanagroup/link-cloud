@@ -38,6 +38,7 @@ using Serilog.Settings.Configuration;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Spi;
 using LantanaGroup.Link.DataAcquisition.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -229,8 +230,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.ConfigureSwagger();
 
     app.AutoMigrateEF<DataAcquisitionDbContext>();
 

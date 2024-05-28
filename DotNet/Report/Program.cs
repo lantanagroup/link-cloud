@@ -31,6 +31,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -239,11 +240,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    if (app.Configuration.GetValue<bool>(ReportConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", "Report Service v1"));
-    }
+    app.ConfigureSwagger();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
