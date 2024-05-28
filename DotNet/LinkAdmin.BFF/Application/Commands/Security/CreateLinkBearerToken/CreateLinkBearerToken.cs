@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
                 }
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512Signature);
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
                 
 
                 var token = new JwtSecurityToken(                                    
