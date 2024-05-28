@@ -16,8 +16,6 @@ import org.springframework.stereotype.Component;
 public class JwtService {
   public final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
 
-  // private static String secret = "/6lBmw6OAVRKb40xHTLy51P6wRrOxlN789c4fUxFB+Dh3wpTTdc2grJuFHr3J6RZyjXoA6E2x83Uv5kHlsljxg==" ;
-
   //retrieve username from jwt token
   public String getUsernameFromToken (String token, String secret) {
     return getClaimFromToken(token, secret, Claims::getSubject);
