@@ -55,6 +55,11 @@
         </dependency>
 
         <dependency>
+            <groupId>com.github.loki4j</groupId>
+            <artifactId>loki-logback-appender</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
@@ -94,6 +99,12 @@
             <groupId>org.opencds.cqf.fhir</groupId>
             <artifactId>cqf-fhir-jackson</artifactId>
             <type>pom</type>
+        </dependency>
+
+        <!-- for logback to use conditional expressions -->
+        <dependency>
+            <groupId>org.codehaus.janino</groupId>
+            <artifactId>janino</artifactId>
         </dependency>
     </dependencies>
 

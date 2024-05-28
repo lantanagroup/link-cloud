@@ -11,6 +11,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -21,6 +22,7 @@ using MediatR;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -90,157 +92,160 @@ public class ResourceAcquiredListener : BackgroundService
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
-            ConsumeResult<string, ResourceAcquiredMessage>? message;
+            ConsumeResult<string, ResourceAcquiredMessage>? message = default;
             try
             {                
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                 {
-                    message = result;
-
-                    if(message.Key == null || string.IsNullOrWhiteSpace(message.Key))
-                    {
-                        _logger.LogError("FacilityId/Message Key is null or empty. Skipping message.");
-                        _deadLetterExceptionHandler.HandleException(message, string.Empty, AuditEventType.Create, "Key is null or Empty.");
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
-                    {
-                        var errorMessage = "Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.";
-                        _logger.LogError(errorMessage);
-                        _deadLetterExceptionHandler.HandleException(message, string.Empty, AuditEventType.Create, errorMessage);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
                     try
                     {
-                        messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
-                    }
-                    catch (Exception ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, message.Message.Key);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
+                        message = result;
 
-                    NormalizationConfig? config = null;
-                    try
-                    {
-                        config = await _mediator.Send(new GetConfigurationEntityQuery
+                        if (message.Key == null || string.IsNullOrWhiteSpace(message.Key))
                         {
-                            FacilityId = messageMetaData.facilityId
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        var errorMessage = $"An error was encountered retrieving facility configuration for {messageMetaData.facilityId}";
+                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.", AuditEventType.Query);
+                        }
 
-                        _logger.LogError(errorMessage, ex);
-                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    if (config == null)
-                    {
-                        var errorMessage = $"No facility configuration found for {messageMetaData.facilityId}";
-                        _transientExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    if(config.OperationSequence == null || config.OperationSequence.Count == 0)
-                    {
-                        var errorMessage = $"No operation sequence found for {messageMetaData.facilityId}";
-                        _deadLetterExceptionHandler.HandleException(message, messageMetaData.facilityId, AuditEventType.Create, errorMessage);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
-
-                    Base resource = null;
-                    try
-                    {
-                        resource = DeserializeResource(message.Message.Value.Resource);
-                    }
-                    catch (Exception ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
-                        kafkaConsumer.Commit(message);
-                        return;
-                    }
-
-                    var operationCommandResult = new OperationCommandResult
-                    {
-                        Resource = resource,
-                        PropertyChanges = new List<PropertyChangeModel>()
-                    };
-
-                    //fix resource ids
-                    operationCommandResult = await _mediator.Send(new FixResourceIDCommand
-                    {
-                        Resource = resource,
-                        PropertyChanges = operationCommandResult.PropertyChanges
-                    });
-
-                    try
-                    {
-                        foreach (var op in opSeq)
+                        if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
                         {
-                            ConceptMapOperation conceptMapOperation = null;
-                            if (op.Value is ConceptMapOperation)
+                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.", AuditEventType.Query);
+                        }
+
+                        (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
+                        try
+                        {
+                            messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", AuditEventType.Query, ex);
+                        }
+
+                        NormalizationConfig? config = null;
+                        try
+                        {
+                            config = await _mediator.Send(new GetConfigurationEntityQuery
                             {
-                                conceptMapOperation = JsonSerializer.Deserialize<ConceptMapOperation>(JsonSerializer.SerializeToElement(op.Value));
-                                JsonElement conceptMapJsonEle = (JsonElement)conceptMapOperation.FhirConceptMap;
-                                conceptMapOperation.FhirConceptMap = JsonSerializer.Deserialize<ConceptMap>(
-                                    conceptMapJsonEle,
-                                    new JsonSerializerOptions().ForFhir(
-                                        ModelInfo.ModelInspector,
-                                        new FhirJsonPocoDeserializerSettings { Validator = null }));
+                                FacilityId = messageMetaData.facilityId
+                            });
+                        }
+                        catch(DbContextNullException ex)
+                        {
+                            throw new TransientException("Database context is null.", AuditEventType.Query, ex);
+                        }
+                        catch (NoEntityFoundException ex)
+                        {
+                            throw new DeadLetterException("Config for facilityId does not exist.", AuditEventType.Query, ex);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", AuditEventType.Query, ex);
+                        }
+
+                        if (config.OperationSequence == null || config.OperationSequence.Count == 0)
+                        {
+                            throw new DeadLetterException("No operation sequence found for facility.", AuditEventType.Query);
+                        }
+
+                        var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
+
+                        Base resource = null;
+                        try
+                        {
+                            resource = DeserializeResource(message.Message.Value.Resource);
+                        }
+                        catch (Exception ex)
+                        {
+                            if(ex is JsonException || ex is NotSupportedException)
+                            {
+                                throw new TransientException("Failed to deserialize resource.", AuditEventType.Query, ex);
                             }
 
-                            operationCommandResult = op.Value switch
-                            {
-                                ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
-                                {
-                                    Resource = resource,
-                                    Operation = conceptMapOperation,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                                ConditionalTransformationOperation => await _mediator.Send(new ConditionalTransformationCommand
-                                {
-                                    Resource = resource,
-                                    Operation = (ConditionalTransformationOperation)op.Value,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                                CopyElementOperation => await _mediator.Send(new CopyElementCommand
-                                {
-                                    Resource = resource,
-                                    Operation = (CopyElementOperation)op.Value,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                                CopyLocationIdentifierToTypeOperation => await _mediator.Send(new CopyLocationIdentifierToTypeCommand
-                                {
-                                    Resource = resource,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                                PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
-                                {
-                                    Resource = resource,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                                _ => await _mediator.Send(new UnknownOperationCommand
-                                {
-                                    Resource = resource,
-                                    PropertyChanges = operationCommandResult.PropertyChanges
-                                }),
-                            };
+                            throw new DeadLetterException("Failed to deserialize resource.", AuditEventType.Query, ex);
+                        }
 
-                            _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                        var operationCommandResult = new OperationCommandResult
+                        {
+                            Resource = resource,
+                            PropertyChanges = new List<PropertyChangeModel>()
+                        };
+
+                        //fix resource ids
+                        try
+                        {
+                            operationCommandResult = await _mediator.Send(new FixResourceIDCommand
+                            {
+                                Resource = resource,
+                                PropertyChanges = operationCommandResult.PropertyChanges
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new TransientException("An error occurred fixing resource Ids.", AuditEventType.Update, ex);
+                        }
+
+                        try
+                        {
+                            foreach (var op in opSeq)
+                            {
+                                ConceptMapOperation conceptMapOperation = null;
+                                try
+                                {
+                                    if (op.Value is ConceptMapOperation)
+                                    {
+                                        conceptMapOperation = JsonSerializer.Deserialize<ConceptMapOperation>(JsonSerializer.SerializeToElement(op.Value));
+                                        JsonElement conceptMapJsonEle = (JsonElement)conceptMapOperation.FhirConceptMap;
+                                        conceptMapOperation.FhirConceptMap = JsonSerializer.Deserialize<ConceptMap>(
+                                            conceptMapJsonEle,
+                                            new JsonSerializerOptions().ForFhir(
+                                                ModelInfo.ModelInspector,
+                                                new FhirJsonPocoDeserializerSettings { Validator = null }));
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+
+                                    throw new TransientException("Error deserializing Concept Map Operation.", AuditEventType.Query, ex);
+                                }
+
+                                operationCommandResult = op.Value switch
+                                {
+                                    ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
+                                    {
+                                        Resource = resource,
+                                        Operation = conceptMapOperation,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                    ConditionalTransformationOperation => await _mediator.Send(new ConditionalTransformationCommand
+                                    {
+                                        Resource = resource,
+                                        Operation = (ConditionalTransformationOperation)op.Value,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                    CopyElementOperation => await _mediator.Send(new CopyElementCommand
+                                    {
+                                        Resource = resource,
+                                        Operation = (CopyElementOperation)op.Value,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                    CopyLocationIdentifierToTypeOperation => await _mediator.Send(new CopyLocationIdentifierToTypeCommand
+                                    {
+                                        Resource = resource,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                    PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
+                                    {
+                                        Resource = resource,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                    _ => await _mediator.Send(new UnknownOperationCommand
+                                    {
+                                        Resource = resource,
+                                        PropertyChanges = operationCommandResult.PropertyChanges
+                                    }),
+                                };
+
+                                _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
                                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
                                 new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
                                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
@@ -248,63 +253,82 @@ public class ResourceAcquiredListener : BackgroundService
                                 new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
                                 new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, op.Value.GetType().Name)
                             });
+                            }
+                        }
+                        catch (TransientException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new DeadLetterException("An error was encountered processing Operation Commands.", AuditEventType.Query, ex);
+                        }
+
+                        try
+                        {
+                            await _mediator.Send(new TriggerAuditEventCommand
+                            {
+                                CorrelationId = messageMetaData.correlationId,
+                                FacilityId = messageMetaData.facilityId,
+                                resourceAcquiredMessage = message.Value,
+                                PropertyChanges = operationCommandResult.PropertyChanges
+                            });
+
+                            var serializedResource = JsonSerializer.SerializeToElement(operationCommandResult.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
+
+                            var headers = new Headers
+                            {
+                                new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
+                            };
+                            var resourceNormalizedMessage = new ResourceNormalizedMessage
+                            {
+                                PatientId = message.Value.PatientId ?? "",
+                                Resource = serializedResource,
+
+                                QueryType = message.Value.QueryType,
+                                ScheduledReports = message.Message.Value.ScheduledReports
+                            };
+                            Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
+                            {
+                                Key = messageMetaData.facilityId,
+                                Headers = headers,
+                                Value = resourceNormalizedMessage
+                            };
+                            await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new TransientException("An error was encountered triggering audit event.", AuditEventType.Create, ex);
                         }
                     }
-                    catch (Exception ex)
+                    catch (DeadLetterException ex)
                     {
-                        var errorMessage = $"An error was encountered processing Operation Commands for {messageMetaData.facilityId}";
-
-                        _logger.LogError(errorMessage, ex);
-                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
-                        kafkaConsumer.Commit(message);
-                        return;
+                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key);
                     }
-
-                    try
+                    catch (TransientException ex)
                     {
-                        await _mediator.Send(new TriggerAuditEventCommand
-                        {
-                            CorrelationId = messageMetaData.correlationId,
-                            FacilityId = messageMetaData.facilityId,
-                            resourceAcquiredMessage = message.Value,
-                            PropertyChanges = operationCommandResult.PropertyChanges
-                        });
-
-                        var serializedResource = JsonSerializer.SerializeToElement(operationCommandResult.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
-
-                        var headers = new Headers
-                    {
-                        new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
-                    };
-                        var resourceNormalizedMessage = new ResourceNormalizedMessage
-                        {
-                            PatientId = message.Value.PatientId ?? "",
-                            Resource = serializedResource,
-
-                            QueryType = message.Value.QueryType,
-                            ScheduledReports = message.Message.Value.ScheduledReports
-                        };
-                        Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
-                        {
-                            Key = messageMetaData.facilityId,
-                            Headers = headers,
-                            Value = resourceNormalizedMessage
-                        };
-                        await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
-
+                        _transientExceptionHandler.HandleException(message, ex, message.Key);
                     }
                     catch (Exception ex)
                     {
-                        var errorMessage = $"An error was encountered building/producing kafka message for {messageMetaData.facilityId}";
+                        _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _logger.LogError(errorMessage, ex);
-                        _transientExceptionHandler.HandleException(message, ex, AuditEventType.Create, messageMetaData.facilityId);
-                        kafkaConsumer.Commit(message);
-                        return;
+                        var auditValue = new Shared.Application.Models.Kafka.AuditEventMessage
+                        {
+                            FacilityId = message.Message.Key,
+                            Action = AuditEventType.Query,
+                            ServiceName = NormalizationConstants.ServiceName,
+                            EventDate = DateTime.UtcNow,
+                            Notes = $"Data Acquisition processing failure \nException Message: {ex}",
+                        };
+
+                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), message.Message.Key);
                     }
-
-                    kafkaConsumer.Commit(message);
-
+                    finally
+                    {
+                        kafkaConsumer.Commit(message);
+                    }
                 }, cancellationToken);
             }
             catch (OperationCanceledException)
@@ -387,14 +411,6 @@ public class ResourceAcquiredListener : BackgroundService
             default:
                 throw new DeserializationUnsupportedTypeException();
         }
-
-        /*return resource switch
-        {
-            JsonElement => DeserializeStringToResource(JsonObject.Create((JsonElement)resource).ToJsonString()),
-            string => DeserializeStringToResource((string)resource),
-            _ => throw new DeserializationUnsupportedTypeException()
-        };
-*/
     }
 
 }

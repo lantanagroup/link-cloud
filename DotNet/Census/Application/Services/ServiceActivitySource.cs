@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Census.Application.Settings;
 using System.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Census.Application.Services
 {
