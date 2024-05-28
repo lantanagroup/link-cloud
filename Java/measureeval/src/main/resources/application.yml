@@ -48,8 +48,5 @@ link:
         query:
           - queryType={queryType}
 
-secretmanagement:
-  enabled: false
-  manager: AzureKeyVault
-  manageruri: https://link-vault.vault.azure.net/
+
 
