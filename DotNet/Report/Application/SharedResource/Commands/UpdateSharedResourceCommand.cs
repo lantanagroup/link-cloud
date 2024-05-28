@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Commands
         public async Task<SharedResourceModel> Handle(UpdateSharedResourceCommand request, CancellationToken cancellationToken)
         {
             request.SharedResource.ModifyDate = DateTime.UtcNow;
-            request.SharedResource.Resource = JsonSerializer.Serialize(request.UpdatedResource, new JsonSerializerOptions().ForFhir());
+            request.SharedResource.Resource = request.UpdatedResource; //JsonSerializer.Serialize(request.UpdatedResource, new JsonSerializerOptions().ForFhir());
 
             var sharedResource = await _repository.UpdateAsync(request.SharedResource);
 

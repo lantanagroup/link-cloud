@@ -12,9 +12,9 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Queries
         public string ResourceType { get; private set; }
         public string ResourceId { get; private set; }
 
-        public GetPatientResourceCommand(string facilitId, string patientId, string resourceType, string resourceId)
+        public GetPatientResourceCommand(string facilityId, string patientId, string resourceType, string resourceId)
         {
-            FacilityId = facilitId;
+            FacilityId = facilityId;
             PatientId = patientId;
             ResourceType = resourceType;
             ResourceId = resourceId;
