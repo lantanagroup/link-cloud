@@ -1,6 +1,7 @@
 package com.lantanagroup.link.shared.auth;
 
 import com.azure.security.keyvault.secrets.SecretClient;
+import com.nimbusds.oauth2.sdk.util.StringUtils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
@@ -25,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final HandlerExceptionResolver handlerExceptionResolver;
   private final SecretClient secretClient;
   private final JwtService jwtService;
+  private String secret;
 
   public JwtAuthenticationFilter (SecretClient secretClient, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver) {
     super();
@@ -36,7 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-    String secret = secretClient.getSecret("link-bearer-key").getValue();
+    if(StringUtils.isBlank(secret)){
+      secret = secretClient.getSecret("link-bearer-key").getValue();
+    }
 
     String authHeader = request.getHeader("Authorization");
 
