@@ -47,6 +47,3 @@ link:
         path: /api/{facilityId}/QueryResult/{correlationId}
         query:
           - queryType={queryType}
-
-
-
