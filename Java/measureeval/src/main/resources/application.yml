@@ -11,6 +11,12 @@ springdoc:
   swagger-ui:
     enabled: false
 
+secretManagement:
+  managerUri: https://link-vault.vault.azure.net/
+
+authentication:
+  enableAnonymousAccess: true
+
 spring:
   application:
     name: measureeval
