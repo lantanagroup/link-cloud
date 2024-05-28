@@ -200,10 +200,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    app.UseProblemDetails();
-
-    //app.UseOpenTelemetryPrometheusScrapingEndpoint();
-
     // Configure the HTTP request pipeline.
     app.ConfigureSwagger();
 
@@ -215,10 +211,9 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    //app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
-    //app.UseAuthorization();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
+    app.MapControllers();
+    app.UseProblemDetails();
 }
 
 #endregion
