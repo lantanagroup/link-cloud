@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SecretClientConfig {
 
-  @Value("${secretmanagement.manageruri}")
+  @Value("${secretManagement.managerUri}")
   private String vaultUrl;
 
   @Bean
