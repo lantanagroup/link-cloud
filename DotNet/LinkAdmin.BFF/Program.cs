@@ -294,13 +294,17 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseStatusCodePages();
-    //app.UseHttpsRedirection();
+    app.UseHttpsRedirection();
 
     // Configure swagger
-    app.ConfigureSwagger(opts =>
+    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
     {
-        opts.RouteTemplate = "api/swagger/{documentname}/swagger.json";
-    });
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
+        app.UseSwaggerUI(opts => {
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.RoutePrefix = "api/swagger";
+        });
+    }
 
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
