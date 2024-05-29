@@ -60,50 +60,59 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     //configure validation of the token
                     ValidateAudience = linkBearerServiceOptions.ValidateToken,
                     ValidateIssuer = linkBearerServiceOptions.ValidateToken,
-                    ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken,                    
+                    ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken, 
+                    ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha512 },
 
                     IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
-                    {                       
-                        var protector = services.BuildServiceProvider().GetRequiredService<IDataProtectionProvider>().CreateProtector(ConfigurationConstants.LinkDataProtectors.LinkSigningKey);
+                    {                             
                         string bearerKey = string.Empty;
 
-                        //check if bearer key is in cache, if not get it from the secret manager
-                        var cache = services.BuildServiceProvider().GetRequiredService<IDistributedCache>();
-                        string? cachedBearerKey = cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
-
-                        if (cachedBearerKey == null)
+                        if (linkBearerServiceOptions.SigningKey is null)
                         {
-                            var secretManager = services.BuildServiceProvider().GetRequiredService<ISecretManager>();
-                            var vaultResult = secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                            var protector = services.BuildServiceProvider().GetRequiredService<IDataProtectionProvider>().CreateProtector(ConfigurationConstants.LinkDataProtectors.LinkSigningKey);
 
-                            bearerKey = vaultResult.Result;
+                            //check if bearer key is in cache, if not get it from the secret manager
+                            var cache = services.BuildServiceProvider().GetRequiredService<IDistributedCache>();
+                            string? cachedBearerKey = cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
 
-                            if (bearerKey == null)
+                            if (cachedBearerKey == null)
                             {
-                                throw new Exception("Bearer key not found");
-                            }
+                                var secretManager = services.BuildServiceProvider().GetRequiredService<ISecretManager>();
+                                var vaultResult = secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
 
-                            //protect the bearer key and store it in the cache
-                            if (linkBearerServiceOptions.ProtectKey)
-                            {
-                                cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                                bearerKey = vaultResult.Result;
+
+                                if (bearerKey == null)
+                                {
+                                    throw new Exception("Bearer key not found");
+                                }
+
+                                //protect the bearer key and store it in the cache
+                                if (linkBearerServiceOptions.ProtectKey)
+                                {
+                                    cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                                }
+                                else
+                                {
+                                    cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                                }
                             }
                             else
                             {
-                                cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
-                            }                            
+                                if (linkBearerServiceOptions.ProtectKey)
+                                {
+                                    bearerKey = protector.Unprotect(cachedBearerKey);
+                                }
+                                else
+                                {
+                                    bearerKey = cachedBearerKey;
+                                }
+                            }
                         }
                         else
-                        {
-                            if(linkBearerServiceOptions.ProtectKey)
-                            {
-                                bearerKey = protector.Unprotect(cachedBearerKey);
-                            }
-                            else
-                            {
-                                bearerKey = cachedBearerKey;
-                            }                   
-                        }
+                        { 
+                            bearerKey = linkBearerServiceOptions.SigningKey;
+                        }                       
 
                         return new[] { new SymmetricSecurityKey(Encoding.UTF8.GetBytes(bearerKey)) };
                     }
@@ -140,6 +149,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             public bool ProtectKey { get; set; } = true;
             public bool ValidateToken { get; set; } = true;
             public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];
+            public string? SigningKey { get; set; }
         }
     }
 }
