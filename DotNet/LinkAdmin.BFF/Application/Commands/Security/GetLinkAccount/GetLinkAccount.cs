@@ -5,7 +5,6 @@ using System.Security.Claims;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using System.Diagnostics;
 using Link.Authorization.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Permissions;
@@ -17,15 +16,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ILogger<GetLinkAccount> _logger;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
-        private readonly IOptions<LinkBearerServiceConfig> _bearerServiceConfig;
+        private readonly IOptions<LinkTokenServiceSettings> _tokenServiceConfig;
         private readonly ICreateLinkBearerToken _createLinkBearerToken;
 
-        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry, IOptions<LinkBearerServiceConfig> bearerServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
+        public GetLinkAccount(ILogger<GetLinkAccount> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry, IOptions<LinkTokenServiceSettings> tokenServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
-            _bearerServiceConfig = bearerServiceConfig ?? throw new ArgumentNullException(nameof(bearerServiceConfig));
+            _tokenServiceConfig = tokenServiceConfig ?? throw new ArgumentNullException(nameof(tokenServiceConfig));
             _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));            
         }
 
@@ -56,7 +55,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             //create a system account principal
             var claims = new List<Claim>
             {
-                new(LinkAuthorizationConstants.LinkSystemClaims.Email, _bearerServiceConfig.Value.LinkAdminEmail ?? string.Empty),
+                new(LinkAuthorizationConstants.LinkSystemClaims.Email, _tokenServiceConfig.Value.LinkAdminEmail ?? string.Empty),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
                 new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
                 new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.IsLinkAdmin))
