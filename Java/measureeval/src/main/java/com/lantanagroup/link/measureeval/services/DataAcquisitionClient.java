@@ -52,7 +52,6 @@ public class DataAcquisitionClient extends Router {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority(JwtService.RolePrefix + JwtService.LinkUserClaims_LinkAdministrator));
         authorities.add(new SimpleGrantedAuthority(JwtService.LinkSystemPermissions_IsLinkAdmin));
-        authorities.add(new SimpleGrantedAuthority(JwtService.LinkSystemPermissions_IsLinkAdmin));
         return new PrincipalUser(JwtService.LinkUserClaims_LinkSystemAccount, authorities);
     }
 
