@@ -22,8 +22,6 @@ namespace LantanaGroup.Link.Report.Entities
 
         public class ContainedResource
         {
-            //TODO: Daniel - Maybe enum instead of bool
-            public bool IsPatientResource { get; set; }
             public string ResourceType { get; set; } = string.Empty;
             public string ResourceId { get; set; } = string.Empty;
             public string DocumentId { get; set; }
@@ -46,13 +44,10 @@ namespace LantanaGroup.Link.Report.Entities
                     continue;
                 }
 
-                bool isPatientResourceType = PatientResourceProvider.GetPatientResourceTypes().Any(x => x == evaluatedResource.TypeName);
-
                 var reference = evaluatedResource.Reference.Split('/');
 
                 ContainedResources.Add(new ContainedResource
                 {
-                    IsPatientResource = isPatientResourceType,
                     ResourceType = reference[0],
                     ResourceId = reference[1]
                 });
@@ -71,10 +66,8 @@ namespace LantanaGroup.Link.Report.Entities
                 ContainedResources.Add(new ContainedResource()
                 {
                     DocumentId = facilityResource.GetId(),
-                    IsPatientResource = facilityResource.IsPatientResource(),
                     ResourceId = facilityResource.Resource().Id,
                     ResourceType = facilityResource.Resource().TypeName
-
                 });
             }
             else
