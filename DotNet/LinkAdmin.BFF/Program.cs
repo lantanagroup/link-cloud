@@ -72,10 +72,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
-    builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
