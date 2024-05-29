@@ -12,8 +12,7 @@
             public const string CORS = "CORS";
             public const string Telemetry = "Telemetry";
             public const string Serilog = "Serilog";
-            public const string SecretManagement = "SecretManagement";
-            public const string LinkBearerService = "LinkBearerService";
+                        
         }
 
         public static class AuthenticationSchemes

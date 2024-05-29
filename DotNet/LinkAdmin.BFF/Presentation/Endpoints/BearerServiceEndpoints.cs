@@ -1,9 +1,8 @@
-﻿using Hl7.FhirPath.Sprache;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Trace;
@@ -14,11 +13,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
     public class BearerServiceEndpoints : IApi
     {
         private readonly ILogger<BearerServiceEndpoints> _logger;
-        private readonly IOptions<LinkBearerServiceConfig> _tokenServiceconfig;
+        private readonly IOptions<LinkTokenServiceSettings> _tokenServiceconfig;
         private readonly ICreateLinkBearerToken _createLinkBearerToken;
         private readonly IRefreshSigningKey _refreshSigningKey;
 
-        public BearerServiceEndpoints(ILogger<BearerServiceEndpoints> logger, IOptions<LinkBearerServiceConfig> tokenServiceconfig, ICreateLinkBearerToken createLinkBearerToken, IRefreshSigningKey refreshSigningKey)
+        public BearerServiceEndpoints(ILogger<BearerServiceEndpoints> logger, IOptions<LinkTokenServiceSettings> tokenServiceconfig, ICreateLinkBearerToken createLinkBearerToken, IRefreshSigningKey refreshSigningKey)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _tokenServiceconfig = tokenServiceconfig ?? throw new ArgumentNullException(nameof(tokenServiceconfig));
