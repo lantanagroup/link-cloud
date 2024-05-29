@@ -148,6 +148,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
         options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
         options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
 
     //Add persistence interceptors
