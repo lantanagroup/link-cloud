@@ -335,7 +335,7 @@ static void SetupMiddleware(WebApplication app)
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy"); ;
+    }).RequireCors("HealthCheckPolicy");
 }
 
 #endregion

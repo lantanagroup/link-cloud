@@ -5,9 +5,7 @@ using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
-using Link.Authorization.Policies;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.User
