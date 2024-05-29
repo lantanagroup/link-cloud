@@ -193,6 +193,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 }
 
                 schedule.PatientsToQueryDataRequested = true;
+
                 await _mediator.Send(new UpdateMeasureReportScheduleCommand
                 {
                     ReportSchedule = schedule
