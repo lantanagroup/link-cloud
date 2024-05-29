@@ -22,11 +22,6 @@ namespace LantanaGroup.Link.Report.Entities
             return this.Id;
         }
 
-        public bool IsPatientResource() 
-        {
-            return true;
-        }
-
         Resource IFacilityResource.Resource()
         {
             return Resource;

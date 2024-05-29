@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Application.PatientResource.Queries;
+using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Application.SharedResource.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
@@ -107,8 +108,10 @@ namespace LantanaGroup.Link.Report.Core
                         if (r.DocumentId == null) return;
 
                         IFacilityResource facilityResource = null!;
+                        
+                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
 
-                        if (r.IsPatientResource)
+                        if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
                             facilityResource = await _mediator.Send(new GetPatientResourceCommand(facilityId, patientId, r.ResourceType, r.ResourceId));
                         }
