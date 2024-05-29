@@ -6,5 +6,6 @@
         public string Authority { get; set; } = default!;
         public string? LinkAdminEmail { get; set; }
         public int TokenLifespan { get; set; } = 10;
+        public string? SigningKey { get; set; }
     }
 }
