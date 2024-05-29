@@ -31,7 +31,6 @@
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="Hellang.Middleware.ProblemDetails" Version="6.*" />
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
