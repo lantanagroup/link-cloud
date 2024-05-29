@@ -39,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
     if(StringUtils.isBlank(secret)){
-      secret = secretClient.getSecret("link-bearer-key").getValue();
+      secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
     }
 
     String authHeader = request.getHeader("Authorization");
@@ -71,15 +71,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         Claims claims = jwtService.getAllClaimsFromToken(token, secret);
 
         // set roles in Granted Authority
-        String role = jwtService.getRolesFromToken(token, secret);
+        List<String> role = jwtService.getRolesFromToken(token, secret);
         GrantedAuthority grantedAuthority;
-        grantedAuthority = new SimpleGrantedAuthority("ROLE_" + role);
-        authorities.add(grantedAuthority);
+        for (String r : role) {
+          grantedAuthority = new SimpleGrantedAuthority(JwtService.RolePrefix + r);
+          authorities.add(grantedAuthority);
+        }
 
         // set permissions in Granted Authority
-        String permissions = jwtService.getPermissionsFromToken(token, secret);
-        grantedAuthority = new SimpleGrantedAuthority(permissions);
-        authorities.add(grantedAuthority);
+        List<String> permissions = jwtService.getPermissionsFromToken(token, secret);
+        for (String p : permissions) {
+          grantedAuthority = new SimpleGrantedAuthority(p);
+          authorities.add(grantedAuthority);
+        }
 
         // set the authentication user with subject as username and authorities from token
         PrincipalUser user = new PrincipalUser(claims.getSubject(), authorities);

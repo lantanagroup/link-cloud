@@ -15,7 +15,7 @@ secretManagement:
   managerUri: https://link-vault.vault.azure.net/
 
 authentication:
-  enableAnonymousAccess: true
+  enableAnonymousAccess: false
 
 spring:
   application:
@@ -47,7 +47,7 @@ link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
 
   data-acquisition:
-    base-url: http://localhost:5194
+    base-url: https://dev-data.nhsnlink.org
     routes:
       query-result:
         path: /api/{facilityId}/QueryResult/{correlationId}
