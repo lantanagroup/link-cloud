@@ -1,10 +1,11 @@
-﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Configs
 {
-    public class LinkBearerServiceConfig
+    public class LinkTokenServiceSettings
     {
         public bool EnableTokenGenrationEndpoint { get; set; }
         public string Authority { get; set; } = default!;
         public string? LinkAdminEmail { get; set; }
         public int TokenLifespan { get; set; } = 10;
+        public string? SigningKey { get; set; }
     }
 }

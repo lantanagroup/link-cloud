@@ -72,10 +72,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
-    builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.SecretManagement));
+    builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<LinkBearerServiceConfig>(builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.LinkBearerService));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -294,13 +294,17 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseStatusCodePages();
-    //app.UseHttpsRedirection();
+    app.UseHttpsRedirection();
 
     // Configure swagger
-    app.ConfigureSwagger(opts =>
+    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
     {
-        opts.RouteTemplate = "api/swagger/{documentname}/swagger.json";
-    });
+        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
+        app.UseSwaggerUI(opts => {
+            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
+            opts.RoutePrefix = "api/swagger";
+        });
+    }
 
     app.UseRouting();
     var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
