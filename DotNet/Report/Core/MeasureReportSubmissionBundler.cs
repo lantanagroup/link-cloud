@@ -132,7 +132,6 @@ namespace LantanaGroup.Link.Report.Core
 
                         try
                         {
-                            //resource = parser.Parse<Resource>(r.Resource);
                             mr.Contained.Add(resource);
                         }
                         catch (Exception ex)
