@@ -11,8 +11,7 @@
             public const string IdentityProvider = "IdentityProviderConfig";
             public const string CORS = "CORS";
             public const string Telemetry = "Telemetry";
-            public const string Serilog = "Serilog";
-                        
+            public const string Serilog = "Serilog";                        
         }
 
         public static class AuthenticationSchemes
@@ -29,6 +28,7 @@
             public const string LinkBearerIssuer = "LinkServiceAdmin";
             public const string LinkBearerAudience = "LinkSevices";
             public const string LinkBearerKeyName = "link-bearer-key";
+            public const string AuthenticatedUserPolicyName = "AuthenticatedUser";
         }
 
         public static class LinkDataProtectors

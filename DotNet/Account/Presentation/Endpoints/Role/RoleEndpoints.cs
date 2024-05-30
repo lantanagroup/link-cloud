@@ -6,6 +6,7 @@ using LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Link.Authorization.Permissions;
+using Link.Authorization.Policies;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
@@ -22,7 +23,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role
         public void RegisterEndpoints(WebApplication app)
         {
             var roleEndpoints = app.MapGroup("/api/account/")
-                .RequireAuthorization([nameof(LinkSystemPermissions.IsLinkAdmin)])
+                .RequireAuthorization([PolicyNames.IsLinkAdmin])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Role" } }

@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                  });
 
             authEndpoints.MapGet("/user", GetUser)
-                .RequireAuthorization("AuthenticatedUser")
+                .RequireAuthorization(LinkAdminConstants.LinkBearerService.AuthenticatedUserPolicyName)
                 .Produces(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             authEndpoints.MapGet("/logout", Logout)
-                .RequireAuthorization("AuthenticatedUser")               
+                .RequireAuthorization(LinkAdminConstants.LinkBearerService.AuthenticatedUserPolicyName)               
                 .Produces<object>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)

@@ -4,6 +4,8 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Policies;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
@@ -27,13 +29,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public void RegisterEndpoints(WebApplication app)
         {
             var integrationEndpoints = app.MapGroup("/api/integration")
+                .RequireAuthorization(
+                    LinkAdminConstants.LinkBearerService.AuthenticatedUserPolicyName,
+                    PolicyNames.IsLinkAdmin)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
                 });
 
-            integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
-                .RequireAuthorization("AuthenticatedUser")
+            integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)                
                 .AddEndpointFilter<ValidationFilter<PatientEvent>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -45,8 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Produces a new patient event that will be sent to the broker. Allows for testing processes outside of scheduled events."
                 });
 
-            integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
-                .RequireAuthorization("AuthenticatedUser")
+            integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)                
                 .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -59,7 +62,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             integrationEndpoints.MapPost("/data-acquisition-requested", CreateDataAcquisitionRequested)
-                .RequireAuthorization("AuthenticatedUser")
                 .AddEndpointFilter<ValidationFilter<DataAcquisitionRequested>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
