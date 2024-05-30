@@ -44,14 +44,14 @@ namespace LantanaGroup.Link.Report.Application.ResourceCategories
                 nameof(FamilyMemberHistory),
                 nameof(Flag),
                 nameof(Goal),
-                //TODO: Should this be categorized as patient related?
+                //TODO: Daniel - Should this be categorized as patient related?
                 nameof(Group),
                 nameof(ImagingStudy),
                 nameof(Immunization),
                 nameof(ImmunizationEvaluation),
                 nameof(ImmunizationRecommendation),
                 nameof(Invoice),
-                //TODO: Should this be categorized as patient related?
+                //TODO: Daniel - Should this be categorized as patient related?
                 nameof(List),
                 nameof(MeasureReport),
                 nameof(Media),
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.Report.Application.ResourceCategories
                 return ResourceCategoryType.Patient;
             }
 
-            //TODO: Potentially dangerous if we didn't add a patient resource to the PatientResourceTypes list.
+            //TODO: Daniel - Potentially dangerous if we didn't add a patient resource to the PatientResourceTypes list.
             return ResourceCategoryType.Shared;
         }
     }
