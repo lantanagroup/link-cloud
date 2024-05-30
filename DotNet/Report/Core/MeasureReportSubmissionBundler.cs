@@ -126,7 +126,7 @@ namespace LantanaGroup.Link.Report.Core
                             facilityResource = await _mediator.Send(new GetSharedResourceCommand(schedule.FacilityId, r.ResourceType, r.ResourceId));
                         }
 
-                        Resource resource = facilityResource.Resource();
+                        Resource resource = facilityResource.GetResource();
 
                         if (resource == null) return;
 

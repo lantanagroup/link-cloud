@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Report.Application.Resources.Commands
 
         public async Task<IFacilityResource> Handle(UpdateResourceCommand request, CancellationToken cancellationToken)
         {
-            if (request.GetType() == typeof(PatientResourceModel))
+            if (request.ReportResource.GetType() == typeof(PatientResourceModel))
             {
                 return await _mediator.Send(new UpdatePatientResourceCommand(request.ReportResource as PatientResourceModel, request.UpdatedResource));
             }

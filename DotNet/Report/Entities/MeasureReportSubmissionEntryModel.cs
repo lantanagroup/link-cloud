@@ -4,6 +4,8 @@ using LantanaGroup.Link.Report.Attributes;
 using LantanaGroup.Link.Report.Domain.Enums;
 using MongoDB.Bson.Serialization.Attributes;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Report.Application.ResourceCategories;
+using MongoDB.Bson;
 
 namespace LantanaGroup.Link.Report.Entities
 {
@@ -16,7 +18,8 @@ namespace LantanaGroup.Link.Report.Entities
         public string MeasureReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
-        public MeasureReport MeasureReport { get; set; }
+        [BsonIgnoreIfNull]
+        public MeasureReport? MeasureReport { get; set; }
         public bool ReadyForSubmission { get; private set; } = false;
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
@@ -25,6 +28,8 @@ namespace LantanaGroup.Link.Report.Entities
             public string ResourceType { get; set; } = string.Empty;
             public string ResourceId { get; set; } = string.Empty;
             public string DocumentId { get; set; }
+            [BsonRepresentation(BsonType.String)]
+            public ResourceCategoryType CategoryType { get; set; }
 
             public string Reference()
             {
@@ -32,7 +37,7 @@ namespace LantanaGroup.Link.Report.Entities
             }
         }
 
-        public  void AddMeasureReport(MeasureReport measureReport)
+        public void AddMeasureReport(MeasureReport measureReport)
         {
             MeasureReport =  measureReport;
 
@@ -45,12 +50,17 @@ namespace LantanaGroup.Link.Report.Entities
                 }
 
                 var reference = evaluatedResource.Reference.Split('/');
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(evaluatedResource.TypeName);
 
-                ContainedResources.Add(new ContainedResource
+                if (resourceCategoryType != null)
                 {
-                    ResourceType = reference[0],
-                    ResourceId = reference[1]
-                });
+                    ContainedResources.Add(new ContainedResource
+                    {
+                        ResourceType = reference[0],
+                        ResourceId = reference[1],
+                        CategoryType = (ResourceCategoryType)resourceCategoryType
+                    });
+                }
             }
 
             ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null);
@@ -60,14 +70,16 @@ namespace LantanaGroup.Link.Report.Entities
         public void UpdateContainedResource(IFacilityResource facilityResource)
         {
             var containedResource = ContainedResources.Where(x => x.DocumentId == facilityResource.GetId()).FirstOrDefault();
+            var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
 
             if (containedResource == null)
             {
                 ContainedResources.Add(new ContainedResource()
                 {
                     DocumentId = facilityResource.GetId(),
-                    ResourceId = facilityResource.Resource().Id,
-                    ResourceType = facilityResource.Resource().TypeName
+                    ResourceId = facilityResource.GetResource().Id,
+                    ResourceType = facilityResource.GetResource().TypeName,
+                    CategoryType = (ResourceCategoryType)resourceCategoryType
                 });
             }
             else

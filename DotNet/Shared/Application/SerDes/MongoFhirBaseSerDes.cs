@@ -36,6 +36,11 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
 
         public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, T resource)
         {
+            if (resource == null)
+            {
+                return;
+            }
+
             var options = new JsonSerializerOptions().ForFhir(typeof(T).Assembly);
             string jsonString = JsonSerializer.Serialize(resource, options);
             BsonDocument document = BsonSerializer.Deserialize<BsonDocument>(jsonString);

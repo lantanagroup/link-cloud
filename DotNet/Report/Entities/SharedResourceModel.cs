@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Attributes;
 using MongoDB.Bson.Serialization.Attributes;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Report.Entities
 {
@@ -20,7 +21,7 @@ namespace LantanaGroup.Link.Report.Entities
             return this.Id;
         }
 
-        Resource IFacilityResource.Resource()
+        public Resource GetResource()
         {
             return Resource;
         }
