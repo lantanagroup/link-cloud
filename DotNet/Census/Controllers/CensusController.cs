@@ -72,12 +72,12 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = await _mediator.Send(new GetAdmittedPatientsQuery
+            var patients = (await _mediator.Send(new GetAdmittedPatientsQuery
             {
                 FacilityId = facilityId,
                 StartDate = startDate,
                 EndDate = endDate
-            });
+            })).DistinctBy(p => p.PatientId).ToList();
 
             var fhirList = new Hl7.Fhir.Model.List();
             fhirList.Status = List.ListStatus.Current;

@@ -52,10 +52,22 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
         {
             if (!activePatients.Any(x => x.PatientId == patient.PatientId))
             {
-                patient.AdmitDate = DateTime.UtcNow;
-                patient.CreateDate = DateTime.UtcNow;
-                patient.ModifyDate = DateTime.UtcNow;
-                patientUpdates.Add(patient);
+                var existingPatient = await _patientListRepository.GetPatientByPatientId(request.FacilityId, patient.PatientId, cancellationToken);
+                if (existingPatient != null)
+                {
+                    existingPatient.AdmitDate = DateTime.UtcNow;
+                    existingPatient.IsDischarged = false;
+                    existingPatient.DischargeDate = null;
+                    existingPatient.ModifyDate = DateTime.UtcNow;
+                    patientUpdates.Add(existingPatient);
+                }
+                else
+                {
+                    patient.AdmitDate = DateTime.UtcNow;
+                    patient.CreateDate = DateTime.UtcNow;
+                    patient.ModifyDate = DateTime.UtcNow;
+                    patientUpdates.Add(patient);
+                }
 
                 _metrics.IncrementPatientAdmittedCounter([ 
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),

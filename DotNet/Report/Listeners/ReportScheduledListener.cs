@@ -119,6 +119,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         AuditEventType.Create);
                                 }
 
+                                
                                 var startDate = startDateOffset.UtcDateTime;
                                 var endDate = endDateOffset.UtcDateTime;
 
@@ -134,36 +135,25 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (existing != null)
                                 {
-                                    existing.FacilityId = key.FacilityId;
-                                    existing.ReportStartDate = startDate;
-                                    existing.ReportEndDate = endDate;
-                                    existing.ReportType = key.ReportType;
-
-                                    await _mediator.Send(new UpdateMeasureReportScheduleCommand()
-                                    {
-                                        ReportSchedule = existing
-                                    }, cancellationToken);
-
-
-                                    await MeasureReportScheduleService.RescheduleJob(existing,
-                                        await _schedulerFactory.GetScheduler(cancellationToken));
+                                    throw new DeadLetterException(
+                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.",
+                                        AuditEventType.Create);
                                 }
-                                else
+
+                                var reportSchedule = await _mediator.Send(new CreateMeasureReportScheduleCommand
                                 {
-                                    var reportSchedule = await _mediator.Send(new CreateMeasureReportScheduleCommand
+                                    ReportSchedule = new MeasureReportScheduleModel
                                     {
-                                        ReportSchedule = new MeasureReportScheduleModel
-                                        {
-                                            FacilityId = key.FacilityId,
-                                            ReportStartDate = startDate,
-                                            ReportEndDate = endDate,
-                                            ReportType = key.ReportType
-                                        }
-                                    }, cancellationToken);
+                                        FacilityId = key.FacilityId,
+                                        ReportStartDate = startDate,
+                                        ReportEndDate = endDate,
+                                        ReportType = key.ReportType
+                                    }
+                                }, cancellationToken);
 
-                                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(cancellationToken));
-                                }
+                                await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
+                                    await _schedulerFactory.GetScheduler(cancellationToken));
+                                
                             }
                             catch (DeadLetterException ex)
                             {

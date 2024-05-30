@@ -1,5 +1,7 @@
 package com.lantanagroup.link.measureeval.configs;
 
+import com.azure.security.keyvault.secrets.SecretClient;
+import com.lantanagroup.link.shared.auth.JwtService;
 import com.lantanagroup.link.measureeval.services.DataAcquisitionClient;
 import lombok.Getter;
 import lombok.Setter;
@@ -26,7 +28,7 @@ public class LinkConfig {
 
     @Bean
     @ConfigurationProperties("link.data-acquisition")
-    public DataAcquisitionClient dataAcquisitionClient(RestClient restClient) {
-        return new DataAcquisitionClient(restClient);
+    public DataAcquisitionClient dataAcquisitionClient(RestClient restClient, SecretClient secretClient, JwtService jwtService) {
+        return new DataAcquisitionClient(restClient, secretClient, jwtService);
     }
 }

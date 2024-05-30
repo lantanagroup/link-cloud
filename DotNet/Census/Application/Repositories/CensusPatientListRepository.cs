@@ -38,6 +38,14 @@ public class CensusPatientListRepository : BaseSqlConfigurationRepo<CensusPatien
         return allPatients;
     }
 
+    public async Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId, CancellationToken cancellationToken = default)
+    {
+        CheckIfNullOrString(facilityId, nameof(facilityId));
+        CheckIfNullOrString(patientId, nameof(patientId));
+
+        return _context.CensusPatientLists.Where(x => x.FacilityId == facilityId && x.PatientId == patientId).FirstOrDefault();
+    }
+
     private bool CheckIfNullOrString(object value, string varName)
     {
         if (value == null) throw new ArgumentNullException(varName);
