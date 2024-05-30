@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Trace;
@@ -45,7 +46,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             tokenEndpoints.MapGet("/refresh-key", (Delegate)RefreshKey)
-                .RequireAuthorization("AuthenticatedUser")
+                .RequireAuthorization(["AuthenticatedUser", PolicyNames.IsLinkAdmin])                
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)

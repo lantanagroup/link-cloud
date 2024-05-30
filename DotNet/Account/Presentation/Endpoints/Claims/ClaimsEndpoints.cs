@@ -3,6 +3,7 @@ using LantanaGroup.Link.Account.Application.Models;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
 using LantanaGroup.Link.Account.Presentation.Endpoints.Claims.Handlers;
 using Link.Authorization.Permissions;
+using Link.Authorization.Policies;
 using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
@@ -19,7 +20,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Claims
         public void RegisterEndpoints(WebApplication app)
         {
             var roleEndpoints = app.MapGroup("/api/account/")
-                .RequireAuthorization([nameof(LinkSystemPermissions.IsLinkAdmin)])
+                .RequireAuthorization([PolicyNames.IsLinkAdmin])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Claim" } }
