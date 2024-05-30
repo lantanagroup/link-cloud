@@ -25,7 +25,9 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Comm
         {
             request.MeasureReportSubmissionEntry.Id = string.Empty;
             request.MeasureReportSubmissionEntry.CreateDate = DateTime.UtcNow;
+
             await _repository.AddAsync(request.MeasureReportSubmissionEntry);
+
             return request.MeasureReportSubmissionEntry;
         }
     }

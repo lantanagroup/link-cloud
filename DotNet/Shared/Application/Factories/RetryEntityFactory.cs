@@ -2,11 +2,8 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using static Confluent.Kafka.ConfigPropertyNames;
-using System.Text;
-using System.Threading;
 using LantanaGroup.Link.Shared.Settings;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Shared.Application.Factories
@@ -21,7 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
             Dictionary<string, string> headers = new Dictionary<string, string>();
             foreach (var header in consumeResult.Message.Headers)
             {
-                headers.Add(header.Key, Encoding.UTF8.GetString(header.GetValueBytes()));
+                headers.TryAdd(header.Key, Encoding.UTF8.GetString(header.GetValueBytes()));
             }
 
             int retryCount = 1;
@@ -34,7 +31,7 @@ namespace LantanaGroup.Link.Shared.Application.Factories
             }
             else
             {
-                headers.Add(KafkaConstants.HeaderConstants.RetryCount, retryCount.ToString());
+                headers.TryAdd(KafkaConstants.HeaderConstants.RetryCount, retryCount.ToString());
             }
 
             var triggerDuration = System.Xml.XmlConvert.ToTimeSpan(consumerSettings.ConsumerRetryDuration[retryCount - 1]);

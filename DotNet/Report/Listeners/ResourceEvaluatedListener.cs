@@ -19,6 +19,11 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Application.Resources.Queries;
+using LantanaGroup.Link.Report.Application.Resources.Commands;
+using LantanaGroup.Link.Report.Domain.Enums;
+using Microsoft.AspNetCore.Razor.Hosting;
+using LantanaGroup.Link.Report.Application.Interfaces;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -158,13 +163,27 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
                                         AuditEventType.Create);
                                 }
-                                else if (resource.TypeName == "MeasureReport")
+
+                                if (resource.TypeName == "MeasureReport")
                                 {
                                     entry.AddMeasureReport((MeasureReport)resource);
                                 }
                                 else
                                 {
-                                    entry.AddContainedResource(resource);
+                                    IFacilityResource returnedResource = null;
+
+                                    var existingReportResource = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
+
+                                    if (existingReportResource != null)
+                                    {
+                                        returnedResource = await _mediator.Send(new UpdateResourceCommand(existingReportResource, resource));
+                                    }
+                                    else
+                                    {
+                                        returnedResource = await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
+                                    }
+
+                                    entry.UpdateContainedResource(returnedResource);
                                 }
 
                                 if (entry.Id == null)
@@ -208,7 +227,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         var parser = new FhirJsonParser();
                                         List<MeasureReport> measureReports = submissionEntries
-                                            .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                                            .Select(e => e.MeasureReport)
                                             .ToList();
 
                                         using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
@@ -242,32 +261,32 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
-                                #endregion
-                            }
-                            catch (DeadLetterException ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                            }
-                            catch (TransientException ex)
-                            {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                            }
-                            catch (TimeoutException ex)
-                            {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                    #endregion
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
-                            }
-                            finally
-                            {
-                                consumer.Commit(consumeResult);
-                            }
+                                }
+                                catch (DeadLetterException ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                }
+                                catch (TransientException ex)
+                                {
+                                    _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                }
+                                catch (TimeoutException ex)
+                                {
+                                    var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+
+                                    _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                }
+                                finally
+                                {
+                                    consumer.Commit(consumeResult);
+                                }
                         }, cancellationToken);
-
                     }
                     catch (ConsumeException ex)
                     {
