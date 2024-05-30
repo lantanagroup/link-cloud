@@ -6,15 +6,11 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Queries
 {
     public class GetSharedResourceCommand : IRequest<SharedResourceModel>
     {
-        public string FacilityId { get; private set; }
-        public string ResourceType { get; private set; }
-        public string ResourceId { get; private set; }
+        public string Id { get; private set; }        
 
-        public GetSharedResourceCommand(string facilityId, string resourceType, string resourceId)
+        public GetSharedResourceCommand(string id)
         {
-            FacilityId = facilityId;
-            ResourceType = resourceType;
-            ResourceId = resourceId;
+            Id = id;
         }
     }
 
@@ -24,7 +20,7 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Queries
 
         public Task<SharedResourceModel> Handle(GetSharedResourceCommand request, CancellationToken cancellationToken)
         {
-            return _repository.GetAsync(request.FacilityId, request.ResourceId, request.ResourceType);
+            return _repository.GetAsync(request.Id);
         }
     }
 }

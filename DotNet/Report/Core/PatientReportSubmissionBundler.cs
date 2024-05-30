@@ -39,6 +39,7 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
+        //TODO: Daniel - Need to replace and use what's in \Report\Application\ResourceCategory\ResourceCategory.cs
         public List<string> PatientResourceTypes = new List<string>()
         {
             "Account", "AdverseEvent", "AllergyIntolerance", "Appointment", "AppointmentResponse", "AuditEvent",
@@ -113,11 +114,11 @@ namespace LantanaGroup.Link.Report.Core
 
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
-                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(facilityId, patientId, r.ResourceType, r.ResourceId));
+                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
                         }
                         else
                         {
-                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(facilityId, r.ResourceType, r.ResourceId));
+                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
                         }
 
                         Resource resource = null!;

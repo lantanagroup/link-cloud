@@ -7,17 +7,12 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Queries
 {
     public class GetPatientResourceCommand : IRequest<PatientResourceModel>
     {
-        public string FacilityId { get; private set; }
-        public string PatientId { get; private set; }
-        public string ResourceType { get; private set; }
-        public string ResourceId { get; private set; }
+        public string Id { get; private set; }
+        
 
-        public GetPatientResourceCommand(string facilityId, string patientId, string resourceType, string resourceId)
+        public GetPatientResourceCommand(string id)
         {
-            FacilityId = facilityId;
-            PatientId = patientId;
-            ResourceType = resourceType;
-            ResourceId = resourceId;
+            this.Id = id;
         }
     }
 
@@ -32,7 +27,7 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Queries
 
         Task<PatientResourceModel> IRequestHandler<GetPatientResourceCommand, PatientResourceModel>.Handle(GetPatientResourceCommand request, CancellationToken cancellationToken)
         {
-            return _repository.GetAsync(request.FacilityId, request.PatientId, request.ResourceId, request.ResourceType);
+            return _repository.GetAsync(request.Id);
         }
     }
 }
