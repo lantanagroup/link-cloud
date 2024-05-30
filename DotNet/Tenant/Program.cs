@@ -170,6 +170,18 @@ namespace Tenant
             builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck>("Database");
 
+            // Add Link Security
+            bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            builder.Services.AddLinkBearerServiceAuthentication(options =>
+            {
+                options.Environment = builder.Environment;
+                options.AllowAnonymous = allowAnonymousAccess;
+                options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+                options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+                options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+                options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+            });
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
