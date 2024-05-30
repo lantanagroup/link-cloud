@@ -126,7 +126,6 @@ namespace LantanaGroup.Link.Report.Core
                         try
                         {
                             resource = facilityResource.GetResource();
-                            //resource = parser.Parse<Resource>(r.Resource);
                             mr.Contained.Add(resource);
                         }
                         catch (Exception ex)
