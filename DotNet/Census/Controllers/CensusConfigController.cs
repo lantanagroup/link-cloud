@@ -6,12 +6,15 @@ using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Census.Controllers;
 
 [Route("api/census/config/")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusConfigController : Controller
 {
