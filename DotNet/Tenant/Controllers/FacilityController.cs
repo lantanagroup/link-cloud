@@ -2,6 +2,8 @@
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Quartz;
 using System.Diagnostics;
@@ -9,6 +11,7 @@ using System.Diagnostics;
 namespace LantanaGroup.Link.Tenant.Controllers
 {
     [Route("api/[controller]")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class FacilityController : ControllerBase
     {

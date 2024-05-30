@@ -1,6 +1,5 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Notification.Application.Extensions;
 using LantanaGroup.Link.Notification.Application.Factory;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
@@ -33,7 +32,6 @@ using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
