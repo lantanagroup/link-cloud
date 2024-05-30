@@ -119,11 +119,11 @@ namespace LantanaGroup.Link.Report.Core
 
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
-                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(schedule.FacilityId, entry.PatientId, r.ResourceType, r.ResourceId));
+                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
                         }
                         else
                         {
-                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(schedule.FacilityId, r.ResourceType, r.ResourceId));
+                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
                         }
 
                         Resource resource = facilityResource.GetResource();
