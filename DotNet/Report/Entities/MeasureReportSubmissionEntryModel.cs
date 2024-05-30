@@ -1,7 +1,11 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Attributes;
+using LantanaGroup.Link.Report.Domain.Enums;
 using MongoDB.Bson.Serialization.Attributes;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Report.Application.ResourceCategories;
+using MongoDB.Bson;
 
 namespace LantanaGroup.Link.Report.Entities
 {
@@ -13,56 +17,77 @@ namespace LantanaGroup.Link.Report.Entities
         public string FacilityId { get; set; } = string.Empty;
         public string MeasureReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
-        public string MeasureReport { get; set; }
+        [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
+        [BsonIgnoreIfNull]
+        public MeasureReport? MeasureReport { get; set; }
         public bool ReadyForSubmission { get; private set; } = false;
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
         public class ContainedResource
         {
-            public string Reference { get; set; } = string.Empty;
-            public string Resource { get; set; }
+            public string ResourceType { get; set; } = string.Empty;
+            public string ResourceId { get; set; } = string.Empty;
+            public string DocumentId { get; set; }
+            [BsonRepresentation(BsonType.String)]
+            public ResourceCategoryType CategoryType { get; set; }
+
+            public string Reference()
+            {
+                return ResourceType + "/" + ResourceId;
+            }
         }
 
-        public  void AddMeasureReport(MeasureReport measureReport)
+        public void AddMeasureReport(MeasureReport measureReport)
         {
-            MeasureReport =  new FhirJsonSerializer().SerializeToString(measureReport);
+            MeasureReport =  measureReport;
 
             foreach (var evaluatedResource in measureReport.EvaluatedResource)
             {
                 //If the resource is already in the list, skip it
-                if (ContainedResources.Any(x => x.Reference == evaluatedResource.Reference))
+                if (ContainedResources.Any(x => x.Reference() == evaluatedResource.Reference))
                 { 
                     continue;
                 }
 
-                ContainedResources.Add(new ContainedResource
+                var reference = evaluatedResource.Reference.Split('/');
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(evaluatedResource.TypeName);
+
+                if (resourceCategoryType != null)
                 {
-                    Reference = evaluatedResource.Reference
-                });
+                    ContainedResources.Add(new ContainedResource
+                    {
+                        ResourceType = reference[0],
+                        ResourceId = reference[1],
+                        CategoryType = (ResourceCategoryType)resourceCategoryType
+                    });
+                }
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
-
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null);
         }
 
-        public void AddContainedResource(Resource resource) 
+
+        public void UpdateContainedResource(IFacilityResource facilityResource)
         {
-            var containedResource = ContainedResources.Where(x => x.Reference == resource.TypeName + "/" + resource.Id).FirstOrDefault();
+            var containedResource = ContainedResources.Where(x => x.DocumentId == facilityResource.GetId()).FirstOrDefault();
+            var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
 
             if (containedResource == null)
             {
-                ContainedResources.Add(new ContainedResource
+                ContainedResources.Add(new ContainedResource()
                 {
-                    Reference = resource.TypeName + "/" + resource.Id,
-                    Resource =  new FhirJsonSerializer().SerializeToString(resource)
-                }); 
+                    DocumentId = facilityResource.GetId(),
+                    ResourceId = facilityResource.GetResource().Id,
+                    ResourceType = facilityResource.GetResource().TypeName,
+                    CategoryType = (ResourceCategoryType)resourceCategoryType
+                });
             }
             else
             {
-                containedResource.Resource =  new FhirJsonSerializer().SerializeToString(resource);
+                containedResource.DocumentId = facilityResource.GetId();
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.Resource) && !string.IsNullOrWhiteSpace(MeasureReport));
+            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null);
         }
     }
 }

@@ -5,10 +5,14 @@ using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
+using LantanaGroup.Link.Report.Application.PatientResource.Queries;
+using LantanaGroup.Link.Report.Application.ResourceCategories;
+using LantanaGroup.Link.Report.Application.SharedResource.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
+using Microsoft.Identity.Client;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -96,29 +100,38 @@ namespace LantanaGroup.Link.Report.Core
             var parser = new FhirJsonParser();
             foreach (var entry in entries)
             {
-                // parse the MeasureReport
-                MeasureReport mr;
-                try
+                if (entry.MeasureReport == null)
                 {
-                    mr = parser.Parse<MeasureReport>(entry.MeasureReport);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"{nameof(MeasureReportSubmissionModel)} with ID {entry.Id} could not be parsed into a valid MeasureReport.", ex);
                     continue;
                 }
+
+                MeasureReport mr = entry.MeasureReport;
 
                 if (entry.ContainedResources is not null && entry.ContainedResources.Count > 0)
                 {
                     if (mr.Contained == null) mr.Contained = new List<Resource>();
 
-                    entry.ContainedResources.ForEach(r =>
+                    entry.ContainedResources.ForEach(async r =>
                     {
-                        Resource resource = null!;
-                        if (r.Resource == null) return;
+                        IFacilityResource facilityResource;
+
+                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+
+                        if (resourceTypeCategory == ResourceCategoryType.Patient)
+                        {
+                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
+                        }
+                        else
+                        {
+                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
+                        }
+
+                        Resource resource = facilityResource.GetResource();
+
+                        if (resource == null) return;
+
                         try
                         {
-                            resource = parser.Parse<Resource>(r.Resource);
                             mr.Contained.Add(resource);
                         }
                         catch (Exception ex)
