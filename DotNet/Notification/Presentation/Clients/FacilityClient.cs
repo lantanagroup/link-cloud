@@ -1,7 +1,6 @@
 ﻿using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
