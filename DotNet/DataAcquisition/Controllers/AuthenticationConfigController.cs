@@ -88,7 +88,7 @@ public class AuthenticationConfigController : Controller
 
             if(result == null)
             {
-                return NotFound();
+                return NotFound($"No configuration found for facilityId: {facilityId}");
             }
 
             return Ok(result);
@@ -149,7 +149,7 @@ public class AuthenticationConfigController : Controller
 
             if (result == null)
             {
-                return NotFound();
+                return NotFound($"No configuration found for facilityId: {facilityId}. Unable to add authentication settings.");
             }
 
             await SendAudit($"Create authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
@@ -299,7 +299,7 @@ public class AuthenticationConfigController : Controller
 
             if (result == null)
             {
-                return NotFound();
+                return NotFound($"No configuration found for facilityId: {facilityId}. Unable to delete authentication settings.");
             }
             await SendAudit($"Delete authentication configuration for facility {facilityId}", null, facilityId, AuditEventType.Delete, null);
             

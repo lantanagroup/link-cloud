@@ -4,6 +4,7 @@ import { UserClaims, UserProfile } from "../../models/user-pofile.model";
 import { AppConfigService } from "../app-config.service";
 import { ErrorHandlingService } from "../error-handling.service";
 import { UserProfileService } from "../user-profile.service";
+import { join as pathJoin } from '@fireflysemantics/join';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +17,7 @@ export class AuthenticationService {
 
   constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
-  loadUser() {    
+  loadUser() {
     this.http.get<UserClaims[]>(`${this.appConfigService.config?.baseApiUrl}/user`, { withCredentials: true })
       .subscribe((response: UserClaims[]) => {
         this.userProfile = new UserProfile(
@@ -28,24 +29,15 @@ export class AuthenticationService {
           response.filter(x => x.type === 'roles').map(y => y.value)
         );
         this.profileService.setProfile(this.userProfile);
-      });    
+      });
   }
 
   login() {
-    window.location.href = "/api/login";
- /*   return this.http.get(`${this.appConfigService.config?.baseApiUrl}/login`)
-      .subscribe((response) => {
-        console.log(response);
-      });*/
+    window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'login');
   }
-  
+
   logout() {
-    window.location.href = "/api/logout";
-   /* return this.http.get(`${this.appConfigService.config?.baseApiUrl}/logout`)
-      .subscribe(_ => {
-        this.profileService.clearProfile();
-       // window.location.href = "/logout";
-      });*/
+    window.location.href = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'logout');
   }
 
 }

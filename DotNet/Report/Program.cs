@@ -128,6 +128,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<ReportRepository>();
     builder.Services.AddSingleton<PatientsToQueryRepository>();
     builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
+    builder.Services.AddSingleton<PatientResourceRepository>();
+    builder.Services.AddSingleton<SharedResourceRepository>();
 
     // Add controllers
     builder.Services.AddControllers();
