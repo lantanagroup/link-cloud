@@ -15,6 +15,7 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import io.opentelemetry.api.trace.Span;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -320,6 +321,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         value.setResource(resource);
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
+
         resourceEvaluatedTemplate.send(new ProducerRecord<>(
                 Topics.RESOURCE_EVALUATED,
                 null,

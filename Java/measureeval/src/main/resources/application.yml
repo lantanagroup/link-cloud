@@ -1,9 +1,19 @@
+
 logging:
   level:
     com.lantanagroup.link: debug
 
 server:
   port: 5135
+
+otel:
+  exporter:
+    otlp:
+      protocol: grpc
+      endpoint: http://localhost:55690
+  propagators:
+    - tracecontext
+
 
 springdoc:
   api-docs:
@@ -34,11 +44,11 @@ spring:
       default-view-inclusion: false
 
   kafka:
-    bootstrap-servers:
-      - localhost:9092
+    bootstrap-servers: localhost:9092
 
     consumer:
       group-id: ${spring.application.name}
+
 
     producer:
       client-id: ${spring.application.name}
@@ -47,7 +57,7 @@ link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
 
   data-acquisition:
-    base-url: https://dev-data.nhsnlink.org
+    base-url: http://localhost:5194
     routes:
       query-result:
         path: /api/{facilityId}/QueryResult/{correlationId}
