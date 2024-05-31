@@ -8,6 +8,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,6 +29,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtService jwtService;
   private String secret;
 
+  @Value("${authentication.enableAnonymousAccess}")
+  private boolean anonymousAccessEnabled;
+
   public JwtAuthenticationFilter (SecretClient secretClient, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver) {
     super();
     this.secretClient = secretClient;
@@ -38,7 +42,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-    if(StringUtils.isBlank(secret)){
+    if (anonymousAccessEnabled) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
+    if (StringUtils.isBlank(secret)){
       secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
     }
 
