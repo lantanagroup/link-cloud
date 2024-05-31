@@ -151,7 +151,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     
                     var parser = new FhirJsonParser();
                     List<MeasureReport> measureReports = submissionEntries
-                        .Select(e => parser.Parse<MeasureReport>(e.MeasureReport))
+                        .Select(e => e.MeasureReport)
                         .ToList();
 
                     var allReady = submissionEntries.All(x => x.ReadyForSubmission);
@@ -193,6 +193,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 }
 
                 schedule.PatientsToQueryDataRequested = true;
+
                 await _mediator.Send(new UpdateMeasureReportScheduleCommand
                 {
                     ReportSchedule = schedule

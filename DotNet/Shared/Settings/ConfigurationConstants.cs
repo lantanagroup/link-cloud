@@ -13,6 +13,8 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string DatabaseProvider = "DatabaseProvider";
             public const string SqlServerDatabaseProvider = "SqlServer";
             public const string DataProtection = "DataProtection";
+            public const string LinkTokenService = "LinkTokenService";
+            public const string SecretManagement = "SecretManagement";
         }
 
         public static class DatabaseConnections

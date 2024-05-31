@@ -1,6 +1,5 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using Hellang.Middleware.ProblemDetails;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -8,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Managers;
@@ -32,10 +33,8 @@ using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Submission.Application.Config;
 using Serilog.Settings.Configuration;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,16 +88,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add problem details
-    builder.Services.AddProblemDetails(opts => {
-        opts.IncludeExceptionDetails = (ctx, ex) => false;
-        opts.OnBeforeWriteDetails = (ctx, dtls) =>
-        {
-            if (dtls.Status == 500)
-            {
-                dtls.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-            }
-        };
-    });
+    builder.Services.AddProblemDetails();
 
     //Add Settings
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
@@ -200,10 +190,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    app.UseProblemDetails();
-
-    //app.UseOpenTelemetryPrometheusScrapingEndpoint();
-
     // Configure the HTTP request pipeline.
     app.ConfigureSwagger();
 
@@ -215,10 +201,8 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    //app.UseAuthentication();
     app.UseMiddleware<UserScopeMiddleware>();
-    //app.UseAuthorization();
-    app.UseEndpoints(endpoints => endpoints.MapControllers());
+    app.MapControllers();
 }
 
 #endregion

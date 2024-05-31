@@ -127,12 +127,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         /// <summary>
-        /// Update a config.
+        /// Update the Tenant Normalization Config for the provide Facility ID.
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="updatedTenantNormalization"></param>
+        /// <param name="facilityId"></param>
+        /// <param name="config"></param>
         /// <returns></returns>
         [HttpPut("{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> UpdateTenantNormalization(string facilityId, [FromBody] JsonElement config)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
@@ -140,28 +144,32 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 return BadRequest();
             }
 
-            string? body = string.Empty;
+            NormalizationConfigModel? configModel;
             try
             {
                 var element = (JsonElement)config;
-                body = element.ToString();
+                string? body = element.ToString();
+
+                if (body == null)
+                {
+                    return BadRequest("No request body");
+                }
+
+                configModel = NormalizationConfigModelDeserializer.Deserialize(config);
+
+                if (string.IsNullOrEmpty(configModel.FacilityId))
+                {
+                    configModel.FacilityId = facilityId;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message, ex);
-                return StatusCode(StatusCodes.Status500InternalServerError);
+                return Problem(detail: ex.Message, statusCode:StatusCodes.Status500InternalServerError);
             }
 
-            if (body == null)
-            {
-                return BadRequest("No request body");
-            }
-
-            NormalizationConfigModel? configModel = null;
             try
             {
-                configModel = NormalizationConfigModelDeserializer.Deserialize(config);
-
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = configModel,
@@ -171,7 +179,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (TenantNotFoundException ex)
             {
-                return BadRequest(ex.Message);
+                return NotFound(ex.Message);
             }
             catch (ConfigOperationNullException ex)
             {
@@ -186,24 +194,28 @@ namespace LantanaGroup.Link.Normalization.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message, ex);
-                return StatusCode(StatusCodes.Status500InternalServerError);
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
-
-            //await CreateAuditEvent(configModel, AuditEventType.Create);
 
             return Accepted();
         }
 
         /// <summary>
-        /// Delete  a config.
+        /// Delete the Tenant Normalization Config for the provide Facility ID.
         /// </summary>
         /// <param name="facilityId"></param>
         /// <returns></returns>
         [HttpDelete("{facilityId}")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteTenantNormalization(string facilityId)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
+            {
                 return BadRequest();
+            }
 
             try
             {
@@ -212,13 +224,20 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId
                 });
             }
-            catch(ConfigOperationNullException ex)
+            catch (ConfigOperationNullException ex)
             {
-                return BadRequest();
+                _logger.LogError(ex.Message, ex);
+                return BadRequest(ex.Message);
+            }
+            catch (NoEntityFoundException ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                return NotFound(ex.Message);
             }
             catch(Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError);
+                _logger.LogError(ex.Message, ex);
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
 
             return Accepted();

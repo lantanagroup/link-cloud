@@ -1,8 +1,6 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using Hellang.Middleware.ProblemDetails;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
-using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
@@ -14,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
@@ -30,7 +29,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Models;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -112,6 +110,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddControllers();
     builder.Services.AddHttpClient();
+    builder.Services.AddProblemDetails();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -229,9 +228,6 @@ static void SetupMiddleware(WebApplication app)
     app.MapGrpcService<NormalizationService>();
     app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
     app.MapControllers();
-    //app.UseProblemDetails();
-
-
 }
 
 #endregion

@@ -21,6 +21,7 @@
     "@angular/platform-browser": "^15.2.7",
     "@angular/platform-browser-dynamic": "^15.2.7",
     "@angular/router": "^15.2.7",
+    "@fireflysemantics/join": "^1.0.14",
     "angular-oauth2-oidc": "^15.0.1",
     "crypto-js": "^4.1.1",
     "jest-editor-support": "*",

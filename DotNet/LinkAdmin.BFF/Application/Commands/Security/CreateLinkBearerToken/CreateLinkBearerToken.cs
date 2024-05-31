@@ -1,10 +1,10 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
@@ -24,17 +24,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
-        private readonly IOptions<LinkBearerServiceConfig> _linkBearerServiceConfig;
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ILinkAdminMetrics _metrics;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkBearerServiceConfig> linkBearerServiceConfig, ILinkAdminMetrics metrics)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
-            _linkBearerServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
+            _linkTokenServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
         }
 
@@ -42,9 +42,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Generate Link Admin JWT");
 
-            if(string.IsNullOrEmpty(_linkBearerServiceConfig.Value.Authority))
+            if(string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
             {
-                   throw new ArgumentNullException(nameof(_linkBearerServiceConfig.Value.Authority));
+                   throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
             }
             
             try
@@ -81,8 +81,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 
 
                 var token = new JwtSecurityToken(                                    
-                                    issuer: _linkBearerServiceConfig.Value.Authority,
-                                    audience: LinkAdminConstants.LinkBearerService.LinkBearerAudience,
+                                    issuer: _linkTokenServiceConfig.Value.Authority,
+                                    audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
                                     claims: user.Claims,
                                     expires: DateTime.Now.AddMinutes(timespan),
                                     signingCredentials: credentials
