@@ -82,15 +82,13 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         {
             var message = $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
             _logger.LogError(message);
-            await GenerateAuditMessage(message, request, "N/A");
             throw;
         }
         catch(Exception ex)
         {
             var message = $"Error retrieving configuration for facility {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
             _logger.LogError(message);
-            await GenerateAuditMessage(message, request, "N/A");
-            return null;
+            throw;
         }
 
         foreach(var scheduledReport in request.Message.ScheduledReports)
