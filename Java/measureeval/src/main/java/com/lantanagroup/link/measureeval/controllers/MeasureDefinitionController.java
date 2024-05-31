@@ -9,11 +9,11 @@ import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidat
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.Operation;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,10 +23,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+
 @RestController
 @RequestMapping("/api/measure-definition")
 @PreAuthorize("hasRole('LinkUser')")
 public class MeasureDefinitionController {
+
+    private final Logger LOG = LoggerFactory.getLogger(MeasureDefinitionController.class);
     private final MeasureDefinitionRepository repository;
     private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache evaluatorCache;
@@ -44,6 +47,8 @@ public class MeasureDefinitionController {
     @JsonView(Views.Summary.class)
     @Operation(summary = "Get all measure definitions", tags = {"Measure Definitions"})
     public List<MeasureDefinition> getAll(@AuthenticationPrincipal UserDetails user) {
+
+        LOG.info("Loki works");
         return repository.findAll();
     }
 
