@@ -2,13 +2,16 @@
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/")]
+[Route("api/data")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class QueryListController : Controller
 {
