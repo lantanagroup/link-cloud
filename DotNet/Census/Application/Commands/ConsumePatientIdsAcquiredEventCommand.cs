@@ -6,6 +6,7 @@ using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using MediatR;
+using Microsoft.Data.SqlClient;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
 
@@ -43,7 +44,22 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
         ///    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow
         /// 4. save updated/new patients   
         var convertedList = ConvertFhirListToEntityList(request.Message.PatientIds, request.FacilityId);
-        var activePatients = await _patientListRepository.GetActivePatientsForFacility(request.FacilityId, cancellationToken);
+
+        List<CensusPatientListEntity>? activePatients = null;
+        try
+        {
+            activePatients = await _patientListRepository.GetActivePatientsForFacility(request.FacilityId, cancellationToken);
+        }
+        catch(SqlException ex)
+        {
+            _logger.LogError(ex, "Error getting active patients for facility {FacilityId}", request.FacilityId);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting active patients for facility {FacilityId}", request.FacilityId);
+            throw;
+        }
 
         var patientUpdates = new List<CensusPatientListEntity>();
 
