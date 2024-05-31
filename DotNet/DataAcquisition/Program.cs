@@ -40,6 +40,7 @@ using Quartz.Spi;
 using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,6 +98,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
@@ -147,6 +149,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
     builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
 
+    //Services
+    builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -181,6 +186,18 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+    });
+
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
 
     //Add CORS
@@ -248,13 +265,24 @@ static void SetupMiddleware(WebApplication app)
         app.UseExceptionHandler();
     }
 
+    app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
+    app.MapControllers();
 
     // Configure the HTTP request pipeline.
     app.MapGrpcService<DataAcquisitionService>();
-    app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
-    app.MapControllers();
-
+    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+    
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
     {

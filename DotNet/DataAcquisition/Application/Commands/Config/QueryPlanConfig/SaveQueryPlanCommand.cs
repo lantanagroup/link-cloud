@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 
@@ -28,14 +29,16 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
     private readonly IQueryPlanRepository _repository;
     private readonly IMediator _mediator;
     private readonly CompareLogic _compareLogic;
+    private readonly ITenantApiService _tenantApiService;
 
-    public SaveQueryPlanCommandHandler(ILogger<SaveQueryPlanCommandHandler> logger, IQueryPlanRepository repository, IMediator mediator)
+    public SaveQueryPlanCommandHandler(ILogger<SaveQueryPlanCommandHandler> logger, IQueryPlanRepository repository, IMediator mediator, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
         _compareLogic = new CompareLogic();
-        _compareLogic.Config.MaxDifferences = 25;
+        _compareLogic.Config.MaxDifferences = 25;        
     }
 
     private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type, List<PropertyChangeModel> changes)
@@ -61,7 +64,7 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
 
     public async Task<Unit> Handle(SaveQueryPlanCommand request, CancellationToken cancellationToken)
     {
-        if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
+        if (await _tenantApiService.CheckFacilityExists(request.FacilityId, cancellationToken) == false)
         {
             throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
         }

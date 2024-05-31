@@ -9,10 +9,13 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/{facilityId}")]
+[Route("api/data/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class AuthenticationConfigController : Controller
 {
