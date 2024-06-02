@@ -25,8 +25,10 @@ using LantanaGroup.Link.Submission.Application.Repositories;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -97,6 +99,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -107,6 +110,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
     builder.Services.AddTransient<TenantSubmissionRepository>();
+
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
 
     // Add Controllers
     builder.Services.AddControllers();
@@ -153,7 +168,45 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(c =>
+    {
+        if (!allowAnonymousAccess)
+        {
+            #region Authentication Schemas
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+
+            #endregion
+        }
+
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        c.IncludeXmlComments(xmlPath);
+
+    });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -190,6 +243,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
+
     // Configure the HTTP request pipeline.
     app.ConfigureSwagger();
 
@@ -201,7 +263,16 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    app.UseMiddleware<UserScopeMiddleware>();
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
     app.MapControllers();
 }
 

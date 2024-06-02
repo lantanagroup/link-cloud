@@ -1,11 +1,13 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Submission.Application.Interfaces;
+﻿using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Models.ApiModels;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Submission.Controllers
 {
     [Route("api/[controller]")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     public class TenantSubmissionController : Controller
     {
         private ITenantSubmissionManager _tenantSubmissionManager { get; set; }
