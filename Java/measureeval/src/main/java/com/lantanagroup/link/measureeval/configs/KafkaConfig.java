@@ -94,14 +94,10 @@ public class KafkaConfig {
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
             Deserializer<?> keyDeserializer,
-            Deserializer<?> valueDeserializer,
-            OpenTelemetry openTelemetry) {
+            Deserializer<?> valueDeserializer) {
         Map<String, Object> consumerProperties = properties.buildConsumerProperties(sslBundles.getIfAvailable());
         consumerProperties.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingConsumerInterceptor.class.getName());
-        DefaultKafkaConsumerFactory consumer = new  DefaultKafkaConsumerFactory<>(consumerProperties, keyDeserializer, valueDeserializer);
-        return consumer;
-        /*KafkaTelemetry kafkaTelemetry = KafkaTelemetry.create(openTelemetry);
-        kafkaTelemetry.wrap(consumer);*/
+        return new DefaultKafkaConsumerFactory<>(consumerProperties, keyDeserializer, valueDeserializer);
     }
 
     @Bean
@@ -135,12 +131,10 @@ public class KafkaConfig {
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
             Serializer<?> keySerializer,
-            Serializer<?> valueSerializer,
-            OpenTelemetry openTelemetry) {
+            Serializer<?> valueSerializer) {
         Map<String, Object> producerProperties = properties.buildProducerProperties(sslBundles.getIfAvailable());
         producerProperties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingProducerInterceptor.class.getName());
-        DefaultKafkaProducerFactory producerFactory  = new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
-        return producerFactory;
+        return  new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
     }
     @Bean
     public RetryTopicConfiguration resourceNormalizedRetryTopic(KafkaTemplate<String, ResourceNormalized> template) {
