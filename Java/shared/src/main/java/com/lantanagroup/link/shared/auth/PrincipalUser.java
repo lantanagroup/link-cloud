@@ -13,8 +13,10 @@ import java.util.Collection;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PrincipalUser extends User {
 
-  public PrincipalUser (String subject, Collection<? extends GrantedAuthority> authorities) {
+  private String emailAddress;
+  public PrincipalUser (String subject, String emailAddress, Collection<? extends GrantedAuthority> authorities) {
     super(subject, "", true, true, true, true, authorities);
+    this.emailAddress = emailAddress;
   }
 
 }
