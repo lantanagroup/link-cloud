@@ -46,14 +46,17 @@ namespace LantanaGroup.Link.Shared.Jobs
                 await RetryScheduleService.DeleteJob(retryEntity, await _schedulerFactory.GetScheduler());
                 await _retryRepository.DeleteAsync(retryEntity.Id);
 
-                ProducerConfig config = new ProducerConfig();
+                ProducerConfig config = new ProducerConfig()
+                { 
+                    CompressionType = CompressionType.Zstd
+                };
+
                 Headers headers = new Headers();
 
                 foreach (var header in retryEntity.Headers)
                 {
                     headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value));
                 }
-
 
                 using (var producer = _retryKafkaProducerFactory.CreateProducer(config, useOpenTelemetry: false))
                 {

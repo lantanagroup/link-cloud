@@ -146,6 +146,12 @@ public class QueryListener : BackgroundService
                             if (responseMessages?.Count > 0)
                             {
                                 var producerSettings = new ProducerConfig();
+
+                                if (rawmessage.Topic == KafkaTopic.DataAcquisitionRequested.ToString())
+                                {
+                                    producerSettings.CompressionType = CompressionType.Zstd;
+                                }
+
                                 using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
 
                                 try
