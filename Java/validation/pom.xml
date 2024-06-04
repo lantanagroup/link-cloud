@@ -71,6 +71,7 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>hapi-fhir-base</artifactId>
