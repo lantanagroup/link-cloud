@@ -1,6 +1,6 @@
 {
   "openapi": "3.0.1",
-  "info": {
+  "info":{
     "title": "Tenant, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
     "version": "1.0"
   },

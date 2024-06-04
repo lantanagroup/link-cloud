@@ -8,6 +8,7 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.records.ResourceNormalized;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import io.opentelemetry.api.trace.Span;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +53,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
     public void consume(
             @Header(Headers.CORRELATION_ID) String correlationId,
             ConsumerRecord<String, ResourceNormalized> record) {
+        String test = Span.current().getSpanContext().getTraceId();
         doConsume(correlationId, record);
     }
 }

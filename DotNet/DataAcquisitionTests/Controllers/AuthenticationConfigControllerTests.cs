@@ -56,7 +56,7 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.GetAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
-            Assert.IsType<NotFoundResult>(result.Result);
+            Assert.IsType<NotFoundObjectResult>(result.Result);
         }
 
         [Fact]

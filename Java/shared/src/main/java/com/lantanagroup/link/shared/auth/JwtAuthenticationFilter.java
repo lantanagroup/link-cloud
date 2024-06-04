@@ -95,7 +95,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // set the authentication user with subject as username and authorities from token
-        PrincipalUser user = new PrincipalUser(claims.getSubject(), authorities);
+        String email = jwtService.getEmailFromToken(token, secret);
+        PrincipalUser user = new PrincipalUser(claims.getSubject(), email, authorities);
 
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
