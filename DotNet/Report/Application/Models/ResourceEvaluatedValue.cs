@@ -8,5 +8,6 @@ namespace LantanaGroup.Link.Report.Application.Models
         public string PatientId { get; set; } = string.Empty;
         public string MeasureReportId { get; set; } = string.Empty;
         public JsonElement Resource { get; set; }
+        public bool IsReportable { get; set; }
     }
 }
