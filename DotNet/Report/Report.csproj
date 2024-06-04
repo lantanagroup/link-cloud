@@ -24,11 +24,8 @@
     <PackageReference Include="AutoMapper" Version="13.*" />
     <PackageReference Include="Azure.Identity" Version="1.11.2" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
     <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="MongoDB.Driver" Version="2.*" />
@@ -44,5 +41,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
+
 
 </Project>
