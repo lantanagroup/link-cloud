@@ -34,11 +34,7 @@
     <PackageReference Include="Azure.Identity" Version="1.11.2" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
     <PackageReference Include="MediatR" Version="12.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.*" />

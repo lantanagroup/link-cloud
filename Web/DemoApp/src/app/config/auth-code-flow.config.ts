@@ -6,10 +6,10 @@ export const authCodeFlowConfig: AuthConfig = {
   issuer: environment.idpIssuer,
 
   // URL of the SPA to redirect the user to after login
-  redirectUri: environment.redirectUri, 
+  redirectUri: environment.redirectUri,
   loginUrl: environment.loginUrl,
 
-  // The SPA's id. The SPA is registerd with this id at the auth-server 
+  // The SPA's id. The SPA is registerd with this id at the auth-server
   clientId: environment.idpClientId,
 
   dummyClientSecret: environment.idpClientSecret,

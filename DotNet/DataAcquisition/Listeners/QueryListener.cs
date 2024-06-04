@@ -235,21 +235,8 @@ public class QueryListener : BackgroundService
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                            var auditValue = new AuditEventMessage
-                            {
-                                FacilityId = rawmessage.Message.Key,
-                                Action = AuditEventType.Query,
-                                ServiceName = DataAcquisitionConstants.ServiceName,
-                                EventDate = DateTime.UtcNow,
-                                Notes = $"Data Acquisition processing failure \nException Message: {ex}",
-                            };
-
-                            ProduceAuditMessage(auditValue);
-
                             _deadLetterConsumerHandler.HandleException(rawmessage, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
                             consumer.Commit(rawmessage);
-
-                            //continue;
                         }
                     }, cancellationToken);
                 }

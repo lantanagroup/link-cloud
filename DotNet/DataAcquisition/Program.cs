@@ -102,6 +102,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
+    IConfigurationSection consumerSettingsSection = builder.Configuration.GetSection(nameof(ConsumerSettings));
+    builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
+    var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
+
     //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
     builder.AddSQLServerEF_DataAcq();
@@ -165,9 +169,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
     //Add Hosted Services
-    builder.Services.AddHostedService<QueryListener>();
-    builder.Services.AddHostedService<RetryListener>();
-    builder.Services.AddHostedService<RetryScheduleService>();
+    if(consumerSettings == null || !consumerSettings.DisableConsumer)
+    {
+        builder.Services.AddHostedService<QueryListener>();
+    }
+
+    if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+    }
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
