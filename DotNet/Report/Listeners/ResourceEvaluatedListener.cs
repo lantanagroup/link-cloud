@@ -1,11 +1,18 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Commands;
+using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Application.Resources.Commands;
+using LantanaGroup.Link.Report.Application.Resources.Queries;
+using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -15,15 +22,6 @@ using System.Text;
 using System.Text.Json;
 using System.Transactions;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
-using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Application.Resources.Queries;
-using LantanaGroup.Link.Report.Application.Resources.Commands;
-using LantanaGroup.Link.Report.Domain.Enums;
-using Microsoft.AspNetCore.Razor.Hosting;
-using LantanaGroup.Link.Report.Application.Interfaces;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -141,64 +139,73 @@ namespace LantanaGroup.Link.Report.Listeners
                                                ?? throw new TransactionException(
                                                    $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
 
-                                var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand()
-                                { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId });
-
-                                if (entry == null)
+                                //TODO Find long term solution Daniel Vargas
+                                if (value.IsReportable)
                                 {
-                                    entry = new MeasureReportSubmissionEntryModel
+                                    var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand()
+                                    { MeasureReportScheduleId = schedule.Id, PatientId = value.PatientId });
+
+                                    if (entry == null)
                                     {
-                                        FacilityId = key.FacilityId,
-                                        MeasureReportScheduleId = schedule.Id,
-                                        PatientId = value.PatientId
-                                    };
-                                }
+                                        entry = new MeasureReportSubmissionEntryModel
+                                        {
+                                            FacilityId = key.FacilityId,
+                                            MeasureReportScheduleId = schedule.Id,
+                                            PatientId = value.PatientId
+                                        };
+                                    }
 
-                                var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
-                                    new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
-                                        new FhirJsonPocoDeserializerSettings { Validator = null }));
+                                    var resource = JsonSerializer.Deserialize<Resource>(value.Resource.ToString(),
+                                        new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector,
+                                            new FhirJsonPocoDeserializerSettings { Validator = null }));
 
-                                if (resource == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
-                                        AuditEventType.Create);
-                                }
-
-                                if (resource.TypeName == "MeasureReport")
-                                {
-                                    entry.AddMeasureReport((MeasureReport)resource);
-                                }
-                                else
-                                {
-                                    IFacilityResource returnedResource = null;
-
-                                    var existingReportResource = await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId, resource.TypeName, resource.Id));
-
-                                    if (existingReportResource != null)
+                                    if (resource == null)
                                     {
-                                        returnedResource = await _mediator.Send(new UpdateResourceCommand(existingReportResource, resource));
+                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
+                                            AuditEventType.Create);
+                                    }
+
+                                    if (resource.TypeName == "MeasureReport")
+                                    {
+                                        entry.AddMeasureReport((MeasureReport)resource);
                                     }
                                     else
                                     {
-                                        returnedResource = await _mediator.Send(new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
+                                        IFacilityResource returnedResource = null;
+
+                                        var existingReportResource =
+                                            await _mediator.Send(new GetResourceQuery(key.FacilityId, value.PatientId,
+                                                resource.TypeName, resource.Id));
+
+                                        if (existingReportResource != null)
+                                        {
+                                            returnedResource =
+                                                await _mediator.Send(
+                                                    new UpdateResourceCommand(existingReportResource, resource));
+                                        }
+                                        else
+                                        {
+                                            returnedResource = await _mediator.Send(
+                                                new CreateResourceCommand(key.FacilityId, value.PatientId, resource));
+                                        }
+
+                                        entry.UpdateContainedResource(returnedResource);
                                     }
 
-                                    entry.UpdateContainedResource(returnedResource);
-                                }
-
-                                if (entry.Id == null)
-                                {
-                                    await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                                    if (entry.Id == null)
                                     {
-                                        MeasureReportSubmissionEntry = entry
-                                    }, cancellationToken);
-                                }
-                                else
-                                {
-                                    await _mediator.Send(new UpdateMeasureReportSubmissionEntryCommand
+                                        await _mediator.Send(new CreateMeasureReportSubmissionEntryCommand
+                                        {
+                                            MeasureReportSubmissionEntry = entry
+                                        }, cancellationToken);
+                                    }
+                                    else
                                     {
-                                        MeasureReportSubmissionEntry = entry
-                                    }, cancellationToken);
+                                        await _mediator.Send(new UpdateMeasureReportSubmissionEntryCommand
+                                        {
+                                            MeasureReportSubmissionEntry = entry
+                                        }, cancellationToken);
+                                    }
                                 }
 
                                 #region Patients To Query & Submision Report Handling
@@ -244,7 +251,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 Value = new SubmissionReportValue()
                                                 {
                                                     PatientIds = patientIds,
-                                                    MeasureIds =  measureReports.Select(mr => mr.Measure).Distinct().ToList(),
+                                                    MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                                     Organization = _bundler.CreateOrganization(schedule.FacilityId),
                                                     Aggregates = _aggregator.Aggregate(measureReports)
                                                 },
@@ -261,31 +268,30 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
-                                    #endregion
+                                #endregion
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                            }
+                            catch (TimeoutException ex)
+                            {
+                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
 
-                                }
-                                catch (DeadLetterException ex)
-                                {
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                                }
-                                catch (TransientException ex)
-                                {
-                                    _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                                }
-                                catch (TimeoutException ex)
-                                {
-                                    var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
-
-                                    _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
-                                }
-                                finally
-                                {
-                                    consumer.Commit(consumeResult);
-                                }
+                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                            }
+                            finally
+                            {
+                                consumer.Commit(consumeResult);
+                            }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)

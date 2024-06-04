@@ -94,6 +94,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
+    IConfigurationSection consumerSettingsSection = builder.Configuration.GetSection(nameof(ConsumerSettings));
+    builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
+    var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
+
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
 
     builder.Services.AddDbContext<CensusContext>((sp, options) =>
@@ -247,9 +251,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
 
-    builder.Services.AddHostedService<CensusListener>();
-    builder.Services.AddHostedService<ScheduleService>();
-    builder.Services.AddHostedService<RetryListener>();
+    if(consumerSettings == null || !consumerSettings.DisableConsumer)
+    {
+        builder.Services.AddHostedService<CensusListener>();
+    }
+
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddHostedService<ScheduleService>();
+        builder.Services.AddHostedService<RetryListener>(); 
+    }
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {

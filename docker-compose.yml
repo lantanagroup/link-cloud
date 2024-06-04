@@ -23,7 +23,6 @@ version: '3.4'
 ## measureeval: 8067
 ## normalization: 8068
 ## notification: 8069
-## patientstoquery: 8070
 ## querydispatch: 8071
 ## report: 8072
 ## submission: 8073
@@ -544,27 +543,6 @@ services:
       - kafka_init
       - otel-collector
       - mssql_init
-      - loki
-      
-  patientstoquery:
-    image: link-patientquery
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      KafkaConnection__BootstrapServers__0: kafka_b:9094
-      Serilog__WriteTo__0__Args__uri: http://loki:3100
-      Telemetry__EnableTelemetry: true
-      Telemetry__EnableOtelCollector: true
-      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
-    ports:
-      - "8070:8070"
-    build:
-      context: .
-      dockerfile: DotNet/PatientsToQuery/Dockerfile
-    networks:
-      - link-nw
-    depends_on:
-      - kafka_init
-      - otel-collector
       - loki
       
   querydispatch:

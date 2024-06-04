@@ -103,8 +103,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container.
     builder.Services.AddHttpClient();
-    builder.Services.AddGrpc().AddJsonTranscoding();
-    builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
     builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
@@ -166,7 +164,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
 
-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+    // Add swagger
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
