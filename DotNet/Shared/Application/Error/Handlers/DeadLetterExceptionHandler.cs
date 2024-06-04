@@ -222,7 +222,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
             headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
-            using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
+            using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
             producer.Produce(Topic, new Message<K, V>
             {
                 Key = key,
