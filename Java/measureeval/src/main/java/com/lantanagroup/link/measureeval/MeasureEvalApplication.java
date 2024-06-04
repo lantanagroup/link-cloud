@@ -1,6 +1,5 @@
 package com.lantanagroup.link.measureeval;
 
-import io.opentelemetry.instrumentation.spring.autoconfigure.EnableOpenTelemetry;
 import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
