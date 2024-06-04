@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
+using Microsoft.Data.SqlClient;
 using Newtonsoft.Json;
 using System.Text;
 using static Confluent.Kafka.ConfigPropertyNames;
@@ -89,7 +90,7 @@ public class CensusListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
-                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new DeadLetterException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
                                 }
 
                                 deserializedMessage = message;
@@ -99,12 +100,12 @@ public class CensusListener : BackgroundService
                                     messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
                                     if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                                     {
-                                        throw new TransientException("Facility ID is null or empty", AuditEventType.Query, new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
+                                        throw new DeadLetterException("Facility ID is null or empty", AuditEventType.Query, new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                     }
                                 }
                                 catch (MissingFacilityIdException ex)
                                 {
-                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new DeadLetterException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
                                 }
 
                                 try
@@ -120,6 +121,10 @@ public class CensusListener : BackgroundService
                                     };
 
                                     await ProduceEvents(responseMessages, kafkaProducer, cancellationToken);
+                                }
+                                catch(SqlException ex)
+                                {
+                                    throw new TransientException("DB Error processing message: " + ex.Message, AuditEventType.Query, ex);
                                 }
                                 catch (Exception ex)
                                 {
