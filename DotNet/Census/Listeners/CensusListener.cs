@@ -98,7 +98,7 @@ public class CensusListener : BackgroundService
                                 try
                                 {
                                     messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
-                                    if (string.IsNullOrWhiteSpace(messageMetaData.facilityId) || string.IsNullOrWhiteSpace(messageMetaData.correlationId))
+                                    if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                                     {
                                         throw new DeadLetterException("Facility ID is null or empty", AuditEventType.Query, new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                     }
