@@ -79,7 +79,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         if(correlationId == null || correlationId.isEmpty()) {
             logger.error("Correlation ID is null or empty. Exiting.");
-            throw new NullPointerException("Correlation ID is null or empty.");
+            throw new ValidationException("Correlation ID is null or empty.");
         }
 
         T value = record.value();
