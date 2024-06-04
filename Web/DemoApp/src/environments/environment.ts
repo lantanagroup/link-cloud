@@ -3,8 +3,6 @@
 // The list of file replacements can be found in `angular.json`.
 
 export const environment = {
-  production: false,
-  loginUrl: ''
 };
 /*
  * For easier debugging in development mode, you can import the following file
