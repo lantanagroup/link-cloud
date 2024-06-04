@@ -13,8 +13,6 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-   //     "ExternalConfigurationSource": "AzureAppConfiguration",
-  //      "ConnectionStrings__AzureAppConfiguration": "Endpoint=https://aca-configs.azconfig.io;Id=v2kd;Secret=WNzmUMf0s8KJUAaM4u6lAsAC3Pnhl3Rp0gC+wxrAkKc="
       },
       "applicationUrl": "http://localhost:5110;https://localhost:7110",
       "dotnetRunMessages": true

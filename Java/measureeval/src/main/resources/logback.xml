@@ -9,37 +9,45 @@
         </encoder>
     </appender>
 
+    <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
+        <then>
+            <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+                <http>
+                    <url>${loki_url}/loki/api/v1/push</url>
+                </http>
+                <format>
+                    <label>
+                        <pattern>app=link-cloud,component=MeasureEval</pattern>
+                        <readMarkers>true</readMarkers>
+                    </label>
+                    <message>
+                        <pattern>
+                            {
+                            "level":"%level",
+                            "class":"%logger{36}",
+                            "thread":"%thread",
+                            "message": "%message",
+                            "requestId": "%X{X-Request-ID}"
+                            }
+                        </pattern>
+                    </message>
+                </format>
+                <batchMaxItems>25</batchMaxItems>
+            </appender>
+        </then>
+    </if>
 
-
-    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
-        <http>
-            <url>http://localhost:3100/loki/api/v1/push</url>
-        </http>
-        <format>
-            <label>
-                <pattern>app=link-cloud,component=MeasureEval</pattern>
-                <readMarkers>true</readMarkers>
-            </label>
-            <message>
-                <pattern>
-                    {
-                    "level":"%level",
-                    "class":"%logger{36}",
-                    "thread":"%thread",
-                    "message": "%message",
-                    "requestId": "%X{X-Request-ID}"
-                    }
-                </pattern>
-            </message>
-        </format>
-        <batchMaxItems>25</batchMaxItems>
-    </appender>
-
-
-    <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-        <appender-ref ref="LOKI"/>
-    </root>
-
-
+    <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
+        <then>
+            <root level="INFO">
+                <appender-ref ref="STDOUT"/>
+                <appender-ref ref="LOKI"/>
+            </root>
+        </then>
+        <else>
+            <root level="INFO">
+                <appender-ref ref="STDOUT"/>
+            </root>
+        </else>
+    </if>
 </configuration>
