@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             return new TenantSubmissionConfigEntity()
             {
-                Id = model.Id,
+                Id = new TenantSubmissionConfigEntityId(new Guid(model.Id)),
                 FacilityId = model.FacilityId,
                 CreateDate = model.CreateDate,
                 ModifyDate = model.ModifyDate,
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             return new TenantSubmissionConfig()
             {
-                Id = entity.Id,
+                Id = entity.Id.ToString(),
                 FacilityId = entity.FacilityId,
                 CreateDate = entity.CreateDate,
                 ModifyDate = entity.ModifyDate,
