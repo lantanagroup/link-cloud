@@ -139,6 +139,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                ?? throw new TransactionException(
                                                    $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
 
+                                //TODO Find long term solution Daniel Vargas
                                 if (value.IsReportable)
                                 {
                                     var entry = await _mediator.Send(new GetMeasureReportSubmissionEntryCommand()
