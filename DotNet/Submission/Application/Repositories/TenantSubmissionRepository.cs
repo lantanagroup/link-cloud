@@ -27,9 +27,9 @@ namespace LantanaGroup.Link.Submission.Application.Repositories
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            if (string.IsNullOrWhiteSpace(entity.Id))
+            if (string.IsNullOrWhiteSpace(entity.Id.ToString()))
             {
-                entity.Id = Guid.NewGuid().ToString();
+                entity.Id = new TenantSubmissionConfigEntityId(Guid.NewGuid());
             }
 
             await _collection.InsertOneAsync(entity, cancellationToken: cancellationToken);
