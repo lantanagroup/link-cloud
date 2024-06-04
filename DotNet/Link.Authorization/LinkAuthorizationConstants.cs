@@ -28,7 +28,7 @@
         public static class LinkBearerService
         {
             public const string LinkBearerIssuer = "LinkServiceAdmin";
-            public const string LinkBearerAudience = "LinkSevices";
+            public const string LinkBearerAudience = "LinkServices";
             public const string LinkBearerKeyName = "link-bearer-key";
         }
     }
