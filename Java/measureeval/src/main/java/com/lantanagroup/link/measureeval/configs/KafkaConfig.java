@@ -69,6 +69,10 @@ public class KafkaConfig {
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
+                Topics.RESOURCE_EVALUATED, new JsonDeserializer<>(ResourceEvaluated.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
                 Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
@@ -83,6 +87,7 @@ public class KafkaConfig {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
             case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
+            case Topics.RESOURCE_EVALUATED -> new ObjectMapper().constructType(ResourceEvaluated.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
             default -> new ObjectMapper().constructType(Object.class);
