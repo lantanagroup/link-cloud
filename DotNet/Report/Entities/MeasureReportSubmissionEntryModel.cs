@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Report.Entities
                 }
 
                 var reference = evaluatedResource.Reference.Split('/');
-                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(evaluatedResource.TypeName);
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(reference[0]);
 
                 if (resourceCategoryType != null)
                 {
