@@ -25,16 +25,20 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final HandlerExceptionResolver handlerExceptionResolver;
-  private final SecretClient secretClient;
+  private  SecretClient secretClient = null;
   private final JwtService jwtService;
   private String secret;
 
   @Value("${authentication.enableAnonymousAccess}")
   private boolean anonymousAccessEnabled;
 
-  public JwtAuthenticationFilter (SecretClient secretClient, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver) {
+
+
+  public JwtAuthenticationFilter (JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, SecretClient... secretClient) {
     super();
-    this.secretClient = secretClient;
+    if(secretClient.length > 0){
+      this.secretClient = secretClient[0];
+    }
     this.jwtService = jwtService;
     this.handlerExceptionResolver = handlerExceptionResolver;
   }
@@ -47,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
-    if (StringUtils.isBlank(secret)){
+    if (StringUtils.isBlank(secret)  &&  this.secretClient != null){
       secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
     }
 
