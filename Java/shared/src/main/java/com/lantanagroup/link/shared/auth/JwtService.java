@@ -1,5 +1,6 @@
 package com.lantanagroup.link.shared.auth;
 
+import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,13 +26,14 @@ public class JwtService {
   public static String LinkUserClaims_LinkSystemAccount = "SystemAccount";
   public static String RolePrefix = "ROLE_";
   public static String Audiences = "LinkServices";
-
-  @Value("${authentication.authority}")
-  private String Authority;
-
   public static String Email = "email";
-
   public static String Link_Bearer_Key = "link-bearer-key";
+
+  private final AuthenticationConfig authenticationConfig;
+
+  public JwtService(AuthenticationConfig authenticationConfig) {
+    this.authenticationConfig = authenticationConfig;
+  }
 
   //retrieve username from jwt token
   public String getUsernameFromToken (String token, String secret) {
@@ -90,11 +92,18 @@ public class JwtService {
   }
 
   private String doGenerateToken (Map<String, Object> claims, String subject, String secret) {
+    if (this.authenticationConfig == null) {
+      throw new RuntimeException("AuthenticationConfig is null");
+    }
+    if (StringUtils.isEmpty(this.authenticationConfig.getAuthority())) {
+      throw new RuntimeException("authentication.authority is null");
+    }
+
     return Jwts.builder().setHeaderParam("typ","JWT")
             .setClaims(claims)
             .setSubject(subject).
              setIssuedAt(new Date(System.currentTimeMillis()))
-            .setIssuer(Authority)
+            .setIssuer(this.authenticationConfig.getAuthority())
             .setAudience(Audiences)
             .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
             .signWith(SignatureAlgorithm.HS512, secret.getBytes(StandardCharsets.UTF_8)).compact();
