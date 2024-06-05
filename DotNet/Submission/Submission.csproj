@@ -1,56 +1,61 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>LantanaGroup.Link.Submission</RootNamespace>
-    <UserSecretsId>950e25dd-d402-4ddc-be72-3b7a0942d7c0</UserSecretsId>
-    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>LantanaGroup.Link.Submission</RootNamespace>
+		<UserSecretsId>950e25dd-d402-4ddc-be72-3b7a0942d7c0</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+	</PropertyGroup>
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="Application\Enums\**" />
-    <Compile Remove="Application\Submission\**" />
-    <Compile Remove="Infrastructure\**" />
-    <Content Remove="Application\Enums\**" />
-    <Content Remove="Application\Submission\**" />
-    <Content Remove="Infrastructure\**" />
-    <EmbeddedResource Remove="Application\Enums\**" />
-    <EmbeddedResource Remove="Application\Submission\**" />
-    <EmbeddedResource Remove="Infrastructure\**" />
-    <None Remove="Application\Enums\**" />
-    <None Remove="Application\Submission\**" />
-    <None Remove="Infrastructure\**" />
-  </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="Application\Enums\**" />
+		<Compile Remove="Application\Submission\**" />
+		<Compile Remove="Infrastructure\**" />
+		<Content Remove="Application\Enums\**" />
+		<Content Remove="Application\Submission\**" />
+		<Content Remove="Infrastructure\**" />
+		<EmbeddedResource Remove="Application\Enums\**" />
+		<EmbeddedResource Remove="Application\Submission\**" />
+		<EmbeddedResource Remove="Infrastructure\**" />
+		<None Remove="Application\Enums\**" />
+		<None Remove="Application\Submission\**" />
+		<None Remove="Infrastructure\**" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
-    <PackageReference Include="Azure.Identity" Version="1.11.2" />
-    <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-    <PackageReference Include="MediatR" Version="12.*" />
-    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.*" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="MongoDB.Driver" Version="2.*" />
-    <PackageReference Include="Quartz" Version="3.*" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-    <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-    <PackageReference Include="Serilog.Exceptions" Version="8.*" />
-    <PackageReference Include="Serilog.Expressions" Version="4.0.0" />
-    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-    <PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+		<PackageReference Include="Azure.Identity" Version="1.11.2" />
+		<PackageReference Include="Confluent.Kafka" Version="2.*" />
+		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
+		<PackageReference Include="MediatR" Version="12.*" />
+		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.*" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
+		<PackageReference Include="MongoDB.Driver" Version="2.*" />
+		<PackageReference Include="Quartz" Version="3.*" />
+		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
+		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
+		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
+		<PackageReference Include="Serilog.Expressions" Version="4.0.0" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Domain\Interfaces\" />
-  </ItemGroup>
+	<ItemGroup>
+		<Folder Include="Domain\Interfaces\" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Shared\Shared.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Shared\Shared.csproj" />
+	</ItemGroup>
+
 
 </Project>
