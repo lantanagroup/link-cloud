@@ -11,4 +11,8 @@ public class ValidationException extends RuntimeException {
     public ValidationException(List<String> errors) {
         this.errors = errors;
     }
+    public ValidationException(String message) {
+        super(message);
+        this.errors = List.of(message);
+    }
 }
