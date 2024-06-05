@@ -8,7 +8,6 @@ import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import org.hl7.fhir.r4.model.Bundle;
@@ -38,8 +37,7 @@ public class MeasureDefinitionController {
     public MeasureDefinitionController(
             MeasureDefinitionRepository repository,
             MeasureDefinitionBundleValidator bundleValidator,
-            MeasureEvaluatorCache evaluatorCache,
-            OpenTelemetry openTelemetry){
+            MeasureEvaluatorCache evaluatorCache){
         this.repository = repository;
         this.bundleValidator = bundleValidator;
         this.evaluatorCache = evaluatorCache;
@@ -52,7 +50,7 @@ public class MeasureDefinitionController {
     public List<MeasureDefinition> getAll(@AuthenticationPrincipal PrincipalUser user) {
         _logger.info("Get all measure definitions");
         Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user.getEmailAddress());
+        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
         return repository.findAll();
 
     }
@@ -62,7 +60,7 @@ public class MeasureDefinitionController {
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
         _logger.info("Get measure definition {}", id);
         Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user.getEmailAddress());
+        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
@@ -72,7 +70,7 @@ public class MeasureDefinitionController {
     public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
         _logger.info("Put measure definition {}", id);
         Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user.getEmailAddress());
+        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
             MeasureDefinition _entity = new MeasureDefinition();
@@ -91,7 +89,7 @@ public class MeasureDefinitionController {
     public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
         _logger.info("Evaluate measure definition {}", id);
         Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user.getEmailAddress());
+        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
         MeasureEvaluator evaluator = evaluatorCache.get(id);
         if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
