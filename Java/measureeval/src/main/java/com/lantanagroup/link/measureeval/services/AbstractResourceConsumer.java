@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
+import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import com.lantanagroup.link.measureeval.kafka.Headers;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.models.NormalizationStatus;
@@ -70,6 +71,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     protected void doConsume(String correlationId, ConsumerRecord<String, T> record) {
         String facilityId = record.key();
+
+        if(facilityId == null || facilityId.isEmpty()) {
+            logger.error("Facility ID is null or empty. Exiting.");
+            throw new ValidationException("Facility ID is null or empty.");
+        }
+
+        if(correlationId == null || correlationId.isEmpty()) {
+            logger.error("Correlation ID is null or empty. Exiting.");
+            throw new ValidationException("Correlation ID is null or empty.");
+        }
+
         T value = record.value();
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
