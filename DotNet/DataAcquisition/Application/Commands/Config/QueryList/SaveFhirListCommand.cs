@@ -43,9 +43,10 @@ public class SaveFhirListCommandHandler : IRequestHandler<SaveFhirListCommand>
         }
         else
         {
-            request.FhirListConfiguration.Id = config.Id;
-            request.FhirListConfiguration.ModifyDate = DateTime.UtcNow;
-            request.FhirListConfiguration.CreateDate = config.CreateDate;
+            config.ModifyDate = DateTime.UtcNow;
+            config.EHRPatientLists = request.FhirListConfiguration.EHRPatientLists;
+            config.Authentication = request.FhirListConfiguration.Authentication;
+            config.FhirBaseServerUrl = request.FhirListConfiguration.FhirBaseServerUrl;
             await _repository.UpdateAsync(config);
         }
         
