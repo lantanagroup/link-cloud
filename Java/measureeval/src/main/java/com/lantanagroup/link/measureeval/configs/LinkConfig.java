@@ -28,7 +28,7 @@ public class LinkConfig {
 
     @Bean
     @ConfigurationProperties("link.data-acquisition")
-    public DataAcquisitionClient dataAcquisitionClient(RestClient restClient, SecretClient secretClient, JwtService jwtService) {
-        return new DataAcquisitionClient(restClient, secretClient, jwtService);
+    public DataAcquisitionClient dataAcquisitionClient(RestClient restClient, JwtService jwtService, SecretClient... secretClient) {
+        return new DataAcquisitionClient(restClient, jwtService, secretClient);
     }
 }
