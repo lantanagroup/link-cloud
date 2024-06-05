@@ -11,11 +11,9 @@ import java.util.TimeZone;
 @EnableMongoAuditing
 public class MeasureEvalApplication {
     public static void main(String[] args) {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         SpringApplication application = new SpringApplication(MeasureEvalApplication.class);
         application.setBannerMode(Banner.Mode.OFF);
         application.run(args);
-
-        //enforce UTC across service
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
     }
 }

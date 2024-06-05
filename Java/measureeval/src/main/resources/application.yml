@@ -19,7 +19,7 @@ secretManagement:
 
 authentication:
   enableAnonymousAccess: false
-  authority: http://localhost:5218
+  authority: https://localhost:7004
 
 springdoc:
   api-docs:
