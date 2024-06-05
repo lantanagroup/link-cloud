@@ -24,6 +24,7 @@ import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
 import org.springframework.kafka.support.serializer.*;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.KafkaTelemetry;
 
+import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -102,6 +103,11 @@ public class KafkaConfig {
 
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
+
+        //set the date format to the ISO 8601 ISO_INSTANT format to match other services
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+        objectMapper.setDateFormat(sdf);
+
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
