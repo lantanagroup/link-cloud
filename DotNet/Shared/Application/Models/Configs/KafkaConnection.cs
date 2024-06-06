@@ -17,12 +17,10 @@ public class KafkaConnection
 
         if (SaslProtocolEnabled)
         {
-            config.SecurityProtocol = SecurityProtocol.SaslSsl;
+            config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
             config.SaslUsername = SaslUsername;
             config.SaslPassword = SaslPassword;
             config.SaslMechanism = SaslMechanism.Plain;
-            config.ApiVersionRequest = ApiVersionRequest;
-            config.ReceiveMessageMaxBytes = ReceiveMessageMaxBytes;
         }
 
         return config;
@@ -38,12 +36,10 @@ public class KafkaConnection
 
         if (SaslProtocolEnabled)
         {
-            config.SecurityProtocol = SecurityProtocol.SaslSsl;
+            config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
             config.SaslUsername = SaslUsername;
             config.SaslPassword = SaslPassword;
             config.SaslMechanism = SaslMechanism.Plain;
-            config.ApiVersionRequest = ApiVersionRequest;
-            config.ReceiveMessageMaxBytes = ReceiveMessageMaxBytes;
         }
 
         return config;
