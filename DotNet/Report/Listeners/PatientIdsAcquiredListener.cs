@@ -109,14 +109,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                         scheduledReport.PatientsToQuery = new List<string>();
                                     }
 
-                                    foreach (var patientId in value.PatientIds.Entry)
+                                    foreach (var patientReference in value.PatientIds.Entry)
                                     {
-                                        if (scheduledReport.PatientsToQuery.Contains(patientId.Item.Reference))
+                                        var patientId = patientReference.Item.Reference.Split('/').Last();
+                                        if (scheduledReport.PatientsToQuery.Contains(patientId))
                                         {
                                             continue;
                                         }
 
-                                        scheduledReport.PatientsToQuery.Add(patientId.Item.Reference);
+                                        scheduledReport.PatientsToQuery.Add(patientId);
                                     }
 
                                     try
