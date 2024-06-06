@@ -22,7 +22,7 @@ public class DataAcquisitionClient extends Router {
     private final JwtService jwtService;
     private String secret;
 
-    public DataAcquisitionClient(RestClient restClient,JwtService jwtService, SecretClient... secretClient) {
+    public DataAcquisitionClient(RestClient restClient, JwtService jwtService, SecretClient... secretClient) {
         this.restClient = restClient;
 
         this.jwtService = jwtService;

@@ -21,6 +21,7 @@ authentication:
   enableAnonymousAccess: false
   authority: https://localhost:7004
 
+
 springdoc:
   api-docs:
     enabled: false
@@ -62,3 +63,10 @@ link:
         path: /api/data/{facilityId}/QueryResult/{correlationId}
         query:
           - queryType={queryType}
+
+secret-management:
+  key-vault-uri: ''
+
+authentication:
+  anonymous: false
+  authority: ''
