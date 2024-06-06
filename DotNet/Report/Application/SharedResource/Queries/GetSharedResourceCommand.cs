@@ -18,6 +18,11 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Queries
     {
         private readonly SharedResourceRepository _repository;
 
+        public GetSharedResourceCommandHandler(SharedResourceRepository repository)
+        {
+            _repository = repository;
+        }
+
         public Task<SharedResourceModel> Handle(GetSharedResourceCommand request, CancellationToken cancellationToken)
         {
             return _repository.GetAsync(request.Id);
