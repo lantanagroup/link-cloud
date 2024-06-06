@@ -17,15 +17,24 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Queries
     public class GetSharedResourceCommandHandler : IRequestHandler<GetSharedResourceCommand, SharedResourceModel>
     {
         private readonly SharedResourceRepository _repository;
-
-        public GetSharedResourceCommandHandler(SharedResourceRepository repository)
+        private readonly ILogger<GetSharedResourceCommandHandler> _logger;
+        public GetSharedResourceCommandHandler(ILogger<GetSharedResourceCommandHandler> logger, SharedResourceRepository repository)
         {
             _repository = repository;
+            _logger = logger;
         }
 
         public Task<SharedResourceModel> Handle(GetSharedResourceCommand request, CancellationToken cancellationToken)
         {
-            return _repository.GetAsync(request.Id);
+            try
+            {
+                return _repository.GetAsync(request.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error Occurred in GetSharedResourceCommandHandler");
+                throw;
+            }
         }
     }
 }
