@@ -1,9 +1,7 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
 using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
 using LantanaGroup.Link.Report.Application.PatientResource.Queries;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
@@ -12,14 +10,12 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using MediatR;
-using System.Reflection.Metadata.Ecma335;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Core
 {
     /// <summary>
-    /// This Class is used to generate a bundle of a particular patients data for the provided facility and the report period.
-    /// This bundle will include data for all applicable Measure Reports as well as a separate bundle of all resources that are not strictly "Patient" resources.
+    /// This Class is used to generate a bundleSettings of a particular patients data for the provided facility and the report period.
+    /// This bundleSettings will include data for all applicable Measure Reports as well as a separate bundleSettings of all resources that are not strictly "Patient" resources.
     /// </summary>
     public class PatientReportSubmissionBundler
     {
@@ -38,23 +34,6 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/specialty",
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
-
-        //TODO: Daniel - Need to replace and use what's in \Report\Application\ResourceCategory\ResourceCategory.cs
-        public List<string> PatientResourceTypes = new List<string>()
-        {
-            "Account", "AdverseEvent", "AllergyIntolerance", "Appointment", "AppointmentResponse", "AuditEvent",
-            "Basic", "BodyStructure", "CarePlan", "CareTeam", "ChargeItem", "Claim", "ClaimResponse",
-            "ClinicalImpression", "Communication", "CommunicationRequest", "Composition", "Condition", "Consent",
-            "Coverage", "CoverageEligibilityRequest", "CoverageEligibilityResponse", "DetectedIssue", "DeviceRequest",
-            "DeviceUseStatement", "DiagnosticReport", "DocumentManifest", "DocumentReference", "Encounter",
-            "EnrollmentRequest", "EpisodeOfCare", "ExplanationOfBenefit", "FamilyMemberHistory", "Flag", "Goal",
-            "Group", "ImagingStudy", "Immunization", "ImmunizationEvaluation", "ImmunizationRecommendation", "Invoice",
-            "List", "MeasureReport", "Media", "MedicationAdministration", "MedicationDispense", "MedicationRequest",
-            "MedicationStatement", "MolecularSequence", "NutritionOrder", "Observation", "Patient", "Person",
-            "Procedure", "Provenance", "QuestionnaireResponse", "RelatedPerson", "RequestGroup", "ResearchSubject",
-            "RiskAssessment", "Schedule", "ServiceRequest", "Specimen", "SupplyDelivery", "SupplyRequest",
-            "VisionPrescription"
-        };
 
         public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IMediator mediator, IReportServiceMetrics metrics)
         {
@@ -83,11 +62,6 @@ namespace LantanaGroup.Link.Report.Core
                 if (schedule == null)
                     throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
-                var submission = await _mediator.Send(new FindMeasureReportSubmissionByScheduleQuery { MeasureReportScheduleId = measureReportScheduleId });
-                Bundle bundle = submission == null ? CreateNewBundle() : submission.SubmissionBundle;
-
-                var parser = new FhirJsonParser();
-
                 if (entry.MeasureReport == null) 
                 {
                     continue;
@@ -100,40 +74,38 @@ namespace LantanaGroup.Link.Report.Core
                 if (config == null)
                     throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
 
-                if (entry.ContainedResources is not null && entry.ContainedResources.Count > 0)
+
+                entry?.ContainedResources?.ForEach(async r =>
                 {
-                    if (mr.Contained == null) mr.Contained = new List<Resource>();
+                    if (r.DocumentId == null) return;
 
-                    entry.ContainedResources.ForEach(async r =>
+                    IFacilityResource facilityResource = null!;
+                    
+                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+
+                    Resource resource = null;
+
+                    try
                     {
-                        if (r.DocumentId == null) return;
-
-                        IFacilityResource facilityResource = null!;
-                        
-                        var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
-
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
                             facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
+                            resource = facilityResource.GetResource();
+                            patientResourceBundle.AddResourceEntry(resource, GetFullUrl(resource));
                         }
                         else
                         {
                             facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
-                        }
-
-                        Resource resource = null!;
-
-                        try
-                        {
                             resource = facilityResource.GetResource();
-                            mr.Contained.Add(resource);
+                            otherResources.AddResourceEntry(resource, GetFullUrl(resource));
                         }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError($"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.", ex);
-                        }
-                    });
-                }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.", ex);
+                    }
+                });
+                
 
                 // ensure we have an id to reference
                 if (string.IsNullOrEmpty(mr.Id))
@@ -142,30 +114,13 @@ namespace LantanaGroup.Link.Report.Core
                 // set individual measure report profile
                 mr.Meta = new Meta
                 {
-                    Profile = new List<string> { ReportConstants.Bundle.IndividualMeasureReportProfileUrl }
+                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
                 };
 
                 // clean up resource
                 cleanupResource(mr);
-                // Clean up the contained resources within the measure report
-                cleanupContainedResource(mr);
 
-                if (config != null && config.BundlingType == BundlingType.SharedPatientLineLevel)
-                    BundleSharedPatientLineLevel(bundle, mr);
-                else
-                    BundleDefault(bundle, mr);
-
-                foreach (var resource in bundle.GetResources())
-                {
-                    if (PatientResourceTypes.Contains(resource.TypeName))
-                    {
-                        patientResourceBundle.AddResourceEntry(resource, GetFullUrl(resource));
-                    }
-                    else
-                    {
-                        otherResources.AddResourceEntry(resource, GetFullUrl(resource));
-                    }
-                }
+                AddMeasureReportToBundle(patientResourceBundle, mr);
 
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
@@ -188,53 +143,14 @@ namespace LantanaGroup.Link.Report.Core
             return patientSubmissionModel;
         }
 
-        private void cleanupContainedResource(MeasureReport mr)
-        {
-            mr.Contained.ForEach(cr =>
-            {
-                if (cr.Id != null && cr.Id.StartsWith("LCR-"))
-                {
-                    // Remove the LCR- prefix added by CQL
-                    cr.Id = cr.Id.Substring(4);
-
-                }
-                else if (cr.Id != null && cr.Id.StartsWith("#LCR-"))
-                {
-                    // Remove the LCR- prefix added by CQL
-                    cr.Id = cr.Id.Substring(5);
-                }
-                // update references in the evaluated resource to point to the contained reference (for validation purposes)
-                mr.EvaluatedResource.Where(er => er.Reference != null && er.Reference == GetRelativeReference(cr)).ToList().ForEach(er => er.Reference = "#" + cr.Id);
-
-            });
-        }
-
-
-
-
         #region Bundling Options
-
-        /// <summary>
-        /// Adds the given MeasureReport to the given Bundle with the default (option B) method which leaves contained resources left in tact
-        /// </summary>
-        /// <param name="bundle">Bundle to add the MeasureReport to</param>
-        /// <param name="measureReport">MeasureReport to be added to the given Bundle</param>
-        /// <returns>new Bundle with MeasureReport added</returns>
-        private void BundleDefault(Bundle bundle, MeasureReport measureReport)
-        {
-            _logger.LogDebug($"Adding MeasureReport to bundle using default bundling method.");
-
-            // add or update the measure report as-is to the bundle
-            AddMeasureReportToBundle(bundle, measureReport);
-        }
-
 
         private void cleanupResource(Resource resource)
         {
             if (resource is DomainResource)
             {
                 DomainResource domainResource = (DomainResource)resource;
-
+                
                 // Remove extensions from resources
                 domainResource.Extension.RemoveAll(e => e.Url != null && REMOVE_EXTENSIONS.Contains(e.Url));
 
@@ -258,59 +174,6 @@ namespace LantanaGroup.Link.Report.Core
                 }
             }
         }
-
-
-        /// <summary>
-        /// Adds the given MeasureReport to the given Bundle with the patient line level (option A) method which pulls out contained resources
-        /// </summary>
-        /// <param name="bundle">Bundle to add the MeasureReport to</param>
-        /// <param name="measureReport">MeasureReport to be added to the given Bundle</param>
-        /// <returns>new Bundle with MeasureReport added</returns>
-        private void BundleSharedPatientLineLevel(Bundle bundle, MeasureReport measureReport)
-        {
-            _logger.LogInformation($"Adding MeasureReport to bundle using shared patient line level bundling method.");
-
-            // add the measure report to the bundle first
-            AddMeasureReportToBundle(bundle, measureReport);
-
-
-            // pull each contained resource from the measure report and add it to the top level bundle removing it from the contained list after it has been copied
-            while (measureReport.Contained.Count > 0)
-            {
-                var resource = measureReport.Contained[0];
-
-                // check for existing resource in the bundle with same type and id
-                var existingEntryIndex = bundle.Entry.FindIndex(e => e.Resource.TypeName == resource.TypeName && e.Resource.Id == resource.Id);
-                if (existingEntryIndex < 0)
-                {
-                    // no duplicate in the bundle so we can just add it
-                    bundle.AddResourceEntry(resource, GetFullUrl(resource));
-                }
-                else
-                {
-                    Resource existingResource = bundle.Entry[existingEntryIndex].Resource;
-
-                    // if this is not an exact match to the existing resource then we have to merge
-                    if (!resource.IsExactly(existingResource))
-                    {
-                        // TODO: determine how to merge based on resource type (?)
-                        _logger.LogError($"Need to merge duplicate \"{GetRelativeReference(resource)}\"");
-
-                        // for now... update existing completely
-                        //bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = resource, FullUrl = GetFullUrl(resource) };
-                    }
-                }
-
-                //  change the resource reference in the measure report to point to the top level bundle
-                var found = measureReport.EvaluatedResource.FirstOrDefault(e => e.Reference != null && e.Reference == "#" + resource.Id);
-                if (found != null) found.Reference = GetRelativeReference(resource);
-
-                measureReport.Contained.RemoveAt(0);
-
-            }
-
-        }
-
         #endregion
 
 
@@ -321,10 +184,10 @@ namespace LantanaGroup.Link.Report.Core
             Bundle bundle = new Bundle();
             bundle.Meta = new Meta
             {
-                Profile = new string[] { ReportConstants.Bundle.ReportBundleProfileUrl },
-                Tag = new List<Coding> { new Coding(ReportConstants.Bundle.MainSystem, "report", "Report") }
+                Profile = new string[] { ReportConstants.BundleSettings.ReportBundleProfileUrl },
+                Tag = new List<Coding> { new Coding(ReportConstants.BundleSettings.MainSystem, "report", "Report") }
             };
-            bundle.Identifier = new Identifier(ReportConstants.Bundle.IdentifierSystem, "urn:uuid:" + Guid.NewGuid());
+            bundle.Identifier = new Identifier(ReportConstants.BundleSettings.IdentifierSystem, "urn:uuid:" + Guid.NewGuid());
             bundle.Type = Bundle.BundleType.Collection;
             bundle.Timestamp = DateTime.UtcNow;
 
@@ -339,14 +202,14 @@ namespace LantanaGroup.Link.Report.Core
 
         protected string GetFullUrl(Resource resource)
         {
-            return string.Format(ReportConstants.Bundle.BundlingFullUrlFormat, GetRelativeReference(resource));
+            return string.Format(ReportConstants.BundleSettings.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
 
         /// <summary>
-        /// Adds the given measure report to the given bundle.
-        /// If an existing report exists with the same ID in the bundle, then the provided report will replace the existing report.
+        /// Adds the given measure report to the given bundleSettings.
+        /// If an existing report exists with the same ID in the bundleSettings, then the provided report will replace the existing report.
         /// </summary>
-        /// <returns>Bundle.EntryComponent with the newly added measure report</returns>
+        /// <returns>BundleSettings.EntryComponent with the newly added measure report</returns>
         protected Bundle.EntryComponent AddMeasureReportToBundle(Bundle bundle, MeasureReport measureReport)
         {
             Bundle.EntryComponent entry;
@@ -355,12 +218,12 @@ namespace LantanaGroup.Link.Report.Core
             var existingEntryIndex = bundle.Entry.FindIndex(e => e.Resource.TypeName == "MeasureReport" && e.Resource.Id == measureReport.Id);
             if (existingEntryIndex < 0)
             {
-                // doesn't exist... add it to the bundle as-is
+                // doesn't exist... add it to the bundleSettings as-is
                 entry = bundle.AddResourceEntry(measureReport, GetFullUrl(measureReport));
             }
             else
             {
-                // already exists in bundle... update the entry
+                // already exists in bundleSettings... update the entry
                 entry = bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = measureReport, FullUrl = GetFullUrl(measureReport) };
             }
 
