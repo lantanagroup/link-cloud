@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Collections.Concurrent;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -312,7 +313,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 while (patientIds.Any())
                                 {
-                                    var otherResourcesBag = new SynchronizedCollection<Bundle>();
+                                    var otherResourcesBag = new ConcurrentBag<Bundle>();
 
                                     List<string> batch = new List<string>();
                                     if (patientIds.Count > batchSize)

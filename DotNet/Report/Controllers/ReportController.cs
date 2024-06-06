@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Converters;
 using Link.Authorization.Policies;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
