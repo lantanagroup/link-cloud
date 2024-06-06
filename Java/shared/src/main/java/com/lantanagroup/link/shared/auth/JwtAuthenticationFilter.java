@@ -1,6 +1,7 @@
 package com.lantanagroup.link.shared.auth;
 
 import com.azure.security.keyvault.secrets.SecretClient;
+import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import com.nimbusds.oauth2.sdk.util.StringUtils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
@@ -8,7 +9,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,32 +21,30 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final HandlerExceptionResolver handlerExceptionResolver;
-  private  SecretClient secretClient = null;
   private final JwtService jwtService;
+  private final AuthenticationConfig authenticationConfig;
+
+  private SecretClient secretClient = null;
   private String secret;
 
-  @Value("${authentication.enableAnonymousAccess}")
-  private boolean anonymousAccessEnabled;
-
-
-
-  public JwtAuthenticationFilter (JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, SecretClient... secretClient) {
+  public JwtAuthenticationFilter (AuthenticationConfig authenticationConfig, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, Optional<SecretClient> secretClient) {
     super();
-    if(secretClient.length > 0){
-      this.secretClient = secretClient[0];
-    }
+
+    this.authenticationConfig = authenticationConfig;
+    this.secretClient = secretClient.orElse(null);
     this.jwtService = jwtService;
     this.handlerExceptionResolver = handlerExceptionResolver;
   }
 
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-
-    if (anonymousAccessEnabled) {
+    // Allow anonymous access to the hosted REST API
+    if (this.authenticationConfig.isAnonymous()) {
       filterChain.doFilter(request, response);
       return;
     }
