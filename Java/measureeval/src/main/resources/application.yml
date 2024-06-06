@@ -13,14 +13,6 @@ loki:
   enabled: true
   url: http://localhost:3100
 
-
-secretManagement:
-  managerUri: https://link-vault.vault.azure.net/
-
-authentication:
-  enableAnonymousAccess: false
-  authority: http://localhost:5218
-
 springdoc:
   api-docs:
     enabled: false
@@ -62,3 +54,10 @@ link:
         path: /api/{facilityId}/QueryResult/{correlationId}
         query:
           - queryType={queryType}
+
+secret-management:
+  key-vault-uri: ''
+
+authentication:
+  anonymous: false
+  authority: ''
