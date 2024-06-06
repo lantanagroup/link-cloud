@@ -219,8 +219,6 @@ public class CensusListener : BackgroundService
                 if (((PatientEventResponse)ev).PatientEvent == null) return;
                 PatientEvent? patientEvent = ((PatientEventResponse)ev).PatientEvent;
 
-                patientEvent.PatientId = patientEvent.PatientId.Replace("Patient/", "", StringComparison.InvariantCultureIgnoreCase).TrimStart();
-
                 Headers? headers = null;
                 if (ev.CorrelationId != null)
                     headers = new Headers

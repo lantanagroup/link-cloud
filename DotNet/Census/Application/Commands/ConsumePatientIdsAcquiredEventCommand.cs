@@ -148,13 +148,11 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
 
         fhirList.Entry.ForEach(x =>
         {
-            var separatedPatientUrl = x.Item.ReferenceElement.Value.Split('/');
-            var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
+            var patientId = x.Item.ReferenceElement.Value.Replace("Patient/", "", StringComparison.InvariantCultureIgnoreCase).TrimStart();
             censusList.Add(new CensusPatientListEntity
             {
                 FacilityId = facilityId,
-                //DisplayName = x.Item?.DisplayElement?.Value,
-                PatientId = patientIdPart,
+                PatientId = patientId,
             });
         });
         return censusList;
