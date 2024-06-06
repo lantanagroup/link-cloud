@@ -113,8 +113,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    _logger.LogInformation(
-                                        $"{Name}: Received message without correlation ID: {consumeResult.Topic}");
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) ||
