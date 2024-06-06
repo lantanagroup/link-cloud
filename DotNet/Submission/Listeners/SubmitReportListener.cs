@@ -154,6 +154,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+
+                                #region Census Admitted Patient List
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
@@ -179,7 +181,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
+                                #region DataAcquisition Query Plan
                                 string queryPlans;
                                 try
                                 {
@@ -196,6 +200,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
                                 Bundle otherResourcesBundle = new Bundle();
 
