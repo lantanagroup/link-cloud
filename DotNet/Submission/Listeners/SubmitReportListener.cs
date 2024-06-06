@@ -160,11 +160,11 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
-                                List? admittedPatients = null;
 
                                 if (!censusResponse.IsSuccessStatusCode)
                                     throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
 
+                                List? admittedPatients;
                                 try
                                 {
                                     admittedPatients =
@@ -180,7 +180,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         AuditEventType.Query, ex.InnerException);
                                 }
 
-                                string queryPlans = string.Empty;
+                                string queryPlans;
                                 try
                                 {
                                     string dataAcqRequestUrl =
