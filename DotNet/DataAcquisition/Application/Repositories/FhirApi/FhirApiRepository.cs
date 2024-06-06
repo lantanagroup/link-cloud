@@ -162,6 +162,8 @@ public class FhirApiRepository : IFhirApiRepository
             new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
         ]);
 
+        patientId = patientId.Contains("Patient/",StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
+
         var fhirClient = GenerateFhirClient(baseUrl);
 
         var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
