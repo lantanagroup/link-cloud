@@ -69,11 +69,12 @@ namespace LantanaGroup.Link.Report.Entities
 
         public void UpdateContainedResource(IFacilityResource facilityResource)
         {
-            var containedResource = ContainedResources.Where(x => x.DocumentId == facilityResource.GetId()).FirstOrDefault();
-            var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
+            var containedResource = ContainedResources.Where(x => x.ResourceId == facilityResource.GetResource().Id && x.ResourceType == facilityResource.GetResource().TypeName).FirstOrDefault();
 
             if (containedResource == null)
             {
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
+
                 ContainedResources.Add(new ContainedResource()
                 {
                     DocumentId = facilityResource.GetId(),
