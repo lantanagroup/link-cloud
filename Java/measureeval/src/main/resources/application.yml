@@ -6,8 +6,7 @@ server:
   port: 5135
 
 telemetryConfig:
-  exporter:
-    endpoint: http://localhost:55690
+  exporterEndpoint: http://localhost:55690
 
 loki:
   enabled: true
@@ -56,8 +55,8 @@ link:
           - queryType={queryType}
 
 secret-management:
-  key-vault-uri: ''
+  key-vault-uri: 'https://link-vault.vault.azure.net/'
 
 authentication:
   anonymous: false
-  authority: ''
+  authority: 'https://localhost:7004'
