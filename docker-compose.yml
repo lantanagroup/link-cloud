@@ -603,14 +603,22 @@ services:
     image: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      ServiceInformation__Name: Link Report Service
+      ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: user
+      KafkaConnection__SaslPassword: password
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
-      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      ServiceRegistry__TenantService__CheckIfTenantExists: false
+      ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+      EnableSwagger: true
     ports:
       - "8072:8072"
     build:
