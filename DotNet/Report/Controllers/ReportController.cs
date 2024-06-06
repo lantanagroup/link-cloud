@@ -1,8 +1,5 @@
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Converters;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;

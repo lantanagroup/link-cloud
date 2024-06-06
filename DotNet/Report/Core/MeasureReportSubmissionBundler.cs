@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Report.Core
             // ensure aggregate patient list and measure report entries are created for reach measure
             var org = submissionBundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "Organization"
                 && (e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
-                && e.Resource.Meta.Profile.Contains(ReportConstants.Bundle.SubmittingOrganizationProfile))
+                && e.Resource.Meta.Profile.Contains(ReportConstants.BundleSettings.SubmittingOrganizationProfile))
             );
             string orgId = org?.Resource.Id ?? "";
             foreach (var config in configs)
@@ -148,7 +148,7 @@ namespace LantanaGroup.Link.Report.Core
                 // set individual measure report profile
                 mr.Meta = new Meta
                 {
-                    Profile = new List<string> { ReportConstants.Bundle.IndividualMeasureReportProfileUrl }
+                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
                 };
 
                 // clean up resource
@@ -333,10 +333,10 @@ namespace LantanaGroup.Link.Report.Core
             Bundle bundle = new Bundle();
             bundle.Meta = new Meta
             {
-                Profile = new string[] { ReportConstants.Bundle.ReportBundleProfileUrl },
-                Tag = new List<Coding> { new Coding(ReportConstants.Bundle.MainSystem, "report", "Report") }
+                Profile = new string[] { ReportConstants.BundleSettings.ReportBundleProfileUrl },
+                Tag = new List<Coding> { new Coding(ReportConstants.BundleSettings.MainSystem, "report", "Report") }
             };
-            bundle.Identifier = new Identifier(ReportConstants.Bundle.IdentifierSystem, "urn:uuid:" + Guid.NewGuid());
+            bundle.Identifier = new Identifier(ReportConstants.BundleSettings.IdentifierSystem, "urn:uuid:" + Guid.NewGuid());
             bundle.Type = Bundle.BundleType.Collection;
             bundle.Timestamp = DateTime.UtcNow;
 
@@ -355,7 +355,7 @@ namespace LantanaGroup.Link.Report.Core
 
         protected string GetFullUrl(Resource resource)
         {
-            return string.Format(ReportConstants.Bundle.BundlingFullUrlFormat, GetRelativeReference(resource));
+            return string.Format(ReportConstants.BundleSettings.BundlingFullUrlFormat, GetRelativeReference(resource));
         }
 
         protected string GetMeasureIdFromCanonical(string measureCanonical)
@@ -387,13 +387,13 @@ namespace LantanaGroup.Link.Report.Core
             Organization org = new Organization();
             org.Meta = new Meta
             {
-                Profile = new string[] { ReportConstants.Bundle.SubmittingOrganizationProfile }
+                Profile = new string[] { ReportConstants.BundleSettings.SubmittingOrganizationProfile }
             };
             org.Active = true;
             org.Id = Guid.NewGuid().ToString(); // or National Provider Identifier (NPI) from config?
             org.Type = new List<CodeableConcept>
             {
-                new CodeableConcept(ReportConstants.Bundle.OrganizationTypeSystem, "prov", "Healthcare Provider", null)
+                new CodeableConcept(ReportConstants.BundleSettings.OrganizationTypeSystem, "prov", "Healthcare Provider", null)
             };
 
             //TODO: Replace this placeholder code?
@@ -401,7 +401,7 @@ namespace LantanaGroup.Link.Report.Core
 
             org.Identifier.Add(new Identifier
             {
-                System = ReportConstants.Bundle.CdcOrgIdSystem,
+                System = ReportConstants.BundleSettings.CdcOrgIdSystem,
                 Value = facilityId // CDC org ID from config
             });
 
@@ -411,7 +411,7 @@ namespace LantanaGroup.Link.Report.Core
             {
                 new ContactPoint
                 {
-                    Extension = new List<Extension>{ new Extension(ReportConstants.Bundle.DataAbsentReasonExtensionUrl, new Code(ReportConstants.Bundle.DataAbsentReasonUnknownCode) ) }
+                    Extension = new List<Extension>{ new Extension(ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, new Code(ReportConstants.BundleSettings.DataAbsentReasonUnknownCode) ) }
                 }
             };
 
@@ -421,7 +421,7 @@ namespace LantanaGroup.Link.Report.Core
             {
                 new Address
                 {
-                    Extension = new List<Extension>{ new Extension(ReportConstants.Bundle.DataAbsentReasonExtensionUrl, new Code(ReportConstants.Bundle.DataAbsentReasonUnknownCode) ) }
+                    Extension = new List<Extension>{ new Extension(ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, new Code(ReportConstants.BundleSettings.DataAbsentReasonUnknownCode) ) }
                 }
             };
 
@@ -437,9 +437,9 @@ namespace LantanaGroup.Link.Report.Core
 
             return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "List"
                 && ((List)e.Resource).Identifier is not null
-                && ((List)e.Resource).Identifier.Any(i => i.System == ReportConstants.Bundle.MainSystem && i.Value == GetMeasureIdFromCanonical(measureCanonical))
+                && ((List)e.Resource).Identifier.Any(i => i.System == ReportConstants.BundleSettings.MainSystem && i.Value == GetMeasureIdFromCanonical(measureCanonical))
                 && e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
-                && e.Resource.Meta.Profile.Contains(ReportConstants.Bundle.CensusProfileUrl)
+                && e.Resource.Meta.Profile.Contains(ReportConstants.BundleSettings.CensusProfileUrl)
             );
 
         }
@@ -450,15 +450,15 @@ namespace LantanaGroup.Link.Report.Core
             list.Id = Guid.NewGuid().ToString();
             list.Meta = new Meta
             {
-                Profile = new List<string> { ReportConstants.Bundle.CensusProfileUrl }
+                Profile = new List<string> { ReportConstants.BundleSettings.CensusProfileUrl }
             };
-            list.AddExtension(ReportConstants.Bundle.ApplicablePeriodExtensionUrl, new Period()
+            list.AddExtension(ReportConstants.BundleSettings.ApplicablePeriodExtensionUrl, new Period()
             {
                 StartElement = reportStart,
                 EndElement = reportEnd
             });
 
-            list.Identifier.Add(new Identifier(ReportConstants.Bundle.MainSystem, GetMeasureIdFromCanonical(measureCanonical)));
+            list.Identifier.Add(new Identifier(ReportConstants.BundleSettings.MainSystem, GetMeasureIdFromCanonical(measureCanonical)));
 
             return list;
         }
@@ -490,7 +490,7 @@ namespace LantanaGroup.Link.Report.Core
             return bundle.Entry.FirstOrDefault(e => e.Resource.TypeName == "MeasureReport"
                 && ((MeasureReport)e.Resource).Measure == measureCanonical
                 && e.Resource.Meta is not null && e.Resource.Meta.Profile is not null
-                && e.Resource.Meta.Profile.Contains(ReportConstants.Bundle.SubjectListMeasureReportProfile)
+                && e.Resource.Meta.Profile.Contains(ReportConstants.BundleSettings.SubjectListMeasureReportProfile)
             );
         }
 
@@ -500,7 +500,7 @@ namespace LantanaGroup.Link.Report.Core
             mr.Id = Guid.NewGuid().ToString();
             mr.Meta = new Meta
             {
-                Profile = new List<string> { ReportConstants.Bundle.SubjectListMeasureReportProfile }
+                Profile = new List<string> { ReportConstants.BundleSettings.SubjectListMeasureReportProfile }
             };
             mr.Contained = new List<Resource>
             {
