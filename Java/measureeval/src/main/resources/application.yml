@@ -13,15 +13,6 @@ loki:
   enabled: true
   url: http://localhost:3100
 
-
-secretManagement:
-  managerUri: https://link-vault.vault.azure.net/
-
-authentication:
-  enableAnonymousAccess: false
-  authority: https://localhost:7004
-
-
 springdoc:
   api-docs:
     enabled: false

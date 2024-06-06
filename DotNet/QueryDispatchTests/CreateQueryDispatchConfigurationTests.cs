@@ -30,8 +30,8 @@ namespace QueryDispatchUnitTests
             };
 
             _mocker.GetMock<ITenantApiService>()
-                .Setup(x => x.CheckFacilityExists(QueryDispatchTestsConstants.facilityId, new CancellationToken()))
-                .ReturnsAsync(true);
+                .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(true));
 
             _mocker.GetMock<IGetQueryDispatchConfigurationQuery>()
                 .Setup(query => query.Execute(It.IsAny<string>()))
