@@ -15,6 +15,7 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Submission.Application.Interfaces;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -30,6 +31,8 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
 
+        private readonly IBlobStorageRepository _blobStorageRepository;
+
         private string Name => this.GetType().Name;
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
@@ -37,7 +40,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig,
             IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, 
+            IBlobStorageRepository blobStorageRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -56,6 +60,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _deadLetterExceptionHandler.ServiceName = "Submission";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
+            _blobStorageRepository = blobStorageRepository ?? throw new ArgumentNullException(nameof(blobStorageRepository));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -219,13 +224,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
-                                    if (Directory.Exists(submissionDirectory))
-                                    {
-                                        Directory.Delete(submissionDirectory, true);
-                                    }
-
-                                    Directory.CreateDirectory(submissionDirectory);
-
                                     #region Device
 
                                     Hl7.Fhir.Model.Device device = new Device();
@@ -237,8 +235,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     fileName = "sending-device.json";
                                     contents = await fhirSerializer.SerializeToStringAsync(device);
 
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                    await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
 
                                     #endregion
 
@@ -247,8 +244,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     fileName = "sending-organization.json";
                                     contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
 
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                    await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
 
                                     #endregion
 
@@ -257,8 +253,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     fileName = "patient-list.json";
                                     contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
 
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                    await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
 
                                     #endregion
 
@@ -267,8 +262,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     fileName = "query-plan.json";
                                     contents = queryPlans;
 
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                    await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
 
                                     #endregion
 
@@ -280,8 +274,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         fileName = $"aggregate-{measureShortName}.json";
                                         contents = await fhirSerializer.SerializeToStringAsync(aggregate);
 
-                                        await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                            cancellationToken);
+                                        await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
                                     }
 
                                     #endregion
@@ -349,8 +342,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 fileName = "other-resources.json";
                                 contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
-                                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
+                                await _blobStorageRepository.UploadBlobAsync(submissionDirectory, fileName, contents);
 
                                 #endregion
                             }

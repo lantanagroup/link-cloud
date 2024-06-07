@@ -97,6 +97,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<SubmissionServiceConfig>(builder.Configuration.GetRequiredSection(nameof(SubmissionServiceConfig)));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.BlobStorageSettings));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -137,7 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     // Add repositories
-    // TODO
+    builder.Services.AddTransient<IBlobStorageRepository, BlobStorageRepository>();
 
     #region Exception Handling
     //Report Scheduled Listener
