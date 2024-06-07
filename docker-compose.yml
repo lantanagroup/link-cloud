@@ -463,15 +463,23 @@ services:
     image: link-dataacquisition
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      AutoMigrate: true
-      DatabaseProvider: SqlServer
-      ConnectionStrings__SqlServer: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      ServiceInformation__Name: Link Data Acquisition Service
+      ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      ServiceRegistry__TenantService__TenantServiceUrl: http://tenant:8074
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: user
+      KafkaConnection__SaslPassword: password
+      DatabaseProvider: SqlServer      
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+      ServiceRegistry__TenantService__CheckIfTenantExists: false
+      ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
+      EnableSwagger: true
     ports:
       - "8065:8065"
     build:
