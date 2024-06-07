@@ -334,6 +334,7 @@ services:
 
   account:
     image: link-account
+    container_name: link-account
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -390,6 +391,7 @@ services:
       
   bff:
     image: link-bff
+    container_name: link-bff
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -434,6 +436,7 @@ services:
   
   census:
     image: link-census
+    container_name: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Census Service
@@ -470,6 +473,7 @@ services:
 
   dataacquisition:
     image: link-dataacquisition
+    container_name: link-dataacquisition
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Data Acquisition Service
@@ -504,6 +508,7 @@ services:
 
   demo-app:
     image: link-demo-app
+    container_name: link-demo-app
     ports:
       - "8066:80"
     build:
@@ -542,6 +547,7 @@ services:
       
   normalization:
     image: link-normalization
+    container_name: link-normalization
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Normalization Service
@@ -575,6 +581,7 @@ services:
       
   notification:
     image: link-notification
+    container_name: link-notification
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       DatabaseProvider: SqlServer
@@ -602,6 +609,7 @@ services:
       
   querydispatch:
     image: link-querydispatch
+    container_name: link-querydispatch
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Query Dispatch Service
@@ -636,6 +644,7 @@ services:
 
   report:
     image: link-report
+    container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Report Service
@@ -669,6 +678,7 @@ services:
 
   submission:
     image: link-submission
+    container_name: link-submission
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -696,6 +706,7 @@ services:
 
   tenant:
     image: link-tenant
+    container_name: link-tenant
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ServiceInformation__Name: Link Tenant Service
@@ -727,6 +738,7 @@ services:
 
   validation:
     image: link-validation
+    container_name: link-validation
     environment:
       server.port: 8075
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
