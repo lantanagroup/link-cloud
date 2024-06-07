@@ -6,3 +6,4 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-notification') CRE
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-tenant') CREATE DATABASE [link-tenant];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-validation') CREATE DATABASE [link-validation];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-querydispatch') CREATE DATABASE [link-querydispatch];
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-account') CREATE DATABASE [link-account];
