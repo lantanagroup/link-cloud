@@ -697,14 +697,34 @@ services:
     container_name: link-submission
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      ServiceInformation__Name: Link Submission Service
+      ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
-      MongoDB__ConnectionString: mongodb://mongo:27017
-      MongoDB__DatabaseName: link-submission
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: user
+      KafkaConnection__SaslPassword: password
+      DatabaseProvider: SqlServer
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
+      SubmissionServiceConfig__CensusServiceUrl: http://census:8064/api/Census
+      SubmissionServiceConfig__DataAcquisitionServiceUrl: http://dataacquisition:8065/api
+      SubmissionServiceConfig__SubmissionDirectory: submissions
+      SubmissionServiceConfig__PatientBundleBatchSize: 5
+      SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
+      SubmissionServiceConfig__MeasureNames__0__ShortName: HYPO
+      SubmissionServiceConfig__MeasureNames__1__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNGlycemicControlHypoglycemicInitialPopulation
+      SubmissionServiceConfig__MeasureNames__1__MeasureId: NHSNGlycemicControlHypoglycemicInitialPopulation
+      SubmissionServiceConfig__MeasureNames__1__ShortName: ACH
+      SubmissionServiceConfig__MeasureNames__2__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNRespiratoryPathogensSurveillanceInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__MeasureId: NHSNRespiratoryPathogensSurveillanceInitialPopulation
+      SubmissionServiceConfig__MeasureNames__2__ShortName: RPS
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      EnableSwagger: true
     ports:
       - "8073:8073"
     build:
