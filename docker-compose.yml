@@ -808,8 +808,6 @@ networks:
 volumes:
   kafka_data:
     driver: local
-  postgres_data:
-    driver: local
   mssql_data:
     driver: local
   redis_cache:
