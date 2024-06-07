@@ -39,6 +39,7 @@ services:
     restart: always
     ports:
       - '6379:6379'
+    container_name: redis
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
     volumes: 
       - redis_cache:/data
@@ -57,6 +58,7 @@ services:
       - MSSQL_PID=Developer
     ports:
       - 1433:1433
+    container_name: sql-server
     volumes:
       - mssql_data:/var/opt/mssql
     restart: always
@@ -71,6 +73,7 @@ services:
       
   mssql_init:
     image: mcr.microsoft.com/mssql-tools
+    container_name: sql-init
     environment:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
@@ -88,6 +91,7 @@ services:
     image: mongo:6-jammy
     ports:
       - '17017:27017'
+    container_name: mongo
     volumes:
       - mongo_data:/data/db
     networks:
@@ -101,12 +105,14 @@ services:
     image: grafana/loki:2.9.0
     ports:
       - "3100:3100"
+    container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - link-nw
       
   otel-collector:
     image: otel/opentelemetry-collector:0.88.0
+    container_name: open-telemetry-collector
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
@@ -125,6 +131,7 @@ services:
     image: prom/prometheus
     ports:
       - "9090:9090"
+    container_name: prometheus
     volumes:
       - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
     command:
@@ -155,6 +162,7 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    container_name: grafana
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -173,6 +181,7 @@ services:
      ports:
        - "9092:9092"
        - "9094:9094"
+     container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
      environment:
@@ -200,6 +209,7 @@ services:
       
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
+    container_name: kafka-init
     depends_on:
       - kafka_b
     entrypoint: [ '/bin/sh', '-c' ]
@@ -286,7 +296,7 @@ services:
       - kafka_b
     ports:
       - 8082:8082
-    container_name: rest-proxy
+    container_name: kafka-rest-proxy
     environment:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: 'kafka_b:9094'
@@ -303,6 +313,7 @@ services:
       - kafka_b
     ports:
       - "8081:8081"
+    container_name: kafka-schema-registry
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
