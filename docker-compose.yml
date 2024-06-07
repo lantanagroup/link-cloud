@@ -2,7 +2,6 @@ version: '3.4'
 
 #### services and ports
 ## redis_cache: 6379
-## pg_db: 5432
 ## mssql: 1433
 ## mongo: 17017
 ## loki: 3100
@@ -49,21 +48,6 @@ services:
   ###########################################
   ### Databases
   ###########################################
-  
-  pg_db:
-    image: postgres:latest
-    restart: always
-    environment:
-      POSTGRES_USER: ${LINK_DB_USER}
-      POSTGRES_PASSWORD: ${LINK_DB_PASS}
-      POSTGRES_DB: link-pg-db
-      POSTGRES_MULTIPLE_DATABASES: 'link-account'
-    ports:
-      - 5432
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - link-nw
   
   mssql:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -343,7 +327,9 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: user
       KafkaConnection__SaslPassword: password
-      Postgres__ConnectionString: Host=pg_db:5432;Database=link-account;Username=link-db-user;Password=link-db-pass;
+      DatabaseProvider: SqlServer
+      AutoMigrate: true
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
@@ -351,6 +337,9 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      SecretManagement__Enabled: false
+      SecretManagement__Manager:
+      SecretManagement__ManagerUri:
     ports:
       - "8060:8060"
     build:
@@ -360,9 +349,9 @@ services:
       - link-nw
     depends_on:
       - loki
-      - pg_db
       - otel-collector
       - kafka_init
+      - mssql_init
 
   audit:
     image: link-audit
