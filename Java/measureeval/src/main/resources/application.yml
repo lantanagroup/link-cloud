@@ -5,7 +5,7 @@ logging:
 server:
   port: 5135
 
-telemetryConfig:
+telemetry:
   exporterEndpoint: http://localhost:55690
 
 loki:
