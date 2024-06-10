@@ -87,7 +87,9 @@ public class ResourceAcquiredListener : BackgroundService
             GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
-        using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: true);
+
+        using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd }, useOpenTelemetry: true);
+
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)

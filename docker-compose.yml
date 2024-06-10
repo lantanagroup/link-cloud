@@ -480,6 +480,7 @@ services:
       spring.kafka.consumer.group-id: measureeval-events
       spring.kafka.consumer.client-id: measureeval-client
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
+      authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
     ports:
       - "8067:8067"
@@ -655,6 +656,7 @@ services:
       spring.datasource.password: ${LINK_DB_PASS}
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.jpa.hibernate.ddl-auto: update
+      authentication.anonymous: true
       loki.enabled: true
       loki.url: http://loki:3100
     ports:

@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Utility;
-
-namespace LantanaGroup.Link.Report.Settings
+﻿namespace LantanaGroup.Link.Report.Settings
 {
     public static class ReportConstants
     {
@@ -16,7 +14,7 @@ namespace LantanaGroup.Link.Report.Settings
             public const string EnableSwagger = "EnableSwagger";
         }
 
-        public static class Bundle
+        public static class BundleSettings
         {
             public const string ApplicablePeriodExtensionUrl = "https://www.cdc.gov/nhsn/nhsn-measures/StructureDefinition/link-patient-list-applicable-period-extension";
             public const string BundlingFullUrlFormat = "https://www.cdc.gov/nhsn/nhsn-measures/{0}";

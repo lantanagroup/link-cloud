@@ -1,11 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Entities;
-using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 using MediatR;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
@@ -67,7 +64,7 @@ public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRe
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2}.", listId, facilityConfig.FacilityId);
+                    _logger.LogError(ex, "Error retrieving patient list id {1} for facility {2} with base url of {3}.", listId, facilityConfig.FacilityId, facilityConfig.FhirBaseServerUrl);
                     throw new FhirApiFetchFailureException($"Error retrieving patient list id {listId} for facility {facilityConfig.FacilityId}.", ex);
                 }
             }

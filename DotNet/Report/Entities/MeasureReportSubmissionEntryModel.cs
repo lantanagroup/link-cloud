@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Report.Entities
                 }
 
                 var reference = evaluatedResource.Reference.Split('/');
-                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(evaluatedResource.TypeName);
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(reference[0]);
 
                 if (resourceCategoryType != null)
                 {
@@ -69,11 +69,12 @@ namespace LantanaGroup.Link.Report.Entities
 
         public void UpdateContainedResource(IFacilityResource facilityResource)
         {
-            var containedResource = ContainedResources.Where(x => x.DocumentId == facilityResource.GetId()).FirstOrDefault();
-            var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
+            var containedResource = ContainedResources.Where(x => x.ResourceId == facilityResource.GetResource().Id && x.ResourceType == facilityResource.GetResource().TypeName).FirstOrDefault();
 
             if (containedResource == null)
             {
+                var resourceCategoryType = ResourceCategory.GetResourceCategoryByType(facilityResource.GetResource().TypeName);
+
                 ContainedResources.Add(new ContainedResource()
                 {
                     DocumentId = facilityResource.GetId(),

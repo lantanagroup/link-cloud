@@ -12,6 +12,7 @@ springdoc:
   swagger-ui:
     enabled: false
 
+
 spring:
   application:
     name: ValidationService
@@ -42,3 +43,10 @@ spring:
       #security.protocol: SASL_SSL
       #sasl.mechanism: PLAIN
       #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+
+secret-management:
+  key-vault-uri: ''
+
+authentication:
+  anonymous: false
+  authority: ''

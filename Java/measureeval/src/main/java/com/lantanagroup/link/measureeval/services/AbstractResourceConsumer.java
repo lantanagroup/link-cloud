@@ -4,6 +4,7 @@ import com.lantanagroup.link.measureeval.entities.AbstractResourceEntity;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.PatientResource;
 import com.lantanagroup.link.measureeval.entities.SharedResource;
+import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import com.lantanagroup.link.measureeval.kafka.Headers;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.models.NormalizationStatus;
@@ -15,6 +16,7 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import io.opentelemetry.api.trace.Span;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -69,6 +71,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     protected void doConsume(String correlationId, ConsumerRecord<String, T> record) {
         String facilityId = record.key();
+
+        if(facilityId == null || facilityId.isEmpty()) {
+            logger.error("Facility ID is null or empty. Exiting.");
+            throw new ValidationException("Facility ID is null or empty.");
+        }
+
+        if(correlationId == null || correlationId.isEmpty()) {
+            logger.error("Correlation ID is null or empty. Exiting.");
+            throw new ValidationException("Correlation ID is null or empty.");
+        }
+
         T value = record.value();
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
@@ -245,7 +258,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
             MeasureReport measureReport = evaluateMeasure(patientStatus, report, bundle);
             switch (value.getQueryType()) {
-                case INITIAL -> updateReportability(patientStatus, report, measureReport);
+                case INITIAL -> {
+                    updateReportability(patientStatus, report, measureReport);
+
+                    if(!report.getReportable())
+                    {
+                        produceResourceEvaluatedRecords(patientStatus, report, measureReport);
+                    }
+                }
                 case SUPPLEMENTAL -> produceResourceEvaluatedRecords(patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(
                         String.format("Unexpected query type: %s", value.getQueryType()));
@@ -253,6 +273,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
         boolean reportable = patientStatus.getReports().stream()
                 .anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+
         if (value.getQueryType() == QueryType.INITIAL && reportable) {
             produceDataAcquisitionRequestedRecord(patientStatus);
         }
@@ -296,8 +317,18 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport) {
         logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
-        for (Resource resource : measureReportNormalizer.normalize(measureReport)) {
-            produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
+
+        var list = measureReportNormalizer.normalize(measureReport);
+
+        if(!report.getReportable())
+        {
+            var measure = list.stream().filter(h -> h instanceof MeasureReport).findFirst().get();
+            produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), measure);
+        }
+        else {
+            for (Resource resource : list) {
+                produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
+            }
         }
     }
 
@@ -318,8 +349,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         value.setMeasureReportId(measureReportId);
         value.setPatientId(patientStatus.getPatientId());
         value.setResource(resource);
+        value.setIsReportable(report.getReportable());
+
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
+
         resourceEvaluatedTemplate.send(new ProducerRecord<>(
                 Topics.RESOURCE_EVALUATED,
                 null,

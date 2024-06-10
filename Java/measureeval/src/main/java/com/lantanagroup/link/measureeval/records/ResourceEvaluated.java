@@ -19,6 +19,8 @@ public class ResourceEvaluated {
 
     private IBaseResource resource;
 
+    private Boolean isReportable;
+
     @Getter
     @Setter
     public static class Key {

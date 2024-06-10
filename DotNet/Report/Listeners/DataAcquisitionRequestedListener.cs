@@ -3,7 +3,6 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
 using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -12,7 +11,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using MediatR;
-using System.Threading;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -88,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var value = consumeResult.Message.Value;
                                 facilityId = key;
 
-                                if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null || string.IsNullOrWhiteSpace(value.PatientId))
+                                if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null || !value.ScheduledReports.Any() || string.IsNullOrWhiteSpace(value.PatientId))
                                 {
                                     throw new DeadLetterException("Invalid Data Acquisition Requested Event", AuditEventType.Create);
                                 }

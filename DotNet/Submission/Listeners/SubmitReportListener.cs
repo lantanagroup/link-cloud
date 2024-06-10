@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Collections.Concurrent;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -153,17 +154,19 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+
+                                #region Census Admitted Patient List
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
-                                List? admittedPatients = null;
 
                                 if (!censusResponse.IsSuccessStatusCode)
                                     throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
 
+                                List? admittedPatients;
                                 try
                                 {
                                     admittedPatients =
@@ -178,8 +181,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
-                                string queryPlans = string.Empty;
+                                #region DataAcquisition Query Plan
+                                string queryPlans;
                                 try
                                 {
                                     string dataAcqRequestUrl =
@@ -195,6 +200,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
                                 Bundle otherResourcesBundle = new Bundle();
 
@@ -294,7 +300,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 while (patientIds.Any())
                                 {
-                                    var otherResourcesBag = new SynchronizedCollection<Bundle>();
+                                    var otherResourcesBag = new ConcurrentBag<Bundle>();
 
                                     List<string> batch = new List<string>();
                                     if (patientIds.Count > batchSize)
@@ -329,7 +335,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     {
                                         foreach (var resource in bundle.GetResources())
                                         {
-                                            if (otherResourcesBundle.GetResources().All(r => r.Id != resource.Id))
+                                            if (!otherResourcesBundle.GetResources().Any(r => r.Id == resource.Id))
                                             {
                                                 otherResourcesBundle.AddResourceEntry(resource, GetFullUrl(resource));
                                             }
