@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Reflection;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -232,6 +234,16 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
                                         Name = "Link"
+                                    });
+
+                                    Assembly assembly = Assembly.GetExecutingAssembly();
+                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+                                    string? version = fvi?.FileVersion;
+
+                                    (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
+                                    {
+                                        Value = version,
+                                        ValueElement = new FhirString(version)
                                     });
 
                                     fileName = "sending-device.json";
