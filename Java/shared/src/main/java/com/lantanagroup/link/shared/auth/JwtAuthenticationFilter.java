@@ -56,7 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     String authHeader = request.getHeader("Authorization");
 
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      logger.warn("JWT Token does not begin with Bearer String");
+     // logger.warn("JWT Token does not begin with Bearer String");
       filterChain.doFilter(request, response);
       return;
     }

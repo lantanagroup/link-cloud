@@ -24,8 +24,10 @@ using LantanaGroup.Link.Submission.Application.Queries;
 using LantanaGroup.Link.Submission.Application.Repositories;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
+using LantanaGroup.Link.Submission.Persistence.Interceptors;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
@@ -37,6 +39,8 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
+using LantanaGroup.Link.Submission.Persistence;
+using LantanaGroup.Link.Submission.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -135,7 +139,32 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<RetryJob>();
 
     //Add health checks
-    builder.Services.AddHealthChecks();
+    builder.Services.AddHealthChecks()
+        .AddCheck<SubmissionHealthCheck>("Submission");
+
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateTenantSubmissionConfigEntityInterceptor>();
+
+    //Add database context
+    builder.Services.AddDbContext<TenantSubmissionDbContext>((sp, options) => {
+        var updateTenantSubmissionConfigEntityInterceptor = sp.GetRequiredService<UpdateTenantSubmissionConfigEntityInterceptor>();
+        switch (builder.Configuration.GetValue<string>(SubmissionConstants.AppSettingsSectionNames.DatabaseProvider))
+        {
+            case "SqlServer":
+                string? connectionString = builder.Configuration.GetValue<string>(SubmissionConstants.AppSettingsSectionNames.DatabaseConnectionString);
+
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+
+                options
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(updateTenantSubmissionConfigEntityInterceptor);
+
+                break;
+            default:
+                throw new InvalidOperationException("Database provider not supported.");
+        }
+    });
 
     // Add commands
     // TODO

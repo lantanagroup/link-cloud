@@ -31,9 +31,9 @@ namespace LantanaGroup.Link.Submission.Application.Managers
             return await _queries.UpdateTenantSubmissionConfig( tenantSubmissionConfig, cancellationToken);
         }
 
-        public async Task<bool> DeleteTenantSubmissionConfig(string configId, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteTenantSubmissionConfig(string facilityId, CancellationToken cancellationToken = default)
         {
-           return await _queries.DeleteTenantSubmissionConfig(configId, cancellationToken);
+           return await _queries.DeleteTenantSubmissionConfig(facilityId, cancellationToken);
         }
     }
 }

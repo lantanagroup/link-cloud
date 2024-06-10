@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Reflection;
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
@@ -18,6 +19,7 @@ using StackExchange.Redis;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -163,6 +165,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+
+                                #region Census Admitted Patient List
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
@@ -178,11 +182,11 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
-                                List? admittedPatients = null;
 
                                 if (!censusResponse.IsSuccessStatusCode)
                                     throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
 
+                                List? admittedPatients;
                                 try
                                 {
                                     admittedPatients =
@@ -197,8 +201,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
-                                string queryPlans = string.Empty;
+                                #region DataAcquisition Query Plan
+                                string queryPlans;
                                 try
                                 {
                                     string dataAcqRequestUrl =
@@ -214,6 +220,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
                                         AuditEventType.Query, ex.InnerException);
                                 }
+                                #endregion
 
                                 Bundle otherResourcesBundle = new Bundle();
 
@@ -245,6 +252,16 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
                                         Name = "Link"
+                                    });
+
+                                    Assembly assembly = Assembly.GetExecutingAssembly();
+                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+                                    string? version = fvi?.FileVersion;
+
+                                    (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
+                                    {
+                                        Value = version,
+                                        ValueElement = new FhirString(version)
                                     });
 
                                     fileName = "sending-device.json";
