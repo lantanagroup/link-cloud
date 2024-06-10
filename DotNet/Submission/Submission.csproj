@@ -31,6 +31,7 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
 		<PackageReference Include="Azure.Identity" Version="1.11.2" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
 		<PackageReference Include="MediatR" Version="12.*" />
