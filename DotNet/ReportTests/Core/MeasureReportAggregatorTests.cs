@@ -54,7 +54,7 @@ public class MeasureReportAggregatorTests
         measureReports.Add(measureReport);
         
         MeasureReportAggregator aggregator = new MeasureReportAggregator(_logger);
-        List<MeasureReport> aggregates = aggregator.Aggregate(measureReports);
+        List<MeasureReport> aggregates = aggregator.Aggregate(measureReports, "123", DateTime.UtcNow.AddDays(-30), DateTime.UtcNow);
         
         Assert.That(aggregates.Count, Is.EqualTo(1));
         MeasureReport aggregate = aggregates[0];
