@@ -166,6 +166,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         };
 
                         using var prod = _submissionProducerFactory.CreateProducer(producerConfig);
+                        var organization = _bundler.CreateOrganization(schedule.FacilityId);
                         prod.Produce(nameof(KafkaTopic.SubmitReport),
                             new Message<SubmissionReportKey, SubmissionReportValue>
                             {
@@ -178,9 +179,9 @@ namespace LantanaGroup.Link.Report.Jobs
                                 Value = new SubmissionReportValue()
                                 {
                                     PatientIds = patientIds,
-                                    Organization = _bundler.CreateOrganization(schedule.FacilityId),
+                                    Organization = organization,
                                     MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
-                                    Aggregates = _aggregator.Aggregate(measureReports)
+                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate)
                                 },
                                 Headers = new Headers
                                 {
