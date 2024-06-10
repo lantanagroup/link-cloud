@@ -1,38 +1,57 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+﻿using Amazon.Runtime.Internal;
 using LantanaGroup.Link.Submission.Domain.Entities;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+using LantanaGroup.Link.Submission.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Submission.Application.Repositories
 {
-    public class TenantSubmissionRepository : MongoDbRepository<TenantSubmissionConfigEntity>
+    public class TenantSubmissionRepository
     {
-        private readonly IOptions<MongoConnection> _settings;
-        private readonly ILogger<MongoDbRepository<TenantSubmissionConfigEntity>> _logger;
-        public TenantSubmissionRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoDbRepository<TenantSubmissionConfigEntity>> logger = null) : base(mongoSettings, logger)
+        private readonly TenantSubmissionDbContext _dbContext;
+        private readonly ILogger<TenantSubmissionConfigEntity> _logger;
+        public TenantSubmissionRepository(ILogger<TenantSubmissionConfigEntity> logger, TenantSubmissionDbContext dbContext)
         {
-            _settings = mongoSettings;
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _logger = logger;
         }
 
         public async Task<TenantSubmissionConfigEntity> FindAsync(string facilityId, CancellationToken cancellationToken = default)
         {
-            var set = await _collection.FindAsync(x => x.FacilityId == facilityId, cancellationToken: cancellationToken);
-            return await set.SingleOrDefaultAsync(cancellationToken: cancellationToken);
+            return await _dbContext.TenantSubmissionConfigEntities.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
         }
 
-        public override async Task AddAsync(TenantSubmissionConfigEntity entity, CancellationToken cancellationToken = default)
+        public async Task<TenantSubmissionConfigEntity?> GetAsync(TenantSubmissionConfigEntityId configId, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.TenantSubmissionConfigEntities.FirstOrDefaultAsync(x => x.Id == configId, cancellationToken);
+        }
+
+        public async Task<bool> AddAsync(TenantSubmissionConfigEntity entity, CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
-                return;
+                return false;
 
-            if (string.IsNullOrWhiteSpace(entity.Id))
+            if (string.IsNullOrWhiteSpace(entity.Id.ToString()))
             {
-                entity.Id = Guid.NewGuid().ToString();
+                entity.Id = new TenantSubmissionConfigEntityId(Guid.NewGuid());
             }
 
-            await _collection.InsertOneAsync(entity, cancellationToken: cancellationToken);
+            await _dbContext.TenantSubmissionConfigEntities.AddAsync(entity, cancellationToken);
+            return await SaveAsync(cancellationToken);
+        }
+
+        public async Task<bool> SaveAsync(CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
+        }
+
+
+        public async Task<bool> DeleteAsync(TenantSubmissionConfigEntityId configId, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.TenantSubmissionConfigEntities
+                .Where(x => x.Id == configId)
+                .ExecuteDeleteAsync(cancellationToken) >= 0;
         }
     }
 }
