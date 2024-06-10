@@ -18,6 +18,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using MediatR;
+using System.Collections;
 using System.Text;
 using System.Text.Json;
 using System.Transactions;
@@ -112,6 +113,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                 facilityId = key.FacilityId;
 
                                 if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                                {
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
+                                }
+
+                                string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
+                                if(string.IsNullOrWhiteSpace(CorrelationIdStr))
                                 {
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
                                 }
@@ -258,7 +265,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 {
                                                 {
                                                     "X-Correlation-Id",
-                                                    Encoding.UTF8.GetBytes(Guid.NewGuid().ToString())
+                                                    headerValue
                                                 }
                                                 }
                                             });
