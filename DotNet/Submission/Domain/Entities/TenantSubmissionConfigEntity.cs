@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using LantanaGroup.Link.Submission.Application.Models.ApiModels;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Submission.Domain.Entities
 {
@@ -12,6 +13,7 @@ namespace LantanaGroup.Link.Submission.Domain.Entities
     }
 
     //[BsonCollection("tenantSubmissionConfig")]
+    [Table("TenantSubmissionConfigs")]
     public class TenantSubmissionConfigEntity : BaseEntity
     {
         public new TenantSubmissionConfigEntityId Id { get; set; }
