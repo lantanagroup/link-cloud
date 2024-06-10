@@ -696,9 +696,12 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: user
       KafkaConnection__SaslPassword: password
-      DatabaseProvider: SqlServer
-      AutoMigrate: true
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      MongoDB__ConnectionString: mongodb://mongo:27017
+      MongoDB__DatabaseName: link-report
+      # TODO: Replce with Mongo dependency when LNK-2166 finishes
+      # DatabaseProvider: SqlServer
+      # AutoMigrate: true
+      # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
       SubmissionServiceConfig__CensusServiceUrl: http://census:8064/api/Census
       SubmissionServiceConfig__DataAcquisitionServiceUrl: http://dataacquisition:8065/api
@@ -731,7 +734,9 @@ services:
       - kafka_init
       - otel-collector
       - mongo
+      #- mssql_init
       - loki
+
 
   tenant:
     image: link-tenant
