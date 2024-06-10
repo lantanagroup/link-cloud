@@ -184,6 +184,7 @@ services:
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
+       - ./kafka-client.properties:/etc/kafka-client.properties
      environment:
        - KAFKA_BROKER_ID=1
        - KAFKA_CFG_NODE_ID=1
@@ -206,10 +207,17 @@ services:
        - KAFKA_CFG_NUM_PARTITIONS=2
      networks:
        - link-nw
-      
+     healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka:9092 --command-config /etc/kafka-client.properties --list" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+     
   kafka_init:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
+    volumes:
+      - ./kafka-client.properties:/etc/kafka-client.properties
     depends_on:
       - kafka_b
     entrypoint: [ '/bin/sh', '-c' ]
@@ -217,61 +225,45 @@ services:
       - link-nw
     command: |
       "
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic PatientsToQuery-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic NotificationRequested-Retry --replication-factor 1 --partitions 1
-
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka_b:9094 --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportScheduled-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic RetentionCheckScheduled-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientCensusScheduled-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientEvent-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic DataAcquisitionRequested-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic PatientIDsAcquired-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceAcquired-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceNormalized-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ResourceEvaluated-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic SubmitReport-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ReportSubmitted-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic NotificationRequested-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
       "
       
   kafka-ui:
@@ -316,7 +308,7 @@ services:
     container_name: kafka-schema-registry
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: PLAIN 
       SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";'
@@ -527,6 +519,7 @@ services:
 
   measureeval:
     image: link-measureeval
+    container_name: link-measureeval
     environment:
       server.port: 8067
       spring.data.mongodb.uri: mongodb://mongo:27017
