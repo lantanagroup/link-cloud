@@ -4,7 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
-using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         {
             var integrationEndpoints = app.MapGroup("/api/integration")
                 .RequireAuthorization(
-                    LinkAdminConstants.LinkBearerService.AuthenticatedUserPolicyName,
+                    LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName,
                     PolicyNames.IsLinkAdmin)
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {

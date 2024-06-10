@@ -23,14 +23,6 @@
             public const string OpenIdConnect = "link_openid_connect";
         }
 
-        public static class LinkBearerService
-        {
-            public const string LinkBearerIssuer = "LinkServiceAdmin";
-            public const string LinkBearerAudience = "LinkServices";
-            public const string LinkBearerKeyName = "link-bearer-key";
-            public const string AuthenticatedUserPolicyName = "AuthenticatedUser";
-        }
-
         public static class LinkDataProtectors
         {
             public const string LinkUser = "LinkUser";
