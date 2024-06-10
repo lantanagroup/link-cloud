@@ -214,20 +214,7 @@ namespace LantanaGroup.Link.Report.Core
         /// <returns></returns>
         protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
         {
-            Bundle.EntryComponent entry;
-
-            // find existing matching measure report
-            var existingEntryIndex = bundle.Entry.FindIndex(e => e.Resource.TypeName == resource.TypeName && e.Resource.Id == resource.Id);
-            if (existingEntryIndex < 0)
-            {
-                // doesn't exist... add it to the bundleSettings as-is
-                entry = bundle.AddResourceEntry(resource, GetFullUrl(resource));
-            }
-            else
-            {
-                // already exists in bundleSettings... update the entry
-                entry = bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = resource, FullUrl = GetFullUrl(resource) };
-            }
+            var entry = bundle.AddResourceEntry(resource, GetFullUrl(resource));
 
             return entry;
         }
