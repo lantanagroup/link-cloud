@@ -410,3 +410,4 @@ FodyWeavers.xsd
 ## Maven
 **/target/
 /DotNet/Submission/appsettings.Development.json
+/DotNet/Submission/submissions

@@ -80,6 +80,11 @@ public class CensusController : Controller
                 EndDate = endDate
             })).DistinctBy(p => p.PatientId).ToList();
 
+            if(patients.Count == 0)
+            {
+                return NotFound($"No patients found for facilityId {facilityId}");
+            }
+
             var fhirList = new Hl7.Fhir.Model.List();
             fhirList.Status = List.ListStatus.Current;
             fhirList.Mode = ListMode.Snapshot;

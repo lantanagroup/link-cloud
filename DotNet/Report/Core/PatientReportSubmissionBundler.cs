@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Report.Core
 
             var entries = await _mediator.Send(new GetPatientSubmissionEntriesQuery() { FacilityId = facilityId, PatientId = patientId, StartDate = startDate, EndDate = endDate });
 
-            Bundle patientResourceBundle = CreateNewBundle();
+            Bundle patientResources = CreateNewBundle();
             Bundle otherResources = CreateNewBundle();  
             foreach (var entry in entries)
             {
@@ -91,13 +91,13 @@ namespace LantanaGroup.Link.Report.Core
                         {
                             facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
                             resource = facilityResource.GetResource();
-                            patientResourceBundle.AddResourceEntry(resource, GetFullUrl(resource));
+                            AddResourceToBundle(patientResources, resource);
                         }
                         else
                         {
                             facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
                             resource = facilityResource.GetResource();
-                            otherResources.AddResourceEntry(resource, GetFullUrl(resource));
+                            AddResourceToBundle(otherResources, resource);
                         }
                     }
                     catch (Exception ex)
@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Report.Core
                 // clean up resource
                 cleanupResource(mr);
 
-                AddMeasureReportToBundle(patientResourceBundle, mr);
+                AddResourceToBundle(patientResources, mr);
 
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.Report.Core
                 PatientId = patientId,
                 StartDate = startDate,
                 EndDate = endDate,
-                PatientResources = patientResourceBundle,
+                PatientResources = patientResources,
                 OtherResources = otherResources
             };
 
@@ -206,26 +206,15 @@ namespace LantanaGroup.Link.Report.Core
         }
 
         /// <summary>
-        /// Adds the given measure report to the given bundleSettings.
-        /// If an existing report exists with the same ID in the bundleSettings, then the provided report will replace the existing report.
+        /// Adds the given resource to the given bundle.
+        /// If an existing resource exists with the same ID in the bundleSettings, then the provided resource will replace the existing resource.
         /// </summary>
-        /// <returns>BundleSettings.EntryComponent with the newly added measure report</returns>
-        protected Bundle.EntryComponent AddMeasureReportToBundle(Bundle bundle, MeasureReport measureReport)
+        /// <param name="bundle"></param>
+        /// <param name="resource"></param>
+        /// <returns></returns>
+        protected Bundle.EntryComponent AddResourceToBundle(Bundle bundle, Resource resource)
         {
-            Bundle.EntryComponent entry;
-
-            // find existing matching measure report
-            var existingEntryIndex = bundle.Entry.FindIndex(e => e.Resource.TypeName == "MeasureReport" && e.Resource.Id == measureReport.Id);
-            if (existingEntryIndex < 0)
-            {
-                // doesn't exist... add it to the bundleSettings as-is
-                entry = bundle.AddResourceEntry(measureReport, GetFullUrl(measureReport));
-            }
-            else
-            {
-                // already exists in bundleSettings... update the entry
-                entry = bundle.Entry[existingEntryIndex] = new Bundle.EntryComponent() { Resource = measureReport, FullUrl = GetFullUrl(measureReport) };
-            }
+            var entry = bundle.AddResourceEntry(resource, GetFullUrl(resource));
 
             return entry;
         }

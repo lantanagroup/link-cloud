@@ -16,16 +16,12 @@
 	<ItemGroup>
 		<Compile Remove="Application\Enums\**" />
 		<Compile Remove="Application\Submission\**" />
-		<Compile Remove="Infrastructure\**" />
 		<Content Remove="Application\Enums\**" />
 		<Content Remove="Application\Submission\**" />
-		<Content Remove="Infrastructure\**" />
 		<EmbeddedResource Remove="Application\Enums\**" />
 		<EmbeddedResource Remove="Application\Submission\**" />
-		<EmbeddedResource Remove="Infrastructure\**" />
 		<None Remove="Application\Enums\**" />
 		<None Remove="Application\Submission\**" />
-		<None Remove="Infrastructure\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -35,6 +31,10 @@
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
 		<PackageReference Include="MediatR" Version="12.*" />
 		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.3">
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		  <PrivateAssets>all</PrivateAssets>
+		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.*" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
