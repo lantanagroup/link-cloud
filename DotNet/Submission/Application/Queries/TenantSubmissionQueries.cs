@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             return new TenantSubmissionConfigEntity()
             {
-                Id = model.Id,
+                Id = new TenantSubmissionConfigEntityId(new Guid(model.Id)),
                 FacilityId = model.FacilityId,
                 CreateDate = model.CreateDate,
                 ModifyDate = model.ModifyDate,
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             return new TenantSubmissionConfig()
             {
-                Id = entity.Id,
+                Id = entity.Id.Value.ToString(),
                 FacilityId = entity.FacilityId,
                 CreateDate = entity.CreateDate,
                 ModifyDate = entity.ModifyDate,
@@ -62,6 +62,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
                     return null;
                 }
 
+                
                 return EntityToModel(existing);
             }
             catch (Exception ex)
@@ -76,7 +77,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             try
             {
-                var existing = await _repository.GetAsync(configId, cancellationToken);
+                var existing = await _repository.GetAsync(new TenantSubmissionConfigEntityId(new Guid(configId)), cancellationToken);
 
                 if (existing == null)
                 {
@@ -102,6 +103,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
                     return null;
                 }
 
+                tenantSubmissionConfig.Id = tenantSubmissionConfig.Id ?? Guid.NewGuid().ToString();
                 tenantSubmissionConfig.CreateDate = DateTime.UtcNow;
                 var entity = ModelToEntity(tenantSubmissionConfig);
                 await _repository.AddAsync(entity, cancellationToken);
@@ -118,7 +120,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
         {
             try
             {
-                var existing = await _repository.GetAsync(tenantSubmissionConfig.Id, cancellationToken);
+                var existing = await _repository.GetAsync(new TenantSubmissionConfigEntityId(new Guid(tenantSubmissionConfig.Id)), cancellationToken);
 
                 if (existing == null)
                 {
@@ -130,8 +132,8 @@ namespace LantanaGroup.Link.Submission.Application.Queries
                 existing.FacilityId = tenantSubmissionConfig.FacilityId;
                 existing.ModifyDate = DateTime.UtcNow;
 
-                var updated = await _repository.UpdateAsync(existing, cancellationToken);
-                return EntityToModel(updated);
+                await _repository.SaveAsync(cancellationToken);
+                return EntityToModel(existing);
             }
             catch (Exception ex)
             {
@@ -145,7 +147,7 @@ namespace LantanaGroup.Link.Submission.Application.Queries
             bool returnVal = false;
             try
             {
-                await _repository.DeleteAsync(configId, cancellationToken);
+                await _repository.DeleteAsync(new TenantSubmissionConfigEntityId(new Guid(configId)), cancellationToken);
                 returnVal = true;
             }
             catch (Exception ex)
