@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         public AzureKeyVaultSecretManager(ILogger<AzureKeyVaultSecretManager> logger, IOptions<SecretManagerSettings> secretMangerConfig)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _secretClient = new SecretClient(new Uri(secretMangerConfig.Value.ManagerUri), new DefaultAzureCredential());
+           _secretClient = new SecretClient(new Uri(secretMangerConfig.Value.ManagerUri), new DefaultAzureCredential());
         
             _logger.LogInformation("Azure Key Vault Secret Manager initialized");
         }

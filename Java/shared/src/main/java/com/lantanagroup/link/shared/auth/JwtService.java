@@ -1,5 +1,6 @@
 package com.lantanagroup.link.shared.auth;
 
+import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -23,15 +25,25 @@ public class JwtService {
   public static String LinkSystemPermissions_IsLinkAdmin = "IsLinkAdmin";
   public static String LinkUserClaims_LinkSystemAccount = "SystemAccount";
   public static String RolePrefix = "ROLE_";
-  public static String Authority = "https://dev-bff.nhsnlink.org";
-
+  public static String Audiences = "LinkServices";
+  public static String Email = "email";
   public static String Link_Bearer_Key = "link-bearer-key";
+
+  private final AuthenticationConfig authenticationConfig;
+
+  public JwtService(AuthenticationConfig authenticationConfig) {
+    this.authenticationConfig = authenticationConfig;
+  }
 
   //retrieve username from jwt token
   public String getUsernameFromToken (String token, String secret) {
     return getClaimFromToken(token, secret, Claims::getSubject);
   }
 
+  public String getEmailFromToken (String token, String secret) {
+    final Claims claims = getAllClaimsFromToken(token, secret);
+    return claims.get(JwtService.Email, String.class);
+  }
   public List<String> getRolesFromToken (String token, String secret) {
     final Claims claims = getAllClaimsFromToken(token, secret);
     return (List<String>)claims.get(JwtService.LinkSystemClaims_Role);
@@ -79,17 +91,20 @@ public class JwtService {
     return doGenerateToken(claims, user.getUsername(), secret);
   }
 
-  //while creating the token -
-  //1. Define  claims of the token, like Issuer, Expiration, Subject, and the ID
-  //2. Sign the JWT using the HS512 algorithm and secret key.
-  //3. According to JWS Compact Serialization(https://tools.ietf.org/html/draft-ietf-jose-json-web-signature-41#section-3.1)
-  //   compaction of the JWT to a URL-safe string
   private String doGenerateToken (Map<String, Object> claims, String subject, String secret) {
+    if (this.authenticationConfig == null) {
+      throw new RuntimeException("AuthenticationConfig is null");
+    }
+    if (StringUtils.isEmpty(this.authenticationConfig.getAuthority())) {
+      throw new RuntimeException("authentication.authority is null");
+    }
+
     return Jwts.builder().setHeaderParam("typ","JWT")
             .setClaims(claims)
             .setSubject(subject).
              setIssuedAt(new Date(System.currentTimeMillis()))
-            .setIssuer(Authority)
+            .setIssuer(this.authenticationConfig.getAuthority())
+            .setAudience(Audiences)
             .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
             .signWith(SignatureAlgorithm.HS512, secret.getBytes(StandardCharsets.UTF_8)).compact();
   }

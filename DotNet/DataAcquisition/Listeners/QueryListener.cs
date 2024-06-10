@@ -137,6 +137,10 @@ public class QueryListener : BackgroundService
                                 {
                                     throw new TransientException("Facility configuration is missing: " + ex.Message, AuditEventType.Query, ex);
                                 }
+                                catch(FhirApiFetchFailureException ex)
+                                {
+                                    throw new TransientException("Error fetching FHIR API: " + ex.Message, AuditEventType.Query, ex);
+                                }
                                 catch (Exception ex)
                                 {
                                     throw new TransientException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
@@ -146,6 +150,12 @@ public class QueryListener : BackgroundService
                             if (responseMessages?.Count > 0)
                             {
                                 var producerSettings = new ProducerConfig();
+
+                                if (rawmessage.Topic == KafkaTopic.DataAcquisitionRequested.ToString())
+                                {
+                                    producerSettings.CompressionType = CompressionType.Zstd;
+                                }
+
                                 using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
 
                                 try

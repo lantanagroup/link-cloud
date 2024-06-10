@@ -18,41 +18,56 @@ import java.util.Map;
 
 public class DataAcquisitionClient extends Router {
     private final RestClient restClient;
-    private final SecretClient secretClient;
+    private  SecretClient secretClient = null;
     private final JwtService jwtService;
-
     private String secret;
 
-    public DataAcquisitionClient(RestClient restClient, SecretClient secretClient, JwtService jwtService) {
+    public DataAcquisitionClient(RestClient restClient, JwtService jwtService, SecretClient... secretClient) {
         this.restClient = restClient;
-        this.secretClient = secretClient;
+
         this.jwtService = jwtService;
+        if(secretClient.length > 0){
+            this.secretClient = secretClient[0];
+        }
     }
 
     public QueryResults getQueryResults(String facilityId, String correlationId, QueryType queryType) {
 
-        if(StringUtils.isBlank(secret )) {
+        String token = "";
+
+        if (StringUtils.isBlank(secret) && secretClient != null) {
             secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
         }
-        PrincipalUser user = createPrincipalUser();
         // generate the token
-        String token = jwtService.generateToken(user, secret);
+        if(!StringUtils.isBlank(secret)){
+            token = jwtService.generateToken(createPrincipalUser(), secret);
+        }
+
         URI uri = getUri(Routes.QUERY_RESULT, Map.of(
                 "facilityId", facilityId,
                 "correlationId", correlationId,
                 "queryType", queryType));
-        return restClient.get()
-                .uri(uri)
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .body(QueryResults.class);
+
+        if (!StringUtils.isBlank(token)) {
+            return restClient.get()
+                    .uri(uri)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(QueryResults.class);
+        } else {
+            return restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(QueryResults.class);
+        }
     }
 
     private  PrincipalUser createPrincipalUser () {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority(JwtService.RolePrefix + JwtService.LinkUserClaims_LinkAdministrator));
         authorities.add(new SimpleGrantedAuthority(JwtService.LinkSystemPermissions_IsLinkAdmin));
-        return new PrincipalUser(JwtService.LinkUserClaims_LinkSystemAccount, authorities);
+
+        return new PrincipalUser(JwtService.LinkUserClaims_LinkSystemAccount, " ", authorities);
     }
 
     private static class Routes {
