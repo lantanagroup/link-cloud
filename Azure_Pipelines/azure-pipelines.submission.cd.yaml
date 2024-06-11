@@ -19,7 +19,7 @@ variables:
 - name: project
   value: 'DotNet/Submission/Submission.csproj'
 - name: testProject
-  value: 'DotNet/SubmissionUnitTests/SubmissionUnitTests.csproj'
+  value: 'DotNet/SubmissionTests/SubmissionTests.csproj'
 - name: registry-repo-Name
   value: 'link-submission'
 - name: dockerPath
