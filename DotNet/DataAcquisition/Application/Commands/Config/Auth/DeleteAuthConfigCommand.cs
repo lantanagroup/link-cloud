@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using MediatR;
 
@@ -7,8 +8,8 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 
 public class DeleteAuthConfigCommand : IRequest<Unit>
 {
-    public QueryConfigurationTypePathParameter QueryConfigurationTypePathParameter { get; set; }
-    public string FacilityId { get; set; }
+    public QueryConfigurationTypePathParameter? QueryConfigurationTypePathParameter { get; set; }
+    public string? FacilityId { get; set; }
 }
 
 public class DeleteAuthConfigCommandHandler : IRequestHandler<DeleteAuthConfigCommand, Unit>
@@ -31,14 +32,12 @@ public class DeleteAuthConfigCommandHandler : IRequestHandler<DeleteAuthConfigCo
     {
         if (request.QueryConfigurationTypePathParameter == null)
         {
-            _logger.LogWarning($"{nameof(request.QueryConfigurationTypePathParameter)} is null.");
-            return new Unit();
+            throw new BadRequestException("request.QueryConfigurationTypePathParameter is null.");
         }
 
         if (request.FacilityId == null)
         {
-            _logger.LogWarning($"{nameof(request.FacilityId)} is null.");
-            return new Unit();
+            throw new BadRequestException("request.FacilityId is null.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
@@ -49,6 +48,7 @@ public class DeleteAuthConfigCommandHandler : IRequestHandler<DeleteAuthConfigCo
         {
             await _fhirQueryListConfigurationRepository.DeleteAuthenticationConfiguration(request.FacilityId, cancellationToken);
         }
-        return new Unit();
+            
+        return new Unit(); 
     }
 }
