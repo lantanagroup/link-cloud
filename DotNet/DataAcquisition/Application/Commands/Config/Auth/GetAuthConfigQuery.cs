@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
@@ -32,14 +33,12 @@ public class GetAuthConfigQueryHandler : IRequestHandler<GetAuthConfigQuery, Aut
     {
         if(request.QueryConfigurationTypePathParameter == null)
         {
-            _logger.LogWarning($"{nameof(request.QueryConfigurationTypePathParameter)} is null.");
-            return null;
+            throw new BadRequestException($"request.QueryConfigurationTypePathParameter is null.");
         }
 
         if (request.FacilityId == null)
         {
-            _logger.LogWarning($"{nameof(request.FacilityId)} is null.");
-            return null;
+            throw new BadRequestException($"request.FacilityId is null.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)

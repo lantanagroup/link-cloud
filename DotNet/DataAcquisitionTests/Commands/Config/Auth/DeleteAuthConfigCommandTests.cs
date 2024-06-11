@@ -1,20 +1,10 @@
-﻿using Amazon.Runtime.Internal.Util;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Controllers;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Commands.Config.Auth
 {
@@ -58,13 +48,19 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
                 FacilityId = null
             };
 
-            var result = await handler.Handle(command, CancellationToken.None);
+            try
+            {
+                var result = await handler.Handle(command, CancellationToken.None);
+                Assert.Fail();
+            }
+            catch (BadRequestException ex)
+            {
+                _mocker.GetMock<IFhirQueryConfigurationRepository>()
+                    .Verify(r => r.DeleteAuthenticationConfiguration(command.FacilityId, It.IsAny<CancellationToken>()),
+                        Times.Never);
 
-            _mocker.GetMock<IFhirQueryConfigurationRepository>()
-                .Verify(r => r.DeleteAuthenticationConfiguration(command.FacilityId, It.IsAny<CancellationToken>()),
-                Times.Never);
-
-            Assert.Equal(Unit.Value, result);
+                Assert.True(true);
+            }
         }
 
     }
