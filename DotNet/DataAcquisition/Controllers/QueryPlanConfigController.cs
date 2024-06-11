@@ -108,6 +108,11 @@ public class QueryPlanConfigController : Controller
         [FromBody] IQueryPlan queryPlan, 
         CancellationToken cancellationToken)
     {
+        if (queryPlan == null)
+        {
+            return BadRequest("No request body");
+        }
+
         try
         {
             var result = await _mediator.Send(new SaveQueryPlanCommand
