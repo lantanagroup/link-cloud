@@ -400,7 +400,40 @@ services:
       Serilog__WriteTo__1__Args__uri: http://loki:3100
       ServiceRegistry__AccountServiceUrl: http://account:8060
       ConnectionStrings__Redis: redis_cache:6379
+      EnableIntegrationFeature: true
+      ProblemDetails__IncludeExceptionDetails: false
+      LinkTokenService__EnableTokenGenerationEndpoint: true
+      LinkTokenService__Authority:      
+      LinkTokenService__LinkAdminEmail:      
+      LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
+      ReverseProxy__Routes__route1__ClusterId: AccountService
+      ReverseProxy__Routes__route1__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route1__Match__Path: api/account/{**catch-all}
+      ReverseProxy__Routes__route2__ClusterId: AuditService
+      ReverseProxy__Routes__route2__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route2__Match__Path: api/audit/{**catch-all}
+      ReverseProxy__Routes__route3__ClusterId: CensusService
+      ReverseProxy__Routes__route3__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route3__Match__Path: api/census/{**catch-all}
+      ReverseProxy__Routes__route4__ClusterId: DataAcquisitionService
+      ReverseProxy__Routes__route4__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route4__Match__Path: api/data/{**catch-all}
+      ReverseProxy__Routes__route5__ClusterId: MeasureEvaluationService
+      ReverseProxy__Routes__route5__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route5__Match__Path: api/measure-definition/{**catch-all}
+      ReverseProxy__Routes__route6__ClusterId: NormalizationService
+      ReverseProxy__Routes__route6__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route6__Match__Path: api/normalization/{**catch-all}
+      ReverseProxy__Routes__route7__ClusterId: NotificationService
+      ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
+      ReverseProxy__Routes__route8__ClusterId: ReportService
+      ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
+      ReverseProxy__Routes__route9__ClusterId: TenantService
+      ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route9__Match__Path: api/facility/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
