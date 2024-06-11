@@ -145,7 +145,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<IApi, AuthEndpoints>();
 
-        if (builder.Configuration.GetValue<bool>("LinkTokenService:EnableTokenGenrationEndpoint"))
+        if (builder.Configuration.GetValue<bool>("LinkTokenService:EnableTokenGenerationEndpoint"))
         {
             builder.Services.AddTransient<IApi, BearerServiceEndpoints>();
         }
