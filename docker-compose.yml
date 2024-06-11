@@ -793,6 +793,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
     ports:
       - "8074:8074"
     build:
