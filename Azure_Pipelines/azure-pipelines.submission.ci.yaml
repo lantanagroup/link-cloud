@@ -15,6 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Submission/Submission.csproj'
+  testProject: 'DotNet/SubmissionTests/SubmissionTests.csproj' 
   serviceName: 'Submission'
 
 steps:
@@ -29,5 +30,11 @@ steps:
     inputs:
       command: build
       projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+    displayName: 'Run Tests'
 
 
