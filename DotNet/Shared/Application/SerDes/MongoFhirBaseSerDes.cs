@@ -17,8 +17,8 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
         public override T Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
         {
             BsonDocument bsonDoc = BsonSerializer.Deserialize<BsonDocument>(context.Reader);
-            var dotNetObj = (T)BsonTypeMapper.MapToDotNetValue(bsonDoc);
-            var jsonString = new FhirJsonSerializer().SerializeToString(dotNetObj);
+            var dotNetObj = BsonTypeMapper.MapToDotNetValue(bsonDoc);
+            var jsonString = JsonSerializer.Serialize(dotNetObj);
 
             var options = new JsonSerializerOptions();
 
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
             {
                 return;
             }
-
+            
             string jsonString = new FhirJsonSerializer().SerializeToString(resource);
             BsonDocument document = BsonSerializer.Deserialize<BsonDocument>(jsonString);
             BsonSerializer.Serialize(context.Writer, document);
