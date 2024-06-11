@@ -7,9 +7,9 @@ namespace LantanaGroup.Link.Submission.Application.Queries
 {
     public class TenantSubmissionQueries : ITenantSubmissionQueries
     {
-        private readonly TenantSubmissionRepository _repository;
+        private readonly ITenantSubmissionRepository _repository;
         private readonly ILogger<TenantSubmissionQueries> _logger;
-        public TenantSubmissionQueries(TenantSubmissionRepository repository, ILogger<TenantSubmissionQueries> logger)
+        public TenantSubmissionQueries(ITenantSubmissionRepository repository, ILogger<TenantSubmissionQueries> logger)
         {
             _repository = repository;
             _logger = logger;
