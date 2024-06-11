@@ -102,7 +102,11 @@ namespace LantanaGroup.Link.Report.Core
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.", ex);
+                        var message =
+                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(message, ex);
+
+                        throw new Exception(message, ex);
                     }
                 });
                 
