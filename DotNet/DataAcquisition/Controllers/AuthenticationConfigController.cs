@@ -70,7 +70,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AuthenticationConfiguration>> GetAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         CancellationToken cancellationToken)
     {
         try
