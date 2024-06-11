@@ -64,15 +64,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public IResult Login(HttpContext context)
         {            
-           var RedirectLink = "/api/info";
-           var referer = context.Request.Headers.Referer.ToString();
-           referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
+            var RedirectLink = "/api/info";
+            var referer = context.Request.Headers.Referer.ToString();
+            referer = (referer.ToString().IndexOf('/') > 0) ? referer[..referer.LastIndexOf('/')] : referer;
 
             // if referer is not empty then set RedirectUri changes to referer + "/dashboard"
             if (!String.IsNullOrEmpty(referer))
             {
                 RedirectLink = referer + "/dashboard";
             }
+
+            _logger.LogInformation("Based on referer {referer} a redirect URL was determined: {RedirectLink}", referer, RedirectLink);
+
             return Results.Challenge(
                 properties: new AuthenticationProperties
                 {
@@ -90,14 +93,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public IResult Logout(HttpContext context)
         {
             var referer = context.Request.Headers.Referer.ToString();
-            referer = (referer.ToString().IndexOf("/") > 0) ? referer[..referer.LastIndexOf("/")] : referer;
+            referer = (referer.ToString().IndexOf('/') > 0) ? referer[..referer.LastIndexOf('/')] : referer;
 
             if (!string.IsNullOrEmpty(referer))
             {
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
                 {
-                    RedirectUri = referer + "/logout"
+                    RedirectUri = referer
                 },
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }
@@ -106,7 +109,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 context.SignOutAsync(LinkAdminConstants.AuthenticationSchemes.Cookie);
                 return Results.SignOut(properties: new AuthenticationProperties
                 {
-                    RedirectUri = "/info"
+                    RedirectUri = "/api/info"
                 },
                  authenticationSchemes: [LinkAdminConstants.AuthenticationSchemes.Cookie]);
             }
