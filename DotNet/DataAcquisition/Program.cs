@@ -2,7 +2,6 @@ using Azure.Identity;
 using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -40,6 +39,7 @@ using Quartz.Spi;
 using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,6 +123,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new QueryPlanResultConverter());
     });
     builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
