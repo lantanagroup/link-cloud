@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Report.Application.SharedResource.Queries
         {
             try
             {
-                return _repository.GetAsync(request.Id);
+                return _repository.GetAsync(request.Id, cancellationToken);
             }
             catch (Exception ex)
             {
