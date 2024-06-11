@@ -3,6 +3,7 @@ using Hl7.Fhir.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
+using System.Text;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.SerDes
@@ -20,18 +21,23 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
             var dotNetObj = BsonTypeMapper.MapToDotNetValue(bsonDoc);
             var jsonString = JsonSerializer.Serialize(dotNetObj);
 
-            var options = new JsonSerializerOptions();
+            //var options = new JsonSerializerOptions();
 
-            options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
-            {
-                DisableBase64Decoding = false,
-                Validator = null
-            });
+            //options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()
+            //{
+            //    DisableBase64Decoding = false,
+            //    Validator = null
+            //});
 
-            options.AllowTrailingCommas = true;
-            options.PropertyNameCaseInsensitive = true;
+            //options.AllowTrailingCommas = true;
+            //options.PropertyNameCaseInsensitive = true;
 
-            return JsonSerializer.Deserialize<T>(jsonString, options);
+            //return JsonSerializer.Deserialize<T>(jsonString, options);
+
+            var bytes = Encoding.UTF8.GetBytes(jsonString);
+            Utf8JsonReader reader = new Utf8JsonReader(bytes);
+
+            return new FhirJsonPocoDeserializer().DeserializeObject<T>(ref reader);
         }
 
         public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, T resource)
@@ -41,8 +47,10 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
                 return;
             }
 
-            var options = new JsonSerializerOptions().ForFhir(typeof(T).Assembly);
-            string jsonString = JsonSerializer.Serialize(resource, options);
+            //var options = new JsonSerializerOptions().ForFhir(typeof(T).Assembly);
+            //string jsonString = JsonSerializer.Serialize(resource, options);
+
+            string jsonString = new FhirJsonSerializer().SerializeToString(resource);
             BsonDocument document = BsonSerializer.Deserialize<BsonDocument>(jsonString);
             BsonSerializer.Serialize(context.Writer, document);
         }
