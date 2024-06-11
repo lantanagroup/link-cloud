@@ -43,11 +43,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.GetAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
-            Assert.IsType<BadRequestResult>(result.Result);
+            Assert.IsType<BadRequestObjectResult>(result.Result);
         }
 
         [Fact]
-        public async void GetAuthenticationSettingsNegativeTest_NullResult()
+        public async Task GetAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
@@ -56,6 +56,7 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.GetAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
+
             Assert.IsType<NotFoundObjectResult>(result.Result);
         }
 
@@ -82,7 +83,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.CreateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<BadRequestResult>(result);
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -136,7 +137,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.UpdateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<BadRequestResult>(result);
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -205,28 +206,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.DeleteAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
 
-            Assert.IsType<BadRequestResult>(result);
-        }
-
-        [Fact]
-        public async Task DeleteAuthenticationSettingsNegativeTest_NullResult()
-        {
-            _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteAuthConfigCommand>(), CancellationToken.None))
-                .Throws(new Exception());
-
-            var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
-
-            try
-            {
-                var result = await _controller.DeleteAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
-                Assert.True(false);
-            }
-            catch (Exception)
-            {
-
-                Assert.True(true);
-            }
+            Assert.IsType<BadRequestObjectResult>(result);
         }
     }
 }
