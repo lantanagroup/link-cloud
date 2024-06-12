@@ -407,7 +407,7 @@ namespace CensusUnitTests
 
             try
             {
-                var response = await handler.Handle(new UpdateCensusCommand
+                var response = await handler.Handle(new UpdateCensusConfigCommand
                 {
                     Config = new CensusConfigModel
                     {
@@ -447,7 +447,7 @@ namespace CensusUnitTests
 
             try
             {
-                var response = await handler.Handle(new UpdateCensusCommand
+                var response = await handler.Handle(new UpdateCensusConfigCommand
                 {
                     Config = new CensusConfigModel
                     {
@@ -483,7 +483,7 @@ namespace CensusUnitTests
 
             try
             {
-                var response = await handler.Handle(new UpdateCensusCommand
+                var response = await handler.Handle(new UpdateCensusConfigCommand
                 {
                     Config = new CensusConfigModel
                     {
