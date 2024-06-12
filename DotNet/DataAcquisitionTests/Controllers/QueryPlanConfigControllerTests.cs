@@ -70,18 +70,8 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), JsonDocument.Parse("{}").RootElement, CancellationToken.None);
+            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), new QueryPlanResult(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
-        }
-
-        [Fact]
-        public async void CreateQueryPlanNegativeTest_InvalidJson()
-        {
-            _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
-
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), "{invalidJson}", CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
         }
 
         [Fact]
@@ -91,7 +81,7 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None);
-            Assert.IsType<StatusCodeResult>(result);
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -105,7 +95,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), JsonDocument.Parse("{}").RootElement, CancellationToken.None);
+            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), new QueryPlanResult(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -120,17 +110,9 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None));
+            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None);
+            Assert.IsType<BadRequestObjectResult>(result);
 
-        }
-
-        [Fact]
-        public async void UpdateQueryPlanNegativeTest_InvalidJson()
-        {
-            _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
-
-            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), "{invalidJson}", CancellationToken.None));
         }
 
         [Fact]
