@@ -52,7 +52,7 @@ namespace CensusUnitTests
             
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(testCase);
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
@@ -100,7 +100,7 @@ namespace CensusUnitTests
             mocker.Use(tenantApiService);
 
             censusConfigServiceMock.Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(testCase));
-            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult<bool>(true));
+            censusConfigServiceMock.Setup(x => x.AddAsync(It.IsAny<CensusConfigEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(testCase);
             _schedulerFactoryMock.Setup(x => x.GetScheduler(It.IsAny<CancellationToken>())).Returns(Task.FromResult<IScheduler>(null));
             censusSchedulingRepoMock.Setup(x => x.UpdateJobsForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Returns(Task.FromResult<bool>(true));
             censusSchedulingRepoMock.Setup(x => x.AddJobForFacility(It.IsAny<CensusConfigEntity>(), It.IsAny<IScheduler>())).Throws(new Exception());
