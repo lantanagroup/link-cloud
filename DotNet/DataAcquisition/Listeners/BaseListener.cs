@@ -45,7 +45,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
         //configure error handlers topic names
         _deadLetterConsumerErrorHandler.Topic = $"{messageType}-Error";
-        _deadLetterConsumerErrorHandler.Topic = $"{messageType}-Error";
+        _deadLetterConsumerHandler.Topic = $"{messageType}-Error";
         _transientExceptionHandler.Topic = $"{messageType}-Retry";
 
         //configure error handlers service names
@@ -66,6 +66,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
+        var messageType = typeof(MessageType).Name;
         var settings = new ConsumerConfig
         {
             EnableAutoCommit = false,
@@ -76,7 +77,6 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
         try
         {
-            var messageType = typeof(MessageType).Name;
             _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", DataAcquisitionConstants.ServiceName, messageType);
 
             consumer.Subscribe(new string[] { messageType } );
