@@ -1,15 +1,15 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Text;
 
-namespace LantanaGroup.Link.DataAcquisition.Listeners;
-
+namespace LantanaGroup.Link.Shared.Application;
 public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
     : BackgroundService
 {
@@ -19,6 +19,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterConsumerErrorHandler;
     private readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> _transientExceptionHandler;
     private readonly IConsumerLogic<ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType> _consumerLogic;
+    private readonly IOptions<ServiceInformation> _serviceInformation;
     private readonly string _messageType;
 
     public BaseListener(
@@ -27,7 +28,8 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> transientExceptionHandler,
-        IConsumerLogic<ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType> consumerLogic)
+        IConsumerLogic<ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType> consumerLogic,
+        IOptions<ServiceInformation> serviceInformation)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
@@ -35,8 +37,8 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         _deadLetterConsumerErrorHandler = deadLetterConsumerErrorHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerErrorHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _consumerLogic = consumerLogic ?? throw new ArgumentNullException(nameof(consumerLogic));
-
-        var _messageType = typeof(MessageType).Name;
+        _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
+        _messageType = typeof(MessageType).Name;
 
         //configure error handlers topic names
         _deadLetterConsumerErrorHandler.Topic = $"{_messageType}-Error";
@@ -44,9 +46,10 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         _transientExceptionHandler.Topic = $"{_messageType}-Retry";
 
         //configure error handlers service names
-        _deadLetterConsumerErrorHandler.ServiceName = ServiceActivitySource.ServiceName;
-        _deadLetterConsumerHandler.ServiceName = ServiceActivitySource.ServiceName;
-        _transientExceptionHandler.ServiceName = ServiceActivitySource.ServiceName;
+        _deadLetterConsumerErrorHandler.ServiceName = _serviceInformation.Value.ServiceName;
+        _deadLetterConsumerHandler.ServiceName = _serviceInformation.Value.ServiceName;
+        _transientExceptionHandler.ServiceName = _serviceInformation.Value.ServiceName;
+        
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -65,9 +68,9 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
         try
         {
-            _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceActivitySource.ServiceName, _messageType);
+            _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", _serviceInformation.Value.ServiceName, _messageType);
 
-            consumer.Subscribe(new string[] { _messageType } );
+            consumer.Subscribe(new string[] { _messageType });
 
             ConsumeResult<ConsumeKeyType, ConsumeValueType>? consumeResult = null;
 
@@ -81,7 +84,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
                         try
                         {
-                            if(consumeResult != null)
+                            if (consumeResult != null)
                             {
                                 await _consumerLogic.executeLogic(consumeResult);
                             }
@@ -96,7 +99,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                         }
                         catch (Exception ex)
                         {
-                            _deadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), _consumerLogic.extractFacilityId(consumeResult)); 
+                            _deadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), _consumerLogic.extractFacilityId(consumeResult));
                         }
                         finally
                         {

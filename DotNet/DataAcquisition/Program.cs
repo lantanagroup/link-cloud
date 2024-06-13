@@ -41,6 +41,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,10 +84,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     var serviceInformation = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    builder.Services.Configure<ServiceInformation>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
 
     if (serviceInformation != null)
     {
-        ServiceActivitySource.Initialize(serviceInformation);       
+        ServiceActivitySource.Initialize(serviceInformation);    
     }
     else
     {
