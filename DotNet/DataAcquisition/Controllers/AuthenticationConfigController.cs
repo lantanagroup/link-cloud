@@ -179,7 +179,7 @@ public class AuthenticationConfigController : Controller
                 return Problem("AuthenticationConfiguration not created.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
 
-            await SendAudit($"Create authorization configuration  for '{facilityId}'", null, facilityId,
+            await SendAudit($"Create authentication configuration for '{facilityId}'", null, facilityId,
                 AuditEventType.Create, null);
 
             return CreatedAtAction(nameof(CreateAuthenticationSettings),
@@ -211,7 +211,7 @@ public class AuthenticationConfigController : Controller
         }
         catch (Exception ex)
         {
-            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
+            await SendAudit($"Error creating authentication configuration for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -284,7 +284,7 @@ public class AuthenticationConfigController : Controller
 
             });
 
-            await SendAudit($"Update authorization configuration for '{facilityId}'", null, facilityId, AuditEventType.Update, propertyChanges);
+            await SendAudit($"Update authentication configuration for '{facilityId}'", null, facilityId, AuditEventType.Update, propertyChanges);
 
             return Accepted(result);
         }
