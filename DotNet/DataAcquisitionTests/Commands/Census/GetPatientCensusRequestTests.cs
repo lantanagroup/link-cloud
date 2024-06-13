@@ -59,7 +59,9 @@ namespace DataAcquisitionUnitTests.Commands.Census
                 .Verify(r => r.GetPatientList(facilityConfig.FhirBaseServerUrl, It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), It.IsAny<CancellationToken>()),
                 Times.Exactly(facilityConfig.EHRPatientLists[0].ListIds.Count));
 
-            Assert.Single(result);
+            Assert.NotNull(result);
+            var patientIds = (result as PatientIDsAcquiredMessage);
+            Assert.NotNull(patientIds?.PatientIds);
         }
 
         [Fact]
