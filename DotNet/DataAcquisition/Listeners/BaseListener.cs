@@ -19,6 +19,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
     private readonly IDeadLetterExceptionHandler<string, string> _deadLetterConsumerErrorHandler;
     private readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> _transientExceptionHandler;
     private readonly IConsumerLogic<ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType> _consumerLogic;
+    private readonly string _messageType;
 
     public BaseListener(
         ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> logger,
@@ -35,12 +36,12 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _consumerLogic = consumerLogic ?? throw new ArgumentNullException(nameof(consumerLogic));
 
-        var messageType = typeof(MessageType).Name;
+        var _messageType = typeof(MessageType).Name;
 
         //configure error handlers topic names
-        _deadLetterConsumerErrorHandler.Topic = $"{messageType}-Error";
-        _deadLetterConsumerHandler.Topic = $"{messageType}-Error";
-        _transientExceptionHandler.Topic = $"{messageType}-Retry";
+        _deadLetterConsumerErrorHandler.Topic = $"{_messageType}-Error";
+        _deadLetterConsumerHandler.Topic = $"{_messageType}-Error";
+        _transientExceptionHandler.Topic = $"{_messageType}-Retry";
 
         //configure error handlers service names
         _deadLetterConsumerErrorHandler.ServiceName = ServiceActivitySource.ServiceName;
@@ -60,15 +61,13 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
-        var messageType = typeof(MessageType).Name;
-        
         using var consumer = _kafkaConsumerFactory.CreateConsumer(_consumerLogic.createConsumerConfig());
 
         try
         {
-            _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceActivitySource.ServiceName, messageType);
+            _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceActivitySource.ServiceName, _messageType);
 
-            consumer.Subscribe(new string[] { messageType } );
+            consumer.Subscribe(new string[] { _messageType } );
 
             ConsumeResult<ConsumeKeyType, ConsumeValueType>? consumeResult = null;
 
