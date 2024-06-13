@@ -1,4 +1,5 @@
-﻿using KellermanSoftware.CompareNetObjects;
+﻿using System.Net;
+using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
@@ -8,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -98,20 +100,25 @@ public class AuthenticationConfigController : Controller
 
             return Ok(result);
         }
-        catch (BadRequestException bex)
+        catch (BadRequestException ex)
         {
-            await SendAudit(bex.Message, null, facilityId, AuditEventType.Query, null); _logger.LogWarning(bex.Message);
-            return BadRequest(bex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
-        catch (NotFoundException nex)
+        catch (NotFoundException ex)
         {
-            await SendAudit(nex.Message, null, facilityId, AuditEventType.Query, null);
-            return NotFound(nex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
+        catch (MissingFacilityConfigurationException ex)
+        {
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "An exception occurred while attempting to authentication settings with a facility id of {id}", facilityId);
-            throw;
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
         
     }
@@ -132,12 +139,12 @@ public class AuthenticationConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("{queryConfigurationTypePathParameter}/authentication")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(AuthenticationConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CreateAuthenticationSettings(
+    public async Task<ActionResult<AuthenticationConfiguration>> CreateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         [FromBody] AuthenticationConfiguration authenticationConfiguration, 
@@ -160,37 +167,52 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            var result = await _mediator.Send(new SaveAuthConfigCommand
+            var result = await _mediator.Send(new CreateAuthConfigCommand
             {
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
                 Configuration = authenticationConfiguration
             }, cancellationToken);
 
-            await SendAudit($"Create authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
-            
-            return Accepted(result);
+            if (result == null)
+            {
+                return Problem("AuthenticationConfiguration not created.", statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+
+            await SendAudit($"Create authorization configuration  for '{facilityId}'", null, facilityId,
+                AuditEventType.Create, null);
+
+            return CreatedAtAction(nameof(CreateAuthenticationSettings),
+                new
+                {
+                    FacilityId = facilityId,
+                    QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
+                    AuthenticationConfiguration = authenticationConfiguration
+                }, result);
         }
-        catch (BadRequestException bex)
+        catch (EntityAlreadyExistsException ex)
         {
-            await SendAudit(bex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(bex.Message);
-            return BadRequest(bex.Message);
+            return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
-        catch (NotFoundException nex)
+        catch (BadRequestException ex)
         {
-            await SendAudit(nex.Message, null, facilityId, AuditEventType.Create, null);
-            return NotFound(nex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
-            return BadRequest(ex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "CreateAuthenticationSettings"), ex, "An exception occurred while attempting to create authentication settings with a facility id of {id}", facilityId);
-            throw;
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -213,7 +235,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateAuthenticationSettings(
+    public async Task<ActionResult> UpdateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
         [FromBody] AuthenticationConfiguration? authenticationConfiguration,
@@ -240,9 +262,9 @@ public class AuthenticationConfigController : Controller
             {
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-            });
+            }, cancellationToken);
 
-            var result = await _mediator.Send(new SaveAuthConfigCommand
+            var result = await _mediator.Send(new UpdateAuthConfigCommand
             {
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
@@ -266,25 +288,20 @@ public class AuthenticationConfigController : Controller
 
             return Accepted(result);
         }
+        catch (BadRequestException ex)
+        {
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(
-                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Query,
-                null);
-            return BadRequest(ex.Message);
-        }
-        catch (BadRequestException bex)
-        {
-            await SendAudit(bex.Message, null, facilityId, AuditEventType.Update, null); _logger.LogWarning(bex.Message);
-            return BadRequest(bex.Message);
-        }
-        catch (NotFoundException nex)
-        {
-            await SendAudit(nex.Message, null, facilityId, AuditEventType.Update, null);
-            return NotFound(nex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -294,8 +311,7 @@ public class AuthenticationConfigController : Controller
                 facilityId,
                 AuditEventType.Query,
                 null);
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "An exception occurred while attempting to update authentication settings with a facility id of {id}", facilityId);
-            throw;
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -344,20 +360,25 @@ public class AuthenticationConfigController : Controller
 
             return Accepted();
         }
-        catch (BadRequestException bex)
+        catch (BadRequestException ex)
         {
-            await SendAudit(bex.Message, null, facilityId, AuditEventType.Delete, null); _logger.LogWarning(bex.Message);
-            return BadRequest(bex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
-        catch (NotFoundException nex)
+        catch (NotFoundException ex)
         {
-            await SendAudit(nex.Message, null, facilityId, AuditEventType.Delete, null);
-            return NotFound(nex.Message);
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
+        catch (MissingFacilityConfigurationException ex)
+        {
+            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteAuthenticationSettings"), ex, "An exception occurred while attempting to delete authentication settings with a facility id of {id}", facilityId);
-            throw;
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 }

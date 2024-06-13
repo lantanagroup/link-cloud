@@ -73,27 +73,23 @@ public class QueryListener : BackgroundService
         {
             List<IBaseMessage>? responseMessages = new List<IBaseMessage>();
             consumer.Subscribe(new string[] { nameof(KafkaTopic.PatientCensusScheduled), nameof(KafkaTopic.DataAcquisitionRequested) });
-            ConsumeResult<string, string>? rawmessage = null;
-
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
                     await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                     {
-                        rawmessage = result;
-
                         try
                         {
                             IBaseMessage deserializedMessage = null;
                             (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
 
-                            if (rawmessage != null)
+                            if (result != null)
                             {
                                 IBaseMessage? message = null;
                                 try
                                 {
-                                    message = MessageDeserializer.DeserializeMessage(rawmessage.Topic, rawmessage.Message.Value);
+                                    message = MessageDeserializer.DeserializeMessage(result.Topic, result.Message.Value);
                                 }
                                 catch (Exception ex)
                                 {
@@ -104,7 +100,7 @@ public class QueryListener : BackgroundService
 
                                 try
                                 {
-                                    messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
+                                    messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(result.Message);
                                 }
                                 catch (Exception ex)
                                 {
@@ -151,7 +147,7 @@ public class QueryListener : BackgroundService
                             {
                                 var producerSettings = new ProducerConfig();
 
-                                if (rawmessage.Topic == KafkaTopic.DataAcquisitionRequested.ToString())
+                                if (result.Topic == KafkaTopic.DataAcquisitionRequested.ToString())
                                 {
                                     producerSettings.CompressionType = CompressionType.Zstd;
                                 }
@@ -160,7 +156,7 @@ public class QueryListener : BackgroundService
 
                                 try
                                 {
-                                    if (rawmessage.Topic == KafkaTopic.PatientCensusScheduled.ToString())
+                                    if (result.Topic == KafkaTopic.PatientCensusScheduled.ToString())
                                     {
                                         var produceMessage = new Message<string, object>
                                         {
@@ -195,7 +191,7 @@ public class QueryListener : BackgroundService
                                                 //Resource = string.Join(',', deserializedMessage.),
                                                 EventDate = DateTime.UtcNow,
                                                 ServiceName = DataAcquisitionConstants.ServiceName,
-                                                Notes = $"Raw Kafka Message: {rawmessage}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
+                                                Notes = $"Raw Kafka Message: {result}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
                                             });
                                         }
                                     }
@@ -206,11 +202,11 @@ public class QueryListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
-                                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, messageMetaData.facilityId);
+                                    _deadLetterConsumerHandler.Topic = result?.Topic + "-Error";
+                                    _deadLetterConsumerHandler.HandleException(result, ex, AuditEventType.Query, messageMetaData.facilityId);
                                     _logger.LogError(ex, "Failed to produce message");
                                 }
-                                consumer.Commit(rawmessage);
+                                consumer.Commit(result);
                             }
                             else
                             {
@@ -222,31 +218,31 @@ public class QueryListener : BackgroundService
                                     //Resource = string.Join(',', deserializedMessage.Type),
                                     ServiceName = DataAcquisitionConstants.ServiceName,
                                     EventDate = DateTime.UtcNow,
-                                    Notes = $"Message with topic: {rawmessage.Topic}. No messages were produced. Please check logs. full message: {rawmessage.Message}",
+                                    Notes = $"Message with topic: {result.Topic}. No messages were produced. Please check logs. full message: {result.Message}",
                                 });
-                                _logger.LogWarning("Message with topic: {1}. No messages were produced. Please check logs. full message: {2}", rawmessage.Topic, rawmessage.Message);
+                                _logger.LogWarning("Message with topic: {1}. No messages were produced. Please check logs. full message: {2}", result.Topic, result.Message);
 
                                 throw new DeadLetterException("No messages were produced. Please check logs.", AuditEventType.Query);
                             }
                         }
                         catch (DeadLetterException ex)
                         {
-                            _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                            _deadLetterConsumerHandler.HandleException(rawmessage, ex, rawmessage.Key);
-                            consumer.Commit(rawmessage);
+                            _deadLetterConsumerHandler.Topic = result?.Topic + "-Error";
+                            _deadLetterConsumerHandler.HandleException(result, ex, result.Key);
+                            consumer.Commit(result);
                         }
                         catch (TransientException ex)
                         {
-                            _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
-                            _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
-                            consumer.Commit(rawmessage);
+                            _transientExceptionHandler.Topic = result?.Topic + "-Retry";
+                            _transientExceptionHandler.HandleException(result, ex, result.Key);
+                            consumer.Commit(result);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                            _deadLetterConsumerHandler.HandleException(rawmessage, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
-                            consumer.Commit(rawmessage);
+                            _deadLetterConsumerHandler.HandleException(result, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), result.Message.Key);
+                            consumer.Commit(result);
                         }
                     }, cancellationToken);
                 }
@@ -274,12 +270,6 @@ public class QueryListener : BackgroundService
                     consumer.Commit();
                     continue;
                 }
-                catch (Exception ex)
-                {
-                    _deadLetterConsumerHandler.Topic = rawmessage?.Topic + "-Error";
-                    _deadLetterConsumerHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
-                    continue;
-                }
             }
         }
         catch (OperationCanceledException oce)
@@ -292,6 +282,11 @@ public class QueryListener : BackgroundService
         {
             throw;
         }
+    }
+
+    private void HandleDeadletterException(DeadLetterException ex)
+    {
+
     }
 
     private void ProduceAuditMessage(AuditEventMessage auditEvent)
