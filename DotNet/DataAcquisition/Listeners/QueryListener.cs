@@ -120,9 +120,9 @@ public class QueryListener : BackgroundService
                                 {
                                     responseMessages = message switch
                                     {
-                                        DataAcquisitionRequestedMessage => await _mediator.Send(new GetPatientDataRequest
+                                        DataAcquisitionRequested => await _mediator.Send(new GetPatientDataRequest
                                         {
-                                            Message = (DataAcquisitionRequestedMessage)message,
+                                            Message = (DataAcquisitionRequested)message,
                                             FacilityId = messageMetaData.facilityId,
                                             CorrelationId = messageMetaData.correlationId,
                                         }, cancellationToken),

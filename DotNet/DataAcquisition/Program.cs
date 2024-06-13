@@ -40,6 +40,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -162,10 +163,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<RetryJob>();
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
+    //Custom Logic
+    builder.Services.AddTransient<IConsumerCustomLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
+
+
     //Add Hosted Services
     if(consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<QueryListener>();
+        //builder.Services.AddHostedService<QueryListener>();
+        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
     }
 
     if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
