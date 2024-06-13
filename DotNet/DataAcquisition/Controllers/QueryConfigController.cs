@@ -193,7 +193,7 @@ public class QueryConfigController : Controller
         catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
-                $"Error creating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
+                $"Error creating FhirQueryConfiguration for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
                 "",
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Query,
@@ -203,7 +203,7 @@ public class QueryConfigController : Controller
         catch (Exception ex)
         {
             string message =
-                $"An exception occurred while attempting to get a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
+                $"An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
             await SendAudit(message, null, facilityId, AuditEventType.Query, null);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
@@ -273,7 +273,7 @@ public class QueryConfigController : Controller
         catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit(
-                $"Error updating authentication config for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
+                $"Error updating FhirQueryConfiguration for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
                 "",
                 fhirQueryConfiguration.FacilityId,
                 AuditEventType.Update,
