@@ -10,7 +10,7 @@ using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public class PatientCensusScheduledProcessingLogic : IConsumerCustomLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
+public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
 {
     private readonly ILogger<PatientCensusScheduledProcessingLogic> _logger;
     private readonly IMediator _mediator;
@@ -27,7 +27,17 @@ public class PatientCensusScheduledProcessingLogic : IConsumerCustomLogic<string
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
-    public async Task executeCustomLogic(
+    public ConsumerConfig createConsumerConfig()
+    {
+        var settings = new ConsumerConfig
+        {
+            EnableAutoCommit = false,
+            GroupId = ServiceActivitySource.ServiceName
+        };
+        return settings;
+    }
+
+    public async Task executeLogic(
         ConsumeResult<string, PatientCensusScheduled> consumeResult, 
         CancellationToken cancellationToken = default, 
         params object[] optionalArgList
@@ -84,7 +94,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerCustomLogic<string
 
     public string extractFacilityId(ConsumeResult<string, PatientCensusScheduled> consumeResult)
     {
-        if(consumeResult.Message.Key == null || string.IsNullOrEmpty(consumeResult.Message.Key))
+        if(string.IsNullOrWhiteSpace(consumeResult.Message.Key))
         {
             throw new MissingFacilityIdException("FacilityId is missing from the message key.");
         }

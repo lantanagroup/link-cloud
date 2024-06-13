@@ -174,8 +174,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
     //Custom Logic
-    builder.Services.AddTransient<IConsumerCustomLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
-    builder.Services.AddTransient<IConsumerCustomLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
+    builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
+    builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
 
     //Add Hosted Services
     if(consumerSettings == null || !consumerSettings.DisableConsumer)
