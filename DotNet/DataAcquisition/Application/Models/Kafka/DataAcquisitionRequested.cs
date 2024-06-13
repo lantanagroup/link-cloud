@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 
-public class DataAcquisitionRequestedMessage : IBaseMessage
+public class DataAcquisitionRequested : BaseMessage, IBaseMessage
 {
     public string PatientId { get; set; } = null!;
     /// <summary>
