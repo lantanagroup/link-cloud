@@ -15,7 +15,7 @@ using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<string, DataAcquisitionRequested, string, ResourceAcquired>
+public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>
 {
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
     private readonly IMediator _mediator;
@@ -32,7 +32,17 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
-    public async Task executeCustomLogic(ConsumeResult<string, DataAcquisitionRequested> consumeResult, CancellationToken cancellationToken = default, params object[] optionalArgList)
+    public ConsumerConfig createConsumerConfig()
+    {
+        var settings = new ConsumerConfig
+        {
+            EnableAutoCommit = false,
+            GroupId = ServiceActivitySource.ServiceName
+        };
+        return settings;
+    }
+
+    public async Task executeLogic(ConsumeResult<string, DataAcquisitionRequested> consumeResult, CancellationToken cancellationToken = default, params object[] optionalArgList)
     {
         string correlationId;
         string facilityId;
