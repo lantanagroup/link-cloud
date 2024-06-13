@@ -2,6 +2,7 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -28,6 +29,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> kafkaConsumerFactory,
         IKafkaProducerFactory<ProduceKeyType, ProduceValueType> kafkaProducerFactory,
         IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
+        IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> transientExceptionHandler
 ,
         IConsumerCustomLogic<ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType> customLogic)
@@ -35,8 +37,21 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _deadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
+        _deadLetterConsumerErrorHandler = deadLetterConsumerErrorHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerErrorHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _customLogic = customLogic ?? throw new ArgumentNullException(nameof(customLogic));
+
+        var messageType = typeof(MessageType).Name;
+
+        //configure error handlers topic names
+        _deadLetterConsumerErrorHandler.Topic = $"{messageType}-Error";
+        _deadLetterConsumerErrorHandler.Topic = $"{messageType}-Error";
+        _transientExceptionHandler.Topic = $"{messageType}-Retry";
+
+        //configure error handlers service names
+        _deadLetterConsumerErrorHandler.ServiceName = ServiceActivitySource.ServiceName;
+        _deadLetterConsumerHandler.ServiceName = ServiceActivitySource.ServiceName;
+        _transientExceptionHandler.ServiceName = ServiceActivitySource.ServiceName;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -61,7 +76,10 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
 
         try
         {
-            consumer.Subscribe(new string[] { nameof(MessageType) } );
+            var messageType = typeof(MessageType).Name;
+            _logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", DataAcquisitionConstants.ServiceName, messageType);
+
+            consumer.Subscribe(new string[] { messageType } );
 
             ConsumeResult<ConsumeKeyType, ConsumeValueType>? consumeResult = null;
 
