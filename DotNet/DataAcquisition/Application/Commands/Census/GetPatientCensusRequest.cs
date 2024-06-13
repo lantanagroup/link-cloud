@@ -9,12 +9,12 @@ using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Census;
 
-public class GetPatientCensusRequest : IRequest<List<IBaseMessage>>
+public class GetPatientCensusRequest : IRequest<IBaseMessage>
 {
     public string FacilityId { get; set; }
 }
 
-public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRequest, List<IBaseMessage>>
+public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRequest, IBaseMessage>
 {
     private readonly ILogger<GetPatientCensusRequestHandler> _logger;
     private readonly IAuthenticationRetrievalService _authRetrievalService;
@@ -34,7 +34,7 @@ public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRe
         _fhirApiRepository = fhirApiRepository ?? throw new ArgumentNullException(nameof(fhirApiRepository));
     }
 
-    public async Task<List<IBaseMessage>> Handle(GetPatientCensusRequest request, CancellationToken cancellationToken)
+    public async Task<IBaseMessage> Handle(GetPatientCensusRequest request, CancellationToken cancellationToken)
     {
         PatientIDsAcquiredMessage result = new PatientIDsAcquiredMessage();
         var facilityConfig = await _fhirQueryListConfigurationRepository.GetByFacilityIdAsync(request.FacilityId);
@@ -78,7 +78,7 @@ public class GetPatientCensusRequestHandler : IRequestHandler<GetPatientCensusRe
         
         result.PatientIds = finalList;
 
-        return new List<IBaseMessage> { result };
+        return  result;
     }
 
     private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(AuthenticationConfiguration auth)

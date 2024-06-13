@@ -12,6 +12,9 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
         {
             string jsonContent = System.Text.Encoding.Default.GetString(data.ToArray());
             
+            if(isNull)
+                return default(T);
+
             var options = new JsonSerializerOptions();
 
             options.ForFhir(ModelInfo.ModelInspector, new FhirJsonPocoDeserializerSettings()

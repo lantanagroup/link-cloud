@@ -10,7 +10,7 @@ public class MessageDeserializer
         topic switch
         {
             DataAcquisitionConstants.MessageNames.DataAcquisitionRequested => JsonConvert.DeserializeObject<DataAcquisitionRequested>(rawMessage),
-            DataAcquisitionConstants.MessageNames.PatientCensusScheduled => new PatientCensusScheduledMessage(),
+            DataAcquisitionConstants.MessageNames.PatientCensusScheduled => new PatientCensusScheduled(),
             _ => throw new Exception($"{topic} not a valid topic. Unable to deserialize message.")
         };
 }

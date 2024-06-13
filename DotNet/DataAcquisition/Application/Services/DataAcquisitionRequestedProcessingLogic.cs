@@ -22,8 +22,8 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
     private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
 
     public DataAcquisitionRequestedProcessingLogic(
-        ILogger<DataAcquisitionRequestedProcessingLogic> logger, 
-        IMediator mediator, 
+        ILogger<DataAcquisitionRequestedProcessingLogic> logger,
+        IMediator mediator,
         IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory
         )
     {
@@ -89,14 +89,12 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
 
             try
             {
-
-
                 foreach (var responseMessage in results)
                 {
                     var headers = new Headers
-                                            {
-                                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                                            };
+                    {
+                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
+                    };
                     var produceMessage = new Message<string, ResourceAcquired>
                     {
                         Key = facilityId,
@@ -116,7 +114,6 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
                         Notes = $"Raw Kafka Message: {consumeResult}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
                     });
                 }
-
             }
             catch (ProduceException<string, object> ex)
             {
@@ -133,7 +130,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
     {
         var facilityId = consumeResult.Message.Key;
 
-        if(string.IsNullOrWhiteSpace(facilityId))
+        if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentNullException("FacilityId is missing from the message key.");
 
         return facilityId;
@@ -151,12 +148,12 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerCustomLogic<stri
         return correlationId;
     }
 
-        private void ProduceAuditMessage(AuditEventMessage auditEvent)
+    private void ProduceAuditMessage(AuditEventMessage auditEvent)
+    {
+        var request = new TriggerAuditEventCommand
         {
-            var request = new TriggerAuditEventCommand
-            {
-                AuditableEvent = auditEvent
-            };
-            _mediator.Send(request);
-        }
+            AuditableEvent = auditEvent
+        };
+        _mediator.Send(request);
     }
+}
