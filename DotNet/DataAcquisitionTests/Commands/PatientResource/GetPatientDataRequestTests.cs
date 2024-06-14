@@ -27,7 +27,7 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
             var request = new GetPatientDataRequest
             {
                 FacilityId = facilityId,
-                Message = new DataAcquisitionRequestedMessage
+                Message = new DataAcquisitionRequested
                 {
                     PatientId = "testPatient",
                     ScheduledReports = new List<ScheduledReport>
@@ -67,7 +67,7 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
             var handler = _mocker.CreateInstance<GetPatientDataRequestHandler>();
             var request = new GetPatientDataRequest
             {
-                Message = new DataAcquisitionRequestedMessage
+                Message = new DataAcquisitionRequested
                 {
                     PatientId = "testPatient",
                     ScheduledReports = new List<ScheduledReport>
@@ -106,7 +106,7 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
             var request = new GetPatientDataRequest 
             { 
                 FacilityId = facilityId, 
-                Message = new DataAcquisitionRequestedMessage
+                Message = new DataAcquisitionRequested
                 {
                     ScheduledReports = new List<ScheduledReport>
                     {

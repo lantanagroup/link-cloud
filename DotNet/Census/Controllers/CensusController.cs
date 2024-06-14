@@ -51,7 +51,6 @@ public class CensusController : Controller
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "Get Census History"), ex, "An exception occurred while attempting to get census history with an id of {id}", facilityId);
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
             throw;
         }
     }
@@ -111,7 +110,6 @@ public class CensusController : Controller
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "Get Admitted Patients"), ex, "An exception occurred while attempting to get admitted patients with an id of {id}", facilityId);
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
             throw;
         }
     }
@@ -140,7 +138,6 @@ public class CensusController : Controller
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "Get Current Census"), ex, "An exception occurred while attempting to get current census with an id of {id}", facilityId);
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
             throw;
         }
     }
@@ -169,29 +166,7 @@ public class CensusController : Controller
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "Get All Patients For Facility"), ex, "An exception occurred while attempting to get All Patients For Facility with an id of {id}", facilityId);
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
             throw;
         }
-    }
-
-    [ApiExplorerSettings(IgnoreApi = true)]
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = correlationId,
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = CensusConstants.ServiceName,
-                //PropertyChanges = "example",
-                Resource = "Census",
-                User = "example",
-                UserId = "example",
-                Notes = $"{type}: {facilityId}\n{message}"
-            }
-        });
     }
 }

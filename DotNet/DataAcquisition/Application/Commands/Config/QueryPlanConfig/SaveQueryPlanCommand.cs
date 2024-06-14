@@ -1,10 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using MediatR;
-
-using Newtonsoft.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -19,7 +15,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPla
 public class SaveQueryPlanCommand : IRequest<Unit>
 {
     public string FacilityId { get; set; }
-    public string QueryPlan { get; set; }
+    public IQueryPlan QueryPlanResult { get; set; }
     public QueryPlanType QueryPlanType { get; set; }
 }
 
@@ -69,22 +65,13 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
             throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
         }
 
-        var jsonSettings = new JsonSerializerSettings
-        {
-            TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
-            TypeNameHandling = TypeNameHandling.Auto
-        };
-
-        var jsonOptions = new JsonSerializerOptions();
-        jsonOptions.Converters.Add(new JsonStringEnumConverter());
         Domain.Entities.QueryPlan updatedPlan = null;
         try
         {
             switch (request.QueryPlanType)
             {
                 case QueryPlanType.QueryPlans:
-                    //runTest();
-                    var queryPlan = JsonConvert.DeserializeObject<QueryPlanResult>(request.QueryPlan, jsonSettings);
+                    var queryPlan = (QueryPlanResult)request.QueryPlanResult;
                     if (queryPlan != null)
                     {
                         var queryPlanResult = await _repository.GetAsync(request.FacilityId, cancellationToken);
@@ -117,23 +104,21 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
                     }
                     break;
                 case QueryPlanType.InitialQueries:
-                    var initialQueries = JsonConvert.DeserializeObject<InitialQueryResult>(request.QueryPlan);
-                    if (initialQueries != null)
+                    var initialQueryPlan = (InitialQueryResult)request.QueryPlanResult;
+                    if (initialQueryPlan.InitialQueries != null)
                     {
-                        await _repository.SaveInitialQueries(request.FacilityId, initialQueries.InitialQueries, cancellationToken);
+                        await _repository.SaveInitialQueries(request.FacilityId, initialQueryPlan.InitialQueries, cancellationToken);
                         await SendAudit($"Update initial query configuration for {request.FacilityId}", null, request.FacilityId, AuditEventType.Update, null);
                     }
                     break;
                 case QueryPlanType.SupplementalQueries:
-                    var supplementalQueries = JsonConvert.DeserializeObject<SupplementalQueryResult>(request.QueryPlan);
+                    var supplementalQueries = (SupplementalQueryResult)request.QueryPlanResult;
                     if (supplementalQueries != null) {
                        await _repository.SaveSupplementalQueries(request.FacilityId, supplementalQueries.SupplementalQueries, cancellationToken);
                        await SendAudit($"Update supplemental query configuration for '{request.FacilityId}'", null, request.FacilityId, AuditEventType.Update, null);
                     }
                     break;
             }
-
-
         }
         catch(Exception ex)
         {
@@ -142,36 +127,4 @@ public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand,
         
         return new Unit();
     }
-
-    //private void runTest()
-    //{
-    //    var testPlan = new QueryPlan
-    //    {
-    //        _id = "testfacility-QP1",
-    //        ReportType = "Test",
-    //        FacilityId = "testFacility",
-    //        EHRDescription = "Epic",
-    //        LookBack = "test",
-    //        InitialQueries = new Dictionary<string, Domain.Interfaces.IQueryConfig>
-    //        {
-    //            {"1", new ParameterQueryConfig
-    //                {
-    //                    ResourceType = "Encounter",
-    //                    Parameters = new List<IParameter>()
-    //                } 
-    //            }
-    //        }
-    //    };
-        
-    //    var jsonSettings = new JsonSerializerSettings
-    //    {
-    //        NullValueHandling = NullValueHandling.Ignore,
-    //        TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
-    //        TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
-    //        TypeNameHandling = TypeNameHandling.Auto
-    //    };
-
-    //    var jsonStr = JsonConvert.SerializeObject(testPlan, jsonSettings);
-    //    Console.WriteLine(jsonStr);
-    //}
 }

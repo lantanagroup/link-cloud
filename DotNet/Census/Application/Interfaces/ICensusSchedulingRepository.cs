@@ -9,7 +9,7 @@ public interface ICensusSchedulingRepository : IDisposable
 
     Task DeleteJobsForFacility(String facilityId, IScheduler scheduler);
 
-    Task UpdateJobsForFacility(CensusConfigEntity newFacility, CensusConfigEntity existingFacility, IScheduler scheduler);
+    Task UpdateJobsForFacility(CensusConfigEntity config, IScheduler scheduler);
 
     Task RescheduleJob(string scheduledTrigger, JobKey jobKey, IScheduler scheduler);
 

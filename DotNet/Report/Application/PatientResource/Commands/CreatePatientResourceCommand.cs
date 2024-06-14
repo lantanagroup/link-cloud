@@ -36,13 +36,12 @@ namespace LantanaGroup.Link.Report.Application.PatientResource.Commands
                 CreateDate = DateTime.UtcNow,
                 FacilityId = request.FacilityId,
                 PatientId = request.PatientId,
-                //Resource = JsonSerializer.Serialize<Resource>(request.Resource, new JsonSerializerOptions().ForFhir()),
                 Resource = request.Resource,
                 ResourceType = request.Resource.TypeName,
                 ResourceId = request.Resource.Id
             };
             
-            await _repository.AddAsync(patientResource);
+            await _repository.AddAsync(patientResource, cancellationToken);
 
             return patientResource;
         }

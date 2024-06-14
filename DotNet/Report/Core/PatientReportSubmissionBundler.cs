@@ -75,9 +75,10 @@ namespace LantanaGroup.Link.Report.Core
                     throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
 
 
-                entry?.ContainedResources?.ForEach(async r =>
+                foreach(var r in entry.ContainedResources)
                 {
-                    if (r.DocumentId == null) return;
+                    if (r.DocumentId == null)
+                        continue;
 
                     IFacilityResource facilityResource = null!;
                     
@@ -102,9 +103,13 @@ namespace LantanaGroup.Link.Report.Core
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.", ex);
+                        var message =
+                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(message, ex);
+
+                        throw new Exception(message, ex);
                     }
-                });
+                }
                 
 
                 // ensure we have an id to reference

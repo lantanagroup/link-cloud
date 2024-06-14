@@ -9,6 +9,9 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
     {
         public T Deserialize(ReadOnlySpan<byte> data, bool isNull, SerializationContext context)
         {
+            if (isNull)
+                return default(T);
+
             string jsonContent = System.Text.Encoding.Default.GetString(data.ToArray());
             
             var options = new JsonSerializerOptions();

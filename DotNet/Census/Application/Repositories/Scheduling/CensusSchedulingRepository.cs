@@ -147,23 +147,23 @@ public class CensusSchedulingRepository : ICensusSchedulingRepository
         await scheduler.ScheduleJob(newTrigger);
     }
 
-    public async Task UpdateJobsForFacility(CensusConfigEntity newFacility, CensusConfigEntity existingFacility, IScheduler scheduler)
+    public async Task UpdateJobsForFacility(CensusConfigEntity config, IScheduler scheduler)
     {
-        await DeleteJobsForFacility(newFacility.FacilityID, scheduler);
+        await DeleteJobsForFacility(config.FacilityID, scheduler);
 
         var groupMatcher = GroupMatcher<JobKey>.GroupContains(KafkaTopic.PatientCensusScheduled.ToString());
 
-        string jobKeyName = $"{newFacility.FacilityID}-{KafkaTopic.PatientCensusScheduled.ToString()}";
+        string jobKeyName = $"{config.FacilityID}-{KafkaTopic.PatientCensusScheduled }";
 
         JobKey jobKey = (await scheduler.GetJobKeys(groupMatcher)).FirstOrDefault(key => key.Name == jobKeyName);
 
         if (jobKey is not null)
         {
-            await RescheduleJob(newFacility.ScheduledTrigger, jobKey, scheduler);
+            await RescheduleJob(config.ScheduledTrigger, jobKey, scheduler);
         }
         else
         {
-            CreateJobAndTrigger(newFacility, scheduler);
+            CreateJobAndTrigger(config, scheduler);
         }
     }
 }

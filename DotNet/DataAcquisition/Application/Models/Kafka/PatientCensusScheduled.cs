@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka
 {
-    public class PatientCensusScheduledMessage : IBaseMessage
+    public class PatientCensusScheduled : BaseMessage, IBaseMessage
     {
     }
 }

@@ -40,9 +40,8 @@ namespace LantanaGroup.Link.Shared.Application.SerDes
             {
                 return;
             }
-
-            var options = new JsonSerializerOptions().ForFhir(typeof(T).Assembly);
-            string jsonString = JsonSerializer.Serialize(resource, options);
+            
+            string jsonString = new FhirJsonSerializer().SerializeToString(resource);
             BsonDocument document = BsonSerializer.Deserialize<BsonDocument>(jsonString);
             BsonSerializer.Serialize(context.Writer, document);
         }

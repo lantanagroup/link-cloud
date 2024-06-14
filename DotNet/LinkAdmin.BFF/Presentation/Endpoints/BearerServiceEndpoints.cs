@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public async Task<IResult> CreateToken(HttpContext context)
         {
-            if(!_tokenServiceconfig.Value.EnableTokenGenrationEndpoint)
+            if(!_tokenServiceconfig.Value.EnableTokenGenerationEndpoint)
             {
                 return Results.BadRequest("Token generation is disabled.");
             }

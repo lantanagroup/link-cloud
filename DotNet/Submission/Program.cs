@@ -111,7 +111,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
-    builder.Services.AddTransient<TenantSubmissionRepository>();
+    builder.Services.AddTransient<ITenantSubmissionRepository, TenantSubmissionRepository>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

@@ -1,13 +1,13 @@
 ﻿using KellermanSoftware.CompareNetObjects;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -73,30 +73,45 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<AuthenticationConfiguration>> GetAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         CancellationToken cancellationToken)
     {
-        if(string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest();
-        }
-
         try
         {
+            if (queryConfigurationTypePathParameter == null)
+            {
+                throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException($"FacilityId is null.");
+            }
+
             var result = await _mediator.Send(new GetAuthConfigQuery
             {
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-            });
+            }, cancellationToken);
 
-            if(result == null)
+            if (result == null)
             {
-                return NotFound($"No configuration found for facilityId: {facilityId}");
+                throw new NotFoundException("No Authentication Settings found.");
             }
 
             return Ok(result);
         }
-        catch(Exception ex)
+        catch (BadRequestException bex)
+        {
+            await SendAudit(bex.Message, null, facilityId, AuditEventType.Query, null); _logger.LogWarning(bex.Message);
+            return BadRequest(bex.Message);
+        }
+        catch (NotFoundException nex)
+        {
+            await SendAudit(nex.Message, null, facilityId, AuditEventType.Query, null);
+            return NotFound(nex.Message);
+        }
+        catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "GetAuthenticationSettings"), ex, "An exception occurred while attempting to authentication settings with a facility id of {id}", facilityId);
             throw;
@@ -127,39 +142,49 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         [FromBody] AuthenticationConfiguration authenticationConfiguration, 
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest();
-        }
-
-        if (authenticationConfiguration == null)
-        {
-            return BadRequest("No request body");
-        }
-
         try
         {
+            if (queryConfigurationTypePathParameter == null)
+            {
+                throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
+            }
+
+            if (authenticationConfiguration == null)
+            {
+                throw new BadRequestException($"AuthenticationConfiguration is null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException($"FacilityId is null.");
+            }
+
             var result = await _mediator.Send(new SaveAuthConfigCommand
             {
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
                 Configuration = authenticationConfiguration
-            });
-
-            if (result == null)
-            {
-                return NotFound($"No configuration found for facilityId: {facilityId}. Unable to add authentication settings.");
-            }
+            }, cancellationToken);
 
             await SendAudit($"Create authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
             
             return Accepted(result);
         }
-        catch(MissingFacilityConfigurationException ex)
+        catch (BadRequestException bex)
+        {
+            await SendAudit(bex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(bex.Message);
+            return BadRequest(bex.Message);
+        }
+        catch (NotFoundException nex)
+        {
+            await SendAudit(nex.Message, null, facilityId, AuditEventType.Create, null);
+            return NotFound(nex.Message);
+        }
+        catch (MissingFacilityConfigurationException ex)
         {
             await SendAudit($"Error creating authorization configuration  for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
             return BadRequest(ex.Message);
@@ -194,21 +219,26 @@ public class AuthenticationConfigController : Controller
     public async Task<IActionResult> UpdateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
-        [FromBody] AuthenticationConfiguration authenticationConfiguration,
+        [FromBody] AuthenticationConfiguration? authenticationConfiguration,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest();
-        }
-
-        if (authenticationConfiguration == null)
-        {
-            return BadRequest("No request body");
-        }
-
         try
         {
+            if (queryConfigurationTypePathParameter == null)
+            {
+                throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
+            }
+
+            if (authenticationConfiguration == null)
+            {
+                throw new BadRequestException($"AuthenticationConfiguration is null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException($"FacilityId is null.");
+            }
+
             var existingAuthorizationConfiguration = await _mediator.Send(new GetAuthConfigQuery
             {
                 FacilityId = facilityId,
@@ -220,12 +250,8 @@ public class AuthenticationConfigController : Controller
                 FacilityId = facilityId,
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
                 Configuration = authenticationConfiguration
-            });
+            }, cancellationToken);
 
-            if (result == null)
-            {
-                return NotFound();
-            }
             var resultChanges = _compareLogic.Compare(authenticationConfiguration, existingAuthorizationConfiguration);
             List<Difference> list = resultChanges.Differences;
             List<PropertyChangeModel> propertyChanges = new List<PropertyChangeModel>();
@@ -238,6 +264,7 @@ public class AuthenticationConfigController : Controller
                 });
 
             });
+
             await SendAudit($"Update authorization configuration for '{facilityId}'", null, facilityId, AuditEventType.Update, propertyChanges);
 
             return Accepted(result);
@@ -251,6 +278,16 @@ public class AuthenticationConfigController : Controller
                 AuditEventType.Query,
                 null);
             return BadRequest(ex.Message);
+        }
+        catch (BadRequestException bex)
+        {
+            await SendAudit(bex.Message, null, facilityId, AuditEventType.Update, null); _logger.LogWarning(bex.Message);
+            return BadRequest(bex.Message);
+        }
+        catch (NotFoundException nex)
+        {
+            await SendAudit(nex.Message, null, facilityId, AuditEventType.Update, null);
+            return NotFound(nex.Message);
         }
         catch (Exception ex)
         {
@@ -284,29 +321,41 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest();
-        }
-
         try
         {
-            var result = await _mediator.Send(new DeleteAuthConfigCommand
+            if (queryConfigurationTypePathParameter == null)
+            {
+                throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException($"FacilityId is null.");
+            }
+
+            await _mediator.Send(new DeleteAuthConfigCommand
             {
                 FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-            });
+                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter
+            }, cancellationToken);
 
-            if (result == null)
-            {
-                return NotFound($"No configuration found for facilityId: {facilityId}. Unable to delete authentication settings.");
-            }
-            await SendAudit($"Delete authentication configuration for facility {facilityId}", null, facilityId, AuditEventType.Delete, null);
-            
-            return Accepted(result);
+            await SendAudit($"Delete authentication configuration for facility {facilityId}", null, facilityId,
+                AuditEventType.Delete, null);
+
+            return Accepted();
+        }
+        catch (BadRequestException bex)
+        {
+            await SendAudit(bex.Message, null, facilityId, AuditEventType.Delete, null); _logger.LogWarning(bex.Message);
+            return BadRequest(bex.Message);
+        }
+        catch (NotFoundException nex)
+        {
+            await SendAudit(nex.Message, null, facilityId, AuditEventType.Delete, null);
+            return NotFound(nex.Message);
         }
         catch (Exception ex)
         {
