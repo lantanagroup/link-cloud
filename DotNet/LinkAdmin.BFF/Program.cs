@@ -294,7 +294,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseStatusCodePages();
-    app.UseHttpsRedirection();
+    //app.UseHttpsRedirection();
 
     // Configure swagger
     if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
