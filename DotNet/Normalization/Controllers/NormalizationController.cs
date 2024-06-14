@@ -40,33 +40,18 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> StoreTenant([FromBody]JsonElement config)
+        public async Task<IActionResult> StoreTenant([FromBody]NormalizationConfigModel config)
         {
-            string? body = string.Empty;
+            if(config == null)
+            {
+                return BadRequest("No request body found.");
+            }
+
             try
             {
-                var element = (JsonElement)config;
-                body = element.ToString();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message, ex);
-                return StatusCode(StatusCodes.Status500InternalServerError);
-            }
-
-            if (body == null)
-            {
-                return BadRequest("No request body");
-            }
-
-            NormalizationConfigModel? configModel = null;
-            try
-            {
-                configModel = NormalizationConfigModelDeserializer.Deserialize(config);
-
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
-                    NormalizationConfigModel = configModel,
+                    NormalizationConfigModel = config,
                     Source = SaveTypeSource.Create
                 });
             }
@@ -82,7 +67,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             catch(EntityAlreadyExistsException ex) 
             {
                 _logger.LogError(ex.Message, ex);
-                return BadRequest($"Entity for {configModel?.FacilityId} already exists. Please use PUT request to update.");
+                return BadRequest($"Entity for {config?.FacilityId} already exists. Please use PUT request to update.");
             }
             catch(Exception ex) 
             {
@@ -140,42 +125,23 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> UpdateTenantNormalization(string facilityId, [FromBody] JsonElement config)
+        public async Task<IActionResult> UpdateTenantNormalization(string facilityId, [FromBody] NormalizationConfigModel config)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
                 return BadRequest();
             }
 
-            NormalizationConfigModel? configModel;
-            try
+            if (config == null)
             {
-                var element = (JsonElement)config;
-                string? body = element.ToString();
-
-                if (body == null)
-                {
-                    return BadRequest("No request body");
-                }
-
-                configModel = NormalizationConfigModelDeserializer.Deserialize(config);
-
-                if (string.IsNullOrEmpty(configModel.FacilityId))
-                {
-                    configModel.FacilityId = facilityId;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message, ex);
-                return Problem(detail: ex.Message, statusCode:StatusCodes.Status500InternalServerError);
+                return BadRequest("No request body");
             }
 
             try
             {
                 await _mediator.Send(new SaveConfigEntityCommand
                 {
-                    NormalizationConfigModel = configModel,
+                    NormalizationConfigModel = config,
                     Source = SaveTypeSource.Update,
                     FacilityId = facilityId,
                 });
@@ -192,7 +158,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             catch (EntityAlreadyExistsException ex)
             {
                 _logger.LogError(ex.Message, ex);
-                return BadRequest($"Entity for {configModel?.FacilityId} already exists. Please use PUT request to update.");
+                return BadRequest($"Entity for {config?.FacilityId} already exists. Please use PUT request to update.");
             }
             catch (Exception ex)
             {

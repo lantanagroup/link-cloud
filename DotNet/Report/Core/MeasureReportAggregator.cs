@@ -20,7 +20,7 @@ public class MeasureReportAggregator
         _logger = logger;
     }
 
-    public List<MeasureReport> Aggregate(List<MeasureReport> individuals)
+    public List<MeasureReport> Aggregate(List<MeasureReport> individuals, string organizationId, DateTime startDate, DateTime endDate)
     {
         List<MeasureReport> aggregates = new List<MeasureReport>();
 
@@ -40,6 +40,8 @@ public class MeasureReportAggregator
                 aggregate.Status = MeasureReport.MeasureReportStatus.Complete;
                 aggregate.DateElement = FhirDateTime.Now();
                 aggregate.Measure = indMeasureReport.Measure;
+                aggregate.Period = new Period(new FhirDateTime(new DateTimeOffset(startDate)), new FhirDateTime(new DateTimeOffset(endDate)));
+                aggregate.Reporter = new ResourceReference($"Organization/{organizationId}");
                 aggregates.Add(aggregate);
             }
 

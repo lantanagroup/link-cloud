@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource
 public class GetPatientDataRequest : IRequest<List<IBaseMessage>>
 {
     public string FacilityId { get; set; }
-    public DataAcquisitionRequestedMessage Message { get; set; }
+    public DataAcquisitionRequested Message { get; set; }
     public string CorrelationId { get; set; }
     public QueryPlanType QueryPlanType { get; set; }
 }

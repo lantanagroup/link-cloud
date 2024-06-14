@@ -1,4 +1,6 @@
 ﻿using Amazon.Runtime.Internal;
+using LantanaGroup.Link.Submission.Application.Interfaces;
+using LantanaGroup.Link.Submission.Application.Models.ApiModels;
 using LantanaGroup.Link.Submission.Domain.Entities;
 using LantanaGroup.Link.Submission.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,7 @@ using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Submission.Application.Repositories
 {
-    public class TenantSubmissionRepository
+    public class TenantSubmissionRepository : ITenantSubmissionRepository
     {
         private readonly TenantSubmissionDbContext _dbContext;
         private readonly ILogger<TenantSubmissionConfigEntity> _logger;

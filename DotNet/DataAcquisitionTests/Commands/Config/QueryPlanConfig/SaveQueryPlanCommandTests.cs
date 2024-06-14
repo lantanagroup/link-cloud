@@ -1,19 +1,15 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 using MediatR;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {
@@ -21,7 +17,36 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
     {
         private AutoMocker _mocker;
         private const string facilityId = "testId";
-        private const string queryPlan = "{\"key\":\"value\"}";
+        //private const string queryPlan = "{\"key\":\"value\"}";
+        private static QueryPlanResult queryPlan = new QueryPlanResult { 
+                QueryPlan = new QueryPlan
+                {
+                    Id = new Guid(),
+                    PlanName = "testName",
+                    FacilityId = "testFacilityId",
+                    EHRDescription = "testEHRDescription",
+                    LookBack = "PT01",
+                    ReportType = "testReportType",
+                    InitialQueries = new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+                    {
+                        { "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
+                            {
+                                ResourceType = "Patient",
+                                Parameters = new List<IParameter>{ new LiteralParameter { Name = "testName", Literal = "testValue" } }
+                            }
+                        }
+                    },
+                    SupplementalQueries = new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+                    {
+                        { "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
+                            {
+                                ResourceType = "Patient",
+                                Parameters = new List<IParameter>{ new LiteralParameter { Name = "testName", Literal = "testValue" } }
+                            }
+                        }
+                        }
+                    }
+            };
 
         [Fact]
         public async Task HandleTest()
@@ -31,7 +56,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var command = new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlan = queryPlan,
+                QueryPlanResult = queryPlan,
                 QueryPlanType = QueryPlanType.QueryPlans
             };
 
@@ -76,7 +101,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var command = new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlan = queryPlan,
+                QueryPlanResult = queryPlan,
                 QueryPlanType = QueryPlanType.QueryPlans
             };
 

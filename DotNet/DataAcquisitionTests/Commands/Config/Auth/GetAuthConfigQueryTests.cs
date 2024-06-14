@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace DataAcquisitionUnitTests.Commands.Config.Auth
 {
@@ -42,9 +43,15 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
             var query = new GetAuthConfigQuery { QueryConfigurationTypePathParameter = null, FacilityId = facilityId };
             var expectedResult = new AuthenticationConfiguration();
 
-            var result = await handler.Handle(query, CancellationToken.None);
-
-            Assert.Null(result);
+            try
+            {
+                var result = await handler.Handle(query, CancellationToken.None);
+                Assert.Fail();
+            }
+            catch (BadRequestException ex)
+            {
+                Assert.True(true);
+            }
         }
 
         [Fact]
@@ -55,9 +62,15 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
             var query = new GetAuthConfigQuery { QueryConfigurationTypePathParameter = QueryConfigurationTypePathParameter.fhirQueryConfiguration, FacilityId = null };
             var expectedResult = new AuthenticationConfiguration();
 
-            var result = await handler.Handle(query, CancellationToken.None);
-
-            Assert.Null(result);
+            try
+            {
+                var result = await handler.Handle(query, CancellationToken.None);
+                Assert.Fail();
+            }
+            catch (BadRequestException ex)
+            {
+                Assert.True(true);
+            }
         }
     }
 }

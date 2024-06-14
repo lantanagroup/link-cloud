@@ -108,20 +108,10 @@ public class QueryPlanConfigController : Controller
     public async Task<IActionResult> CreateQueryPlan(
         string facilityId, 
         QueryPlanType queryPlanType, 
-        [FromBody] dynamic queryPlan, 
+        [FromBody] IQueryPlan queryPlan, 
         CancellationToken cancellationToken)
     {
-        string? body = string.Empty;
-        try
-        {
-            var element = (JsonElement)queryPlan;
-            body = element.ToString();
-        }catch(Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError);
-        }
-        
-        if (body == null)
+        if (queryPlan == null)
         {
             return BadRequest("No request body");
         }
@@ -131,7 +121,7 @@ public class QueryPlanConfigController : Controller
             var result = await _mediator.Send(new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlan = body,
+                QueryPlanResult = queryPlan,
                 QueryPlanType = queryPlanType
             });
 
@@ -181,27 +171,10 @@ public class QueryPlanConfigController : Controller
     public async Task<IActionResult> UpdateQueryPlan(
         string facilityId,
         QueryPlanType queryPlanType,
-        [FromBody] dynamic queryPlan,
+        [FromBody] IQueryPlan queryPlan,
         CancellationToken cancellationToken)
     {
-        string? body = string.Empty;
-        try
-        {
-            var element = (JsonElement)queryPlan;
-            body = element.ToString();
-        }
-        catch (Exception ex)
-        {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Query,
-                null);
-            return StatusCode(StatusCodes.Status500InternalServerError);
-        }
-
-        if (body == null)
+        if (queryPlan == null)
         {
             return BadRequest("No request body");
         }
@@ -211,7 +184,7 @@ public class QueryPlanConfigController : Controller
             var result = await _mediator.Send(new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlan = body,
+                QueryPlanResult = queryPlan,
                 QueryPlanType = queryPlanType
             });
 

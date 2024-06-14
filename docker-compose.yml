@@ -193,16 +193,16 @@ services:
        - KAFKA_CFG_LISTENERS=SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
        - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
        - KAFKA_CFG_ADVERTISED_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094
-       - KAFKA_CLIENT_USERS=user
-       - KAFKA_CLIENT_PASSWORDS=password
+       - KAFKA_CLIENT_USERS=${KAFKA_SASL_CLIENT_USER}
+       - KAFKA_CLIENT_PASSWORDS=${KAFKA_SASL_CLIENT_PASSWORD}
        - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT
        - KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
        - KAFKA_INTER_BROKER_USER=controller_user
        - KAFKA_INTER_BROKER_PASSWORD=controller_password
        - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
        - KAFKA_CFG_SASL_MECHANISM_CONTROLLER_PROTOCOL=PLAIN
-       - KAFKA_CONTROLLER_USER=controller_user
-       - KAFKA_CONTROLLER_PASSWORD=controller_password  
+       - KAFKA_CONTROLLER_USER=${KAFKA_INTER_BROKER_USER}
+       - KAFKA_CONTROLLER_PASSWORD=${KAFKA_INTER_BROKER_PASSWORD}
        - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
        - KAFKA_CFG_NUM_PARTITIONS=2
      networks:
@@ -278,7 +278,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka_b:9094
       KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
-      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";'
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
     networks:
       - link-nw
 
@@ -295,7 +295,7 @@ services:
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
       KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
       KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
-      KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";'
+      KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
     networks:
       - link-nw
 
@@ -311,7 +311,7 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://kafka_b:9094,PLAINTEXT_INTERNAL://localhost:29092
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: PLAIN 
-      SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";'
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";'
     networks:
       - link-nw
      
@@ -328,8 +328,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -365,8 +365,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -395,12 +395,45 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__1__Args__uri: http://loki:3100
       ServiceRegistry__AccountServiceUrl: http://account:8060
       ConnectionStrings__Redis: redis_cache:6379
+      EnableIntegrationFeature: true
+      ProblemDetails__IncludeExceptionDetails: false
+      LinkTokenService__EnableTokenGenerationEndpoint: true
+      LinkTokenService__Authority:      
+      LinkTokenService__LinkAdminEmail:      
+      LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
+      ReverseProxy__Routes__route1__ClusterId: AccountService
+      ReverseProxy__Routes__route1__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route1__Match__Path: api/account/{**catch-all}
+      ReverseProxy__Routes__route2__ClusterId: AuditService
+      ReverseProxy__Routes__route2__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route2__Match__Path: api/audit/{**catch-all}
+      ReverseProxy__Routes__route3__ClusterId: CensusService
+      ReverseProxy__Routes__route3__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route3__Match__Path: api/census/{**catch-all}
+      ReverseProxy__Routes__route4__ClusterId: DataAcquisitionService
+      ReverseProxy__Routes__route4__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route4__Match__Path: api/data/{**catch-all}
+      ReverseProxy__Routes__route5__ClusterId: MeasureEvaluationService
+      ReverseProxy__Routes__route5__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route5__Match__Path: api/measure-definition/{**catch-all}
+      ReverseProxy__Routes__route6__ClusterId: NormalizationService
+      ReverseProxy__Routes__route6__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route6__Match__Path: api/normalization/{**catch-all}
+      ReverseProxy__Routes__route7__ClusterId: NotificationService
+      ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
+      ReverseProxy__Routes__route8__ClusterId: ReportService
+      ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
+      ReverseProxy__Routes__route9__ClusterId: TenantService
+      ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route9__Match__Path: api/facility/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -445,8 +478,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -482,8 +515,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer      
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -532,7 +565,7 @@ services:
       spring.kafka.consumer.client-id: measureeval-client
       spring.kafka.properties.security.protocol: SASL_PLAINTEXT
       spring.kafka.properties.sasl.mechanism: PLAIN
-      spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";
+      spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
@@ -557,8 +590,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -591,8 +624,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-notification;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -628,8 +661,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-querydispatch;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -663,8 +696,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
       Serilog__WriteTo__0__Args__uri: http://loki:3100
@@ -697,8 +730,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       MongoDB__ConnectionString: mongodb://mongo:27017
       MongoDB__DatabaseName: link-report
       # TODO: Replce with Mongo dependency when LNK-2166 finishes
@@ -750,8 +783,8 @@ services:
       ServiceInformation__Version: 1.1.00-dev
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
-      KafkaConnection__SaslUsername: user
-      KafkaConnection__SaslPassword: password
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       DatabaseProvider: SqlServer
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -760,6 +793,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
     ports:
       - "8074:8074"
     build:
@@ -785,7 +819,7 @@ services:
       spring.kafka.bootstrap-servers: kafka_b:9094
       spring.kafka.properties.security.protocol: SASL_PLAINTEXT
       spring.kafka.properties.sasl.mechanism: PLAIN
-      spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="password";
+      spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       authentication.enableAnonymousAccess: true
       secretManagement.managerUri: https://link-vault.vault.azure.net/
       spring.jpa.hibernate.ddl-auto: update

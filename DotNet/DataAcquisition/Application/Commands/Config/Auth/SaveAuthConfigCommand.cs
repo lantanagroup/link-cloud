@@ -38,31 +38,39 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
     {
         if (request.QueryConfigurationTypePathParameter == null)
         {
-            _logger.LogWarning("{QueryConfigTypeParam} is null.", nameof(request.QueryConfigurationTypePathParameter));
-            return new Unit();
+            throw new BadRequestException("QueryConfigTypeParam is null.");
         }
 
         if (request.FacilityId == null)
         {
-            _logger.LogWarning("{FacilityId} is null.", nameof(request.FacilityId));
-            return new Unit();
+            throw new BadRequestException("FacilityId is null.");
         }
 
-        if(await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
+        if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
         {
             throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
         }
 
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
         {
-            if(!(await checkIfFacilityConfigExists(request.FacilityId, request.QueryConfigurationTypePathParameter.Value, cancellationToken)))
-                throw new MissingFacilityConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
+            if (!await checkIfFacilityConfigExists(request.FacilityId,
+                    request.QueryConfigurationTypePathParameter.Value, cancellationToken))
+            {
+                throw new MissingFacilityConfigurationException(
+                    $"Facility configuration for {request.FacilityId} does not exist.");
+            }
+
             await _fhirQueryConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
         }
         else
         {
-            if (!(await checkIfFacilityConfigExists(request.FacilityId, request.QueryConfigurationTypePathParameter.Value, cancellationToken)))
-                throw new MissingFacilityConfigurationException($"Facility configuration for {request.FacilityId} does not exist.");
+            if (!await checkIfFacilityConfigExists(request.FacilityId,
+                    request.QueryConfigurationTypePathParameter.Value, cancellationToken))
+            {
+                throw new MissingFacilityConfigurationException(
+                    $"Facility configuration for {request.FacilityId} does not exist.");
+            }
+
             await _fhirQueryListConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
         }
         return new Unit();

@@ -2,6 +2,7 @@ using Azure.Identity;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
+using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
@@ -112,7 +113,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
+        });
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
 

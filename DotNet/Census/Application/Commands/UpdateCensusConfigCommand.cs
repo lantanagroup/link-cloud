@@ -7,12 +7,12 @@ using Quartz;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
 
-public class UpdateCensusCommand : IRequest<CensusConfigModel>
+public class UpdateCensusConfigCommand : IRequest<CensusConfigModel>
 {
     public CensusConfigModel Config;
 }
 
-public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusCommand, CensusConfigModel>
+public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusConfigCommand, CensusConfigModel>
 {
     private readonly ILogger<UpdateCensusCommandHandler> _logger;
     private readonly ICensusConfigRepository _repository;
@@ -30,7 +30,7 @@ public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusCommand, C
         _tenantApiService = tenantApiService ?? throw new ArgumentNullException();
     }
 
-    public async Task<CensusConfigModel> Handle(UpdateCensusCommand request, CancellationToken cancellationToken)
+    public async Task<CensusConfigModel> Handle(UpdateCensusConfigCommand request, CancellationToken cancellationToken)
     {
         if (await _tenantApiService.CheckFacilityExists(request.Config.FacilityId, cancellationToken) == false)
         {
@@ -38,12 +38,16 @@ public class UpdateCensusCommandHandler : IRequestHandler<UpdateCensusCommand, C
         }
 
         _logger.LogInformation($"Updating config for facility {request.Config}.");
+
         var entity = await _repository.GetByFacilityIdAsync(request.Config.FacilityId, cancellationToken);
-        var oldEntity = entity;
+        
         if (entity == null) { throw new Exception($"Unable to retrieve entity for facility {request.Config.FacilityId}"); }
+
         entity.ScheduledTrigger = request.Config.ScheduledTrigger;
+
         await _repository.UpdateAsync(entity, cancellationToken);
-        await _censusSchedulingRepo.UpdateJobsForFacility(entity, oldEntity, await _schedulerFactory.GetScheduler(cancellationToken));
+        await _censusSchedulingRepo.UpdateJobsForFacility(entity, await _schedulerFactory.GetScheduler(cancellationToken));
+
         return new CensusConfigModel
         {
             FacilityId = entity.FacilityID,
