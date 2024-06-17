@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 options.Cookie.Name = LinkAdminConstants.AuthenticationSchemes.Cookie;
                 options.Cookie.HttpOnly = configuration.GetValue<bool>("Authentication:Schemas:Cookie:HttpOnly");
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;                
+                options.Cookie.SecurePolicy = securityServiceOptions.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;                
                 options.Cookie.Path = configuration.GetValue<string>("Authentication:Schemas:Cookie:Path");                
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
@@ -80,20 +80,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     
             });
 
-            logger.Information("Set Cookie Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.Cookie);
+            logger.Debug("Registering Cookie Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.Cookie);
             if (!string.IsNullOrEmpty(configuration.GetValue<string>("Authentication:Schemas:Cookie:Domain")))
             {
-                logger.Information("Cookie Domain: {Domain}", configuration.GetValue<string>("Authentication:Schemas:Cookie:Domain"));
+                logger.Debug("Cookie Domain: {Domain}", configuration.GetValue<string>("Authentication:Schemas:Cookie:Domain"));
             }
-            logger.Information("Cookie Path: {Path}", configuration.GetValue<string>("Authentication:Schemas:Cookie:Path"));
-            logger.Information("Cookie HttpOnly: {HttpOnly}", configuration.GetValue<bool>("Authentication:Schemas:Cookie:HttpOnly"));
-            logger.Information("Cookie SecurePolicy: {SecurePolicy}", nameof(CookieSecurePolicy.SameAsRequest));
-            logger.Information("Cookie SameSite: {SameSite}", nameof(SameSiteMode.Strict));
+            logger.Debug("Cookie Path: {Path}", configuration.GetValue<string>("Authentication:Schemas:Cookie:Path"));
+            logger.Debug("Cookie HttpOnly: {HttpOnly}", configuration.GetValue<bool>("Authentication:Schemas:Cookie:HttpOnly"));
+            logger.Debug("Cookie SecurePolicy: {SecurePolicy}", nameof(CookieSecurePolicy.SameAsRequest));
+            logger.Debug("Cookie SameSite: {SameSite}", nameof(SameSiteMode.Strict));
 
             //Add Oauth authorization scheme if enabled
             if (configuration.GetValue<bool>("Authentication:Schemas:Oauth2:Enabled"))
             {
-                logger.Information("Registering OAuth2 authentication scheme.");
+                logger.Information("Registering OAuth2 authentication scheme: {Scheme}", LinkAdminConstants.AuthenticationSchemes.Oauth2);
                 if (!LinkAdminConstants.AuthenticationSchemes.Oauth2.Equals(defaultChallengeScheme))
                     authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.Oauth2);
 
@@ -108,18 +108,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath");                                     
                 });
 
-                logger.Information("Set OAuth2 Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.Oauth2);
-                logger.Information("Client Id: {ClientId}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId"));
-                logger.Information("Authorization Endpoint: {AuthorizationEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization"));
-                logger.Information("Token Endpoint: {TokenEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token"));
-                logger.Information("User Information Endpoint: {UserInformationEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation"));
-                logger.Information("Callback Path: {CallbackPath}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath"));
+                logger.Debug("Set OAuth2 Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.Oauth2);
+                logger.Debug("Client Id: {ClientId}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:ClientId"));
+                logger.Debug("Authorization Endpoint: {AuthorizationEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Authorization"));
+                logger.Debug("Token Endpoint: {TokenEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:Token"));
+                logger.Debug("User Information Endpoint: {UserInformationEndpoint}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:Endpoints:UserInformation"));
+                logger.Debug("Callback Path: {CallbackPath}", configuration.GetValue<string>("Authentication:Schemas:Oauth2:CallbackPath"));
             }
 
             // Add OpenIdConnect authorization scheme if enabled
             if (configuration.GetValue<bool>("Authentication:Schemas:OpenIdConnect:Enabled"))
             {
-                logger.Information("Registering OpenIdConnect authentication scheme.");
+                logger.Debug("Registering OpenIdConnect authentication scheme: {scheme}", LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
                 if (!LinkAdminConstants.AuthenticationSchemes.OpenIdConnect.Equals(defaultChallengeScheme))
                     authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
 
@@ -133,15 +133,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.RoleClaimType = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:RoleClaimType");
                 });
 
-                logger.Information("Set OpenIdConnect Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
-                logger.Information("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority"));
-                logger.Information("Client Id: {ClientId}", configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId"));
+                logger.Debug("Set OpenIdConnect Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.OpenIdConnect);
+                logger.Debug("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority"));
+                logger.Debug("Client Id: {ClientId}", configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId"));
             }
 
             // Add JWT authorization scheme if enabled
             if (configuration.GetValue<bool>("Authentication:Schemas:Jwt:Enabled"))
             {
-                logger.Information("Registering JWT authentication scheme.");
+                logger.Debug("Registering JWT authentication scheme: {scheme}", LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
                 if (!LinkAdminConstants.AuthenticationSchemes.JwtBearerToken.Equals(defaultChallengeScheme))
                     authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
 
@@ -154,9 +154,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.RoleClaimType = configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
                 });
 
-                logger.Information("Set JWT Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
-                logger.Information("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority"));
-                logger.Information("Audience: {Audience}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience"));
+                logger.Debug("Set JWT Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
+                logger.Debug("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority"));
+                logger.Debug("Audience: {Audience}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience"));
             }
 
             // Add Link Bearer Token authorization schema
@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             var corsConfig = configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
             if (corsConfig != null)
             {
-                logger.Information("Registering CORS settings.");
+                logger.Debug("Registering CORS settings.");
                 services.AddCorsService(options =>
                 {
                     options.Environment = securityServiceOptions.Environment;
