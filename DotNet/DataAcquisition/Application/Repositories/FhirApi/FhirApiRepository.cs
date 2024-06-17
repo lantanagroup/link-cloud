@@ -275,7 +275,7 @@ public class FhirApiRepository : IFhirApiRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "error encountered retrieving fhir resource.");
+            _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; PatientId: {PatientId}", resourceType, patientId);
             throw;
         }
 

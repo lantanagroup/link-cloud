@@ -43,12 +43,12 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
 
         if (existingEntity != null)
         {
-            var oldEntity = existingEntity;
             existingEntity.ScheduledTrigger = request.CensusConfigEntity.ScheduledTrigger;
             existingEntity.ModifyDate = DateTime.UtcNow;
+
             try
             {
-                await _censusSchedulingRepo.UpdateJobsForFacility(existingEntity, oldEntity, await _schedulerFactory.GetScheduler(cancellationToken));
+                await _censusSchedulingRepo.UpdateJobsForFacility(existingEntity, await _schedulerFactory.GetScheduler(cancellationToken));
             }
             catch (Exception ex)
             {
@@ -96,6 +96,7 @@ public class CreateCensusConfigCommandHandler : IRequestHandler<CreateCensusConf
             }
             catch (Exception ex)
             {
+                //TODO: Daniel - doesn't do anything with the message
                 var message = $"Error saving config for facility {existingEntity.FacilityID} {ex.Message}\n{ex.InnerException}\n{ex.Source}\n{ex.StackTrace}";
                 throw;
             }

@@ -16,7 +16,7 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
-import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.common.Attributes;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -36,15 +36,17 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static io.opentelemetry.api.common.AttributeKey.stringKey;
+
 public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
-
     private final AbstractResourceRepository resourceRepository;
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final DataAcquisitionClient dataAcquisitionClient;
     private final MeasureEvaluatorCache measureEvaluatorCache;
     private final MeasureReportNormalizer measureReportNormalizer;
     private final Predicate<MeasureReport> reportabilityPredicate;
+    private final MeasureEvalMetrics measureEvalMetrics;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
 
@@ -56,7 +58,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate) {
+            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
+            MeasureEvalMetrics measureEvalMetrics) {
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
         this.dataAcquisitionClient = dataAcquisitionClient;
@@ -65,6 +68,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.reportabilityPredicate = reportabilityPredicate;
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
         this.resourceEvaluatedTemplate = resourceEvaluatedTemplate;
+        this.measureEvalMetrics = measureEvalMetrics;
     }
 
     protected abstract NormalizationStatus getNormalizationStatus();
@@ -256,7 +260,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void evaluateMeasures(T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         logger.debug("Evaluating measures");
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
-            MeasureReport measureReport = evaluateMeasure(patientStatus, report, bundle);
+            MeasureReport measureReport = evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
@@ -280,9 +284,13 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     private MeasureReport evaluateMeasure(
+            String queryType,
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
             Bundle bundle) {
+
+        long start = System.currentTimeMillis();
+
         String measureId = report.getReportType();
         logger.debug("Evaluating measure: {}", measureId);
         MeasureEvaluator measureEvaluator = measureEvaluatorCache.get(measureId);
@@ -301,6 +309,22 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                         population.getCode().getCodingFirstRep().getCode(),
                         population.getCount()))
                 .collect(Collectors.joining(" ")));
+
+        long timeElapsed = System.currentTimeMillis() - start;
+        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
+                put(stringKey("patientId"), patientStatus.getPatientId()).
+                put(stringKey("reportType"), report.getReportType()).
+                put(stringKey("startDate"), report.getStartDate().toString()).
+                put(stringKey("endDate"), report.getEndDate().toString()).
+                put(stringKey("queryType"), queryType).
+                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+        logger.info("Measure evaluation duration for Patient {}: {}", patientStatus.getPatientId(), timeElapsed);
+        // Record the duration of the evaluation
+        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes );
+
+        // count the number of patients evaluated (reportable or non-reportable)
+        measureEvalMetrics.IncrementPatientEvaluatedCounter(attributes);
+
         return measureReport;
     }
 
@@ -318,17 +342,26 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             MeasureReport measureReport) {
         logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
 
+        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
+                put(stringKey("patientId"), patientStatus.getPatientId()).
+                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+
         var list = measureReportNormalizer.normalize(measureReport);
 
         if(!report.getReportable())
         {
             var measure = list.stream().filter(h -> h instanceof MeasureReport).findFirst().get();
             produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), measure);
+
+            // Count non-reportable patients
+            measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
         }
         else {
             for (Resource resource : list) {
                 produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
             }
+            // Count reportable patients
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes);
         }
     }
 
