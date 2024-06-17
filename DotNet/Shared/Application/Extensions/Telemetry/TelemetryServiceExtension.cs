@@ -150,11 +150,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                 }
 
                 if (telemetryServiceOptions.Environment.IsDevelopment())
-                {
-                    otel.WithMetrics(tracerProviderBuilder =>
-                        tracerProviderBuilder
-                         .AddConsoleExporter());
-
+                {                  
                     //metrics are very verbose, only enable console exporter if you really want to see metric details
                     //otel.WithMetrics(metricsProviderBuilder =>
                     //    metricsProviderBuilder
