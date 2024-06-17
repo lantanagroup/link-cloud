@@ -11,7 +11,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Link_BOTW_Build_Package_Variables
+- group: link-cloud-variables
 - name: project
   value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
 - name: domainProject
