@@ -19,16 +19,16 @@ public class YarpConfigFilter : IProxyConfigFilter
 
         string endpoint = origCluster.ClusterId switch
         {
-            "AccountService" => _serviceRegistry.AccountServiceApiUrl,
-            "AuditService" => _serviceRegistry.AuditServiceApiUrl,
-            "CensusService" => _serviceRegistry.CensusServiceApiUrl,
-            "DataAcquisitionService" => _serviceRegistry.DataAcquisitionServiceApiUrl,
-            "MeasureEvaluationService" => _serviceRegistry.MeasureServiceApiUrl,
-            "NormalizationService" => _serviceRegistry.NormalizationServiceApiUrl,
-            "NotificationService" => _serviceRegistry.NotificationServiceApiUrl,
-            "ReportService" => _serviceRegistry.ReportServiceApiUrl,
-            "SubmissionService" => _serviceRegistry.SubmissionServiceApiUrl,
-            "TenantService" => _serviceRegistry.SubmissionServiceApiUrl,
+            "AccountService" => _serviceRegistry.AccountServiceUrl,
+            "AuditService" => _serviceRegistry.AuditServiceUrl,
+            "CensusService" => _serviceRegistry.CensusServiceUrl,
+            "DataAcquisitionService" => _serviceRegistry.DataAcquisitionServiceUrl,
+            "MeasureEvaluationService" => _serviceRegistry.MeasureServiceUrl,
+            "NormalizationService" => _serviceRegistry.NormalizationServiceUrl,
+            "NotificationService" => _serviceRegistry.NotificationServiceUrl,
+            "ReportService" => _serviceRegistry.ReportServiceUrl,
+            "SubmissionService" => _serviceRegistry.SubmissionServiceUrl,
+            "TenantService" => _serviceRegistry.SubmissionServiceUrl,
             _ => throw new InvalidOperationException($"Unknown cluster id: {origCluster.ClusterId}")
         };
         var existingDestination = origCluster.Destinations["destination1"];
