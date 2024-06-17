@@ -57,6 +57,8 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .Enrich.With<ActivityEnricher>()
                     .CreateLogger();
 
+    //Serilog.Debugging.SelfLog.Enable(Console.Error);
+
     //Initialize activity source
     var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
     ServiceActivitySource.Initialize(version);
@@ -268,9 +270,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add YARP (reverse proxy)
     Log.Logger.Information("Registering YARP for the Link Admin API.");
-    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment);
-
-    //Serilog.Debugging.SelfLog.Enable(Console.Error); 
+    builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment); 
 
     //Add telemetry if enabled
     Log.Logger.Information("Registering Open Telemetry for the Link Admin API.");
