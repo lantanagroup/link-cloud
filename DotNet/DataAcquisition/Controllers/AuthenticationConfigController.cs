@@ -61,8 +61,8 @@ public class AuthenticationConfigController : Controller
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 200
-    ///     Bad Facility ID: 404
-    ///     Missing Facility ID: 400
+    ///     Bad Facility ID: 400
+    ///     Missing Facility ID: 404
     ///     Server Error: 500
     /// </returns>
     [HttpGet("{queryConfigurationTypePathParameter}/authentication")]
@@ -102,17 +102,17 @@ public class AuthenticationConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
@@ -179,9 +179,6 @@ public class AuthenticationConfigController : Controller
                 return Problem("AuthenticationConfiguration not created.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
 
-            await SendAudit($"Create authentication configuration for '{facilityId}'", null, facilityId,
-                AuditEventType.Create, null);
-
             return CreatedAtAction(nameof(CreateAuthenticationSettings),
                 new
                 {
@@ -192,26 +189,27 @@ public class AuthenticationConfigController : Controller
         }
         catch (EntityAlreadyExistsException ex)
         {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            await SendAudit($"Error creating authentication configuration for '{facilityId}'", null, facilityId, AuditEventType.Create, null);
+            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateAuthenticationSettings"), ex, "An exception occurred while attempting to create authentication settings with a facility id of {id}", facilityId);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -226,12 +224,12 @@ public class AuthenticationConfigController : Controller
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 202
-    ///     Bad Facility ID: 404
-    ///     Missing Facility ID: 400
+    ///     Bad Facility ID: 400
+    ///     Missing Facility ID: 404
     ///     Server Error: 500
     /// </returns>
     [HttpPut("{queryConfigurationTypePathParameter}/authentication")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(AuthenticationConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -284,33 +282,26 @@ public class AuthenticationConfigController : Controller
 
             });
 
-            await SendAudit($"Update authentication configuration for '{facilityId}'", null, facilityId, AuditEventType.Update, propertyChanges);
-
             return Accepted(result);
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            await SendAudit(
-                $"Error creating authentication config for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Query,
-                null);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateAuthenticationSettings"), ex, "An exception occurred while attempting to update authentication settings with a facility id of {id}", facilityId);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -355,24 +346,21 @@ public class AuthenticationConfigController : Controller
                 QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter
             }, cancellationToken);
 
-            await SendAudit($"Delete authentication configuration for facility {facilityId}", null, facilityId,
-                AuditEventType.Delete, null);
-
             return Accepted();
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)

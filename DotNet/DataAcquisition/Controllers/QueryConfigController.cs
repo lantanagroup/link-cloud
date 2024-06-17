@@ -69,12 +69,12 @@ public class QueryConfigController : Controller
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Create, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
@@ -166,8 +166,6 @@ public class QueryConfigController : Controller
                 return Problem("FhirQueryConfiguration not created.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
 
-            await SendAudit($"Create query configuration {fhirQueryConfiguration.Id} for '{fhirQueryConfiguration.FacilityId}'", null, fhirQueryConfiguration.FacilityId, AuditEventType.Create, null);
-
             return CreatedAtAction(nameof(CreateFhirConfiguration),
                 new
                 {
@@ -177,34 +175,29 @@ public class QueryConfigController : Controller
         }
         catch (EntityAlreadyExistsException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Query, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Query, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Query, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(
-                $"Error creating FhirQueryConfiguration for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
-                "",
-                fhirQueryConfiguration.FacilityId,
-                AuditEventType.Query,
-                null);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message =
                 $"An exception occurred while attempting to get a FhirQueryConfiguration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            await SendAudit(message, null, facilityId, AuditEventType.Query, null);
+            _logger.LogError(new EventId(LoggingIds.InsertItem, "CreateFhirConfiguration"), ex, message, facilityId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -266,35 +259,28 @@ public class QueryConfigController : Controller
 
             });
 
-            await SendAudit($"Update query configuration {fhirQueryConfiguration.Id} for '{fhirQueryConfiguration.FacilityId}'", null, fhirQueryConfiguration.FacilityId, AuditEventType.Update, propertyChanges);
-           
             return Accepted(result);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(
-                $"Error updating FhirQueryConfiguration for facility {fhirQueryConfiguration.FacilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                fhirQueryConfiguration.FacilityId,
-                AuditEventType.Update,
-                null);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return BadRequest(ex.Message);
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Update, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Update, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message =
                 $"An exception occurred while attempting to update a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            await SendAudit(message, null, facilityId, AuditEventType.Update, null);
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateFhirConfiguration"), ex, message, facilityId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
@@ -330,25 +316,23 @@ public class QueryConfigController : Controller
                 FacilityId = facilityId
             });
 
-            await SendAudit($"Delete query configuration for facility {facilityId}", null, facilityId, AuditEventType.Delete, null);
-            
             return Accepted(result);
         }
         catch (BadRequestException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Delete, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
-            await SendAudit(ex.Message, null, facilityId, AuditEventType.Delete, null); _logger.LogWarning(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
             string message =
                 $"An exception occurred while attempting to delete a fhir query configuration with a facility id of {facilityId}. " + Environment.NewLine + ex.Message;
-            await SendAudit(message, null, facilityId, AuditEventType.Delete, null);
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, message, facilityId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
