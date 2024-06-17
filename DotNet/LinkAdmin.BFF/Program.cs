@@ -31,7 +31,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using System.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +44,18 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    // Logging using Serilog    
+    builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = LinkAdminConstants.AppSettingsSectionNames.Serilog };
+    Log.Logger = new LoggerConfiguration()
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    .Filter.ByExcluding("RequestPath like '/swagger%'")
+                    .Enrich.WithExceptionDetails()
+                    .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
+                    .Enrich.With<ActivityEnricher>()
+                    .CreateLogger();
 
     //Initialize activity source
     var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
@@ -98,7 +109,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
-    //Add Redis     
+    //Add Redis
+    Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
     builder.Services.AddRedisCache(options =>
     {
         options.Environment = builder.Environment;
@@ -115,9 +127,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
     {
+        var manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
+        Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", manager);
         builder.Services.AddSecretManager(options =>
         {
-            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
+            options.Manager = manager;
         });
     }
 
@@ -125,13 +139,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     if (!allowAnonymousAccess)
     {
-        builder.Services.AddLinkGatewaySecurity(builder.Configuration, options =>
+        Log.Logger.Information("Registering Link Gateway Security for the Link Admin API.");
+        builder.Services.AddLinkGatewaySecurity(builder.Configuration, Log.Logger, options =>
         {
             options.Environment = builder.Environment;
         });
     }
     else
-    {  
+    {
+        Log.Logger.Information("Enabling anonymous access for the Link Admin API.");
         //create anonymous access
         builder.Services.AddAuthorizationBuilder()        
             .AddPolicy("AuthenticatedUser", pb =>
@@ -244,30 +260,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     });   
 
     // Add logging redaction services
+    Log.Logger.Information("Adding Redaction Service for the Link Admin API.");
     builder.Services.AddRedactionService(options =>
     {
         options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
-    });
-
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = LinkAdminConstants.AppSettingsSectionNames.Serilog };
-    Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                    .Filter.ByExcluding("RequestPath like '/health%'")
-                    .Filter.ByExcluding("RequestPath like '/swagger%'")
-                    .Enrich.WithExceptionDetails()
-                    .Enrich.FromLogContext()
-                    .Enrich.WithSpan()
-                    .Enrich.With<ActivityEnricher>()
-                    .CreateLogger();
+    });    
 
     // Add YARP (reverse proxy)
+    Log.Logger.Information("Registering YARP for the Link Admin API.");
     builder.Services.AddYarpProxy(builder.Configuration, Log.Logger, options => options.Environment = builder.Environment);
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error); 
 
     //Add telemetry if enabled
+    Log.Logger.Information("Registering Open Telemetry for the Link Admin API.");
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
@@ -294,7 +300,6 @@ static void SetupMiddleware(WebApplication app)
     }
 
     app.UseStatusCodePages();
-    //app.UseHttpsRedirection();
 
     // Configure swagger
     if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
