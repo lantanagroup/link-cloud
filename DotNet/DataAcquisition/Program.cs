@@ -40,6 +40,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,10 +84,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     var serviceInformation = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    builder.Services.Configure<ServiceInformation>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
 
     if (serviceInformation != null)
     {
-        ServiceActivitySource.Initialize(serviceInformation);       
+        ServiceActivitySource.Initialize(serviceInformation);    
     }
     else
     {
@@ -141,7 +144,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Exception Handlers
     builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
+    builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
     builder.Services.AddScoped<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
@@ -154,18 +161,29 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
+    builder.Services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddScoped<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
+    builder.Services.AddScoped<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
+    builder.Services.AddScoped<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
+    builder.Services.AddScoped<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
     builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
+    //Custom Logic
+    builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
+    builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
+
     //Add Hosted Services
     if(consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<QueryListener>();
+        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
+        builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
     }
 
     if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)

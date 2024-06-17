@@ -27,7 +27,8 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate) {
+            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
+            MeasureEvalMetrics measureEvalMetrics){
         super(
                 resourceRepository,
                 patientStatusRepository,
@@ -36,7 +37,8 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
                 measureReportNormalizer,
                 reportabilityPredicate,
                 dataAcquisitionRequestedTemplate,
-                resourceEvaluatedTemplate);
+                resourceEvaluatedTemplate,
+                measureEvalMetrics);
     }
 
     @Override
