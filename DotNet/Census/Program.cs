@@ -36,6 +36,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Census.Application.Models.Messages;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,7 +124,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Factories
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIDsAcquired>, KafkaConsumerFactory<string, PatientIDsAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
@@ -138,7 +141,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIDsAcquired>, DeadLetterExceptionHandler<string, PatientIDsAcquired>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string,string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIDsAcquired>, TransientExceptionHandler<string, PatientIDsAcquired>>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
