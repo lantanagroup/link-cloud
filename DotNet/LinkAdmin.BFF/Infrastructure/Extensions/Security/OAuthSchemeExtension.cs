@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
-using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Text.Json;
