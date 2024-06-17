@@ -11,6 +11,7 @@ import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluation
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Header;
@@ -28,6 +29,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           MeasureReportNormalizer measureReportNormalizer,
           Predicate<MeasureReport> reportabilityPredicate,
           KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
+          @Qualifier("compressedKafkaTemplate")
           KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
           MeasureEvalMetrics measureEvalMetrics) {
     super(
