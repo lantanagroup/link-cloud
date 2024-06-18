@@ -13,6 +13,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
@@ -148,7 +149,7 @@ public class KafkaConfig {
         return  new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
     }
     @Bean
-    public RetryTopicConfiguration resourceNormalizedRetryTopic(KafkaTemplate<String, ResourceNormalized> template) {
+    public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, ResourceNormalized> template) {
         return RetryTopicConfigurationBuilder
                 .newInstance()
                 .fixedBackOff(3000)
@@ -160,5 +161,15 @@ public class KafkaConfig {
                 .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
                 .create(template);
+    }
+
+
+    @Bean
+    public KafkaTemplate<?, ?> compressedKafkaTemplate(KafkaProperties properties,
+                                                       ObjectProvider<SslBundles> sslBundles,
+                                                       Serializer<?> keySerializer,
+                                                       Serializer<?> valueSerializer) {
+        properties.getProperties().put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd");
+        return new KafkaTemplate<>(producerFactory(properties, sslBundles, keySerializer, valueSerializer));
     }
 }

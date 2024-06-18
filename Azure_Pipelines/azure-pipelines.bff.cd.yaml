@@ -16,7 +16,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Link_BOTW_Build_Package_Variables
+- group: link-cloud-variables
 - name: project
   value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
 - name: registryRepositoryName
