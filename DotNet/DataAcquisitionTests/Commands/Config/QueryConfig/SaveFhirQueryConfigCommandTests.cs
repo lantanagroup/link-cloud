@@ -1,17 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryConfig
 {
@@ -49,7 +42,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryConfig
                 .Verify(r => r.UpdateAsync(command.queryConfiguration, It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            Assert.Equal(Unit.Value, result);
+            Assert.Equal(existingConfig.FacilityId, result.FacilityId);
         }
 
         [Fact]
@@ -68,7 +61,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryConfig
 
             _mocker.GetMock<IFhirQueryConfigurationRepository>()
                 .Setup(r => r.AddAsync(It.IsAny<FhirQueryConfiguration>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(Unit.Value));
+                .ReturnsAsync(command.queryConfiguration);
 
             _mocker.GetMock<IMediator>()
                 .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
@@ -80,7 +73,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryConfig
                 .Verify(r => r.AddAsync(command.queryConfiguration, It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            Assert.Equal(Unit.Value, result);
+            Assert.Equal(command.queryConfiguration, result);
             Assert.NotNull(command.queryConfiguration.ModifyDate);
         }
     }

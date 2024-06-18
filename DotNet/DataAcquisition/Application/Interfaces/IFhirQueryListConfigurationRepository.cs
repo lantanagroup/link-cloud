@@ -4,10 +4,11 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
-public interface IFhirQueryListConfigurationRepository : IPersistenceRepository<FhirListConfiguration>, IDisposable
+public interface IFhirQueryListConfigurationRepository : IPersistenceRepository<FhirListConfiguration>
 {
-    Task<AuthenticationConfiguration> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default);
-    Task SaveAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
+    Task<AuthenticationConfiguration?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default);
+    Task<AuthenticationConfiguration> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
+    Task<AuthenticationConfiguration> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration> GetByFacilityIdAsync(string facilityId, CancellationToken cancellation = default);
 

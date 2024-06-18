@@ -29,7 +29,7 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         return (documentType.GetCustomAttributes(typeof(BsonCollectionAttribute), true).FirstOrDefault() as BsonCollectionAttribute)?.CollectionName;
     }
 
-    public virtual void Add(T entity)
+    public virtual T Add(T entity)
     {
         if (!string.IsNullOrWhiteSpace(entity.Id))
             throw new EntityPotentiallyExistsException("Entity ID already has a value. This indicates that a record already exists.");
@@ -44,11 +44,13 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         {
             throw;
         }
+
+        return entity;  
     }
 
-    public virtual async Task AddAsync(T entity, CancellationToken cancellationToken = default)
+    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested) return;
+        if (cancellationToken.IsCancellationRequested) return null;
 
         if (!string.IsNullOrWhiteSpace(entity.Id))
             throw new EntityPotentiallyExistsException("Entity ID already has a value. This indicates that a record already exists.");
@@ -63,6 +65,8 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         {
             throw;
         }
+
+        return entity;
     }
 
     public virtual void Delete(string id)

@@ -202,7 +202,7 @@ public class PatientCensusTests
 
         mockPatientListRepo.Setup(x => x.GetActivePatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingPatientList);
         mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(new CensusPatientListEntity()));
-        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
+        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PatientCensusHistoricEntity());
 
         var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object, mockMetrics.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand
@@ -211,7 +211,7 @@ public class PatientCensusTests
             Message = patientIdsAcquired
         }, CancellationToken.None);
 
-        Assert.Empty(eventList);
+        Assert.True(eventList.Count() == 1);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class PatientCensusTests
 
         mockPatientListRepo.Setup(x => x.GetActivePatientsForFacility(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingPatientList);
         mockPatientListRepo.Setup(x => x.UpdateAsync(It.IsAny<CensusPatientListEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CensusPatientListEntity());
-        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).Returns(Task.FromResult(true));
+        mockHistoryRepo.Setup(x => x.AddAsync(It.IsAny<PatientCensusHistoricEntity>(), It.IsAny<CancellationToken>())).ReturnsAsync(new PatientCensusHistoricEntity());
         
         var handler = new ConsumePaitentIdsAcquiredEventHandler(mockLogger.Object, mockPatientListRepo.Object, mockHistoryRepo.Object, mockMetrics.Object);
         var eventList = await handler.Handle(new ConsumePatientIdsAcquiredEventCommand

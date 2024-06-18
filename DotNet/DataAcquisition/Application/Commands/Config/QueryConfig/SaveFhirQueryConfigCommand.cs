@@ -8,12 +8,12 @@ using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
 
-public class SaveFhirQueryConfigCommand : IRequest<Unit>
+public class SaveFhirQueryConfigCommand : IRequest<FhirQueryConfiguration>
 {
     public FhirQueryConfiguration queryConfiguration { get; set; }
 }
 
-public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryConfigCommand, Unit>
+public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryConfigCommand, FhirQueryConfiguration>
 {
     private readonly ILogger<SaveFhirQueryConfigCommandHandler> _logger;
     private readonly IFhirQueryConfigurationRepository _queryConfigurationRepository;
@@ -26,11 +26,11 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
     }
 
-    public async Task<Unit> Handle(SaveFhirQueryConfigCommand request, CancellationToken cancellationToken)
+    public async Task<FhirQueryConfiguration> Handle(SaveFhirQueryConfigCommand request, CancellationToken cancellationToken)
     {
         if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.queryConfiguration.FacilityId }, cancellationToken) == false)
         {
-            throw new MissingFacilityConfigurationException($"Facility {request.queryConfiguration.FacilityId} not found.");
+            throw new NotFoundException($"Facility {request.queryConfiguration.FacilityId} not found.");
         }
 
         if (request.queryConfiguration.ModifyDate == null)
@@ -41,17 +41,18 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
         var existingConfig = await _mediator.Send(new GetFhirQueryConfigQuery
         {
             FacilityId = request.queryConfiguration.FacilityId,
-        });
+        }, cancellationToken);
 
-        if(existingConfig == null) 
+        FhirQueryConfiguration result;
+        if (existingConfig == null) 
         {
-            await _queryConfigurationRepository.AddAsync(request.queryConfiguration, cancellationToken);
+            result = await _queryConfigurationRepository.AddAsync(request.queryConfiguration, cancellationToken);
         }
         else
         {
-            await _queryConfigurationRepository.UpdateAsync(request.queryConfiguration, cancellationToken);
+            result = await _queryConfigurationRepository.UpdateAsync(request.queryConfiguration, cancellationToken);
         }
 
-        return new Unit();
+        return result;
     }
 }
