@@ -182,14 +182,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Hosted Services
     if(consumerSettings == null || !consumerSettings.DisableConsumer)
     {
-        //builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
-        //builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
+        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
+        builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
     }
 
     if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
-        //builder.Services.AddHostedService<RetryListener>();
-        //builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
     }
 
     // Logging using Serilog
