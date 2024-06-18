@@ -49,6 +49,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final Predicate<MeasureReport> reportabilityPredicate;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
+    @Qualifier("compressedKafkaTemplate")
     private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
 
     public AbstractResourceConsumer(
