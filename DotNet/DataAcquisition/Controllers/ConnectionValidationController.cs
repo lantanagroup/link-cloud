@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Validate;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
@@ -32,11 +33,14 @@ public class ConnectionValidationController : Controller
         string facilityId, 
         [FromQuery] string? patientId = default, 
         [FromQuery] string? patientIdentifier = default,
+        [FromQuery] string? measureId = default,
+        [FromQuery] DateTime? start = default,
+        [FromQuery] DateTime? end = default,
         CancellationToken cancellationToken = default)
     {
-        if(string.IsNullOrWhiteSpace(patientId) && string.IsNullOrWhiteSpace(patientIdentifier))
+        if(!ConnectionValidationRequestValidator.ValidateRequest(facilityId, patientId, patientIdentifier, measureId, start, end, out var errorMessage))
         {
-            return BadRequest("No Patient ID or Patient Identifier was provided. One is required to validate.");
+            return Problem(errorMessage, statusCode: StatusCodes.Status400BadRequest);
         }
 
         try
@@ -45,24 +49,27 @@ public class ConnectionValidationController : Controller
             {
                 FacilityId = facilityId,
                 PatientId = patientId,
-                PatientIdentifier = patientIdentifier
+                PatientIdentifier = patientIdentifier,
+                MeasureId = measureId,
+                Start = start.Value,
+                End = end.Value
             }, cancellationToken);
 
             if(!result.IsConnected)
             {
-                _logger.LogError("Connection validation failed for facility {FacilityId}", facilityId);
-                return BadRequest("Connection validation failed.");
+                _logger.LogError("Connection validation failed for facility {FacilityId}\nerror:\n{errorMessage}", facilityId, result.ErrorMessage);
+                return Problem(result.ErrorMessage, statusCode: StatusCodes.Status400BadRequest);
             }
 
             if(result.IsConnected && !result.IsPatientFound)
             {
-                _logger.LogError("Patient not found for facility {FacilityId}", facilityId);
-                return NotFound("Patient not found.");
+                _logger.LogError("Patient not found for facility {FacilityId}\nerror:\n{errorMessage}", facilityId, result.ErrorMessage);
+                return Problem(result.ErrorMessage, statusCode: StatusCodes.Status400BadRequest);
             }
 
             if (result.IsConnected && result.IsPatientFound)
             {
-                return Ok();
+                return Ok(result);
             }
         }
         catch (MissingFacilityIdException ex)
@@ -83,13 +90,13 @@ public class ConnectionValidationController : Controller
         catch(FhirConnectionFailedException ex)
         {
             _logger.LogError(ex, "Error connecting to FHIR server for facility {FacilityId}", facilityId);
-            return StatusCode(424, "An error occurred while connecting to the FHIR server. Please review your query connection configuration.");
+            return StatusCode(424, $"An error occurred while connecting to the FHIR server. Please review your query connection configuration.\nerrorMessage: {ex.Message}\ninnerException:\n{ex.InnerException}");
         }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFacilityConnection"), ex, "An exception occurred while attempting to validate a connection with a facility id of {id}", facilityId);
-            throw;
+            return Problem("An error occurred while validating the connection.", statusCode: StatusCodes.Status500InternalServerError);
         }
-        return StatusCode(500, "Something went wrong. Please contact an administrator.");
+        return Problem("Something went wrong. Please contact an administrator.", statusCode: StatusCodes.Status500InternalServerError);
     }
 }
