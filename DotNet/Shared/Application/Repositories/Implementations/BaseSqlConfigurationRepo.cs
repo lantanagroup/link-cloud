@@ -19,21 +19,22 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async virtual Task<T> GetAsync(string id, CancellationToken cancellationToken)
+    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
-    public async virtual Task AddAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
     {
 
-        _dbContext.Set<T>().Add(entity);
+        var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        return result;
     }
 
-    public async virtual Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
     {
         _dbContext.Set<T>().Update(entity);
 
@@ -43,7 +44,7 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     }
 
-    public async virtual Task DeleteAsync(string id, CancellationToken cancellationToken)
+    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
         var entity = await _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefaultAsync();
 
@@ -55,11 +56,13 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     }
 
-    public virtual void Add(T entity)
+    public virtual T Add(T entity)
     {
-        _dbContext.Set<T>().Add(entity);
+        var result = _dbContext.Set<T>().Add(entity).Entity;
 
         _dbContext.SaveChanges();
+        
+        return result;
     }
 
     public virtual T Get(string id)

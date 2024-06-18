@@ -20,13 +20,13 @@ public class FhirQueryListConfigurationRepository : BaseSqlConfigurationRepo<Fhi
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public async Task<AuthenticationConfiguration> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<AuthenticationConfiguration?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
         var queryResult = await _dbContext.FhirListConfigurations.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
 
         if (queryResult == null)
         {
-            throw new NotFoundException($"No configuration found for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
+            throw new MissingFacilityConfigurationException($"No configuration found for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
         }
 
         if (queryResult.Authentication == null)
@@ -37,18 +37,44 @@ public class FhirQueryListConfigurationRepository : BaseSqlConfigurationRepo<Fhi
         return queryResult.Authentication;
     }
 
-    public async Task SaveAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
+    public async Task<AuthenticationConfiguration> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
     {
-        var queryResult = await _dbContext.FhirListConfigurations.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
+        var queryResult = await _dbContext.FhirQueryConfigurations.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
 
         if (queryResult == null)
+            throw new MissingFacilityConfigurationException($"No configuration found for facilityId: {facilityId}. Unable to save authentication settings.");
+
+        if (queryResult.Authentication != null)
         {
-            throw new NotFoundException($"No configuration found for facilityId: {facilityId}. Unable to save Authentication settings.");
+            throw new EntityAlreadyExistsException(
+                $"An AuthenticationConfiguration already exists for the FhirQueryConfiguration for facilityId {facilityId}");
         }
 
         queryResult.Authentication = config;
-        _dbContext.FhirListConfigurations.Update(queryResult);
+        _dbContext.FhirQueryConfigurations.Update(queryResult);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return config;
+    }
+
+    public async Task<AuthenticationConfiguration> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
+    {
+        var queryResult = await _dbContext.FhirQueryConfigurations.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
+
+        if (queryResult == null)
+            throw new MissingFacilityConfigurationException($"No configuration found for facilityId: {facilityId}. Unable to save authentication settings.");
+
+        if (queryResult.Authentication == null)
+        {
+            throw new NotFoundException(
+                $"No AuthenticationConfiguration found for the FhirQueryConfiguration for facilityId {facilityId}");
+        }
+
+        queryResult.Authentication = config;
+        _dbContext.FhirQueryConfigurations.Update(queryResult);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return config;
     }
 
     public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
