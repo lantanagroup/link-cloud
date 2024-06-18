@@ -69,7 +69,7 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
         List<IBaseMessage> supplementalResults = null;
         try
         {
-            intialResults = await _mediator.Send(new GetPatientDataRequest
+            var patientDataRequest = new GetPatientDataRequest
             {
                 FacilityId = request.FacilityId,
                 CorrelationId = Guid.NewGuid().ToString(),
@@ -89,29 +89,13 @@ public class ValidateFacilityConnectionQueryHandler : IRequestHandler<ValidateFa
                         }
                     }
                 }
-            }, cancellationToken);
+            };
 
-            supplementalResults = await _mediator.Send(new GetPatientDataRequest
-            {
-                FacilityId = request.FacilityId,
-                CorrelationId = Guid.NewGuid().ToString(),
-                QueryPlanType = QueryPlanType.SupplementalQueries,
-                Message = new DataAcquisitionRequested
-                {
-                    PatientId = request.PatientId,
-                    QueryType = "Supplemental",
-                    Topic = "ConnectionValidation",
-                    ScheduledReports = new List<ScheduledReport>
-                    {
-                        new ScheduledReport
-                        {
-                            ReportType = request.MeasureId,
-                            StartDate = request.Start.ToString(),
-                            EndDate = request.End.ToString()
-                        }
-                    }
-                }
-            }, cancellationToken);
+            intialResults = await _mediator.Send(patientDataRequest, cancellationToken);
+
+            patientDataRequest.QueryPlanType = QueryPlanType.SupplementalQueries;
+            patientDataRequest.Message.QueryType = "Supplemental";
+            supplementalResults = await _mediator.Send(patientDataRequest, cancellationToken);
         }
         catch (Exception ex) when (
             ex is FhirConnectionFailedException ||
