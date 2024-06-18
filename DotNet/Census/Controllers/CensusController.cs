@@ -37,7 +37,7 @@ public class CensusController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientCensusHistoricEntity>))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history")]
-    public async Task<ActionResult<List<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
+    public async Task<ActionResult<IEnumerable<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
     {
         try
         {
