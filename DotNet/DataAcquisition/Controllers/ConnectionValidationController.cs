@@ -26,9 +26,16 @@ public class ConnectionValidationController : Controller
     /// <param name="facilityId"></param>
     /// <param name="patientId"></param>
     /// <param name="patientIdentifier"></param>
+    /// <param name="measureId"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     [HttpGet("{facilityId}/$validate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status424FailedDependency)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ValidateFacilityConnection(
         string facilityId, 
         [FromQuery] string? patientId = default, 
