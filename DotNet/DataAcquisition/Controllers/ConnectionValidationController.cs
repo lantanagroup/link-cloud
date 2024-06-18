@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Validate;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using MediatR;
@@ -30,13 +31,22 @@ public class ConnectionValidationController : Controller
     /// <param name="start"></param>
     /// <param name="end"></param>
     /// <param name="cancellationToken"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     MissingFacilityId: 400
+    ///     Missing Patient Information: 400
+    ///     Missing Measure ID: 400
+    ///     Missing Start Date: 400
+    ///     Missing End Date: 400
+    ///     Fhir Endpoint Connection Error: 424
+    ///     Server Error: 500
+    /// </returns>
     [HttpGet("{facilityId}/$validate")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status424FailedDependency)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> ValidateFacilityConnection(
+    public async Task<ActionResult<FacilityConnectionResult>> ValidateFacilityConnection(
         string facilityId, 
         [FromQuery] string? patientId = default, 
         [FromQuery] string? patientIdentifier = default,
