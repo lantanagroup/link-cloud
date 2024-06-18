@@ -2,8 +2,8 @@
 
 public interface IPersistenceRepository<T>
 {
-    void Add(T entity);
-    Task AddAsync(T entity, CancellationToken cancellationToken = default);
+    T Add(T entity);
+    Task<T> AddAsync(T entity, CancellationToken cancellationToken = default);
     T Get(string id);
     Task<T> GetAsync(string id, CancellationToken cancellationToken = default);
     T Update(T entity);

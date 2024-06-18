@@ -2,20 +2,19 @@
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
 
-public class SaveAuthConfigCommand : IRequest<Unit>
+public class UpdateAuthConfigCommand : IRequest<AuthenticationConfiguration>
 {
     public string FacilityId { get; set; }
     public AuthenticationConfiguration Configuration { get; set; }
     public QueryConfigurationTypePathParameter? QueryConfigurationTypePathParameter { get; set; }
 }
 
-public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigCommand, Unit>
+public class UpdateAuthConfigCommandHandler : IRequestHandler<UpdateAuthConfigCommand, AuthenticationConfiguration>
 {
     private readonly ILogger<UpdateAuthConfigCommandHandler> _logger;
     private readonly IFhirQueryConfigurationRepository _fhirQueryConfigurationRepository;
@@ -34,7 +33,7 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
         _mediator = mediator;
     }
 
-    public async Task<Unit> Handle(SaveAuthConfigCommand request, CancellationToken cancellationToken = default)
+    public async Task<AuthenticationConfiguration> Handle(UpdateAuthConfigCommand request, CancellationToken cancellationToken = default)
     {
         if (request.QueryConfigurationTypePathParameter == null)
         {
@@ -48,43 +47,19 @@ public class UpdateAuthConfigCommandHandler : IRequestHandler<SaveAuthConfigComm
 
         if (await _mediator.Send(new CheckIfTenantExistsQuery { TenantId = request.FacilityId }, cancellationToken) == false)
         {
-            throw new MissingFacilityConfigurationException($"Facility {request.FacilityId} not found.");
+            throw new NotFoundException($"Facility {request.FacilityId} not found.");
         }
 
+        AuthenticationConfiguration created;
         if (request.QueryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
         {
-            if (!await checkIfFacilityConfigExists(request.FacilityId,
-                    request.QueryConfigurationTypePathParameter.Value, cancellationToken))
-            {
-                throw new MissingFacilityConfigurationException(
-                    $"Facility configuration for {request.FacilityId} does not exist.");
-            }
-
-            await _fhirQueryConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
+            created = await _fhirQueryConfigurationRepository.UpdateAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
         }
         else
         {
-            if (!await checkIfFacilityConfigExists(request.FacilityId,
-                    request.QueryConfigurationTypePathParameter.Value, cancellationToken))
-            {
-                throw new MissingFacilityConfigurationException(
-                    $"Facility configuration for {request.FacilityId} does not exist.");
-            }
+            created = await _fhirQueryListConfigurationRepository.UpdateAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
+        }
 
-            await _fhirQueryListConfigurationRepository.SaveAuthenticationConfiguration(request.FacilityId, request.Configuration, cancellationToken);
-        }
-        return new Unit();
-    }
-
-    private async Task<bool> checkIfFacilityConfigExists(string facilityId, QueryConfigurationTypePathParameter queryConfigurationTypePathParameter, CancellationToken cancellationToken = default)
-    {
-        if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
-        {
-            return await _fhirQueryConfigurationRepository.GetAsync(facilityId) != null;
-        }
-        else
-        {
-            return await _fhirQueryListConfigurationRepository.GetAsync(facilityId) != null;
-        }
+        return created;
     }
 }

@@ -14,16 +14,16 @@ public class RetryRepository_SQL : BaseSqlConfigurationRepo<RetryEntity>, IRetry
         _context = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public override void Add(RetryEntity entity)
+    public override RetryEntity Add(RetryEntity entity)
     {
         entity.Id = Guid.NewGuid().ToString();
-        base.Add(entity);
+        return base.Add(entity);
     }
 
-    public override Task AddAsync(RetryEntity entity, CancellationToken cancellationToken)
+    public override async Task<RetryEntity> AddAsync(RetryEntity entity, CancellationToken cancellationToken)
     {
         entity.Id = Guid.NewGuid().ToString();
-        return base.AddAsync(entity, cancellationToken);
+        return await base.AddAsync(entity, cancellationToken);
     }
 
     public Task<List<RetryEntity>> GetAllAsync(CancellationToken cancellationToken = default)

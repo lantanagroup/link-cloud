@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
@@ -21,9 +23,28 @@ public class GetFhirQueryConfigQueryHandler : IRequestHandler<GetFhirQueryConfig
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
     }
 
+    /// <summary>
+    /// Returns the FhirQueryConfiguration for the provided facilityId or throws a NotFoundException if none exists.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="BadRequestException"></exception>
+    /// <exception cref="NotFoundException"></exception>
     public async Task<FhirQueryConfiguration> Handle(GetFhirQueryConfigQuery request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.FacilityId))
+        {
+            throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
+        }
+
         var result = await _repository.GetAsync(request.FacilityId, cancellationToken);
+
+        if (result == null)
+        {
+            throw new NotFoundException($"No {nameof(FhirQueryConfiguration)} found for facilityId: {request.FacilityId}");
+        }
+
         return result;
     }
 }

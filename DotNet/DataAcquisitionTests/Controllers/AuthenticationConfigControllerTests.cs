@@ -12,8 +12,11 @@ using Moq.AutoMock;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Hl7.Fhir.Model;
+using Task = System.Threading.Tasks.Task;
 
 namespace DataAcquisitionUnitTests.Controllers
 {
@@ -43,7 +46,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.GetAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
-            Assert.IsType<BadRequestObjectResult>(result.Result);
+
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -57,21 +64,25 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.GetAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
 
-            Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.NotFound);
         }
 
         [Fact]
         public async Task CreateAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(new Unit());
+            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<CreateAuthConfigCommand>(), CancellationToken.None))
+                .ReturnsAsync(new AuthenticationConfiguration());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<AcceptedResult>(result);
+            Assert.IsType<ActionResult<AuthenticationConfiguration>>(result);
+            Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
         }
 
         [Fact]
@@ -83,7 +94,10 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.CreateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -95,21 +109,27 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), null, CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
         public async Task CreateAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
+            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
                 .Throws(new MissingFacilityConfigurationException());
 
-            var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
+            var controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
-            var result = await _controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
+            var result = await controller.CreateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.InternalServerError);
         }
 
         [Fact]
@@ -118,8 +138,8 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(new Unit());
+            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
+                .ReturnsAsync(new AuthenticationConfiguration());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
@@ -137,7 +157,10 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.UpdateAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), new AuthenticationConfiguration(), CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.NotNull(objectResult.Value);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -149,7 +172,10 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.UpdateAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), null, CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.NotNull(objectResult.Value);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -158,7 +184,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveAuthConfigCommand>(), CancellationToken.None))
+            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
                 .Throws(new Exception());
 
             _mocker.GetMock<IMediator>()
@@ -206,7 +232,10 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.DeleteAuthenticationSettings("", It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.NotNull(objectResult.Value);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
     }
 }

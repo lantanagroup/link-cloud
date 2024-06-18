@@ -6,12 +6,12 @@ using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
 
-public class SaveFhirQueryConfigCommand : IRequest<Unit>
+public class SaveFhirQueryConfigCommand : IRequest<FhirQueryConfiguration>
 {
     public FhirQueryConfiguration queryConfiguration { get; set; }
 }
 
-public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryConfigCommand, Unit>
+public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryConfigCommand, FhirQueryConfiguration>
 {
     private readonly ILogger<SaveFhirQueryConfigCommandHandler> _logger;
     private readonly IFhirQueryConfigurationRepository _queryConfigurationRepository;
@@ -26,12 +26,12 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
         _tenantApiService = tenantApiService ?? throw new ArgumentNullException(nameof(tenantApiService));
     }
 
-    public async Task<Unit> Handle(SaveFhirQueryConfigCommand request, CancellationToken cancellationToken)
+    public async Task<FhirQueryConfiguration> Handle(SaveFhirQueryConfigCommand request, CancellationToken cancellationToken)
     {
         if (await _tenantApiService.CheckFacilityExists(request.queryConfiguration.FacilityId, cancellationToken) == false)
         {
             _logger.LogWarning("Facility {facilityId} not found in Tenant service.", request.queryConfiguration.FacilityId);
-            throw new MissingFacilityConfigurationException($"Facility {request.queryConfiguration.FacilityId} not found.");
+            throw new NotFoundException($"Facility {request.queryConfiguration.FacilityId} not found.");
         }
 
         if (request.queryConfiguration.ModifyDate == null)
@@ -42,19 +42,20 @@ public class SaveFhirQueryConfigCommandHandler : IRequestHandler<SaveFhirQueryCo
         var existingConfig = await _mediator.Send(new GetFhirQueryConfigQuery
         {
             FacilityId = request.queryConfiguration.FacilityId,
-        });
+        }, cancellationToken);
 
-        if(existingConfig == null) 
-        {
-            await _queryConfigurationRepository.AddAsync(request.queryConfiguration, cancellationToken);
-            _logger.LogInformation("Query configuration for {facilityId} was created successfully.", request.queryConfiguration.FacilityId);
+        FhirQueryConfiguration result;
+        if (existingConfig == null) 
+        {            
+            result = await _queryConfigurationRepository.AddAsync(request.queryConfiguration, cancellationToken);
+		  _logger.LogInformation("Query configuration for {facilityId} was created successfully.", request.queryConfiguration.FacilityId);
         }
         else
         {
-            await _queryConfigurationRepository.UpdateAsync(request.queryConfiguration, cancellationToken);
+            result = await _queryConfigurationRepository.UpdateAsync(request.queryConfiguration, cancellationToken);
             _logger.LogInformation("Query configuration for {facilityId} was updated successfully.", request.queryConfiguration.FacilityId);
         }        
 
-        return new Unit();
+        return result;
     }
 }

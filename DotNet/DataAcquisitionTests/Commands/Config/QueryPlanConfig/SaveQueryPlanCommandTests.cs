@@ -105,13 +105,15 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 QueryPlanType = QueryPlanType.QueryPlans
             };
 
+            var qp = _mocker.CreateInstance<QueryPlan>();
+
             _mocker.GetMock<IQueryPlanRepository>()
                 .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((QueryPlan)null);
 
             _mocker.GetMock<IQueryPlanRepository>()
                 .Setup(r => r.AddAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(Unit.Value));
+                .ReturnsAsync(qp);
 
             _mocker.GetMock<IMediator>()
                 .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))

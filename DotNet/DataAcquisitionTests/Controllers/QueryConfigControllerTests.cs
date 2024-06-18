@@ -11,6 +11,7 @@ using Moq.AutoMock;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -44,7 +45,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
             var result = await _controller.GetFhirConfiguration(facilityId, CancellationToken.None);
-            Assert.IsType<NotFoundResult>(result.Result);
+
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.NotFound);
         }
 
         [Fact]
@@ -54,7 +59,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
             var result = await _controller.GetFhirConfiguration("", CancellationToken.None);
-            Assert.IsType<BadRequestResult>(result.Result);
+
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -62,12 +71,14 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveFhirQueryConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(new FhirQueryConfiguration());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            var result = await _controller.CreateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None);
-            Assert.IsType<AcceptedResult>(result);
+            var result = _controller.CreateFhirConfiguration(new FhirQueryConfiguration(), CancellationToken.None).Result;
+
+            Assert.IsType<ActionResult<FhirQueryConfiguration>>(result);
+            Assert.NotNull(((CreatedAtActionResult)result.Result).Value);
         }
 
         [Fact]
@@ -77,7 +88,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
             var result = await _controller.CreateFhirConfiguration(null, CancellationToken.None);
-            Assert.IsType<BadRequestObjectResult>(result);
+
+            Assert.True(result.Value == null);
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -87,7 +102,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetFhirQueryConfigQuery>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfiguration());
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveFhirQueryConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(new FhirQueryConfiguration());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
@@ -102,7 +117,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
             var result = await _controller.UpdateFhirConfiguration(null, CancellationToken.None);
-            Assert.IsType<BadRequestObjectResult>(result);
+
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.NotNull(objectResult.Value);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -145,7 +164,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
             var result = await _controller.DeleteFhirConfiguration("", CancellationToken.None);
-            Assert.IsType<BadRequestResult>(result);
+
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.NotNull(objectResult.Value);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
     }
 }

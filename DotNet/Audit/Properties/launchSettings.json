@@ -7,13 +7,13 @@
       },
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "launchUrl": "http://localhost:7334/swagger",
-      "applicationUrl": "http://localhost:7334;https://localhost:7335"
+      "launchUrl": "http://localhost:7344/swagger",
+      "applicationUrl": "http://localhost:7344;https://localhost:7355"
     },
     "Docker": {
       "commandName": "Docker",
-      "DockerfileRunArguments": "--name=Link-Audit --network=local-link -p 7334:8080 -p 7335:8081",
-      "launchUrl": "http://localhost:7334/swagger",      
+      "DockerfileRunArguments": "--name=Link-Audit --network=local-link -p 7344:8080 -p 7355:8081",
+      "launchUrl": "http://localhost:7344/swagger",
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
