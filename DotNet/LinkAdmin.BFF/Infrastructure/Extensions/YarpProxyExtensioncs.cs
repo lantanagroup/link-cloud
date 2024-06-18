@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Filters;
 using Yarp.ReverseProxy.Transforms;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
@@ -12,6 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
 
             services.AddReverseProxy()
                 .LoadFromConfig(configuration.GetRequiredSection("ReverseProxy"))
+                .AddConfigFilter<YarpConfigFilter>()
                 .AddTransforms(builderContext =>
                 {
                     bool enableAnonymous = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
