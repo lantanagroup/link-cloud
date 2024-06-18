@@ -10,6 +10,7 @@ import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Header;
@@ -27,7 +28,9 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
-            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate) {
+            @Qualifier("compressedKafkaTemplate")
+            KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
+            MeasureEvalMetrics measureEvalMetrics){
         super(
                 resourceRepository,
                 patientStatusRepository,
@@ -36,7 +39,8 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
                 measureReportNormalizer,
                 reportabilityPredicate,
                 dataAcquisitionRequestedTemplate,
-                resourceEvaluatedTemplate);
+                resourceEvaluatedTemplate,
+                measureEvalMetrics);
     }
 
     @Override
