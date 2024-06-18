@@ -4,7 +4,7 @@ using MediatR;
 
 namespace LantanaGroup.Link.Census.Application.Commands;
 
-public class GetCensusHistoryQuery : IRequest<List<PatientCensusHistoricEntity>>
+public class GetCensusHistoryQuery : IRequest<IEnumerable<PatientCensusHistoricEntity>>
 {
     public string FacilityId { get; set; }
 }

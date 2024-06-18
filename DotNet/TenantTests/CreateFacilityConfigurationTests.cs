@@ -57,7 +57,7 @@ namespace TenantTests
            _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.AddAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
 
 
             _ = _mocker.GetMock<IKafkaProducerFactory<string, object>>()
@@ -109,7 +109,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.AddAsync(_model, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.GetAsyncByFacilityId(_model.FacilityId, CancellationToken.None))
