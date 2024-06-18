@@ -75,27 +75,27 @@ public class ConnectionValidationController : Controller
         catch (MissingFacilityIdException ex)
         {
             _logger.LogError(ex, "Facility ID is required to validate connection.");
-            return BadRequest("Facility ID is required to validate connection.");
+            return Problem("Facility ID is required to validate connection.", statusCode: StatusCodes.Status400BadRequest);
         }
         catch (MissingFacilityConfigurationException ex)
         {
             _logger.LogError(ex, "No configuration found for Facility ID {facilityId}.", facilityId);
-            return BadRequest($"No configuration found for Facility ID {facilityId}.");
+            return Problem($"No configuration found for Facility ID {facilityId}.", statusCode: StatusCodes.Status400BadRequest);
         }
         catch (MissingPatientIdOrPatientIdentifierException ex)
         {
             _logger.LogError(ex, "No Patient ID or Patient Identifier was provided. One is required to validate.");
-            return BadRequest("No Patient ID or Patient Identifier was provided. One is required to validate.");
+            return Problem("No Patient ID or Patient Identifier was provided. One is required to validate.", statusCode: StatusCodes.Status400BadRequest);
         }
         catch(FhirConnectionFailedException ex)
         {
             _logger.LogError(ex, "Error connecting to FHIR server for facility {FacilityId}", facilityId);
-            return StatusCode(424, $"An error occurred while connecting to the FHIR server. Please review your query connection configuration.\nerrorMessage: {ex.Message}\ninnerException:\n{ex.InnerException}");
+            return Problem($"An error occurred while connecting to the FHIR server. Please review your query connection configuration.\nerrorMessage: {ex.Message}\ninnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status424FailedDependency);
         }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.GetItem, "ValidateFacilityConnection"), ex, "An exception occurred while attempting to validate a connection with a facility id of {id}", facilityId);
-            return Problem("An error occurred while validating the connection.", statusCode: StatusCodes.Status500InternalServerError);
+            return Problem($"An error occurred while validating the connection.\nerror:\n{ex.Message}\nInnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status500InternalServerError);
         }
         return Problem("Something went wrong. Please contact an administrator.", statusCode: StatusCodes.Status500InternalServerError);
     }
