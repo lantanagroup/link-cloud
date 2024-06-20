@@ -9,7 +9,7 @@ using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisit
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [ApiController]
-[Route("api/{facilityId}/[controller]")]
+[Route("api/data/{facilityId}/[controller]")]
 public class QueryResultController : ControllerBase
 {
     private readonly ILogger<QueryResultController> _logger;
