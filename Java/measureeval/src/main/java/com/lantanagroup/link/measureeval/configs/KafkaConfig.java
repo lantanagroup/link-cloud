@@ -2,6 +2,8 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
+import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;
@@ -150,6 +152,7 @@ public class KafkaConfig {
                 .maxAttempts(5)
                 .concurrency(1)
                 .includeTopic(Topics.RESOURCE_NORMALIZED)
+                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class)
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
                 .useSingleTopicForSameIntervals()
