@@ -97,6 +97,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                     new KeyValuePair<string, object?>("timespan", timespan)
                 ]);
 
+                if (_linkTokenServiceConfig.Value.LogToken)
+                {
+                    Activity.Current?.AddEvent(new("Token generated.", tags: [
+                        new KeyValuePair<string, object?>("token", jwt),
+                    ]));
+                }
+
                 return jwt;
 
             }
