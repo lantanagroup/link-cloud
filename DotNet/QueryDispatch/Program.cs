@@ -104,7 +104,6 @@ builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
 var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
 // Add services to the container.
-builder.Services.AddGrpc();
 builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters().AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHttpClient();
 
@@ -278,10 +277,4 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());    
-    
-
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        //app.MapGrpcReflectionService();
-    }
 }

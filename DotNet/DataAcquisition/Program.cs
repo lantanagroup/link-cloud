@@ -128,14 +128,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanResultConverter());
     });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
-    {
-        //TODO: figure out how to handle service url. Need some sort of service discovery.
-        o.Address = new Uri("TBD on what to do here.");
-    });
 
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
@@ -266,11 +259,6 @@ static void SetupMiddleware(WebApplication app)
 
     app.AutoMigrateEF<DataAcquisitionDbContext>();
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
@@ -283,7 +271,6 @@ static void SetupMiddleware(WebApplication app)
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     // Configure the HTTP request pipeline.
-    app.MapGrpcService<DataAcquisitionService>();
     app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
     app.MapControllers();
 
