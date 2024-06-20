@@ -19,7 +19,6 @@ using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
 using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
-using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -294,10 +293,9 @@ static void SetupMiddleware(WebApplication app)
 
     if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
     {
-        app.MapGrpcReflectionService();
+        app.UseSwagger();
+        app.UseSwaggerUI();
     }
-
-    app.MapGrpcService<NotificationService>();
 }
 
 #endregion
