@@ -22,16 +22,16 @@ public class YarpConfigFilter : IProxyConfigFilter
 
         string endpoint = origCluster.ClusterId switch
         {
-            "AccountService" => _serviceRegistry.AccountServiceUrl,
-            "AuditService" => _serviceRegistry.AuditServiceUrl,
-            "CensusService" => _serviceRegistry.CensusServiceUrl,
-            "DataAcquisitionService" => _serviceRegistry.DataAcquisitionServiceUrl,
-            "MeasureEvaluationService" => _serviceRegistry.MeasureServiceUrl,
-            "NormalizationService" => _serviceRegistry.NormalizationServiceUrl,
-            "NotificationService" => _serviceRegistry.NotificationServiceUrl,
-            "ReportService" => _serviceRegistry.ReportServiceUrl,
-            "SubmissionService" => _serviceRegistry.SubmissionServiceUrl,
-            "TenantService" => _serviceRegistry.SubmissionServiceUrl,
+            "AccountService" => _serviceRegistry.AccountServiceUrl ?? string.Empty,
+            "AuditService" => _serviceRegistry.AuditServiceUrl ?? string.Empty,
+            "CensusService" => _serviceRegistry.CensusServiceUrl ?? string.Empty,
+            "DataAcquisitionService" => _serviceRegistry.DataAcquisitionServiceUrl ?? string.Empty,
+            "MeasureEvaluationService" => _serviceRegistry.MeasureServiceUrl ?? string.Empty,
+            "NormalizationService" => _serviceRegistry.NormalizationServiceUrl ?? string.Empty,
+            "NotificationService" => _serviceRegistry.NotificationServiceUrl ?? string.Empty,
+            "ReportService" => _serviceRegistry.ReportServiceUrl ?? string.Empty,
+            "SubmissionService" => _serviceRegistry.SubmissionServiceUrl ?? string.Empty,
+            "TenantService" => _serviceRegistry.TenantService.TenantServiceUrl ?? string.Empty,
             _ => string.Empty
         };
 
