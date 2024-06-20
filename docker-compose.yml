@@ -738,9 +738,9 @@ services:
       # DatabaseProvider: SqlServer
       # AutoMigrate: true
       # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
-      SubmissionServiceConfig__CensusServiceUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionServiceUrl: http://dataacquisition:8065/api
+      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
+      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
+      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
       SubmissionServiceConfig__SubmissionDirectory: submissions
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
