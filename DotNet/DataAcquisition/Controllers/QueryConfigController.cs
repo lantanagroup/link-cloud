@@ -14,7 +14,7 @@ using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisit
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/")]
+[Route("api/data")]
 [ApiController]
 public class QueryConfigController : Controller
 {

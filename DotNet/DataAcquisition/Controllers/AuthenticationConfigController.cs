@@ -14,7 +14,7 @@ using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisit
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/{facilityId}")]
+[Route("api/data/{facilityId}")]
 [ApiController]
 public class AuthenticationConfigController : Controller
 {
