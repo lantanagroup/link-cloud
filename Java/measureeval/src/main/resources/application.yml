@@ -19,6 +19,7 @@ springdoc:
     enabled: false
 
 spring:
+
   application:
     name: measureeval
 
@@ -43,6 +44,10 @@ spring:
     producer:
       client-id: ${spring.application.name}
 
+    retry:
+      maxAttempts: 6
+      retry-backoff-ms: 3000
+
 link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
 
@@ -55,7 +60,7 @@ link:
           - queryType={queryType}
 
 secret-management:
-  key-vault-uri: 'https://link-vault.vault.azure.net/'
+  key-vault-uri:
 
 authentication:
   anonymous: false
