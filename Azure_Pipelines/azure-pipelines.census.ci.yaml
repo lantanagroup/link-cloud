@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Census/Census.csproj'
-  testProject: 'DotNet/CensusUnitTests/CensusUnitTests.csproj'
+  testProject: 'DotNet/CensusTests/CensusTests.csproj'
   serviceName: 'Census'
 
 steps:
