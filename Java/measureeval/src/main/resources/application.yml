@@ -45,7 +45,7 @@ spring:
       client-id: ${spring.application.name}
 
     retry:
-      maxAttempts: 6
+      maxAttempts: 3
       retry-backoff-ms: 3000
 
 link:
