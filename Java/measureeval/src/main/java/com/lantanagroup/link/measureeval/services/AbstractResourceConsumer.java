@@ -84,11 +84,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             throw new ValidationException("Facility ID is null or empty.");
         }
 
-        if(correlationId == null || correlationId.isEmpty()) {
-            logger.error("Correlation ID is null or empty. Exiting.");
-            throw new ValidationException("Correlation ID is null or empty.");
-        }
-
         T value = record.value();
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
