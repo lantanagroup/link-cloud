@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Tenant/Tenant.csproj'
-  testProject: 'DotNet/TenantUnitTests/TenantUnitTests.csproj'
+  testProject: 'DotNet/TenantTests/TenantTests.csproj'
   serviceName: 'Tenant'
 
 steps:
