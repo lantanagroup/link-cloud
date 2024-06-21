@@ -36,11 +36,5 @@ steps:
     inputs:
       command: 'test'
       projects: $(testProject)
+      publishTestResults: true
     displayName: 'Run Tests'
-
-  - task: PublishTestResults@2
-    condition: succeededOrFailed()
-    inputs:
-      testRunner: VSTest
-      testResultsFiles: '**/*.trx'
-
