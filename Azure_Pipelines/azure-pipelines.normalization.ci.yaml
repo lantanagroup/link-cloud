@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Normalization/Normalization.csproj'
-  testProject: 'DotNet/NormalizationUnitTests/NormalizationUnitTests.csproj'
+  testProject: 'DotNet/NormalizationTests/NormalizationTests.csproj'
   serviceName: 'Normalization'
 
 steps:
