@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Audit/Audit.csproj'
-  testProject: 'DotNet/AuditUnitTests/AuditUnitTests.csproj'
+  testProject: 'DotNet/AuditTests/AuditTests.csproj'
   serviceName: 'Audit'
 
 steps:
@@ -36,5 +36,4 @@ steps:
     inputs:
       command: 'test'
       projects: $(testProject)
-      publishTestResults: true
     displayName: 'Run Tests'
