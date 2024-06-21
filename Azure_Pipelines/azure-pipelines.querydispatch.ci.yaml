@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/QueryDispatch/QueryDispatch.csproj'
-  testProject: 'DotNet/QueryDispatchUnitTests/QueryDispatchUnitTests.csproj'
+  testProject: 'DotNet/QueryDispatchTests/QueryDispatchTests.csproj'
   serviceName: 'QueryDispatch'
 
 steps:
