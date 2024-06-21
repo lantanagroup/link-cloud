@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Notification/Notification.csproj'
-  testProject: 'DotNet/NotificationUnitTests/NotificationUnitTests.csproj'
+  testProject: 'DotNet/NotificationTests/NotificationTests.csproj'
   serviceName: 'Notification'
 
 steps:
