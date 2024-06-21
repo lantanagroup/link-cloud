@@ -55,7 +55,7 @@ link:
     base-url: http://localhost:5194
     routes:
       query-result:
-        path: /api/{facilityId}/QueryResult/{correlationId}
+        path: /api/data/{facilityId}/QueryResult/{correlationId}
         query:
           - queryType={queryType}
 
