@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Account/Account.csproj'
-  testProject: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
+  testProject: 'DotNet/AccountTests/AccountTests.csproj'
   serviceName: 'Account'
 
 steps:
