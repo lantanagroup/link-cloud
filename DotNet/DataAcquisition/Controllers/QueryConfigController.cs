@@ -95,7 +95,7 @@ public class QueryConfigController : Controller
                 CorrelationId = "",
                 Action = type,
                 EventDate = DateTime.UtcNow,
-                ServiceName = DataAcquisitionConstants.ServiceName,
+                ServiceName = ServiceName,
                 PropertyChanges = changes != null?changes: new List<PropertyChangeModel>(),
                 Resource = "DataAcquisition",
                 User = "",
