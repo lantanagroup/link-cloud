@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
+import org.springframework.messaging.MessageHandlingException;
 
 @Configuration
 public class KafkaConfig {
@@ -166,7 +167,7 @@ public class KafkaConfig {
                 .includeTopic(Topics.RESOURCE_NORMALIZED)
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
-                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class)
+                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class).notRetryOn(MessageHandlingException.class)
                 .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
                 .create(template);
