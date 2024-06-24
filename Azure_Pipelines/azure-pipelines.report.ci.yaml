@@ -15,7 +15,7 @@ pool:
 
 variables:
   project: 'DotNet/Report/Report.csproj'
-  testProject: 'DotNet/ReportUnitTests/ReportUnitTests.csproj'
+  testProject: 'DotNet/ReportTests/ReportTests.csproj'
   serviceName: 'Report'
 
 steps:
@@ -35,5 +35,6 @@ steps:
     inputs:
       command: 'test'
       projects: $(testProject)
+      arguments: --collect "Code coverage"
     displayName: 'Run Tests'
 

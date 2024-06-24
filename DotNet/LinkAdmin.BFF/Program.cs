@@ -73,7 +73,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Initialize activity source
     var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);       
+    ServiceActivitySource.Initialize(version); 
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>

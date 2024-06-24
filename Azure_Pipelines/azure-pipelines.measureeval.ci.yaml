@@ -27,5 +27,6 @@ steps:
     displayName: Maven Install
     inputs:
       mavenPomFile: 'Java/pom.xml'
-      goals: install
+      goals: test
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
       options: '-pl measureeval -am'
