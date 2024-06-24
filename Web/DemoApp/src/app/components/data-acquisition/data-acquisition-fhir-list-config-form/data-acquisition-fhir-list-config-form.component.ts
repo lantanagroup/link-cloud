@@ -137,7 +137,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
         });
       }
       else if (this.formMode == FormMode.Edit) {
-        this.dataAcquisitionService.updateFhirListConfiguration(
+        this.dataAcquisitionService.createFhirListConfiguration(
           this.facilityIdControl.value,
           {
             facilityId: this.facilityIdControl.value,
