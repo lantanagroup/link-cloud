@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Census.Controllers;
 
-[Route("api/census/config/")]
+[Route("api/census/config")]
 [ApiController]
 public class CensusConfigController : Controller
 {
