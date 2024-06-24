@@ -340,6 +340,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
       SecretManagement__Enabled: false
       SecretManagement__Manager:
       SecretManagement__ManagerUri:
@@ -375,6 +376,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8062:8062"
     build:
@@ -491,7 +493,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
-      
+      Authentication__EnableAnonymousAccess: true      
     ports:
       - "8064:8064"
     build:
@@ -528,6 +530,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8065:8065"
     build:
@@ -603,6 +606,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8068:8068"
     build:
@@ -639,6 +643,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8069:8069"
     build:
@@ -674,6 +679,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8071:8071"
     build:
@@ -708,6 +714,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8072:8072"
     build:
@@ -757,6 +764,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8073:8073"
     build:
@@ -793,6 +801,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
     ports:
       - "8074:8074"
