@@ -17,7 +17,7 @@
                 </http>
                 <format>
                     <label>
-                        <pattern>app=link-cloud,component=MeasureEval</pattern>
+                        <pattern>app=link-cloud,component=MeasureEval,TraceId="%X{traceId}",SpanId="%X{spanId}"</pattern>
                         <readMarkers>true</readMarkers>
                     </label>
                     <message>
@@ -26,8 +26,10 @@
                             "level":"%level",
                             "class":"%logger{36}",
                             "thread":"%thread",
-                            "message": "%message",
-                            "requestId": "%X{X-Request-ID}"
+                            "message":"%message",
+                            "requestId":"%X{X-Request-ID}",
+                            "TraceId":"%X{traceId}",
+                            "SpanId":"%X{spanId}",
                             }
                         </pattern>
                     </message>
