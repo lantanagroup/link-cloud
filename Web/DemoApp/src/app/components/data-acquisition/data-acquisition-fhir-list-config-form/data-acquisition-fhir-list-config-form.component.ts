@@ -65,11 +65,13 @@ export class DataAcquisitionFhirListConfigFormComponent {
     this.configForm.reset();
 
     if (this.item) {
+      console.log("DataAcquisitionFhirListConfigFormComponent ngOnInit");
+      console.log(this.item);
       //set form values
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
+      this.fhirServerBaseUrlControl.setValue(this.item.fhirBaseServerUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
       this.loadEhrPatientLists(this.item.eHRPatientLists);
@@ -85,11 +87,13 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   ngOnChanges(changes: SimpleChanges) {
 
+    console.log("DataAcquisitionFhirListConfigFormComponent ngOnChanges");
+    console.log(changes);
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
+      this.fhirServerBaseUrlControl.setValue(this.item.fhirBaseServerUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
       this.loadEhrPatientLists(this.item.eHRPatientLists);
@@ -130,7 +134,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
       if (this.formMode == FormMode.Create) {
         this.dataAcquisitionService.createFhirListConfiguration(this.facilityIdControl.value, {
           facilityId: this.facilityIdControl.value,
-          fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+          fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
           eHRPatientLists: this.eHRPatientListControl.value
         } as IDataAcquisitionFhirListConfigModel).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit(response);
@@ -141,7 +145,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
           this.facilityIdControl.value,
           {
             facilityId: this.facilityIdControl.value,
-            fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+            fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
             eHRPatientLists: this.eHRPatientListControl.value
           } as IDataAcquisitionFhirListConfigModel).subscribe((response: IEntityCreatedResponse) => {
             this.submittedConfiguration.emit(response);
@@ -168,14 +172,17 @@ export class DataAcquisitionFhirListConfigFormComponent {
   }
 
   private loadEhrPatientLists(ehrPatientList: IEhrPatientListModel[]): void {
-    this.eHRPatientListControl.clear();
-    this.eHRPatientListControl.updateValueAndValidity();
-    ehrPatientList.forEach((ehrPatientListItem: IEhrPatientListModel) => {
+    console.log(ehrPatientList);
+    if(ehrPatientList) {
+      this.eHRPatientListControl.clear();
+      this.eHRPatientListControl.updateValueAndValidity();
+      ehrPatientList.forEach((ehrPatientListItem: IEhrPatientListModel) => {
       this.eHRPatientListControl.push(new FormGroup({
         measureId: new FormControl(ehrPatientListItem.measureIds.join(", "), Validators.required),
         listId: new FormControl(ehrPatientListItem.listIds.join(", "), Validators.required)
       }));
     });
+    }
   }
   
 }
