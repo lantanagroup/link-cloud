@@ -16,7 +16,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [readonly]="viewOnly">
+      <input matInput formControlName="facilityId" [readonly]="viewOnly" placeholder="Facility Id">
       <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
         <mat-icon>close</mat-icon>
       </button>
@@ -29,7 +29,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Auth Type</mat-label>
-      <input matInput formControlName="authType" [readonly]="viewOnly">
+      <input matInput formControlName="authType" [readonly]="viewOnly" placeholder="Authentication Type">
       <button *ngIf="authTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthType()">
         <mat-icon>close</mat-icon>
       </button>
@@ -42,7 +42,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Key</mat-label>
-      <input matInput formControlName="authKey" [readonly]="viewOnly">
+      <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key">
       <button *ngIf="authKeyControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthKey()">
         <mat-icon>close</mat-icon>
       </button>
@@ -53,9 +53,9 @@
   </div>
 
   <div class="form-input">
-    <mat-form-field appearance="outline" class="subject-input form-input ">
+    <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Token URL</mat-label>
-      <input matInput formControlName="tokenUrl" [readonly]="viewOnly">
+      <input matInput formControlName="tokenUrl" [readonly]="viewOnly" placeholder="Token URL">
       <button *ngIf="tokenUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearTokenUrl()">
         <mat-icon>close</mat-icon>
       </button>
@@ -68,7 +68,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Audience</mat-label>
-      <input matInput formControlName="audience" [readonly]="viewOnly">
+      <input matInput formControlName="audience" [readonly]="viewOnly" placeholder="Audience">
       <button *ngIf="audienceControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearAudience()">
         <mat-icon>close</mat-icon>
       </button>
@@ -81,7 +81,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Audience</mat-label>
-      <input matInput formControlName="clientId" [readonly]="viewOnly">
+      <input matInput formControlName="clientId" [readonly]="viewOnly" placeholder="Client ID">
       <button *ngIf="clientIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearClientId()">
         <mat-icon>close</mat-icon>
       </button>
@@ -94,7 +94,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>User Name</mat-label>
-      <input matInput formControlName="userName" [readonly]="viewOnly">
+      <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name">
       <button *ngIf="userNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearUserName()">
         <mat-icon>close</mat-icon>
       </button>
@@ -107,7 +107,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Password</mat-label>
-      <input matInput formControlName="password" [readonly]="viewOnly">
+      <input matInput formControlName="password" [readonly]="viewOnly" placeholder="Password">
       <button *ngIf="passwordControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearPassword()">
         <mat-icon>close</mat-icon>
       </button>
