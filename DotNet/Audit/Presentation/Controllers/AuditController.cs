@@ -4,6 +4,8 @@ using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -12,6 +14,7 @@ using System.Text.Json;
 namespace LantanaGroup.Link.Audit.Presentation.Controllers
 {
     [Route("api/audit")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class AuditController : ControllerBase
     {

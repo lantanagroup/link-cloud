@@ -64,4 +64,4 @@ secret-management:
 
 authentication:
   anonymous: false
-  authority: ''
+  authority: 'https://localhost:7004'
