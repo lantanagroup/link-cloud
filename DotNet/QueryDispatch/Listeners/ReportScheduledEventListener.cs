@@ -103,21 +103,23 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     ReportScheduledKey key = consumeResult.Message.Key;
                                     ReportScheduledValue value = consumeResult.Message.Value;
 
-                                    DateTime startDate = new DateTime();
-                                    DateTime endDate = new DateTime();
-
-                                    var startDatePair = value.Parameters.Where(x => x.Key.ToLower() == "startdate").FirstOrDefault();
-                                    var endDatePair = value.Parameters.Where(x => x.Key.ToLower() == "enddate").FirstOrDefault();
-
-                                    if (startDatePair.Key == null || !DateTime.TryParse(startDatePair.Value, out startDate))
+                                    // Validate the start and end dates
+                                    if (!DateTimeOffset.TryParse(
+                                            value.Parameters.Single(x => x.Key.Equals("startdate", StringComparison.CurrentCultureIgnoreCase)).Value,
+                                            out DateTimeOffset startDateOffset))
                                     {
                                         throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
                                     }
 
-                                    if (endDatePair.Key == null || !DateTime.TryParse(endDatePair.Value, out endDate))
+                                    if (!DateTimeOffset.TryParse(
+                                            value.Parameters.Single(x => x.Key.Equals("enddate", StringComparison.CurrentCultureIgnoreCase)).Value,
+                                            out DateTimeOffset endDateOffset))
                                     {
                                         throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
                                     }
+
+                                    var startDate = startDateOffset.UtcDateTime;
+                                    var endDate = endDateOffset.UtcDateTime;           
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key.FacilityId, key.ReportType, startDate, endDate);
 

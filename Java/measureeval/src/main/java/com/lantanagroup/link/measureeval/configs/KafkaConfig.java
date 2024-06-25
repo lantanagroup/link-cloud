@@ -7,7 +7,7 @@ import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;
-import io.opentelemetry.api.OpenTelemetry;
+import com.lantanagroup.link.shared.config.TelemetryConfig;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -25,16 +25,24 @@ import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
 import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
 import org.springframework.kafka.support.serializer.*;
-import io.opentelemetry.instrumentation.kafkaclients.v2_6.KafkaTelemetry;
 
+import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import com.lantanagroup.link.shared.config.KafkaRetryConfig;
+import org.springframework.messaging.MessageHandlingException;
 
 @Configuration
 public class KafkaConfig {
+
+    private final KafkaRetryConfig KafkaRetryConfig;
+
+    public KafkaConfig(KafkaRetryConfig KafkaRetryConfig) {
+        this.KafkaRetryConfig = KafkaRetryConfig;
+    }
+
     private static <T> Map<Pattern, T> byPattern(Map<String, T> map) {
         return map.entrySet().stream().collect(Collectors.toMap(
                 entry -> Pattern.compile(Pattern.quote(entry.getKey())),
@@ -110,6 +118,11 @@ public class KafkaConfig {
 
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
+
+        //set the date format to the ISO 8601 ISO_INSTANT format to match other services
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX");
+        objectMapper.setDateFormat(sdf);
+
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
                 ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
@@ -148,13 +161,13 @@ public class KafkaConfig {
     public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, ResourceNormalized> template) {
         return RetryTopicConfigurationBuilder
                 .newInstance()
-                .fixedBackOff(3000)
-                .maxAttempts(5)
+                .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
+                .maxAttempts(KafkaRetryConfig.getMaxAttempts())
                 .concurrency(1)
                 .includeTopic(Topics.RESOURCE_NORMALIZED)
-                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class)
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
+                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class).notRetryOn(MessageHandlingException.class)
                 .useSingleTopicForSameIntervals()
                 .doNotAutoCreateRetryTopics()
                 .create(template);

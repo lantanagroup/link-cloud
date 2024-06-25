@@ -11,10 +11,13 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Quartz;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [Route("api/data/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class AuthenticationConfigController : Controller
 {

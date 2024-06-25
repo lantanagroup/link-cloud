@@ -1,12 +1,16 @@
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Converters;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
     [Route("api/[controller]")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class ReportController : ControllerBase
     {

@@ -35,7 +35,6 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
-using System.Configuration;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -98,6 +97,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
 
     //add factories
@@ -335,7 +335,7 @@ static void SetupMiddleware(WebApplication app)
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy"); ;
+    }).RequireCors("HealthCheckPolicy");
 }
 
 #endregion
