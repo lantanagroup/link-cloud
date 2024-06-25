@@ -50,20 +50,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             try
             {
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                string? bearerKey = _cache.GetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName);
+                string? bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
 
                 if (bearerKey == null)
                 {
 
-                    bearerKey = await _secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                    bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
 
                     if (_dataProtectionSettings.Value.Enabled)
                     {
-                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
                     }
                     else
                     {
-                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
                     }                             
                 }
 

@@ -150,6 +150,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.Environment = securityServiceOptions.Environment;
                     options.Authority = configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority");
                     options.Audience = configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience");
+                    options.RequireHttpsMetadata = !securityServiceOptions.Environment.IsDevelopment() && configuration.GetValue<bool>("Authentication:Schemas:Jwt:RequireHttpsMetadata");
                     options.NameClaimType = configuration.GetValue<string>("Authentication:Schemas:Jwt:NameClaimType");
                     options.RoleClaimType = configuration.GetValue<string>("Authentication:Schemas:Jwt:RoleClaimType");
                 });

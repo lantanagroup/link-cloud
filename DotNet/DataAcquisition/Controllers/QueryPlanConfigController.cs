@@ -11,10 +11,13 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [Route("api/data/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 public class QueryPlanConfigController : Controller
 {
     private readonly ILogger<QueryPlanConfigController> _logger;

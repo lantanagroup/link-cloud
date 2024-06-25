@@ -1,14 +1,15 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResult;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [ApiController]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [Route("api/data/{facilityId}/[controller]")]
 public class QueryResultController : ControllerBase
 {

@@ -1,4 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
@@ -21,7 +23,11 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             var linkBearerServiceOptions = new LinkBearerServiceOptions();
             options?.Invoke(linkBearerServiceOptions);
 
-            if(linkBearerServiceOptions.AllowAnonymous)
+            //add token commands            
+            services.AddTransient<ICreateSystemToken, CreateSystemToken>();
+            services.AddTransient<ICreateUserToken, CreateUserToken>();
+
+            if (linkBearerServiceOptions.AllowAnonymous)
             {             
                 services.AddAuthorizationBuilder()
                    .AddPolicy("CanViewAccounts", pb => { pb.RequireAssertion(context => true); })
@@ -61,7 +67,6 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     ValidateAudience = linkBearerServiceOptions.ValidateToken,
                     ValidateIssuer = linkBearerServiceOptions.ValidateToken,
                     ValidateIssuerSigningKey = linkBearerServiceOptions.ValidateToken, 
-                    ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha512 },
 
                     IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
                     {                             

@@ -32,6 +32,9 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
 using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.OpenApi.Models;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,6 +87,14 @@ static void RegisterServices(WebApplicationBuilder builder)
         throw new NullReferenceException("Service Information was null.");
     }
 
+    // Add problem details
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = ReportConstants.ServiceName;
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
+    });
+
     // Add configuration settings
     builder.Services.AddSingleton(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? new KafkaConnection());
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
@@ -91,6 +102,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.Mongo));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     // Add services to the container.
     builder.Services.AddHttpClient();
@@ -131,6 +143,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<PatientResourceRepository>();
     builder.Services.AddSingleton<SharedResourceRepository>();
 
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
+
     // Add controllers
     builder.Services.AddControllers();
 
@@ -142,6 +166,38 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        if (!allowAnonymousAccess)
+        {
+            #region Authentication Schemas
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+
+            #endregion
+        }
+
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
@@ -240,6 +296,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
+    }
+
     app.ConfigureSwagger();
 
     //map health check middleware
@@ -250,6 +315,16 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
     app.MapControllers();
 }
 

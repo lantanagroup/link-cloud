@@ -19,6 +19,7 @@ springdoc:
     enabled: false
 
 spring:
+
   application:
     name: measureeval
 
@@ -43,6 +44,10 @@ spring:
     producer:
       client-id: ${spring.application.name}
 
+    retry:
+      maxAttempts: 3
+      retry-backoff-ms: 3000
+
 link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
 
@@ -50,13 +55,13 @@ link:
     base-url: http://localhost:5194
     routes:
       query-result:
-        path: /api/{facilityId}/QueryResult/{correlationId}
+        path: /api/data/{facilityId}/QueryResult/{correlationId}
         query:
           - queryType={queryType}
 
 secret-management:
-  key-vault-uri: ''
+  key-vault-uri:
 
 authentication:
   anonymous: false
-  authority: ''
+  authority: 'https://localhost:7004'
