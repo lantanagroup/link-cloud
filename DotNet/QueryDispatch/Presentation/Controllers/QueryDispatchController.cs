@@ -3,14 +3,16 @@ using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
     [Route("api/querydispatch")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class QueryDispatchController : ControllerBase
     {

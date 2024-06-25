@@ -5,6 +5,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Diagnostics;
@@ -41,7 +42,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var key = GenerateRandomKey(64); // 64 bytes = 512 bits
 
             //update secret manager
-            var result = await _secretManager.SetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key, CancellationToken.None);
+            var result = await _secretManager.SetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key, CancellationToken.None);
 
             if (!result)
             {
@@ -53,8 +54,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _metrics.IncrementTokenKeyRefreshCounter([]);
 
             var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-            //_cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
-            _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, key);
+            //_cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
+            _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key);
 
             return true;
         }

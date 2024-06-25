@@ -1,14 +1,17 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Validate;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using Link.Authorization.Policies;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
 [Route("api/data/connectionValidation")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class ConnectionValidationController : Controller
 {
