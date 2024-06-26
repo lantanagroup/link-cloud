@@ -61,8 +61,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var command = new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlan = queryPlan,
-                QueryPlanType = QueryPlanType.QueryPlans
+                QueryPlan = queryPlan
             };
 
             _mocker.GetMock<IQueryPlanRepository>()
@@ -71,11 +70,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 
             _mocker.GetMock<IQueryPlanRepository>()
                 .Setup(r => r.UpdateAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new QueryPlan());
-
-            _mocker.GetMock<IMediator>()
-                .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(command.QueryPlan);
 
             _mocker.GetMock<IMediator>()
                 .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
@@ -87,54 +82,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Verify(r => r.UpdateAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            _mocker.GetMock<IMediator>()
-                .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
             Assert.Equal(queryPlan.FacilityId, result.FacilityId);
-        }
-
-        [Fact]
-        public async Task HandleTest_Without_QueryPlanType()
-        {
-            _mocker = new AutoMocker();
-            var handler = _mocker.CreateInstance<SaveQueryPlanCommandHandler>();
-            var command = new SaveQueryPlanCommand
-            {
-                FacilityId = facilityId,
-                QueryPlan = queryPlan,
-                QueryPlanType = QueryPlanType.QueryPlans
-            };
-
-            var qp = _mocker.CreateInstance<QueryPlan>();
-
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((QueryPlan)null);
-
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Setup(r => r.AddAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(qp);
-
-            _mocker.GetMock<IMediator>()
-                .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Unit.Value);
-
-            _mocker.GetMock<IMediator>()
-                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(true));
-
-            var result = await handler.Handle(command, CancellationToken.None);
-
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Verify(r => r.AddAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
-            _mocker.GetMock<IMediator>()
-                .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
-            Assert.Equal(null, result);
         }
     }
 }
