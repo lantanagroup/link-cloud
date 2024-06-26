@@ -4,6 +4,7 @@ using Link.Authorization.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -42,6 +43,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security.Token
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
                 _logger.LogInformation("Link token created for user {user}", user.Claims.First(c => c.Type == "sub").Value);
+                if (_linkTokenServiceConfig.Value.LogToken)
+                {
+                    Activity.Current?.AddEvent(new("Token created.", tags: [
+                        new KeyValuePair<string, object?>("token", jwt),
+                    ]));
+                }
 
                 return Task.FromResult(jwt);
             }

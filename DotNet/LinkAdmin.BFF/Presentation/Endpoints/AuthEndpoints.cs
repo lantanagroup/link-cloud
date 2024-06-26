@@ -2,6 +2,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -38,7 +39,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                  });
 
             authEndpoints.MapGet("/user", GetUser)
-                .RequireAuthorization("AuthenticatedUser")
+                .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
                 .Produces(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -49,7 +50,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             authEndpoints.MapGet("/logout", Logout)
-                .RequireAuthorization("AuthenticatedUser")               
+                .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)               
                 .Produces<object>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)

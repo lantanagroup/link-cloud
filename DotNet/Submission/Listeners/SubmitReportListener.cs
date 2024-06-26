@@ -7,13 +7,16 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using MediatR;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using System.Diagnostics;
@@ -32,6 +35,9 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
 
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly ICreateSystemToken _createSystemToken;
+
         private string Name => this.GetType().Name;
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
@@ -39,7 +45,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig,
             IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -58,6 +64,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _deadLetterExceptionHandler.ServiceName = "Submission";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
+
+            _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
+            _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -160,6 +169,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #region Census Admitted Patient List
                                 string censusRequestUrl = _submissionConfig.CensusUrl +
                                                           $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
+
+                                //TODO: add method to get key that includes looking at redis for future use case
+                                if (_linkTokenServiceConfig.Value.SigningKey is null)
+                                    throw new Exception("Link Token Service Signing Key is missing.");
+
+                                //Add link token
+                                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
+                                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
@@ -441,6 +459,14 @@ namespace LantanaGroup.Link.Submission.Listeners
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
 
             var httpClient = _httpClient.CreateClient();
+
+            //TODO: add method to get key that includes looking at redis for future use case
+            if (_linkTokenServiceConfig.Value.SigningKey is null)
+                throw new Exception("Link Token Service Signing Key is missing.");
+
+            //Add link token
+            var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 

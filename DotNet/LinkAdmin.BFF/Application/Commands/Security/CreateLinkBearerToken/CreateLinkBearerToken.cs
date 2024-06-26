@@ -50,20 +50,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             try
             {
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                string? bearerKey = _cache.GetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName);
+                string? bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
 
                 if (bearerKey == null)
                 {
 
-                    bearerKey = await _secretManager.GetSecretAsync(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                    bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
 
                     if (_dataProtectionSettings.Value.Enabled)
                     {
-                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
                     }
                     else
                     {
-                        _cache.SetString(LinkAdminConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
                     }                             
                 }
 
@@ -96,6 +96,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                     new KeyValuePair<string, object?>("subject", userId),
                     new KeyValuePair<string, object?>("timespan", timespan)
                 ]);
+
+                if (_linkTokenServiceConfig.Value.LogToken)
+                {
+                    Activity.Current?.AddEvent(new("Token generated.", tags: [
+                        new KeyValuePair<string, object?>("token", jwt),
+                    ]));
+                }
 
                 return jwt;
 
