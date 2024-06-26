@@ -9,10 +9,13 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
     [Route("api/[controller]")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class NormalizationController : ControllerBase
     {

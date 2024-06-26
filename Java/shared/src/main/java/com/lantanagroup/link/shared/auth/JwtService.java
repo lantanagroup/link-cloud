@@ -6,10 +6,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.StringUtils;
@@ -46,12 +43,28 @@ public class JwtService {
   }
   public List<String> getRolesFromToken (String token, String secret) {
     final Claims claims = getAllClaimsFromToken(token, secret);
-    return (List<String>)claims.get(JwtService.LinkSystemClaims_Role);
+    Object roles = claims.get(JwtService.LinkSystemClaims_Role);
+    if (roles instanceof List){
+        return (List<String>)roles;
+    }
+    else{
+      List<String> newList = new ArrayList<>();
+      newList.add((String)roles);
+      return newList;
+    }
   }
 
   public List<String> getPermissionsFromToken (String token, String secret) {
     final Claims claims = getAllClaimsFromToken(token, secret);
-    return (List<String>)claims.get(JwtService.LinkSystemClaims_LinkPermissions);
+    Object perm = claims.get(JwtService.LinkSystemClaims_LinkPermissions);
+    if (perm instanceof List){
+      return (List<String>)perm;
+    }
+    else{
+      List<String> newList = new ArrayList<>();
+      newList.add((String)perm);
+      return newList;
+    }
   }
 
   //retrieve expiration date from jwt token

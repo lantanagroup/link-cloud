@@ -44,6 +44,18 @@ app.Run();
 #region Register Services
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    // load external configuration source if specified
+    var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    if (!string.IsNullOrEmpty(externalConfigurationSource))
+    {
+        builder.AddExternalConfiguration(options =>
+        {
+            options.ExternalConfigurationSource = externalConfigurationSource;
+            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
+            options.Environment = builder.Environment;
+        });
+    }
+
     // Logging using Serilog    
     builder.Logging.AddSerilog();
     var loggerOptions = new ConfigurationReaderOptions { SectionName = LinkAdminConstants.AppSettingsSectionNames.Serilog };
@@ -61,19 +73,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Initialize activity source
     var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
-
-    // load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        builder.AddExternalConfiguration(options =>
-        {
-            options.ExternalConfigurationSource = externalConfigurationSource;
-            options.ExternalConfigurationConnectionString = builder.Configuration.GetConnectionString("AzureAppConfiguration");
-            options.Environment = builder.Environment;
-        });
-    }     
+    ServiceActivitySource.Initialize(version); 
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>

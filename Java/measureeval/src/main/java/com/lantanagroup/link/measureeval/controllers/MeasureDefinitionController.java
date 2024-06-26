@@ -41,7 +41,6 @@ public class MeasureDefinitionController {
         this.repository = repository;
         this.bundleValidator = bundleValidator;
         this.evaluatorCache = evaluatorCache;
-        //tracer =  ExtendedTracer.create(openTelemetry.getTracer(INSTRUMENTATION_NAME));
     }
 
     @GetMapping
@@ -49,8 +48,11 @@ public class MeasureDefinitionController {
     @Operation(summary = "Get all measure definitions", tags = {"Measure Definitions"})
     public List<MeasureDefinition> getAll(@AuthenticationPrincipal PrincipalUser user) {
         _logger.info("Get all measure definitions");
-        Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
         return repository.findAll();
 
     }
@@ -59,8 +61,12 @@ public class MeasureDefinitionController {
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
         _logger.info("Get measure definition {}", id);
-        Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+
         return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
@@ -69,8 +75,11 @@ public class MeasureDefinitionController {
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
         _logger.info("Put measure definition {}", id);
-        Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
         bundleValidator.validate(bundle);
         MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
             MeasureDefinition _entity = new MeasureDefinition();
@@ -88,8 +97,11 @@ public class MeasureDefinitionController {
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
         _logger.info("Evaluate measure definition {}", id);
-        Span currentSpan = Span.current();
-        currentSpan.setAttribute("user", user != null ? user.getEmailAddress() : "");
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
         MeasureEvaluator evaluator = evaluatorCache.get(id);
         if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);

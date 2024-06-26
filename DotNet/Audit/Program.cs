@@ -6,15 +6,12 @@ using LantanaGroup.Link.Audit.Application.Factory;
 using LantanaGroup.Link.Audit.Application.Audit.Queries;
 using LantanaGroup.Link.Audit.Infrastructure.AuditHelper;
 using Serilog;
-using Serilog.Exceptions;
 using Serilog.Enrichers.Span;
-using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Infrastructure;
 using System.Reflection;
 using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Audit.Infrastructure.Extensions;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using System.Diagnostics;
 using Serilog.Settings.Configuration;
@@ -125,6 +122,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -207,18 +205,17 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.Environment = builder.Environment;
     });
 
-    //configure service api security    
-    var idpConfig = builder.Configuration.GetSection(AuditConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
-    if (idpConfig != null)
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
     {
-        builder.Services.AddAuthenticationService(idpConfig, builder.Environment);        
-    }
-    else
-    {
-        throw new NullReferenceException("Identity Provider Configuration was null.");
-    }
-
-    //builder.Services.AddAuthorizationService();
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
 
     builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters();    
 

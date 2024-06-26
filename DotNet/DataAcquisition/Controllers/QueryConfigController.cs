@@ -7,14 +7,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/")]
+[Route("api/data")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class QueryConfigController : Controller
 {

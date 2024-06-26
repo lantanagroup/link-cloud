@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             {
                 options.Authority = jwtBearerOptions.Authority;
                 options.Audience = jwtBearerOptions.Audience;
-                options.RequireHttpsMetadata = !jwtBearerOptions.Environment.IsDevelopment();
+                options.RequireHttpsMetadata = jwtBearerOptions.RequireHttpsMetadata;
                 options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
@@ -38,6 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
         public IWebHostEnvironment Environment { get; set; } = null!;
         public string? Authority { get; set; } = null!;
         public string? Audience { get; set; } = null!;
+        public bool RequireHttpsMetadata { get; set; } = true;
         public string? NameClaimType { get; set; } = null!;
         public string? RoleClaimType { get; set; } = null!;
         public string[]? ValidTypes { get; set; } = ["at+jwt", "JWT"];

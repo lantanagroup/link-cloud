@@ -1,19 +1,20 @@
-﻿using System.Text.Json;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
+using Link.Authorization.Policies;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Controllers;
 
 [Route("api/census/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusController : Controller
 {
@@ -37,7 +38,7 @@ public class CensusController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientCensusHistoricEntity>))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("history")]
-    public async Task<ActionResult<List<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
+    public async Task<ActionResult<IEnumerable<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
     {
         try
         {

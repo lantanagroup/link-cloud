@@ -35,6 +35,7 @@ steps:
     inputs:
       command: 'test'
       projects: $(testProject)
+      arguments: --collect "Code coverage"
     displayName: 'Run Tests'
 
 

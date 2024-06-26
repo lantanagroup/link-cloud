@@ -1,5 +1,7 @@
-﻿using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Models;
+using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
@@ -26,7 +28,7 @@ namespace QueryDispatchUnitTests
                 .ReturnsAsync(true);
 
             var result = await _controller.DeleteQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId);
-            Assert.IsType<NoContentResult>(result.Result);
+            Assert.IsType<ActionResult<RequestResponse>>(result);
         }
 
         [Fact]
