@@ -13,4 +13,9 @@ public class QueryPlan : BaseEntity
     public string LookBack { get; set; }
     public Dictionary<string, IQueryConfig> InitialQueries { get; set; }
     public Dictionary<string, IQueryConfig> SupplementalQueries { get; set; }
+
+    public QueryPlan() : base()
+    {
+
+    }
 }

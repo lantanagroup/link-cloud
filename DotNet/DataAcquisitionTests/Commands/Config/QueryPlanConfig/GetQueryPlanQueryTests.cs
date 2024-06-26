@@ -27,9 +27,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var handler = _mocker.CreateInstance<GetQueryPlanQueryHandler>();
             var query = new GetQueryPlanQuery
             {
-                FacilityId = facilityId,
-                QueryPlanType = QueryPlanType.QueryPlans,
-                SystemPlans = true
+                FacilityId = facilityId
             };
             var expectedResult = new QueryPlan();
 
@@ -53,9 +51,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var handler = _mocker.CreateInstance<GetQueryPlanQueryHandler>();
             var query = new GetQueryPlanQuery
             {
-                FacilityId = null,
-                QueryPlanType = QueryPlanType.QueryPlans,
-                SystemPlans = true
+                FacilityId = null
             };
 
             _mocker.GetMock<IQueryPlanRepository>()

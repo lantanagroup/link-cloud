@@ -19,14 +19,13 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken)
+    public virtual async Task<T?> GetAsync(string id, CancellationToken cancellationToken)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
     {
-
         var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 
         await _dbContext.SaveChangesAsync(cancellationToken);

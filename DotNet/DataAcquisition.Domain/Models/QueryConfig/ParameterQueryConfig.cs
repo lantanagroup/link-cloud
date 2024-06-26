@@ -7,4 +7,9 @@ public class ParameterQueryConfig : IQueryConfig
 {
     public string ResourceType { get; set; }
     public List<IParameter> Parameters { get; set; }
+
+    public ParameterQueryConfig()
+    {
+
+    }
 }
