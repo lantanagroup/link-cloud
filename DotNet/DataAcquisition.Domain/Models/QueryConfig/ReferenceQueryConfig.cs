@@ -9,4 +9,9 @@ public class ReferenceQueryConfig : IQueryConfig
     public string ResourceType { get; set; }
     public OperationType OperationType { get; set; }
     public int Paged { get; set; }
+
+    public ReferenceQueryConfig()
+    {
+
+    }
 }

@@ -1,18 +1,15 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
+using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using MediatR;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 
 public class DeleteQueryPlanCommand : IRequest<Unit>
 {
     public string FacilityId { get; set; }
-    public QueryPlanType QueryPlanType { get; set; }
 }
 
 public class DeleteQueryPlanCommandHandler : IRequestHandler<DeleteQueryPlanCommand, Unit>
@@ -52,19 +49,8 @@ public class DeleteQueryPlanCommandHandler : IRequestHandler<DeleteQueryPlanComm
 
     public async Task<Unit> Handle(DeleteQueryPlanCommand request, CancellationToken cancellationToken)
     {
-        switch (request.QueryPlanType)
-        {
-            case QueryPlanType.QueryPlans:
-                await _queryPlanRepository.DeleteAsync(request.FacilityId, cancellationToken);
-                break;
-            case QueryPlanType.InitialQueries:
-                await _queryPlanRepository.DeleteInitialQueriesForFacility(request.FacilityId, cancellationToken);
-                break;
-            case QueryPlanType.SupplementalQueries:
-                await _queryPlanRepository.DeleteSupplementalQueriesForFacility(request.FacilityId, cancellationToken);
-                break;
-        }
-        await SendAudit($"Delete query plan configuration for '{request.FacilityId}'", null, request.FacilityId, AuditEventType.Delete, null);
+        await _queryPlanRepository.DeleteAsync(request.FacilityId, cancellationToken);
+
         return new Unit();
     }
 }

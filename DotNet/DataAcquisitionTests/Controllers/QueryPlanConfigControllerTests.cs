@@ -1,21 +1,11 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Controllers
 {
@@ -30,11 +20,11 @@ namespace DataAcquisitionUnitTests.Controllers
             var cancellationToken = new CancellationToken();
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetQueryPlanQuery>(), CancellationToken.None))
-                .ReturnsAsync(new QueryPlanResult());
+                .ReturnsAsync(new QueryPlan());
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan(facilityId, new QueryPlanType(), false, CancellationToken.None);
+            var result = await _controller.GetQueryPlan(facilityId, CancellationToken.None);
             Assert.IsType<OkObjectResult>(result.Result);
         }
 
@@ -43,11 +33,11 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetQueryPlanQuery>(), CancellationToken.None))
-                .ReturnsAsync((QueryPlanResult)null);
+                .ReturnsAsync((QueryPlan?)null);
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan(facilityId, new QueryPlanType(), false, CancellationToken.None);
+            var result = await _controller.GetQueryPlan(facilityId, CancellationToken.None);
             Assert.IsType<NotFoundResult>(result.Result);
         }
 
@@ -57,7 +47,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan("", new QueryPlanType(), false, CancellationToken.None);
+            var result = await _controller.GetQueryPlan("",   CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result.Result);
         }
 
@@ -66,11 +56,11 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveQueryPlanCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(new QueryPlan());
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), new QueryPlanResult(), CancellationToken.None);
+            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), new QueryPlan(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -89,13 +79,13 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetQueryPlanQuery>(), CancellationToken.None))
-                .ReturnsAsync(new QueryPlanResult());
+                .ReturnsAsync(new QueryPlan());
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveQueryPlanCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(new QueryPlan());
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), new QueryPlanResult(), CancellationToken.None);
+            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), new QueryPlan(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -104,9 +94,9 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             _mocker = new AutoMocker();
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetQueryPlanQuery>(), CancellationToken.None))
-                .ReturnsAsync(new QueryPlanResult());
+                .ReturnsAsync(new QueryPlan());
             _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveQueryPlanCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+                .ReturnsAsync(new QueryPlan());
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 

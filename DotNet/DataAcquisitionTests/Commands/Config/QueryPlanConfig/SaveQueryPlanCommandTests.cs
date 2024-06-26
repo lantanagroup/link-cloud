@@ -15,37 +15,43 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
     public class SaveQueryPlanCommandTests
     {
         private AutoMocker _mocker;
+
         private const string facilityId = "testId";
+
         //private const string queryPlan = "{\"key\":\"value\"}";
-        private static QueryPlanResult queryPlan = new QueryPlanResult { 
-                QueryPlan = new QueryPlan
+        private static QueryPlan queryPlan = new QueryPlan
+        {
+            Id = new Guid(),
+            PlanName = "testName",
+            FacilityId = "testFacilityId",
+            EHRDescription = "testEHRDescription",
+            LookBack = "PT01",
+            ReportType = "testReportType",
+            InitialQueries = new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+            {
                 {
-                    Id = new Guid(),
-                    PlanName = "testName",
-                    FacilityId = "testFacilityId",
-                    EHRDescription = "testEHRDescription",
-                    LookBack = "PT01",
-                    ReportType = "testReportType",
-                    InitialQueries = new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+                    "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
                     {
-                        { "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
-                            {
-                                ResourceType = "Patient",
-                                Parameters = new List<IParameter>{ new LiteralParameter { Name = "testName", Literal = "testValue" } }
-                            }
-                        }
-                    },
-                    SupplementalQueries = new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+                        ResourceType = "Patient",
+                        Parameters = new List<IParameter>
+                            { new LiteralParameter { Name = "testName", Literal = "testValue" } }
+                    }
+                }
+            },
+            SupplementalQueries =
+                new Dictionary<string, LantanaGroup.Link.DataAcquisition.Domain.Interfaces.IQueryConfig>
+                {
                     {
-                        { "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
-                            {
-                                ResourceType = "Patient",
-                                Parameters = new List<IParameter>{ new LiteralParameter { Name = "testName", Literal = "testValue" } }
-                            }
-                        }
+                        "0", new LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.ParameterQueryConfig
+                        {
+                            ResourceType = "Patient",
+                            Parameters = new List<IParameter>
+                                { new LiteralParameter { Name = "testName", Literal = "testValue" } }
                         }
                     }
-            };
+                }
+        };
+
 
         [Fact]
         public async Task HandleTest()
@@ -55,7 +61,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var command = new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlanResult = queryPlan,
+                QueryPlan = queryPlan,
                 QueryPlanType = QueryPlanType.QueryPlans
             };
 
@@ -85,7 +91,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            Assert.Equal(Unit.Value, result);
+            Assert.Equal(queryPlan.FacilityId, result.FacilityId);
         }
 
         [Fact]
@@ -96,7 +102,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var command = new SaveQueryPlanCommand
             {
                 FacilityId = facilityId,
-                QueryPlanResult = queryPlan,
+                QueryPlan = queryPlan,
                 QueryPlanType = QueryPlanType.QueryPlans
             };
 
@@ -128,7 +134,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            Assert.Equal(Unit.Value, result);
+            Assert.Equal(null, result);
         }
     }
 }
