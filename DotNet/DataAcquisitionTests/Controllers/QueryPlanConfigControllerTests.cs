@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
+﻿using System.Net;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
@@ -60,7 +61,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), new QueryPlan(), CancellationToken.None);
+            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -70,8 +71,10 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.CreateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None);
-            Assert.IsType<BadRequestObjectResult>(result);
+            var result = await _controller.CreateQueryPlan(facilityId, null, CancellationToken.None);
+            Assert.IsType<ObjectResult>(result);
+            var res = (ProblemDetails)result;
+            Assert.True(res.Status == (int)HttpStatusCode.BadRequest);
         }
 
         [Fact]
@@ -85,7 +88,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), new QueryPlan(), CancellationToken.None);
+            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlan(), CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -100,7 +103,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.UpdateQueryPlan(facilityId, new QueryPlanType(), null, CancellationToken.None);
+            var result = await _controller.UpdateQueryPlan(facilityId, null, CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result);
 
         }
@@ -114,7 +117,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan(facilityId, new QueryPlanType(), CancellationToken.None);
+            var result = await _controller.DeleteQueryPlan(facilityId, CancellationToken.None);
             Assert.IsType<AcceptedResult>(result);
         }
 
@@ -124,7 +127,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan("", new QueryPlanType(), CancellationToken.None);
+            var result = await _controller.DeleteQueryPlan("", CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
@@ -137,7 +140,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.DeleteQueryPlan(facilityId, new QueryPlanType(), CancellationToken.None));
+            await Assert.ThrowsAsync<NullReferenceException>(() => _controller.DeleteQueryPlan(facilityId, CancellationToken.None));
         }
     }
 }
