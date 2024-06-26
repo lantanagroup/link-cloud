@@ -17,6 +17,7 @@ import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -26,6 +27,7 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaUtils;
@@ -77,6 +79,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     protected abstract NormalizationStatus getNormalizationStatus();
 
     protected void doConsume(String correlationId, ConsumerRecord<String, T> record) {
+
+        Span currentSpan = Span.current();
+        MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
+        MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
+
         String facilityId = record.key();
 
         if(facilityId == null || facilityId.isEmpty()) {
@@ -88,6 +95,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
                 KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId());
+
 
         logger.info("Beginning resource update");
         AbstractResourceEntity resource = Objects.requireNonNullElseGet(
