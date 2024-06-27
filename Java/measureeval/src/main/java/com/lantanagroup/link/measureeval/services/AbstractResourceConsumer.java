@@ -324,9 +324,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 put(stringKey("endDate"), report.getEndDate().toString()).
                 put(stringKey("queryType"), queryType).
                 put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
-        logger.info("Measure evaluation duration for Patient {}: {}", patientStatus.getPatientId(), timeElapsed);
+        logger.info("Measure evaluation duration for Patient {}: {}", patientStatus.getPatientId(), timeElapsed + " milliseconds");
         // Record the duration of the evaluation
-        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes );
+        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
 
         // count the number of patients evaluated (reportable or non-reportable)
         measureEvalMetrics.IncrementPatientEvaluatedCounter(attributes);
