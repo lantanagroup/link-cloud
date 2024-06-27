@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 using MediatR;
 using Moq;
 using Moq.AutoMock;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {
@@ -87,23 +88,17 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Verify(r => r.UpdateAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()),
                 Times.Once);
 
-            _mocker.GetMock<IMediator>()
-                .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
-            Assert.Equal(Unit.Value, result);
+            Assert.Equal(command.QueryPlan, result);
         }
 
         [Fact]
-        public async Task HandleTest_Without_QueryPlanType()
+        public async Task HandleTest_Without_FacilityId()
         {
             _mocker = new AutoMocker();
             var handler = _mocker.CreateInstance<SaveQueryPlanCommandHandler>();
             var command = new SaveQueryPlanCommand
             {
-                FacilityId = facilityId,
-                QueryPlanResult = queryPlan,
-                QueryPlanType = QueryPlanType.QueryPlans
+                FacilityId = string.Empty
             };
 
             var qp = _mocker.CreateInstance<QueryPlan>();
@@ -117,10 +112,6 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .ReturnsAsync(qp);
 
             _mocker.GetMock<IMediator>()
-                .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Unit.Value);
-
-            _mocker.GetMock<IMediator>()
                 .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(true));
 
@@ -128,17 +119,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(true));
 
-            var result = await handler.Handle(command, CancellationToken.None);
-
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Verify(r => r.AddAsync(It.IsAny<QueryPlan>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
-            _mocker.GetMock<IMediator>()
-                .Verify(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-
-            Assert.Equal(Unit.Value, result);
+            await Assert.ThrowsAsync<BadRequestException>(() => handler.Handle(command, CancellationToken.None));
         }
     }
 }
