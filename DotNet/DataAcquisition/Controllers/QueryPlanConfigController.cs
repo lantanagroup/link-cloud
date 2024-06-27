@@ -1,21 +1,12 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
-using Link.Authorization.Policies;
-using Microsoft.AspNetCore.Authorization;
-using System.Net;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using System.Drawing;
+using Link.Authorization.Policies;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -33,7 +24,7 @@ public class QueryPlanConfigController : Controller
     }
 
     /// <summary>
-    /// Gets a QueryPlanConfig record for a given facilityId, queryPlanType, and systemPlans.
+    /// Gets a QueryPlanConfig record for a given facilityId.
     /// </summary>
     /// <param name="facilityId"></param>
     /// <param name="cancellationToken"></param>
@@ -48,7 +39,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<QueryPlan>> GetQueryPlan(
+    public async Task<ActionResult> GetQueryPlan(
         string facilityId,
         CancellationToken cancellationToken)
     {
@@ -103,7 +94,7 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPost("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlan))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -150,7 +141,7 @@ public class QueryPlanConfigController : Controller
                 new
                 {
                     FacilityId = facilityId,
-                    IQueryPlan = result
+                    QueryPlan = result
                 }, result);
         }
         catch (EntityAlreadyExistsException ex)
@@ -195,11 +186,11 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpPut("QueryPlan")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlan))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateQueryPlan(
+    public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
         [FromBody] QueryPlan? queryPlan,
         CancellationToken cancellationToken)
@@ -273,7 +264,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteQueryPlan(
+    public async Task<ActionResult> DeleteQueryPlan(
         string facilityId,
         CancellationToken cancellationToken)
     {
@@ -323,25 +314,5 @@ public class QueryPlanConfigController : Controller
             _logger.LogError(ex, message, facilityId);
             return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
-    }
-
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type, List<PropertyChangeModel> changes)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = "",
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = DataAcquisitionConstants.ServiceName,
-                PropertyChanges = changes != null ? changes : new List<PropertyChangeModel>(),
-                Resource = "DataAcquisition",
-                User = "",
-                UserId = "",
-                Notes = $"{message}"
-            }
-        });
     }
 }
