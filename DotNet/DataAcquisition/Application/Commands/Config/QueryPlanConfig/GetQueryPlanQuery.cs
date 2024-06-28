@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
@@ -12,9 +13,9 @@ public class GetQueryPlanQuery : IRequest<QueryPlan?>
 public class GetQueryPlanQueryHandler : IRequestHandler<GetQueryPlanQuery, QueryPlan?>
 {
     private readonly ILogger<GetQueryPlanQueryHandler> _logger;
-    private readonly IQueryPlanRepository _queryPlanRepository;
+    private readonly IEntityRepository<QueryPlan> _queryPlanRepository;
 
-    public GetQueryPlanQueryHandler(ILogger<GetQueryPlanQueryHandler> logger, IQueryPlanRepository queryPlanRepository)
+    public GetQueryPlanQueryHandler(ILogger<GetQueryPlanQueryHandler> logger, IEntityRepository<QueryPlan> queryPlanRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryPlanRepository = queryPlanRepository ?? throw new ArgumentNullException(nameof(queryPlanRepository));

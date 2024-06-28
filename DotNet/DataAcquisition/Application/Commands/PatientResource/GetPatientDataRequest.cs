@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
 using Newtonsoft.Json;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
 
@@ -34,7 +35,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 {
     private readonly ILogger<GetPatientDataRequestHandler> _logger;
     private readonly IFhirQueryConfigurationRepository _fhirQueryRepo;
-    private readonly IQueryPlanRepository _queryPlanRepository;
+    private readonly IEntityRepository<QueryPlan> _queryPlanRepository;
     private readonly IReferenceResourcesRepository _referenceResourcesRepository;
     private readonly IMediator _mediator;
     private readonly IFhirApiRepository _fhirRepo;
@@ -42,7 +43,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
     public GetPatientDataRequestHandler(
         ILogger<GetPatientDataRequestHandler> logger,
         IFhirQueryConfigurationRepository fhirQueryRepo,
-        IQueryPlanRepository queryPlanRepository,
+        IEntityRepository<QueryPlan> queryPlanRepository,
         IMediator mediator,
         IFhirApiRepository fhirRepo,
         IReferenceResourcesRepository referenceResourcesRepository,
@@ -71,7 +72,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         try
         {
             fhirQueryConfiguration = await _fhirQueryRepo.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans = await _queryPlanRepository.GetQueryPlansByFacilityId(request.FacilityId, cancellationToken);
+            queryPlans = (await _queryPlanRepository.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken)).ToList();
 
             if(fhirQueryConfiguration == null || queryPlans == null) 
             {

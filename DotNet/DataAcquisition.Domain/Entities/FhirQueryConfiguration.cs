@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("fhirQueryConfiguration")]
-public class FhirQueryConfiguration : BaseEntity
+public class FhirQueryConfiguration : BaseEntityExtended
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string FacilityId { get; set; }

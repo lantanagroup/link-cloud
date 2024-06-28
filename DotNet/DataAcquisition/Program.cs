@@ -44,6 +44,7 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -130,7 +131,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        options.JsonSerializerOptions.Converters.Add(new QueryPlanResultConverter());
+        options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
     });
     builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
@@ -155,9 +156,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddScoped<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
-    builder.Services.AddScoped<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
-    builder.Services.AddScoped<IQueryPlanRepository,QueryPlanRepository>();
+    builder.Services.AddScoped<IEntityRepository<FhirQueryConfiguration>, FhirQueryConfigurationRepository>();
+    builder.Services.AddScoped<IEntityRepository<FhirListConfiguration>, FhirQueryListConfigurationRepository>();
+    builder.Services.AddScoped<IEntityRepository<QueryPlan>, QueryPlanRepository>();
     builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();
     builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
@@ -186,18 +187,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
     builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
 
-    //Add Hosted Services
-    if(consumerSettings == null || !consumerSettings.DisableConsumer)
-    {
-        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
-        builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
-    }
+    ////Add Hosted Services
+    //if(consumerSettings == null || !consumerSettings.DisableConsumer)
+    //{
+    //    builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
+    //    builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
+    //}
 
-    if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
-    {
-        builder.Services.AddHostedService<RetryListener>();
-        builder.Services.AddHostedService<RetryScheduleService>();
-    }
+    //if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    //{
+    //    builder.Services.AddHostedService<RetryListener>();
+    //    builder.Services.AddHostedService<RetryScheduleService>();
+    //}
 
     // Logging using Serilog
     builder.Logging.AddSerilog();

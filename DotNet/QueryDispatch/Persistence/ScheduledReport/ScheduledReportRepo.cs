@@ -5,7 +5,7 @@ using QueryDispatch.Domain.Context;
 
 namespace LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport
 {
-    public class ScheduledReportRepo : BaseSqlConfigurationRepo<ScheduledReportEntity>, IScheduledReportRepository
+    public class ScheduledReportRepo : EntityRepository<ScheduledReportEntity>, IScheduledReportRepository
     {
         private readonly ILogger<ScheduledReportRepo> _logger;
         private readonly QueryDispatchDbContext _dbContext;
