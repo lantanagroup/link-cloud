@@ -41,8 +41,8 @@ public class CensusListener : BackgroundService
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
         _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-        consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
-        consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
+        _consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
+        _consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
 
     }
 
