@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {
@@ -27,13 +29,13 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 FacilityId = facilityId
             };
 
-            _mocker.GetMock<IQueryPlanRepository>()
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
                 .Setup(r => r.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(Unit.Value));
 
             var result = await handler.Handle(command, CancellationToken.None);
 
-            _mocker.GetMock<IQueryPlanRepository>()
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
                 .Verify(r => r.DeleteAsync(command.FacilityId, It.IsAny<CancellationToken>()),
                 Times.Once);
 
@@ -50,13 +52,13 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
                 FacilityId = "InvalidId"
             };
 
-            _mocker.GetMock<IQueryPlanRepository>()
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
                 .Setup(r => r.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("Invalid FacilityId"));
 
             await Assert.ThrowsAsync<Exception>(() => handler.Handle(command, CancellationToken.None));
 
-            _mocker.GetMock<IQueryPlanRepository>()
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
                 .Verify(r => r.DeleteAsync(command.FacilityId, It.IsAny<CancellationToken>()),
                 Times.Once);
         }

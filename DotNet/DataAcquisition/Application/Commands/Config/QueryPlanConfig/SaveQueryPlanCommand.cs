@@ -1,7 +1,9 @@
 ﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 
@@ -16,12 +18,12 @@ public class SaveQueryPlanCommand : IRequest<QueryPlan?>
 public class SaveQueryPlanCommandHandler : IRequestHandler<SaveQueryPlanCommand, QueryPlan?>
 {
     private readonly ILogger<SaveQueryPlanCommandHandler> _logger;
-    private readonly IQueryPlanRepository _repository;
+    private readonly IEntityRepository<QueryPlan> _repository;
     private readonly IMediator _mediator;
     private readonly CompareLogic _compareLogic;
     private readonly ITenantApiService _tenantApiService;
 
-    public SaveQueryPlanCommandHandler(ILogger<SaveQueryPlanCommandHandler> logger, IQueryPlanRepository repository, IMediator mediator, ITenantApiService tenantApiService)
+    public SaveQueryPlanCommandHandler(ILogger<SaveQueryPlanCommandHandler> logger, IEntityRepository<QueryPlan> repository, IMediator mediator, ITenantApiService tenantApiService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));

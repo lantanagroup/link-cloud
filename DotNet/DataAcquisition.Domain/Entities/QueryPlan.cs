@@ -1,10 +1,11 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.Shared.Domain.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("queryPlan")]
-public class QueryPlan : BaseEntity
+public class QueryPlan : BaseEntityExtended
 {
     public string PlanName { get; set; }
     public string ReportType { get; set; }

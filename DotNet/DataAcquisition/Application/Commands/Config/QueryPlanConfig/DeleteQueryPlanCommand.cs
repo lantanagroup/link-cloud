@@ -1,8 +1,10 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
@@ -15,10 +17,10 @@ public class DeleteQueryPlanCommand : IRequest<Unit>
 public class DeleteQueryPlanCommandHandler : IRequestHandler<DeleteQueryPlanCommand, Unit>
 {
     private readonly ILogger<DeleteQueryPlanCommandHandler> _logger;
-    private readonly IQueryPlanRepository _queryPlanRepository;
+    private readonly IEntityRepository<QueryPlan> _queryPlanRepository;
     private readonly IMediator _mediator;
 
-    public DeleteQueryPlanCommandHandler(ILogger<DeleteQueryPlanCommandHandler> logger, IQueryPlanRepository queryPlanRepository, IMediator mediator)
+    public DeleteQueryPlanCommandHandler(ILogger<DeleteQueryPlanCommandHandler> logger, IEntityRepository<QueryPlan> queryPlanRepository, IMediator mediator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _queryPlanRepository = queryPlanRepository ?? throw new ArgumentNullException(nameof(queryPlanRepository));
