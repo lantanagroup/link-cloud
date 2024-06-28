@@ -37,11 +37,11 @@ public class CensusListener : BackgroundService
         _transientExceptionHandler = transientExceptionHandler;
         _consumeErrorHandler = consumeErrorHandler;
 
-        _transientExceptionHandler.ServiceName = "Census";
+        _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
-        _nonTransientExceptionHandler.ServiceName = "Census";
+        _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-        consumeErrorHandler.ServiceName = "Census";
+        consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
         consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
 
     }
