@@ -29,4 +29,5 @@ WORKDIR /app
 #RUN apk add --no-cache aspnetcore7-runtime
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Account.dll"]
+#
 
