@@ -231,6 +231,7 @@ export class FacilityViewComponent implements OnInit {
         if (res) {
           this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe((data: IDataAcquisitionFhirListConfigModel) => {
             if (data) {
+              console.log(data);
               this.showNoDataAcqFhirQueryConfigAlert = false;
               this.dataAcqFhirListConfig = data;
             }
@@ -282,7 +283,7 @@ loadDataAcquisitionConfig() {
 
 loadAuthenticationConfig() {
   if (!this.dataAcqAuthQueryConfig) {
-    this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, 'query').subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
+    this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, 'fhirQueryConfiguration').subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
       this.dataAcqAuthQueryConfig = data;
       if (this.dataAcqAuthQueryConfig) {
         this.showNoDataAcqAuthQueryConfigAlert = false;
@@ -299,7 +300,7 @@ loadAuthenticationConfig() {
         });
         this.dataAcqAuthQueryConfig = { id: '', facilityId: this.facilityConfig.facilityId, audience: '', authType: '', clientId: '', key: '', password: '', tokenUrl: '', userName: '' } as IDataAcquisitionAuthenticationConfigModel;
         this.showNoDataAcqAuthQueryConfigAlert = true;
-        this.showDataAcqAuthDialog('fhirQueryConfiguration');
+        //this.showDataAcqAuthDialog('fhirQueryConfiguration');
       }
       else {
         this.snackBar.open(`Failed to load FHIR query authentication configuration for the facility, see error for details.`, '', {
@@ -330,7 +331,7 @@ loadAuthenticationConfig() {
         });
         this.dataAcqAuthQueryListConfig = { id: '', facilityId: this.facilityConfig.facilityId, audience: '', authType: '', clientId: '', key: '', password: '', tokenUrl: '', userName: '' } as IDataAcquisitionAuthenticationConfigModel;
         this.showNoDataAcqAuthQueryListConfigAlert = true;
-        this.showDataAcqAuthDialog('fhirQueryListConfiguration');
+        //this.showDataAcqAuthDialog('fhirQueryListConfiguration');
       }
       else {
         this.snackBar.open(`Failed to load FHIR list authentication configuration for the facility, see error for details.`, '', {
@@ -364,7 +365,7 @@ loadFhirQueryConfig() {
         });
         this.dataAcqFhirQueryConfig = { id: '', facilityId: this.facilityConfig.facilityId, fhirServerBaseUrl: '', queryPlanIds: [] } as IDataAcquisitionQueryConfigModel;
         this.showNoDataAcqFhirQueryConfigAlert = true;
-        this.showDataAcqFhirQueryDialog();
+        //this.showDataAcqFhirQueryDialog();
       }
       else {
         this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
@@ -396,9 +397,9 @@ loadFhirListConfig() {
           horizontalPosition: 'end',
           verticalPosition: 'top'
         });
-        this.dataAcqFhirListConfig = { id: '', facilityId: this.facilityConfig.facilityId, fhirServerBaseUrl: '', eHRPatientLists: [] } as IDataAcquisitionFhirListConfigModel;
+        this.dataAcqFhirListConfig = { id: '', facilityId: this.facilityConfig.facilityId, fhirBaseServerUrl: '', eHRPatientLists: [] } as IDataAcquisitionFhirListConfigModel;
         this.showNoDataAcqFhirQueryConfigAlert = true;
-        this.showDataAcqFhirQueryDialog();
+        //this.showDataAcqFhirQueryDialog();
       }
       else {
         this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
