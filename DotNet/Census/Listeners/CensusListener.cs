@@ -36,6 +36,14 @@ public class CensusListener : BackgroundService
         _nonTransientExceptionHandler = nonTransientExceptionHandler;
         _transientExceptionHandler = transientExceptionHandler;
         _consumeErrorHandler = consumeErrorHandler;
+
+        _transientExceptionHandler.ServiceName = "Census";
+        _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
+        _nonTransientExceptionHandler.ServiceName = "Census";
+        _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
+        consumeErrorHandler.ServiceName = "Census";
+        consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
+
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
