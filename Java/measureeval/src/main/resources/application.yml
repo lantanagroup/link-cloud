@@ -10,7 +10,7 @@ telemetry:
 
 loki:
   enabled: true
-  url: https://loki.nhsnlink.org
+  url:
 
 springdoc:
   api-docs:
