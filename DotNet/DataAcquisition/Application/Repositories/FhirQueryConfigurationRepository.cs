@@ -9,7 +9,7 @@ using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQueryConfiguration>, IFhirQueryConfigurationRepository
+public class FhirQueryConfigurationRepository : EntityRepository<FhirQueryConfiguration>, IFhirQueryConfigurationRepository
 {
     private readonly ILogger<FhirQueryConfigurationRepository> _logger;
     private readonly DataAcquisitionDbContext _dbContext;
@@ -85,16 +85,6 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public override async Task<FhirQueryConfiguration> GetAsync(string facilityId, CancellationToken cancellationToken = default)
-    {
-        var queryResult = await _dbContext.FhirQueryConfigurations.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
-
-        if (queryResult == null)
-            throw new NotFoundException($"No {nameof(FhirQueryConfiguration)} exists for facilityId: {facilityId}");
-
-        return queryResult;
-    }
-
     public override async Task<FhirQueryConfiguration> AddAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)
     {
         FhirQueryConfiguration? existingEntity =
@@ -107,7 +97,7 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
                 $"A {nameof(FhirQueryConfiguration)} already exists for facilityId: {entity.FacilityId}");
         }
 
-        entity.Id = Guid.NewGuid();
+        entity.Id = Guid.NewGuid().ToString();
         entity.CreateDate = DateTime.UtcNow;
         entity.ModifyDate = DateTime.UtcNow;
         await _dbContext.FhirQueryConfigurations.AddAsync(entity, cancellationToken);
@@ -115,6 +105,11 @@ public class FhirQueryConfigurationRepository : BaseSqlConfigurationRepo<FhirQue
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return entity;
+    }
+
+    public override async Task<FhirQueryConfiguration> GetAsync(string id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.FhirQueryConfigurations.FirstOrDefaultAsync(q => q.FacilityId == id, cancellationToken);
     }
 
     public override async Task<FhirQueryConfiguration> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)

@@ -7,7 +7,7 @@ using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class QueriedFhirResourceRepository : BaseSqlConfigurationRepo<QueriedFhirResourceRecord>, IQueriedFhirResourceRepository
+public class QueriedFhirResourceRepository : EntityRepository<QueriedFhirResourceRecord>, IQueriedFhirResourceRepository
 {
     private readonly ILogger<QueriedFhirResourceRepository> _logger;
     private readonly DataAcquisitionDbContext _dbContext;

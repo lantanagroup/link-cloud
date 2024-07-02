@@ -1,8 +1,13 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+﻿using System.Linq.Expressions;
+using Task = System.Threading.Tasks.Task;
 
-public interface IPersistenceRepository<T>
+namespace LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+
+public interface IEntityRepository<T>
 {
     T Add(T entity);
+    Task Remove(T entity);
+
     Task<T> AddAsync(T entity, CancellationToken cancellationToken = default);
     T Get(string id);
     Task<T> GetAsync(string id, CancellationToken cancellationToken = default);

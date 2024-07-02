@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services;
 
 public class RetryRepository_SQL_Norm : RetryRepositorySQL
 {
-    public RetryRepository_SQL_Norm(ILogger<BaseSqlConfigurationRepo<RetryEntity>> logger, NormalizationDbContext dbContext) : base(logger, dbContext)
+    public RetryRepository_SQL_Norm(ILogger<EntityRepository<RetryEntity>> logger, NormalizationDbContext dbContext) : base(logger, dbContext)
     {
     }
 }

@@ -1,31 +1,27 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Entities;
-using System.Threading;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
-public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : BaseEntity
+public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 {
     protected readonly ILogger _logger;
 
     protected readonly DbContext _dbContext;
 
-    public BaseSqlConfigurationRepo(ILogger<BaseSqlConfigurationRepo<T>> logger, DbContext dbContext)
+    public EntityRepository(ILogger<EntityRepository<T>> logger, DbContext dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken)
-    {
-        return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
-    }
-
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
     {
+        entity.Id = Guid.NewGuid().ToString();
 
         var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 
@@ -46,7 +42,7 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
-        var entity = await _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefaultAsync();
+        var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
         if (entity is null) return;
 
@@ -58,6 +54,8 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     public virtual T Add(T entity)
     {
+        entity.Id = Guid.NewGuid().ToString();
+
         var result = _dbContext.Set<T>().Add(entity).Entity;
 
         _dbContext.SaveChanges();
@@ -70,6 +68,10 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
         return _dbContext.Set<T>().FirstOrDefault(o => o.Id == id);
     }
 
+    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+    }
 
     public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -87,7 +89,7 @@ public class BaseSqlConfigurationRepo<T> : IPersistenceRepository<T> where T : B
 
     public virtual void Delete(string id)
     {
-        var entity = _dbContext.Set<T>().Where(g => g.Id == id).FirstOrDefault();
+        var entity = _dbContext.Set<T>().FirstOrDefault(g => g.Id == id);
 
         if (entity is null) return;
 

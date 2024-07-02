@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
@@ -12,7 +13,7 @@ using System.Reflection;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
-public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
+public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
 {
     private readonly ILogger<MongoDbRepository<T>> _logger;
     protected readonly IMongoCollection<T> _collection;
@@ -89,7 +90,7 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         _collection.DeleteOne(filter);
     }
 
-    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    public virtual async System.Threading.Tasks.Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
@@ -113,15 +114,6 @@ public class MongoDbRepository<T> : IMongoDbRepository<T> where T : BaseEntity
         if (cancellationToken.IsCancellationRequested) return null;
 
         var result = (await _collection.FindAsync(_ => true, cancellationToken: cancellationToken)).ToList();
-        return result;
-    }
-
-    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested) return null;
-
-        var filter = Builders<T>.Filter.Eq(x => x.Id, id);
-        var result = await (await _collection.FindAsync(filter, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken);
         return result;
     }
 

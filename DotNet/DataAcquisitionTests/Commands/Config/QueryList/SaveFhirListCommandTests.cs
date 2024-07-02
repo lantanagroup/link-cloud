@@ -29,7 +29,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryList
                 FacilityId = facilityId,
                 FhirListConfiguration = new FhirListConfiguration()
             };
-            var existingConfig = new FhirListConfiguration { Id = Guid.NewGuid(), FacilityId = facilityId, CreateDate = DateTime.UtcNow };
+            var existingConfig = new FhirListConfiguration { Id = Guid.NewGuid().ToString(), FacilityId = facilityId, CreateDate = DateTime.UtcNow };
 
             _mocker.GetMock<IFhirQueryListConfigurationRepository>()
                 .Setup(r => r.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

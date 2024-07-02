@@ -5,7 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Tenant.Repository.Interfaces.Sql
 {
-    public interface IFacilityConfigurationRepo : IPersistenceRepository<FacilityConfigModel>
+    public interface IFacilityConfigurationRepo : IEntityRepository<FacilityConfigModel>
     {
         public Task<List<FacilityConfigModel>> GetAsync(CancellationToken cancellationToken);
 

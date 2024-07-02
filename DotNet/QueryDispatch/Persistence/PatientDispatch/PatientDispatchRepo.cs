@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch
 {
-    public class PatientDispatchRepo : BaseSqlConfigurationRepo<PatientDispatchEntity>, IPatientDispatchRepository
+    public class PatientDispatchRepo : EntityRepository<PatientDispatchEntity>, IPatientDispatchRepository
     {
         private readonly ILogger<PatientDispatchRepo> _logger;
         private readonly QueryDispatchDbContext _dbContext;

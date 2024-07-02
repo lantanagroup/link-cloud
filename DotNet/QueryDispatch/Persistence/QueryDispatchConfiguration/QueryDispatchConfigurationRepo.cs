@@ -7,7 +7,7 @@ using QueryDispatch.Domain.Context;
 
 namespace LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration
 {
-    public class QueryDispatchConfigurationRepo : BaseSqlConfigurationRepo<QueryDispatchConfigurationEntity>, IQueryDispatchConfigurationRepository
+    public class QueryDispatchConfigurationRepo : EntityRepository<QueryDispatchConfigurationEntity>, IQueryDispatchConfigurationRepository
     {
         private readonly ILogger<QueryDispatchConfigurationRepo> _logger;
         private readonly QueryDispatchDbContext _dbContext;

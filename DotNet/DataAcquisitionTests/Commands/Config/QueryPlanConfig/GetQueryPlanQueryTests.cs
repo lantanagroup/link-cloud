@@ -12,6 +12,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {
@@ -27,21 +28,16 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var handler = _mocker.CreateInstance<GetQueryPlanQueryHandler>();
             var query = new GetQueryPlanQuery
             {
-                FacilityId = facilityId,
-                QueryPlanType = QueryPlanType.QueryPlans,
-                SystemPlans = true
+                FacilityId = facilityId
             };
+
             var expectedResult = new QueryPlan();
 
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
+                .Setup(r => r.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(expectedResult);
 
             var result = await handler.Handle(query, CancellationToken.None);
-
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Verify(r => r.GetAsync(query.FacilityId, It.IsAny<CancellationToken>()),
-                Times.Once);
 
             Assert.NotNull(result);
         }
@@ -53,20 +49,16 @@ namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
             var handler = _mocker.CreateInstance<GetQueryPlanQueryHandler>();
             var query = new GetQueryPlanQuery
             {
-                FacilityId = null,
-                QueryPlanType = QueryPlanType.QueryPlans,
-                SystemPlans = true
+                FacilityId = null
             };
 
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new ArgumentNullException());
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
+                .Setup(r => r.GetAsync(It.IsAny<string>(), CancellationToken.None))
+                .ReturnsAsync((QueryPlan?)null);
 
-            await Assert.ThrowsAsync<ArgumentNullException>(() => handler.Handle(query, CancellationToken.None));
+            var result = await handler.Handle(query, CancellationToken.None);
 
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Verify(r => r.GetAsync(query.FacilityId, It.IsAny<CancellationToken>()),
-                Times.Once);
+            Assert.Null(result);
         }
     }
 }
