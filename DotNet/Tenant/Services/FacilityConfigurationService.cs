@@ -101,7 +101,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-                ValidateSchedules(newFacility);
+                await ValidateSchedules(newFacility);
             }
 
             try
@@ -145,7 +145,6 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-
                 existingFacility = GetFacilityById(id, cancellationToken).Result;
 
                 ValidateFacility(newFacility);
@@ -159,8 +158,9 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists under another ID: {foundFacility.Id}");
                 }
 
-                ValidateSchedules(newFacility);
+                await ValidateSchedules(newFacility);
             }
+                
             // audit update facility event
             AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
 
@@ -288,7 +288,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        private void ValidateSchedules(FacilityConfigModel facility)
+        private async Task ValidateSchedules(FacilityConfigModel facility)
         {
             if (facility.ScheduledTasks == null) return;
 
@@ -358,7 +358,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     }
 
                     // check if the report type was set-up in Measure Evaluation Service
-                    checkIfMeasureEvalExists(reportTypeSchedule);
+                    await checkIfMeasureEvalExists(reportTypeSchedule);
 
                     if (reportTypeSchedule.ScheduledTriggers.Count == 0)
                     {
@@ -386,7 +386,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        private void checkIfMeasureEvalExists(ReportTypeSchedule reportTypeSchedule)
+        private async Task checkIfMeasureEvalExists(ReportTypeSchedule reportTypeSchedule)
         {
             if (_measureConfig.Value.CheckIfMeasureExists)
             {
@@ -401,7 +401,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
 
                 //get link token
-                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
+                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
 
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var response = _httpClient.GetAsync(requestUrl).Result;
