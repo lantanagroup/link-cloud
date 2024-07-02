@@ -187,18 +187,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
     builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
 
-    ////Add Hosted Services
-    //if(consumerSettings == null || !consumerSettings.DisableConsumer)
-    //{
-    //    builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
-    //    builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
-    //}
+    //Add Hosted Services
+    if (consumerSettings == null || !consumerSettings.DisableConsumer)
+    {
+        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
+        builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
+    }
 
-    //if(consumerSettings == null || !consumerSettings.DisableRetryConsumer)
-    //{
-    //    builder.Services.AddHostedService<RetryListener>();
-    //    builder.Services.AddHostedService<RetryScheduleService>();
-    //}
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    {
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+    }
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
