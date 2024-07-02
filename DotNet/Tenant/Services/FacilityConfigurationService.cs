@@ -11,8 +11,12 @@ using LantanaGroup.Link.Tenant.Utils;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Net.Http;
 using System.Text;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -28,6 +32,8 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
         private readonly CreateAuditEventCommand _createAuditEventCommand;
         private readonly IOptions<MeasureConfig> _measureConfig;
+        private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
+        private readonly ICreateSystemToken _createSystemToken;
 
         static FacilityConfigurationService()
         {
@@ -36,7 +42,7 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
@@ -45,6 +51,8 @@ namespace LantanaGroup.Link.Tenant.Services
             _logger = logger;
             _httpClient = httpClient;
             _createAuditEventCommand = createAuditEventCommand;
+            _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
+            _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
         }
 
         public async Task<PagedFacilityConfigModel> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
@@ -137,7 +145,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             using (ServiceActivitySource.Instance.StartActivity("Validate the Facility Configuration"))
             {
-             
+
                 existingFacility = GetFacilityById(id, cancellationToken).Result;
 
                 ValidateFacility(newFacility);
@@ -348,22 +356,9 @@ namespace LantanaGroup.Link.Tenant.Services
                     {
                         throw new ApplicationException($"ReportType {reportTypeSchedule.ReportType} is not a known report type.");
                     }
-                    
+
                     // check if the report type was set-up in Measure Evaluation Service
-                    if (_measureConfig.Value.CheckIfMeasureExists)
-                    {
-                        if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
-                            throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
-
-                        string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportTypeSchedule.ReportType}";
-                        var response = _httpClient.GetAsync(requestUrl).Result;
-
-                        // check respone status code
-                        if (!response.IsSuccessStatusCode)
-                        {
-                            throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
-                        }
-                    }
+                    checkIfMeasureEvalExists(reportTypeSchedule);
 
                     if (reportTypeSchedule.ScheduledTriggers.Count == 0)
                     {
@@ -389,6 +384,34 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException(schedulingErrors.ToString());
             }
 
+        }
+
+        private void checkIfMeasureEvalExists(ReportTypeSchedule reportTypeSchedule)
+        {
+            if (_measureConfig.Value.CheckIfMeasureExists)
+            {
+                if (String.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
+                    throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
+
+                string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportTypeSchedule.ReportType}";
+
+                //TODO: add method to get key that includes looking at redis for future use case
+                if (_linkTokenServiceConfig.Value.SigningKey is null)
+                    throw new Exception("Link Token Service Signing Key is missing.");
+
+
+                //get link token
+                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
+
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = _httpClient.GetAsync(requestUrl).Result;
+
+                // check respone status code
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new ApplicationException($"Report Type {reportTypeSchedule.ReportType} is not setup in MeasureEval service.");
+                }
+            }
         }
     }
 }
