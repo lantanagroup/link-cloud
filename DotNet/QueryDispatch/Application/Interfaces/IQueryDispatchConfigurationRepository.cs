@@ -3,7 +3,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Interfaces
 {
-    public interface IQueryDispatchConfigurationRepository : IPersistenceRepository<QueryDispatchConfigurationEntity>
+    public interface IQueryDispatchConfigurationRepository : IEntityRepository<QueryDispatchConfigurationEntity>
     {
         Task<QueryDispatchConfigurationEntity> GetByFacilityId(string facilityId);
         Task<bool> DeleteByFacilityId(string facilityId);

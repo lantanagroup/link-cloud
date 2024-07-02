@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Census.Application.Repositories;
 
 public class RetryRepositorySQLCensus : RetryRepository_SQL
 {
-    public RetryRepositorySQLCensus(ILogger<BaseSqlConfigurationRepo<RetryEntity>> logger, CensusContext dbContext) : base(logger, dbContext)
+    public RetryRepositorySQLCensus(ILogger<EntityRepository<RetryEntity>> logger, CensusContext dbContext) : base(logger, dbContext)
     {
     }
 }
