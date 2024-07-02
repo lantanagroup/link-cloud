@@ -1,7 +1,5 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Report.Attributes;
-using LantanaGroup.Link.Report.Domain.Enums;
-using MongoDB.Bson;
+using LantanaGroup.Link.Shared.Domain.Attributes;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities

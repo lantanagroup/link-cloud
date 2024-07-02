@@ -1,8 +1,6 @@
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Converters;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -17,13 +15,11 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportController> _logger;
         private readonly MeasureReportSubmissionBundler _bundler;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
-        private readonly IMediator _mediator;
 
-        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, IMediator mediator, PatientReportSubmissionBundler patientReportSubmissionBundler)
+        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, PatientReportSubmissionBundler patientReportSubmissionBundler)
         {
             _logger = logger;
             _bundler = bundler;
-            _mediator = mediator;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
         }
 
