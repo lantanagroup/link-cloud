@@ -103,15 +103,6 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
         return result;
     }
 
-    public virtual async Task<T> GetQueryPlansByFacilityId(string id, CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested) return null;
-
-        var filter = Builders<T>.Filter.Eq(x => x.Id, id);
-        var result = await (await _collection.FindAsync(filter, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken);
-        return result;
-    }
-
     public virtual T Update(T entity)
     {
         if (string.IsNullOrWhiteSpace(entity.Id))
