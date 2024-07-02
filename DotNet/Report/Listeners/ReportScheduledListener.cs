@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
@@ -10,9 +8,8 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Quartz;
-using Quartz.Impl.Triggers;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -21,22 +18,22 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ReportScheduledListener> _logger;
         private readonly IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> _kafkaConsumerFactory;
-        private readonly IMediator _mediator;
         private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
-
+        private readonly IEntityRepository<MeasureReportScheduleModel> _repository;
         private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
-            IMediator mediator, ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
+            IEntityRepository<MeasureReportScheduleModel> repository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _repository = repository;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -124,14 +121,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var endDate = endDateOffset.UtcDateTime;
 
                                 // create or update the consumed report schedule
-                                var existing = await _mediator.Send(
-                                    new FindMeasureReportScheduleForReportTypeQuery()
-                                    {
-                                        FacilityId = key.FacilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        ReportType = key.ReportType
-                                    }, cancellationToken);
+                                var existing = await _repository.FindAsync(x => x.FacilityId == facilityId 
+                                                                                                        && x.ReportStartDate == startDate 
+                                                                                                        && x.ReportEndDate == endDate 
+                                                                                                        && x.ReportType == key.ReportType, cancellationToken);
 
                                 if (existing != null)
                                 {
@@ -140,16 +133,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                         AuditEventType.Create);
                                 }
 
-                                var reportSchedule = await _mediator.Send(new CreateMeasureReportScheduleCommand
+                                var ent = new MeasureReportScheduleModel
                                 {
-                                    ReportSchedule = new MeasureReportScheduleModel
-                                    {
-                                        FacilityId = key.FacilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        ReportType = key.ReportType
-                                    }
-                                }, cancellationToken);
+                                    Id = Guid.NewGuid().ToString(),
+                                    FacilityId = key.FacilityId,
+                                    ReportStartDate = startDate,
+                                    ReportEndDate = endDate,
+                                    ReportType = key.ReportType
+                                };
+
+                                var reportSchedule = await _repository.AddAsync(ent, cancellationToken);
 
                                 await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                     await _schedulerFactory.GetScheduler(cancellationToken));

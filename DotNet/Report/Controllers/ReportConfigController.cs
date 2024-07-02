@@ -1,11 +1,9 @@
-using LantanaGroup.Link.Report.Application.MeasureReportConfig.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,13 +15,13 @@ namespace LantanaGroup.Link.Report.Controllers
     public class ReportConfigController : ControllerBase
     {
         private readonly ILogger<ReportConfigController> _logger;
-        private readonly IMediator _mediator;
         private readonly ITenantApiService _tenantApiService;
-        public ReportConfigController(ILogger<ReportConfigController> logger, IMediator mediator, ITenantApiService tenantApiService)
+        private readonly ReportDomainManager _reportDomainManager;
+        public ReportConfigController(ILogger<ReportConfigController> logger, ReportDomainManager reportDomainManager, ITenantApiService tenantApiService)
         {
             _logger = logger;
-            _mediator = mediator;
             _tenantApiService = tenantApiService;
+            _reportDomainManager = reportDomainManager;
         }
 
         /// <summary>
@@ -34,7 +32,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpGet("Get")]
         public async Task<ActionResult<MeasureReportConfig>> GetReportConfig(string Id)
         {
-            var response = await _mediator.Send(new GetMeasureReportConfigQuery { Id = Id });
+            var response = await _reportDomainManager.ReportConfigRepository.GetAsync(Id);
             if (response == null) return NoContent();
             var model = new MeasureReportConfig()
             {
@@ -63,7 +61,8 @@ namespace LantanaGroup.Link.Report.Controllers
                 return BadRequest("FacilityId is null or empty");
             }
 
-            var  res = (await _mediator.Send(new GetFacilityMeasureReportConfigsQuery { FacilityId = facilityId })).ToList();
+            var  res = await _reportDomainManager.ReportConfigRepository.FindAsync(x => x.FacilityId == facilityId );
+
             if (res == null)
             {
                 return Problem($"No MeasureReportConfigs found for FacilityId {facilityId}", statusCode: 304);
@@ -116,10 +115,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 BundlingType = BundlingType.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
             };
 
-            var returned = await _mediator.Send(new CreateMeasureReportConfigCommand
-            {
-                MeasureReportConfig = entity
-            });
+            var returned = await _reportDomainManager.ReportConfigRepository.AddAsync(entity);
 
             if (returned != null && !string.IsNullOrWhiteSpace(returned.Id))
             {
@@ -142,7 +138,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="config"></param>
         /// <returns></returns>
         [HttpPut("Update")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MeasureReportConfigModel))]
+        [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(MeasureReportConfigModel))]
         [ProducesResponseType(StatusCodes.Status304NotModified, Type = typeof(MeasureReportConfigModel))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -159,17 +155,14 @@ namespace LantanaGroup.Link.Report.Controllers
                 Id = config.Id,
                 FacilityId = config.FacilityId,
                 ReportType = config.ReportType,
-                BundlingType = BundlingType.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
+                BundlingType = Enum.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
             };
 
-            var updatedConfig = await _mediator.Send(new UpdateMeasureReportConfigCommand
-            {
-                MeasureReportConfig = entity
-            });
+            var updatedConfig = await _reportDomainManager.ReportConfigRepository.UpdateAsync(entity);
 
             if (updatedConfig != null)
             {
-                return Ok(updatedConfig);
+                return Accepted(updatedConfig);
             }
             else
             {
@@ -183,7 +176,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="Id"></param>
         /// <returns></returns>
         [HttpDelete("Delete")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status304NotModified)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -196,12 +189,9 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                await _mediator.Send(new DeleteMeasureReportConfigCommand()
-                {
-                    Id = Id
-                });
+                await _reportDomainManager.ReportConfigRepository.DeleteAsync(Id, cancellationToken);
 
-                return Ok();
+                return Accepted();
             }
             catch { }
 

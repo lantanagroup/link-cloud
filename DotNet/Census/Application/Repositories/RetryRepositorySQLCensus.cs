@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;
 
-public class RetryRepositorySQLCensus : RetryRepository_SQL
+public class RetryRepositorySQLCensus : RetryRepositorySQL
 {
     public RetryRepositorySQLCensus(ILogger<BaseSqlConfigurationRepo<RetryEntity>> logger, CensusContext dbContext) : base(logger, dbContext)
     {

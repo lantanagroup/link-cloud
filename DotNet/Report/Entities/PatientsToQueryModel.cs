@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Attributes;
+﻿using LantanaGroup.Link.Shared.Domain.Attributes;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities

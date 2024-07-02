@@ -1,15 +1,10 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
-using LantanaGroup.Link.Report.Application.PatientResource.Queries;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
-using LantanaGroup.Link.Report.Application.SharedResource.Queries;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
-using MediatR;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -20,8 +15,8 @@ namespace LantanaGroup.Link.Report.Core
     public class PatientReportSubmissionBundler
     {
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
-        private readonly IMediator _mediator;
         private readonly IReportServiceMetrics _metrics;
+        private readonly ReportDomainManager _reportDomainManager;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -35,11 +30,11 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IMediator mediator, IReportServiceMetrics metrics)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, ReportDomainManager reportDomainManager, IReportServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
+            _reportDomainManager = reportDomainManager ?? throw new ArgumentNullException(nameof(reportDomainManager));
         }
 
 
@@ -51,14 +46,18 @@ namespace LantanaGroup.Link.Report.Core
             if (string.IsNullOrEmpty(patientId))
                 throw new Exception($"GenerateBundle: no patientId supplied");
 
-            var entries = await _mediator.Send(new GetPatientSubmissionEntriesQuery() { FacilityId = facilityId, PatientId = patientId, StartDate = startDate, EndDate = endDate });
+            var schedules = await _reportDomainManager.GetMeasureReportSchedules(facilityId, startDate, endDate) ?? throw new Exception($"No Measure Reports Scheduled for facility {facilityId} and date range of {startDate} - {endDate}");
+
+            var entries = await _reportDomainManager.SubmissionEntryRepository.FindAsync(e =>
+                e.FacilityId == facilityId && e.PatientId == patientId &&
+                schedules.Any(s => s.Id == e.MeasureReportScheduleId));
 
             Bundle patientResources = CreateNewBundle();
             Bundle otherResources = CreateNewBundle();  
             foreach (var entry in entries)
             {
                 var measureReportScheduleId = entry.MeasureReportScheduleId;
-                var schedule = await _mediator.Send(new GetMeasureReportScheduleQuery { Id = measureReportScheduleId });
+                var schedule = schedules.Single(s => s.Id == entry.MeasureReportScheduleId);
                 if (schedule == null)
                     throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
@@ -67,9 +66,11 @@ namespace LantanaGroup.Link.Report.Core
                     continue;
                 }
 
-                MeasureReport mr = entry.MeasureReport;                
+                MeasureReport mr = entry.MeasureReport;
 
-                var config = (await _mediator.Send(new SearchMeasureReportConfigQuery { FacilityId = facilityId, ReportType = schedule.ReportType })).FirstOrDefault();
+                var config =
+                    (await _reportDomainManager.ReportConfigRepository.FindAsync(x =>
+                        x.FacilityId == facilityId && x.ReportType == schedule.ReportType)).FirstOrDefault();
 
                 if (config == null)
                     throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
@@ -90,13 +91,14 @@ namespace LantanaGroup.Link.Report.Core
                     {
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
-                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
+                            facilityResource = await _reportDomainManager.PatientResourceRepository.GetAsync(r.DocumentId);
                             resource = facilityResource.GetResource();
                             AddResourceToBundle(patientResources, resource);
                         }
                         else
                         {
-                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
+                            facilityResource =
+                                await _reportDomainManager.SharedResourceRepository.GetAsync(r.DocumentId);
                             resource = facilityResource.GetResource();
                             AddResourceToBundle(otherResources, resource);
                         }
