@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace LantanaGroup.Link.Shared.Domain.Entities;
+﻿namespace LantanaGroup.Link.Shared.Domain.Entities;
 
 public class BaseEntityExtended : BaseEntity
 {

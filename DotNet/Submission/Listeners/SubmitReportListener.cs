@@ -208,7 +208,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 try
                                 {
                                     string dataAcqRequestUrl =
-                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
+                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlan";
                                     var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
                                     queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 

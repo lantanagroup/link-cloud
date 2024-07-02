@@ -2,6 +2,6 @@
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
-public interface IRedisRepository<T> : IPersistenceRepository<T> where T : BaseEntity
+public interface IRedisRepository<T> : IEntityRepository<T> where T : BaseEntity
 {
 }

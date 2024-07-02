@@ -1,16 +1,11 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Census;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Commands.PatientResource
 {
@@ -85,8 +80,8 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
                 .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new FhirQueryConfiguration());
 
-            _mocker.GetMock<IQueryPlanRepository>()
-                .Setup(r => r.GetQueryPlansByFacilityId(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _mocker.GetMock<IEntityRepository<QueryPlan>>()
+                .Setup(r => r.FindAsync(q => q.FacilityId == It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<QueryPlan>());
 
             _mocker.GetMock<IFhirApiRepository>()
