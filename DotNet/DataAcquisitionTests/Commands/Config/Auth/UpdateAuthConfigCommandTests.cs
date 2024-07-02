@@ -57,7 +57,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
                 .ReturnsAsync(command.Configuration);
 
             _mocker.GetMock<IFhirQueryConfigurationRepository>()
-                .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .Returns(Task.FromResult(new FhirQueryConfiguration()));
 
             _mocker.GetMock<IMediator>()
@@ -97,7 +97,7 @@ namespace DataAcquisitionUnitTests.Commands.Config.Auth
             };
 
             _mocker.GetMock<IFhirQueryConfigurationRepository>()
-                .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .Returns(Task.FromResult((FhirQueryConfiguration)null));
 
             _mocker.GetMock<IFhirQueryConfigurationRepository>()

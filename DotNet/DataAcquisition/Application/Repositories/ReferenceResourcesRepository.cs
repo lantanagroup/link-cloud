@@ -7,7 +7,7 @@ using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class ReferenceResourcesRepository : BaseSqlConfigurationRepo<ReferenceResources>, IReferenceResourcesRepository 
+public class ReferenceResourcesRepository : EntityRepository<ReferenceResources>, IReferenceResourcesRepository 
 {
     private readonly ILogger<ReferenceResourcesRepository> _logger;
     private readonly DataAcquisitionDbContext _dbContext;
@@ -23,7 +23,7 @@ public class ReferenceResourcesRepository : BaseSqlConfigurationRepo<ReferenceRe
         List<ReferenceResources> referenceResources = new List<ReferenceResources>();
         foreach (var id in ids)
         {
-            var result = await _dbContext.ReferenceResources.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == id);
+            var result = await _dbContext.ReferenceResources.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == id, cancellationToken);
             if (result != null)
             {
                 referenceResources.Add(result);

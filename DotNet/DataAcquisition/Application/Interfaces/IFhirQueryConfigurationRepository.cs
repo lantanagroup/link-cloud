@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
-public interface IFhirQueryConfigurationRepository : IPersistenceRepository<FhirQueryConfiguration>, IDisposable
+public interface IFhirQueryConfigurationRepository : IEntityRepository<FhirQueryConfiguration>, IDisposable
 {
     Task<AuthenticationConfiguration?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default);
     Task<AuthenticationConfiguration> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Linq.Expressions;
 namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
-public class FacilityConfigurationRepo : BaseSqlConfigurationRepo<FacilityConfigModel>, IFacilityConfigurationRepo
+public class FacilityConfigurationRepo : EntityRepository<FacilityConfigModel>, IFacilityConfigurationRepo
 {
     protected new readonly FacilityDbContext _dbContext;
 

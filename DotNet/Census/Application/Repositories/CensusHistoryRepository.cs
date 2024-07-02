@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;
 
-public class CensusHistoryRepository : BaseSqlConfigurationRepo<PatientCensusHistoricEntity>, ICensusHistoryRepository
+public class CensusHistoryRepository : EntityRepository<PatientCensusHistoricEntity>, ICensusHistoryRepository
 {
     private readonly ILogger<CensusHistoryRepository> _logger;
     private readonly CensusContext _context;

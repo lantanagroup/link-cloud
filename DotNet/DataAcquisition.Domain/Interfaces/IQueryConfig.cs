@@ -7,6 +7,10 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 [JsonDerivedType(typeof(ParameterQueryConfig), nameof(ParameterQueryConfig))]
 [JsonDerivedType(typeof(ReferenceQueryConfig), nameof(ReferenceQueryConfig))]
 [BsonKnownTypes(typeof(ParameterQueryConfig), typeof(ReferenceQueryConfig))]
-public abstract class IQueryConfig
+public class IQueryConfig
 {
+    public IQueryConfig()
+    {
+
+    }
 }
