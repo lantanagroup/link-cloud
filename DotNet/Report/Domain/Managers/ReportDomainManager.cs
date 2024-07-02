@@ -22,6 +22,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public readonly IEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository;
         public readonly IEntityRepository<MeasureReportConfigModel> ReportConfigRepository;
         public readonly IEntityRepository<MeasureReportSubmissionModel> ReportSubmissionRepository;
+
         public ReportDomainManager(IOptions<MongoConnection> mongoSettings, IEntityRepository<PatientResourceModel> patientResourceRepository, IEntityRepository<SharedResourceModel> sharedResourceRepository, IEntityRepository<MeasureReportScheduleModel> reportScheduledRepository,
             IEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository, IEntityRepository<MeasureReportConfigModel> reportConfigRepository, IEntityRepository<MeasureReportSubmissionModel> reportSubmissionRepository)
         {

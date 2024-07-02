@@ -16,6 +16,17 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Attributes\**" />
+	  <Compile Remove="Repositories\**" />
+	  <Content Remove="Attributes\**" />
+	  <Content Remove="Repositories\**" />
+	  <EmbeddedResource Remove="Attributes\**" />
+	  <EmbeddedResource Remove="Repositories\**" />
+	  <None Remove="Attributes\**" />
+	  <None Remove="Repositories\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <_ContentIncludedByDefault Remove="appsettings.local.json" />
 	</ItemGroup>
 
@@ -39,11 +50,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Attributes\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
 
