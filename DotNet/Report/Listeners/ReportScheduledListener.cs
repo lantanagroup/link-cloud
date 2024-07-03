@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -8,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Quartz;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -21,19 +21,20 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IEntityRepository<MeasureReportScheduleModel> _repository;
+        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
+
         private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
-            IEntityRepository<MeasureReportScheduleModel> repository)
+            IMeasureReportScheduledManager measureReportScheduledManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _repository = repository;
+            _measureReportScheduledManager = measureReportScheduledManager;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -121,7 +122,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var endDate = endDateOffset.UtcDateTime;
 
                                 // create or update the consumed report schedule
-                                var existing = await _repository.FindAsync(x => x.FacilityId == facilityId 
+                                var existing = await _measureReportScheduledManager.FindAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
                                                                                                         && x.ReportEndDate == endDate 
                                                                                                         && x.ReportType == key.ReportType, cancellationToken);
@@ -142,7 +143,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportType = key.ReportType
                                 };
 
-                                var reportSchedule = await _repository.AddAsync(ent, cancellationToken);
+                                var reportSchedule = await _measureReportScheduledManager.AddAsync(ent, cancellationToken);
 
                                 await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                     await _schedulerFactory.GetScheduler(cancellationToken));

@@ -1,8 +1,8 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 
@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Report.Core
     {
         private readonly ILogger<MeasureReportSubmissionBundler> _logger;
         private readonly IReportServiceMetrics _metrics;
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
@@ -27,11 +27,11 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, ReportDomainManager reportDomainManager, IReportServiceMetrics metrics)
+        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
-            _reportDomainManager = reportDomainManager ?? throw new ArgumentNullException(nameof(reportDomainManager));
+            _database = database ?? throw new ArgumentNullException(nameof(database));
         }
 
 
@@ -41,19 +41,19 @@ namespace LantanaGroup.Link.Report.Core
                 throw new Exception($"GenerateBundle: no measureReportScheduleId supplied");
 
             // find existing report scheduled for the supplied ID
-            MeasureReportScheduleModel schedule = await _reportDomainManager.ReportScheduledRepository.GetAsync(measureReportScheduleId);
+            MeasureReportScheduleModel schedule = await _database.ReportScheduledRepository.GetAsync(measureReportScheduleId);
 
             if (schedule == null)
                 throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
             List<MeasureReportConfigModel> configs =
-                await _reportDomainManager.ReportConfigRepository.FindAsync(c => c.FacilityId == schedule.FacilityId);
+                await _database.ReportConfigRepository.FindAsync(c => c.FacilityId == schedule.FacilityId);
 
             if (configs == null || configs.Count < 1)
                 throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
 
             var submission =
-                (await _reportDomainManager.ReportSubmissionRepository.FindAsync(s =>
+                (await _database.ReportSubmissionRepository.FindAsync(s =>
                     s.MeasureReportScheduleId == measureReportScheduleId)).Single();
 
             Bundle submissionBundle;
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Report.Core
 
             // add every fetched measure report entry to the submission bundle
             var entries =
-                await _reportDomainManager.SubmissionEntryRepository.FindAsync(e =>
+                await _database.SubmissionEntryRepository.FindAsync(e =>
                     e.MeasureReportScheduleId == measureReportScheduleId);
 
             foreach (var entry in entries)
@@ -110,11 +110,11 @@ namespace LantanaGroup.Link.Report.Core
 
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
-                            facilityResource = await _reportDomainManager.PatientResourceRepository.GetAsync(r.DocumentId);
+                            facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
                         }
                         else
                         {
-                            facilityResource = await _reportDomainManager.SharedResourceRepository.GetAsync(r.DocumentId);
+                            facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
                         }
 
                         Resource resource = facilityResource.GetResource();

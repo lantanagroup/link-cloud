@@ -1,8 +1,8 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, DataAcquisitionRequestedValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, DataAcquisitionRequestedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue> _deadLetterExceptionHandler;
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
         private string Name => this.GetType().Name;
 
@@ -27,11 +27,11 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, DataAcquisitionRequestedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, DataAcquisitionRequestedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue> deadLetterExceptionHandler,
-            ReportDomainManager reportDomainManager) 
+            IDatabase database) 
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _reportDomainManager = reportDomainManager;
+            _database = database;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var scheduledReports =
-                                    await _reportDomainManager.ReportScheduledRepository.FindAsync(x =>
+                                    await _database.ReportScheduledRepository.FindAsync(x =>
                                         x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _reportDomainManager.ReportScheduledRepository.UpdateAsync(
+                                        await _database.ReportScheduledRepository.UpdateAsync(
                                             scheduledReport, cancellationToken);
                                     } 
                                     catch (Exception)

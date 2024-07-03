@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Report.Listeners
         //for a ProducerFactory that's only used for an AuditEvent
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
 
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
         private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
@@ -30,14 +30,14 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, ReportDomainManager reportDomainManager,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IDatabase database,
             ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
-            _reportDomainManager = reportDomainManager;
+            _database = database;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -107,11 +107,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // find existing report schedule
                                 var subEntry =
-                                    (await _reportDomainManager.ReportSubmissionRepository.FindAsync(e =>
+                                    (await _database.ReportSubmissionRepository.FindAsync(e =>
                                         e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken)).Single();
 
                                 var schedule =
-                                    (await _reportDomainManager.ReportScheduledRepository.FindAsync(s =>
+                                    (await _database.ReportScheduledRepository.FindAsync(s =>
                                         s.Id == subEntry.MeasureReportScheduleId, cancellationToken)).SingleOrDefault();
 
                                 if (schedule is null)
@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // update report schedule with submitted date
                                 schedule.SubmittedDate = DateTime.UtcNow;
-                                await _reportDomainManager.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
+                                await _database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
 
                                 // produce audit message signalling the report service acknowledged the report has been submitted
                                 using var producer = _kafkaProducerFactory.CreateAuditEventProducer();

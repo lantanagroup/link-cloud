@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Domain.Managers;
+﻿using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Settings;
@@ -12,16 +12,16 @@ namespace LantanaGroup.Link.Report.Services
         private readonly ILogger<MeasureReportScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
         public IScheduler Scheduler { get; set; } = default!;
 
-        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, ReportDomainManager reportDomainManager)
+        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IDatabase database)
         {
             _logger = logger;
             _jobFactory = jobFactory;
             _schedulerFactory = schedulerFactory;
-            _reportDomainManager = reportDomainManager;
+            _database = database;
         }
 
 
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Services
 
             // find all reports that have not been submitted yet
             var reportSchedules =
-                await _reportDomainManager.ReportScheduledRepository.FindAsync(s => s.SubmittedDate == null, cancellationToken);
+                await _database.ReportScheduledRepository.FindAsync(s => s.SubmittedDate == null, cancellationToken);
 
             foreach (var reportSchedule in reportSchedules)
             {

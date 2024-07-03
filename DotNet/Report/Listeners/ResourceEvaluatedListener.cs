@@ -25,7 +25,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
-        private readonly ReportDomainManager _domainManager;
+        private readonly IResourceManager _resourceManager;
+        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
+        private readonly ISubmissionEntryManager _submissionEntryManager;
 
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
@@ -41,7 +43,9 @@ namespace LantanaGroup.Link.Report.Listeners
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             MeasureReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
-            ReportDomainManager domainManager)
+            IResourceManager resourceManager,
+            IMeasureReportScheduledManager measureReportScheduledManager,
+            ISubmissionEntryManager submissionEntryManager)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -49,7 +53,9 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _bundler = bundler;
             _aggregator = aggregator;
-            _domainManager = domainManager; 
+            _resourceManager = resourceManager;
+            _measureReportScheduledManager = measureReportScheduledManager;
+            _submissionEntryManager = submissionEntryManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -128,7 +134,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
-                                var schedule = await _domainManager.GetMeasureReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, cancellationToken) ??
+                                var schedule = await _measureReportScheduledManager.GetMeasureReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, cancellationToken) ??
                                             throw new TransactionException(
                                                 $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
                                 
@@ -136,7 +142,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 //TODO Find long term solution Daniel Vargas
                                 if (value.IsReportable)
                                 {
-                                    var entry = await _domainManager.GetPatientSubmissionEntry(schedule.Id,
+                                    var entry = await _submissionEntryManager.GetPatientSubmissionEntry(schedule.Id,
                                         value.PatientId, cancellationToken);
 
                                     if (entry == null)
@@ -168,18 +174,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                         IFacilityResource returnedResource = null;
 
                                         var existingReportResource =
-                                            await _domainManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
+                                            await _resourceManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
                                                 cancellationToken);
 
                                         if (existingReportResource != null)
                                         {
                                             returnedResource =
-                                                await _domainManager.UpdateResourceAsync(existingReportResource,
+                                                await _resourceManager.UpdateResourceAsync(existingReportResource,
                                                     cancellationToken);
                                         }
                                         else
                                         {
-                                            returnedResource = await _domainManager.CreateResourceAsync(key.FacilityId, resource, value.PatientId, cancellationToken);
+                                            returnedResource = await _resourceManager.CreateResourceAsync(key.FacilityId, resource, value.PatientId, cancellationToken);
                                         }
 
                                         entry.UpdateContainedResource(returnedResource);
@@ -187,11 +193,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     if (entry.Id == null)
                                     {
-                                        await _domainManager.SubmissionEntryRepository.AddAsync(entry, cancellationToken);
+                                        await _submissionEntryManager.AddAsync(entry, cancellationToken);
                                     }
                                     else
                                     {
-                                        await _domainManager.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+                                        await _submissionEntryManager.UpdateAsync(entry, cancellationToken);
                                     }
                                 }
 
@@ -203,11 +209,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         schedule.PatientsToQuery.Remove(value.PatientId);
 
-                                        await _domainManager.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
+                                        await _measureReportScheduledManager.UpdateAsync(schedule, cancellationToken);
                                     }
 
                                     var submissionEntries =
-                                        await _domainManager.SubmissionEntryRepository.FindAsync(
+                                        await _submissionEntryManager.FindAsync(
                                             e => e.MeasureReportScheduleId == schedule.Id, cancellationToken);
 
                                     var allReady = submissionEntries.All(x => x.ReadyForSubmission);
