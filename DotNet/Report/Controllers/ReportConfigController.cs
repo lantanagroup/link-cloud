@@ -1,6 +1,6 @@
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Services;
 using Link.Authorization.Policies;
@@ -16,12 +16,13 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportConfigController> _logger;
         private readonly ITenantApiService _tenantApiService;
-        private readonly ReportDomainManager _reportDomainManager;
-        public ReportConfigController(ILogger<ReportConfigController> logger, ReportDomainManager reportDomainManager, ITenantApiService tenantApiService)
+        private readonly IDatabase _database;
+
+        public ReportConfigController(ILogger<ReportConfigController> logger, IDatabase database, ITenantApiService tenantApiService)
         {
             _logger = logger;
             _tenantApiService = tenantApiService;
-            _reportDomainManager = reportDomainManager;
+            _database = database;
         }
 
         /// <summary>
@@ -32,7 +33,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [HttpGet("Get")]
         public async Task<ActionResult<MeasureReportConfig>> GetReportConfig(string Id)
         {
-            var response = await _reportDomainManager.ReportConfigRepository.GetAsync(Id);
+            var response = await _database.ReportConfigRepository.GetAsync(Id);
             if (response == null) return NoContent();
             var model = new MeasureReportConfig()
             {
@@ -61,7 +62,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 return BadRequest("FacilityId is null or empty");
             }
 
-            var  res = await _reportDomainManager.ReportConfigRepository.FindAsync(x => x.FacilityId == facilityId );
+            var  res = await _database.ReportConfigRepository.FindAsync(x => x.FacilityId == facilityId );
 
             if (res == null)
             {
@@ -109,13 +110,12 @@ namespace LantanaGroup.Link.Report.Controllers
             BundlingType bundleType;
             var entity = new MeasureReportConfigModel()
             {
-                Id = Guid.NewGuid().ToString(),
                 FacilityId = config.FacilityId,
                 ReportType = config.ReportType,
                 BundlingType = BundlingType.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
             };
 
-            var returned = await _reportDomainManager.ReportConfigRepository.AddAsync(entity);
+            var returned = await _database.ReportConfigRepository.AddAsync(entity);
 
             if (returned != null && !string.IsNullOrWhiteSpace(returned.Id))
             {
@@ -158,7 +158,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 BundlingType = Enum.TryParse(config.BundlingType, out bundleType) ? bundleType : BundlingType.Default
             };
 
-            var updatedConfig = await _reportDomainManager.ReportConfigRepository.UpdateAsync(entity);
+            var updatedConfig = await _database.ReportConfigRepository.UpdateAsync(entity);
 
             if (updatedConfig != null)
             {
@@ -189,7 +189,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                await _reportDomainManager.ReportConfigRepository.DeleteAsync(Id, cancellationToken);
+                await _database.ReportConfigRepository.DeleteAsync(Id, cancellationToken);
 
                 return Accepted();
             }

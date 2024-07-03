@@ -1,7 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -17,17 +17,17 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
         private string Name => this.GetType().Name;
 
         public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
           ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, ReportDomainManager reportDomainManager ) 
+          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IDatabase database ) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _reportDomainManager = reportDomainManager;
+            _database = database;
 
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var scheduledReports =
-                                    await _reportDomainManager.ReportScheduledRepository.FindAsync(x =>
+                                    await _database.ReportScheduledRepository.FindAsync(x =>
                                         x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
@@ -118,7 +118,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _reportDomainManager.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
+                                        await _database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
                                     }
                                     catch (Exception)
                                     {

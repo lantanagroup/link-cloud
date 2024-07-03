@@ -140,9 +140,4 @@ public class FhirQueryConfigurationRepository : EntityRepository<FhirQueryConfig
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
-
-    public void Dispose()
-    {
-        
-    }
 }

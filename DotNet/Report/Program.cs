@@ -4,7 +4,7 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Listeners;
@@ -36,6 +36,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Report.Domain.Managers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,7 +108,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container.
     builder.Services.AddHttpClient();
-    builder.Services.AddTransient<ReportDomainManager>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
@@ -140,9 +140,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionEntryModel>, MongoDbRepository<MeasureReportSubmissionEntryModel>>();
     builder.Services.AddTransient<IEntityRepository<ReportModel>, MongoDbRepository<ReportModel>>();
     builder.Services.AddTransient<IEntityRepository<PatientsToQueryModel>, MongoDbRepository<PatientsToQueryModel>>();
-    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoDbRepository<PatientResourceModel>>();
     builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoDbRepository<SharedResourceModel>>();
+    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoDbRepository<PatientResourceModel>>();
     builder.Services.AddSingleton<IRetryRepository, RetryRepositoryMongo>();
+    builder.Services.AddTransient<IDatabase, Database>();
+
+
+    //Add Managers
+    builder.Services.AddTransient<IMeasureReportScheduledManager, MeasureReportScheduledManager>();
+    builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+    builder.Services.AddTransient<IResourceManager, ResourceManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

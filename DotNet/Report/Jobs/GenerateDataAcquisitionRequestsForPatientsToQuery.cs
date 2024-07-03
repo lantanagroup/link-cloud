@@ -3,8 +3,8 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -27,11 +27,11 @@ namespace LantanaGroup.Link.Report.Jobs
 
         private readonly MeasureReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
-        private readonly ReportDomainManager _reportDomainManager;
+        private readonly IDatabase _database;
 
         public GenerateDataAcquisitionRequestsForPatientsToQuery(ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger, 
             IKafkaProducerFactory<string, DataAcquisitionRequestedValue> dataAcquisitionProducerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, MeasureReportSubmissionBundler bundler, MeasureReportAggregator aggregator, ReportDomainManager reportDomainManager)
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, MeasureReportSubmissionBundler bundler, MeasureReportAggregator aggregator, IDatabase database)
         {
             _logger = logger;
             _dataAcquisitionProducerFactory = dataAcquisitionProducerFactory;
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Report.Jobs
             _schedulerFactory = schedulerFactory;
             _bundler = bundler;
             _aggregator = aggregator;
-            _reportDomainManager = reportDomainManager;
+            _database = database;
         }
 
 
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
 
                 //Make sure we get a fresh object from the DB
-                schedule = await _reportDomainManager.ReportScheduledRepository.GetAsync(schedule.Id);
+                schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id);
 
                 _logger.LogInformation(
                     $"Executing GenerateDataAcquisitionRequestsForPatientsToQuery for MeasureReportScheduleModel {schedule.Id}");
@@ -139,7 +139,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {
                     var submissionEntries =
-                        await _reportDomainManager.SubmissionEntryRepository.FindAsync(x =>
+                        await _database.SubmissionEntryRepository.FindAsync(x =>
                             x.MeasureReportScheduleId == schedule.Id);
 
                     var measureReports = submissionEntries
@@ -187,7 +187,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 schedule.PatientsToQueryDataRequested = true;
 
-                await _reportDomainManager.ReportScheduledRepository.UpdateAsync(schedule);
+                await _database.ReportScheduledRepository.UpdateAsync(schedule);
 
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
