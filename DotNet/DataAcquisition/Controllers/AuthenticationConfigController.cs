@@ -1,18 +1,16 @@
-﻿using System.Net;
-using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
+﻿using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using Quartz;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 using Link.Authorization.Policies;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -22,38 +20,15 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class AuthenticationConfigController : Controller
 {
     private readonly ILogger<AuthenticationConfigController> _logger;
-    private readonly IMediator _mediator;
-    private readonly CompareLogic _compareLogic;
+    private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
+    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
 
 
-    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IMediator mediator)
+    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _compareLogic = new CompareLogic();
-        _compareLogic.Config.MaxDifferences = 25;
-    }
-
-    [ApiExplorerSettings(IgnoreApi = true)]
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type, List<PropertyChangeModel> changes)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = correlationId,
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = Application.Settings.DataAcquisitionConstants.ServiceName,
-                PropertyChanges = changes != null ? changes : new List<PropertyChangeModel>(),
-                Resource = "DataAcquisition",
-                User = "",
-                UserId = "",
-                Notes = $"{message}"
-                
-            }
-        });
+        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
+        _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
     }
 
     /// <summary>
@@ -90,11 +65,15 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            var result = await _mediator.Send(new GetAuthConfigQuery
+            AuthenticationConfiguration? result;
+            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
             {
-                FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-            }, cancellationToken);
+                result = await _fhirQueryConfigurationManager.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
+            }
+            else
+            {
+                result = await _fhirQueryListConfigurationManager.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
+            }
 
             if (result == null)
             {
@@ -170,16 +149,14 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            var result = await _mediator.Send(new CreateAuthConfigCommand
+            AuthenticationConfiguration? result;
+            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
             {
-                FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-                Configuration = authenticationConfiguration
-            }, cancellationToken);
-
-            if (result == null)
+                result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+            }
+            else
             {
-                return Problem("AuthenticationConfiguration not created.", statusCode: (int)HttpStatusCode.InternalServerError);
+                result = await _fhirQueryListConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
             }
 
             return CreatedAtAction(nameof(CreateAuthenticationSettings),
@@ -259,31 +236,15 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            var existingAuthorizationConfiguration = await _mediator.Send(new GetAuthConfigQuery
+            AuthenticationConfiguration? result;
+            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
             {
-                FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-            }, cancellationToken);
-
-            var result = await _mediator.Send(new UpdateAuthConfigCommand
+                result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+            }
+            else
             {
-                FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter,
-                Configuration = authenticationConfiguration
-            }, cancellationToken);
-
-            var resultChanges = _compareLogic.Compare(authenticationConfiguration, existingAuthorizationConfiguration);
-            List<Difference> list = resultChanges.Differences;
-            List<PropertyChangeModel> propertyChanges = new List<PropertyChangeModel>();
-            list.ForEach(d => {
-                propertyChanges.Add(new PropertyChangeModel
-                {
-                    PropertyName = d.PropertyName,
-                    InitialPropertyValue = d.Object2Value,
-                    NewPropertyValue = d.Object1Value
-                });
-
-            });
+                result = await _fhirQueryListConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration, cancellationToken);
+            }
 
             return Accepted(result);
         }
@@ -343,11 +304,14 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            await _mediator.Send(new DeleteAuthConfigCommand
+            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
             {
-                FacilityId = facilityId,
-                QueryConfigurationTypePathParameter = queryConfigurationTypePathParameter
-            }, cancellationToken);
+                await _fhirQueryConfigurationManager.DeleteAuthenticationConfiguration(facilityId, cancellationToken);
+            }
+            else
+            {
+                await _fhirQueryListConfigurationManager.DeleteAuthenticationConfiguration(facilityId, cancellationToken);
+            }
 
             return Accepted();
         }

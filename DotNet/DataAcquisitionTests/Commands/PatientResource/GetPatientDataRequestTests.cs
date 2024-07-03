@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;

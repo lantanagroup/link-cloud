@@ -1,14 +1,10 @@
-﻿using System.Net;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Controllers;
+﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
+using System.Net;
 
 namespace DataAcquisitionUnitTests.Controllers
 {

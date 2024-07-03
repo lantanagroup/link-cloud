@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResult;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using Link.Authorization.Policies;
 using MediatR;
@@ -14,12 +14,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class QueryResultController : ControllerBase
 {
     private readonly ILogger<QueryResultController> _logger;
-    private readonly IMediator _mediator;
+    private IQueriedFhirResourceManager _queriedFhirResourceManager;
 
-    public QueryResultController(ILogger<QueryResultController> logger, IMediator mediator)
+    public QueryResultController(ILogger<QueryResultController> logger, IQueriedFhirResourceManager queriedFhirResourceManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
     }
 
     /// <summary>
@@ -49,7 +49,9 @@ public class QueryResultController : ControllerBase
 
         try
         {
-            var results = await _mediator.Send(new GetPatientQueryResultsQuery { CorrelationId = correlationId, QueryType = queryType, SuccessOnly = successOnly }, cancellationToken);
+            var results =
+                await _queriedFhirResourceManager.GetQueryResultsAsync(queryType, correlationId, successOnly,
+                    cancellationToken);
 
             if (results.QueryResults.Count == 0)
             {

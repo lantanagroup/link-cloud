@@ -1,18 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {

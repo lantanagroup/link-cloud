@@ -1,10 +1,8 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+﻿using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.ParameterFactories;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 

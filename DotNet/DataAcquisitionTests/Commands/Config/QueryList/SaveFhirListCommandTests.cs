@@ -1,16 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MediatR;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryList
 {
