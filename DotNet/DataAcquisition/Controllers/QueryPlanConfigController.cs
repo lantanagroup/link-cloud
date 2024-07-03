@@ -1,12 +1,11 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -16,12 +15,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class QueryPlanConfigController : Controller
 {
     private readonly ILogger<QueryPlanConfigController> _logger;
-    private readonly IMediator _mediator;
+    private readonly IQueryPlanManager _queryPlanManager;
 
-    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IMediator mediator)
+    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IQueryPlanManager queryPlanManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
     }
 
     /// <summary>
@@ -51,10 +50,7 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("parameter facilityId is required.");
             }
 
-            var result = await _mediator.Send(new GetQueryPlanQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            var result = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -117,21 +113,14 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("facilityId is required.");
             }
 
-            var existing = await _mediator.Send(new GetQueryPlanQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
 
             if (existing != null) 
             {
                 throw new EntityAlreadyExistsException($"A Query Plan already exists for facilityId: {facilityId}.");
             }
 
-            var result = await _mediator.Send(new SaveQueryPlanCommand
-            {
-                FacilityId = facilityId,
-                QueryPlan = queryPlan
-            }, cancellationToken);
+            var result = await _queryPlanManager.AddAsync(queryPlan, cancellationToken);
 
             if (result == null)
             {
@@ -208,21 +197,14 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("parameter facilityId is required.");
             }
 
-            var existing = await _mediator.Send(new GetQueryPlanQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
 
             if (existing == null)
             {
                 throw new NotFoundException($"A Query Plan was not found for facilityId: {facilityId}.");
             }
 
-            var result = await _mediator.Send(new SaveQueryPlanCommand
-            {
-                FacilityId = facilityId,
-                QueryPlan = queryPlan
-            }, cancellationToken);
+            var result = await _queryPlanManager.UpdateAsync(queryPlan, cancellationToken);
 
             return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError);
         }
@@ -277,20 +259,13 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("parameter facilityId is required.");
             }
 
-            var existing = await _mediator.Send(new GetQueryPlanQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
-
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
             if (existing == null)
             {
                 throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
             }
 
-            var result = await _mediator.Send(new DeleteQueryPlanCommand
-            {
-                FacilityId = facilityId,
-            }, cancellationToken);
+            await _queryPlanManager.DeleteAsync(facilityId, cancellationToken);
 
             return Accepted();
         }

@@ -1,16 +1,13 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using MediatR;
-using Newtonsoft.Json;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -20,15 +17,16 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
     private readonly IMediator _mediator;
     private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
+    private readonly IPatientDataRequestManager _patientDataRequestManager;
 
     public DataAcquisitionRequestedProcessingLogic(
         ILogger<DataAcquisitionRequestedProcessingLogic> logger,
-        IMediator mediator,
+        IPatientDataRequestManager patientDataRequestManager,
         IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _patientDataRequestManager = patientDataRequestManager;
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
@@ -70,7 +68,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         List<IBaseMessage> results = new List<IBaseMessage>();
         try
         {
-            results = await _mediator.Send(new GetPatientDataRequest
+            results = await _patientDataRequestManager.GetPatientDataRequestManager(new GetPatientDataRequest
             {
                 Message = consumeResult.Message.Value,
                 FacilityId = facilityId,
@@ -112,17 +110,6 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
                         Value = (ResourceAcquired)responseMessage
                     };
                     await producer.ProduceAsync(KafkaTopic.ResourceAcquired.ToString(), produceMessage, cancellationToken);
-
-                    ProduceAuditMessage(new AuditEventMessage
-                    {
-                        CorrelationId = correlationId,
-                        FacilityId = facilityId,
-                        Action = AuditEventType.Query,
-                        //Resource = string.Join(',', deserializedMessage.),
-                        EventDate = DateTime.UtcNow,
-                        ServiceName = DataAcquisitionConstants.ServiceName,
-                        Notes = $"Raw Kafka Message: {consumeResult}\nRaw Message Produced: {JsonConvert.SerializeObject(responseMessage)}",
-                    });
                 }
             }
             catch (ProduceException<string, object> ex)
@@ -156,14 +143,5 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
 
         var correlationId = Encoding.UTF8.GetString(cIBytes);
         return correlationId;
-    }
-
-    private void ProduceAuditMessage(AuditEventMessage auditEvent)
-    {
-        var request = new TriggerAuditEventCommand
-        {
-            AuditableEvent = auditEvent
-        };
-        _mediator.Send(request);
     }
 }

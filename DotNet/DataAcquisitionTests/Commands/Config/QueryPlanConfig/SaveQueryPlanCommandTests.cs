@@ -1,17 +1,12 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
 using MediatR;
 using Moq;
 using Moq.AutoMock;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace DataAcquisitionUnitTests.Commands.Config.QueryPlanConfig
 {

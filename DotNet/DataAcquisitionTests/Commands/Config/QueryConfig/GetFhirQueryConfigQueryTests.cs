@@ -1,6 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Moq;
 using Moq.AutoMock;

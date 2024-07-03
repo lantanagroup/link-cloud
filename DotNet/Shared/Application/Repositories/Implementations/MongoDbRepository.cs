@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
@@ -102,6 +101,26 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
         return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).ToListAsync(cancellationToken);
     }
 
+    public virtual async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) ?? (T)null;
+    }
+
+    public virtual async Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).FirstAsync(cancellationToken);
+    }
+
+    public virtual async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleOrDefaultAsync(cancellationToken) ?? (T)null;
+    }
+
+    public virtual async Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleAsync(cancellationToken);
+    }
+
     public virtual T Get(string id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
@@ -147,7 +166,7 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
         return entity;
     }
 
-    public async System.Threading.Tasks.Task Remove(T entity)
+    public async System.Threading.Tasks.Task RemoveAsync(T entity)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
         await _collection.DeleteOneAsync(filter);

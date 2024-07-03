@@ -33,6 +33,7 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Diagnostics;
+using DataAcquisition.Domain.Context;
 using Serilog.Settings.Configuration;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Spi;
@@ -46,6 +47,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.DataAcquisition.Application.Managers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -156,16 +159,28 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddScoped<IFhirQueryConfigurationRepository, FhirQueryConfigurationRepository>();
-    builder.Services.AddScoped<IFhirQueryListConfigurationRepository, FhirQueryListConfigurationRepository>();
-    builder.Services.AddScoped<IEntityRepository<QueryPlan>, QueryPlanRepository>();
-    builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
-    builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();
-    builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
+    builder.Services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan>>();
+    builder.Services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources>>();
+    builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, EntityRepository<QueriedFhirResourceRecord>>();
     builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
+    builder.Services.AddTransient<IFhirApiRepository, FhirApiRepository>();
+
+    builder.Services.AddTransient<IDatabase, Database>();
+
+    //Managers
+    builder.Services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+    builder.Services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
+    builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
+    builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
+    builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
+    builder.Services.AddTransient<IPatientDataRequestManager, PatientDataRequestManager>();
+    builder.Services.AddTransient<IPatientCensusRequestManager, PatientCensusRequestManager>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();

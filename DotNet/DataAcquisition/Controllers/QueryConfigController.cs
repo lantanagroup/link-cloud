@@ -1,14 +1,9 @@
 ﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -22,13 +17,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class QueryConfigController : Controller
 {
     private readonly ILogger<QueryConfigController> _logger;
-    private readonly IMediator _mediator;
     private readonly CompareLogic _compareLogic;
-
-    public QueryConfigController(ILogger<QueryConfigController> logger, IMediator mediator)
+    private readonly IFhirQueryConfigurationManager _queryConfigurationManager;
+    public QueryConfigController(ILogger<QueryConfigController> logger, IFhirQueryConfigurationManager queryConfigurationManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _queryConfigurationManager = queryConfigurationManager;
         _compareLogic = new CompareLogic();
         _compareLogic.Config.MaxDifferences = 25;
     }
@@ -58,10 +52,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
             }
 
-            var result = await _mediator.Send(new GetFhirQueryConfigQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            var result = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -85,28 +76,6 @@ public class QueryConfigController : Controller
             _logger.LogError(new EventId(LoggingIds.GetItem, "GetFhirQueryConfig"), ex, "An exception occurred while attempting to get a fhir configuration with a facility id of {id}", facilityId);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
-    }
-
-    [ApiExplorerSettings(IgnoreApi = true)]
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type, List<PropertyChangeModel> changes)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = "",
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = DataAcquisitionConstants.ServiceName,
-                PropertyChanges = changes != null?changes: new List<PropertyChangeModel>(),
-                Resource = "DataAcquisition",
-                User = "",
-                UserId = "",
-                Notes = $"{message}"
-                
-            }
-        });
     }
 
     /// <summary>
@@ -140,18 +109,7 @@ public class QueryConfigController : Controller
 
             facilityId = fhirQueryConfiguration.FacilityId;
 
-            FhirQueryConfiguration? existing = null;
-            try
-            {
-                existing = await _mediator.Send(new GetFhirQueryConfigQuery
-                {
-                    FacilityId = facilityId
-                }, cancellationToken);
-            }
-            catch (NotFoundException ex)
-            {
-                //We will hopefully NOT find an existing item and hit this catch
-            }
+            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
 
             if (existing != null)
             {
@@ -159,10 +117,7 @@ public class QueryConfigController : Controller
                     $"A FhirQueryConfiguration already exists for facilityId: {facilityId}. Use PUT endpoint to update it.");
             }
 
-            var result = await _mediator.Send(new SaveFhirQueryConfigCommand
-            {
-                queryConfiguration = fhirQueryConfiguration
-            }, cancellationToken);
+            var result = await _queryConfigurationManager.AddAsync(fhirQueryConfiguration, cancellationToken);
 
             if (result == null)
             {
@@ -234,22 +189,22 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("fhirQueryConfiguration is null.");
             }
 
-            var existingFhirQueryConfiguration = await _mediator.Send(new GetFhirQueryConfigQuery
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            var existing = await _queryConfigurationManager.GetAsync(facilityId, cancellationToken);
 
-            var result = await _mediator.Send(new SaveFhirQueryConfigCommand
+            if (existing == null)
             {
-                queryConfiguration = fhirQueryConfiguration
-            }, cancellationToken);
+                throw new NotFoundException("No FhirQueryConfiguration found for the provided facilityId");
+            }
+
+            var result = await _queryConfigurationManager.UpdateAsync(fhirQueryConfiguration, cancellationToken);
 
             if (result == null)
             {
                 return Problem("FhirQueryConfiguration not Updated.", statusCode: (int)HttpStatusCode.NotModified);
             }
 
-            var resultChanges = _compareLogic.Compare(fhirQueryConfiguration, existingFhirQueryConfiguration);
+            var resultChanges = _compareLogic.Compare(fhirQueryConfiguration, existing);
+
             List<Difference> list = resultChanges.Differences;
             List<PropertyChangeModel> propertyChanges = new List<PropertyChangeModel>();
             list.ForEach(d => {
@@ -314,10 +269,7 @@ public class QueryConfigController : Controller
                 throw new BadRequestException("GetFhirQueryConfigQuery.FacilityId is null or empty.");
             }
 
-            var result = await _mediator.Send(new DeleteFhirQueryConfigurationCommand
-            {
-                FacilityId = facilityId
-            });
+            var result = await _queryConfigurationManager.DeleteAsync(facilityId, cancellationToken);
 
             return Accepted(result);
         }
