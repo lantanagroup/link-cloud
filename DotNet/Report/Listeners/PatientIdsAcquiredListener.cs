@@ -1,18 +1,13 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using MediatR;
-using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -22,18 +17,19 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
-        private readonly IMediator _mediator;
+        private readonly IDatabase _database;
 
         private string Name => this.GetType().Name;
 
         public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
           ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IMediator mediator ) 
+          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IDatabase database ) 
         { 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _database = database;
+
+
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
@@ -92,9 +88,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Patient Id's Acquired Event", AuditEventType.Create);
                                 }
 
-                                var scheduledReports = await _mediator.Send(
-                                    new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key },
-                                    cancellationToken);
+                                var scheduledReports =
+                                    await _database.ReportScheduledRepository.FindAsync(x =>
+                                        x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -122,11 +118,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _mediator.Send(new UpdateMeasureReportScheduleCommand()
-                                        {
-                                            ReportSchedule = scheduledReport
-
-                                        }, cancellationToken);
+                                        await _database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
                                     }
                                     catch (Exception)
                                     {

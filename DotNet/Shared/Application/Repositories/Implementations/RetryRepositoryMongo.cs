@@ -6,11 +6,11 @@ using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations
 {
-    public class RetryRepository_Mongo : MongoDbRepository<RetryEntity>, IRetryRepository
+    public class RetryRepositoryMongo : MongoDbRepository<RetryEntity>, IRetryRepository
     {
-        private readonly ILogger<RetryRepository_Mongo> _logger;
+        private readonly ILogger<RetryRepositoryMongo> _logger;
 
-        public RetryRepository_Mongo(IOptions<MongoConnection> mongoSettings, ILogger<RetryRepository_Mongo> logger) : base(mongoSettings, logger)
+        public RetryRepositoryMongo(IOptions<MongoConnection> mongoSettings, ILogger<RetryRepositoryMongo> logger) : base(mongoSettings, logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }

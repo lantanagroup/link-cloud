@@ -1,10 +1,9 @@
-﻿using Quartz.Spi;
-using Quartz;
-using MediatR;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
+﻿using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.Settings;
+using Quartz;
+using Quartz.Spi;
 
 namespace LantanaGroup.Link.Report.Services
 {
@@ -13,16 +12,16 @@ namespace LantanaGroup.Link.Report.Services
         private readonly ILogger<MeasureReportScheduleService> _logger;
         private readonly IJobFactory _jobFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IMediator _mediator;
+        private readonly IDatabase _database;
 
         public IScheduler Scheduler { get; set; } = default!;
 
-        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IMediator mediator)
+        public MeasureReportScheduleService(ILogger<MeasureReportScheduleService> logger, IJobFactory jobFactory, ISchedulerFactory schedulerFactory, IDatabase database)
         {
             _logger = logger;
             _jobFactory = jobFactory;
             _schedulerFactory = schedulerFactory;
-            _mediator = mediator;
+            _database = database;
         }
 
 
@@ -32,7 +31,8 @@ namespace LantanaGroup.Link.Report.Services
             Scheduler.JobFactory = _jobFactory;
 
             // find all reports that have not been submitted yet
-            var reportSchedules = await _mediator.Send(new GetMeasureReportSchedulesByIsSubmittedQuery { IsSubmitted = false });
+            var reportSchedules =
+                await _database.ReportScheduledRepository.FindAsync(s => s.SubmittedDate == null, cancellationToken);
 
             foreach (var reportSchedule in reportSchedules)
             {

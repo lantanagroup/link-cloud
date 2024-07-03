@@ -1,5 +1,5 @@
-﻿using LantanaGroup.Link.Report.Attributes;
-using LantanaGroup.Link.Report.Domain.Enums;
+﻿using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Domain.Attributes;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 

@@ -156,8 +156,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddScoped<IEntityRepository<FhirQueryConfiguration>, FhirQueryConfigurationRepository>();
-    builder.Services.AddScoped<IEntityRepository<FhirListConfiguration>, FhirQueryListConfigurationRepository>();
+    builder.Services.AddScoped<IFhirQueryConfigurationRepository, FhirQueryConfigurationRepository>();
+    builder.Services.AddScoped<IFhirQueryListConfigurationRepository, FhirQueryListConfigurationRepository>();
     builder.Services.AddScoped<IEntityRepository<QueryPlan>, QueryPlanRepository>();
     builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
     builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();

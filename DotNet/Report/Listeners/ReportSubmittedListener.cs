@@ -1,8 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -10,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -23,7 +21,8 @@ namespace LantanaGroup.Link.Report.Listeners
         //Doesn't actually generate a SubmissionReport but prevents us from having to declare a new factory type in the initialization
         //for a ProducerFactory that's only used for an AuditEvent
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
-        private readonly IMediator _mediator;
+
+        private readonly IDatabase _database;
 
         private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
@@ -31,14 +30,14 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IDatabase database,
             ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _database = database;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -107,9 +106,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report schedule
-                                MeasureReportScheduleModel schedule = await _mediator.Send(
-                                    new GetMeasureReportScheduleByBundleIdQuery
-                                        { ReportBundleId = value.ReportBundleId });
+                                var subEntry =
+                                    (await _database.ReportSubmissionRepository.FindAsync(e =>
+                                        e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken)).Single();
+
+                                var schedule =
+                                    (await _database.ReportScheduledRepository.FindAsync(s =>
+                                        s.Id == subEntry.MeasureReportScheduleId, cancellationToken)).SingleOrDefault();
 
                                 if (schedule is null)
                                 {
@@ -120,8 +123,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // update report schedule with submitted date
                                 schedule.SubmittedDate = DateTime.UtcNow;
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand
-                                    { ReportSchedule = schedule });
+                                await _database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
 
                                 // produce audit message signalling the report service acknowledged the report has been submitted
                                 using var producer = _kafkaProducerFactory.CreateAuditEventProducer();

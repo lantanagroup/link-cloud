@@ -6,23 +6,37 @@ using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
 public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
 {
-    protected IMongoCollection<T> _collection;
+    private readonly ILogger<MongoDbRepository<T>> _logger;
+    protected readonly IMongoCollection<T> _collection;
     protected readonly IMongoDatabase _database;
     protected readonly MongoClient _client;
-    protected readonly ILogger<MongoDbRepository<T>> _logger;
 
-    public MongoDbRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoDbRepository<T>> logger = default)
+    public MongoDbRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoDbRepository<T>> logger)
     {
-        _client = new MongoClient(mongoSettings.Value.ConnectionString);
-        _database = _client.GetDatabase(mongoSettings.Value.DatabaseName);
-        _collection = _database.GetCollection<T>(GetCollectionName(typeof(T)));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _client = new MongoClient(
+            mongoSettings.Value.ConnectionString);
+
+        _database = _client.GetDatabase(
+            mongoSettings.Value.DatabaseName);
+
+        _collection = _database.GetCollection<T>(GetCollectionName());
+
+    }
+
+    protected string GetCollectionName()
+    {
+        return typeof(T).GetTypeInfo().GetCustomAttribute<BsonCollectionAttribute>()?.CollectionName;
     }
 
     private protected string GetCollectionName(Type documentType)
@@ -83,9 +97,9 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
         await _collection.DeleteOneAsync(filter, cancellationToken);
     }
 
-    public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    public virtual async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).ToEnumerable();
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).ToListAsync(cancellationToken);
     }
 
     public virtual T Get(string id)
@@ -143,5 +157,20 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         return await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<bool> HealthCheck(int eventId)
+    {
+        try
+        {
+            await _database.RunCommandAsync((Command<BsonDocument>)"{ping:1}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(new EventId(eventId, "Database Health Check"), ex, "Health check failed for database connection.");
+            return false;
+        }
+
+        return true;
     }
 }
