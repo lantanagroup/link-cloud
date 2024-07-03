@@ -4,9 +4,10 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Listeners;
-using LantanaGroup.Link.Report.Repositories;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -15,6 +16,8 @@ using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
@@ -22,8 +25,10 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -31,10 +36,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.OpenApi.Models;
-using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Report.Domain.Managers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,7 +108,6 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container.
     builder.Services.AddHttpClient();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));                 
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
@@ -133,15 +134,22 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
 
     // Add repositories
-    builder.Services.AddSingleton<MeasureReportConfigRepository>();
-    builder.Services.AddSingleton<MeasureReportScheduleRepository>();
-    builder.Services.AddSingleton<MeasureReportSubmissionRepository>();
-    builder.Services.AddSingleton<MeasureReportSubmissionEntryRepository>();
-    builder.Services.AddSingleton<ReportRepository>();
-    builder.Services.AddSingleton<PatientsToQueryRepository>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepository_Mongo>();
-    builder.Services.AddSingleton<PatientResourceRepository>();
-    builder.Services.AddSingleton<SharedResourceRepository>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportScheduleModel>, MongoDbRepository<MeasureReportScheduleModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportConfigModel>, MongoDbRepository<MeasureReportConfigModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionModel>, MongoDbRepository<MeasureReportSubmissionModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionEntryModel>, MongoDbRepository<MeasureReportSubmissionEntryModel>>();
+    builder.Services.AddTransient<IEntityRepository<ReportModel>, MongoDbRepository<ReportModel>>();
+    builder.Services.AddTransient<IEntityRepository<PatientsToQueryModel>, MongoDbRepository<PatientsToQueryModel>>();
+    builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoDbRepository<SharedResourceModel>>();
+    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoDbRepository<PatientResourceModel>>();
+    builder.Services.AddSingleton<IRetryRepository, RetryRepositoryMongo>();
+    builder.Services.AddTransient<IDatabase, Database>();
+
+
+    //Add Managers
+    builder.Services.AddTransient<IMeasureReportScheduledManager, MeasureReportScheduledManager>();
+    builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
+    builder.Services.AddTransient<IResourceManager, ResourceManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");

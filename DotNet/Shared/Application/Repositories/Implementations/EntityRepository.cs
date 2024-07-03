@@ -32,7 +32,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
     {
-        _dbContext.Set<T>().Update(entity);
+        entity = _dbContext.Set<T>().Update(entity).Entity;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -73,6 +73,11 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
+    public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().ToListAsync( cancellationToken);
+    }
+
     public virtual T Update(T entity)
     {
         _dbContext.Set<T>().Update(entity);
@@ -100,7 +105,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         await _dbContext.SaveChangesAsync();
     }
 
-    public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.Set<T>().AsQueryable();
 
@@ -110,5 +115,10 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         }
 
         return await query.ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> HealthCheck(int eventId)
+    {
+        return _dbContext != null;
     }
 }

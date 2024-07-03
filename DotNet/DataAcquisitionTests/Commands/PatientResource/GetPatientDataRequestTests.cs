@@ -37,13 +37,13 @@ namespace DataAcquisitionUnitTests.Commands.PatientResource
                 QueryPlanType = LantanaGroup.Link.DataAcquisition.Application.Models.QueryPlanType.InitialQueries,
                 CorrelationId = "testCorrelation"
             };
-
+            
             _mocker.GetMock<IFhirQueryConfigurationRepository>()
                 .Setup(r => r.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new FhirQueryConfiguration());
 
             _mocker.GetMock<IEntityRepository<QueryPlan>>()
-                .Setup(r => r.FindAsync(q => q.FacilityId == It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.FindAsync(q => q.FacilityId == request.FacilityId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<QueryPlan>());
 
             _mocker.GetMock<IFhirApiRepository>()

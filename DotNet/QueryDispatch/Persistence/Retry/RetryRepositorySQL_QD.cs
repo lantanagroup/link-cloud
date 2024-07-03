@@ -3,7 +3,7 @@ using QueryDispatch.Domain.Context;
 
 namespace QueryDispatch.Persistence.Retry;
 
-public class RetryRepositorySQL_QD : RetryRepository_SQL
+public class RetryRepositorySQL_QD : RetryRepositorySQL
 {
     private readonly ILogger<RetryRepositorySQL_QD> _logger;
     private readonly QueryDispatchDbContext _dbContext;

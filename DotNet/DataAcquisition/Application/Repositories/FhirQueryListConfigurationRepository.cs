@@ -9,8 +9,7 @@ using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
-public class FhirQueryListConfigurationRepository : EntityRepository<FhirListConfiguration>,
-    IFhirQueryListConfigurationRepository
+public class FhirQueryListConfigurationRepository : EntityRepository<FhirListConfiguration>, IFhirQueryListConfigurationRepository
 {
     private readonly ILogger<FhirQueryListConfigurationRepository> _logger;
     private readonly DataAcquisitionDbContext _dbContext;

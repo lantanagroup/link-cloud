@@ -1,8 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -10,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using MediatR;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -20,7 +18,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, DataAcquisitionRequestedValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, DataAcquisitionRequestedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue> _deadLetterExceptionHandler;
-        private readonly IMediator _mediator;
+        private readonly IDatabase _database;
 
         private string Name => this.GetType().Name;
 
@@ -29,13 +27,15 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<string, DataAcquisitionRequestedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, DataAcquisitionRequestedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue> deadLetterExceptionHandler,
-            IMediator mediator) 
+            IDatabase database) 
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
+            _database = database;
+
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(_transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(_deadLetterExceptionHandler));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue();
 
@@ -96,9 +96,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     return;
                                 }
 
-                                var scheduledReports = await _mediator.Send(
-                                    new FindMeasureReportScheduleForFacilityQuery() { FacilityId = key },
-                                    cancellationToken);
+                                var scheduledReports =
+                                    await _database.ReportScheduledRepository.FindAsync(x =>
+                                        x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -117,11 +117,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _mediator.Send(new UpdateMeasureReportScheduleCommand()
-                                        {
-                                            ReportSchedule = scheduledReport
-
-                                        }, cancellationToken);
+                                        await _database.ReportScheduledRepository.UpdateAsync(
+                                            scheduledReport, cancellationToken);
                                     } 
                                     catch (Exception)
                                     {

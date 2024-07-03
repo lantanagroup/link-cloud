@@ -72,7 +72,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
         try
         {
             fhirQueryConfiguration = await _fhirQueryRepo.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans = (await _queryPlanRepository.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken)).ToList();
+            queryPlans = await _queryPlanRepository.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
 
             if(fhirQueryConfiguration == null || queryPlans == null) 
             {

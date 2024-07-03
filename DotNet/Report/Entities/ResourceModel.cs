@@ -1,20 +1,19 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Attributes;
-using LantanaGroup.Link.Report.Serializers;
-using MongoDB.Bson.Serialization.Attributes;
-using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Domain.Attributes;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
 {
-    [BsonCollection("patientResource")]
-    public class PatientResourceModel : ReportEntity, IFacilityResource
+    public class ResourceModel : ReportEntity, IFacilityResource
     {
+        public ResourceCategoryType ResourceCategoryType { get; set; }
         public string FacilityId { get; set; }
-        public string PatientId { get; set; }
         public string ResourceType { get; set; }
         public string ResourceId { get; set; }
+
         [BsonSerializer(typeof(MongoFhirBaseSerDes<Resource>))]
         public Resource Resource { get; set; }
 
@@ -27,5 +26,17 @@ namespace LantanaGroup.Link.Report.Entities
         {
             return Resource;
         }
+    }
+
+    [BsonCollection("sharedResource")]
+    public class SharedResourceModel : ResourceModel
+    {
+        
+    }
+
+    [BsonCollection("patientResource")]
+    public class PatientResourceModel : ResourceModel
+    {
+        public string PatientId { get; set; }
     }
 }
