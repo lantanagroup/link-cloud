@@ -1,12 +1,11 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations
 {
-    public class RetryRepositoryMongo : MongoDbRepository<RetryEntity>, IRetryRepository
+    public class RetryRepositoryMongo : MongoDbRepository<RetryEntity>
     {
         private readonly ILogger<RetryRepositoryMongo> _logger;
 

@@ -75,7 +75,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<T>().ToListAsync( cancellationToken);
+        return await _dbContext.Set<T>().ToListAsync(cancellationToken);
     }
 
     public virtual T Update(T entity)

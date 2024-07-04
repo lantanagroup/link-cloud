@@ -6,15 +6,16 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
+using LantanaGroup.Link.Audit.Persistance.Repositories;
 
 namespace LantanaGroup.Link.Audit.Application.Retry.Commands
 {
     public class CreateRetryEntity : ICreateRetryEntity
     {
         private readonly ILogger<CreateRetryEntity> _logger;
-        private readonly IRetryRepository _retryRepository;
+        private readonly IEntityRepository<RetryEntity> _retryRepository;
 
-        public CreateRetryEntity(ILogger<CreateRetryEntity> logger, IRetryRepository retryRepository)
+        public CreateRetryEntity(ILogger<CreateRetryEntity> logger, IEntityRepository<RetryEntity> retryRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _retryRepository = retryRepository ?? throw new ArgumentNullException(nameof(retryRepository));
