@@ -1,6 +1,4 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Entities;
-using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 

@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Context;
+﻿using DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
