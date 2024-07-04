@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Context;
+﻿using DataAcquisition.Domain;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
@@ -15,6 +15,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using Newtonsoft.Json;
 using System.Text.Json;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers
 {
@@ -31,8 +32,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
         private readonly IFhirQueryConfigurationManager _fhirQueryManager;
         private readonly IQueryPlanManager _queryPlanManager;
         private readonly IReferenceResourcesManager _referenceResourcesManager;
-        private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
-        private readonly IFhirApiRepository _fhirRepo;
+        private readonly IFhirApiService _fhirRepo;
 
         public PatientDataRequestManager(
             IDatabase database,
@@ -40,15 +40,13 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
             IFhirQueryConfigurationManager fhirQueryManager,
             IQueryPlanManager queryPlanManager,
             IReferenceResourcesManager referenceResourcesManager,
-            IQueriedFhirResourceManager queriedFhirResourceManager,
-            IFhirApiRepository fhirRepo)
+            IFhirApiService fhirRepo)
         {
             _database = database;
             _logger = logger;
             _fhirQueryManager = fhirQueryManager;
             _queryPlanManager = queryPlanManager;
             _referenceResourcesManager = referenceResourcesManager;
-            _queriedFhirResourceManager = queriedFhirResourceManager;
 
             _fhirRepo = fhirRepo;
         }

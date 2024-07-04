@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 
@@ -18,20 +19,20 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
         private readonly ILogger<PatientCensusRequestManager> _logger;
         private readonly IAuthenticationRetrievalService _authRetrievalService;
         private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
-        private readonly IFhirApiRepository _fhirApiRepository;
+        private readonly IFhirApiService _fhirApiManager;
 
         public PatientCensusRequestManager(
             ILogger<PatientCensusRequestManager> logger,
             IAuthenticationRetrievalService authRetrievalService,
             IFhirQueryListConfigurationManager fhirQueryListConfigurationManager,
-            IFhirApiRepository fhirApiRepository
+            IFhirApiService fhirApiManager
         )
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authRetrievalService = authRetrievalService ?? throw new ArgumentNullException(nameof(authRetrievalService));
             _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager ??
                                                  throw new ArgumentNullException(nameof(fhirQueryListConfigurationManager));
-            _fhirApiRepository = fhirApiRepository ?? throw new ArgumentNullException(nameof(fhirApiRepository));
+            _fhirApiManager = fhirApiManager ?? throw new ArgumentNullException(nameof(fhirApiManager));
         }
 
         public async Task<IBaseMessage> GetPatientCensusRequestManager(string facilityId, CancellationToken cancellationToken)
@@ -61,7 +62,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
                 {
                     try
                     {
-                        resultLists.Add(await _fhirApiRepository.GetPatientList(facilityConfig.FhirBaseServerUrl, listId,
+                        resultLists.Add(await _fhirApiManager.GetPatientList(facilityConfig.FhirBaseServerUrl, listId,
                             facilityConfig.Authentication));
                     }
                     catch (Exception ex)

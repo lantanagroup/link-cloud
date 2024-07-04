@@ -3,7 +3,6 @@ using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
@@ -33,7 +32,6 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Diagnostics;
-using DataAcquisition.Domain.Context;
 using Serilog.Settings.Configuration;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Spi;
@@ -49,6 +47,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using DataAcquisition.Domain;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -136,14 +136,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
     });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
-    {
-        //TODO: figure out how to handle service url. Need some sort of service discovery.
-        o.Address = new Uri("TBD on what to do here.");
-    });
+
+    //builder.Services.AddGrpc();
+    //builder.Services.AddGrpcReflection();
+    //builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
+    //builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
+    //{
+    //    //TODO: figure out how to handle service url. Need some sort of service discovery.
+    //    o.Address = new Uri("TBD on what to do here.");
+    //});
 
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
@@ -159,13 +160,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration>>();
-    builder.Services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration>>();
-    builder.Services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan>>();
-    builder.Services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources>>();
-    builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, EntityRepository<QueriedFhirResourceRecord>>();
-    builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
-    builder.Services.AddTransient<IFhirApiRepository, FhirApiRepository>();
+    builder.Services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
+    builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
+    builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, DataEntityRepository<QueriedFhirResourceRecord>>();
+    builder.Services.AddTransient<IRetryRepository, RetryRepository_SQL_DataAcq>();
+    builder.Services.AddTransient<IFhirApiService, FhirApiService>();
 
     builder.Services.AddTransient<IDatabase, Database>();
 
@@ -361,9 +362,9 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapControllers();
 
-    // Configure the HTTP request pipeline.
-    app.MapGrpcService<DataAcquisitionService>();
-    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+    //// Configure the HTTP request pipeline.
+    //app.MapGrpcService<DataAcquisitionService>();
+    ////app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
     
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions

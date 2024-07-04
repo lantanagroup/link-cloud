@@ -1,5 +1,6 @@
-﻿using DataAcquisition.Domain.Context;
+﻿using DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
@@ -8,6 +9,8 @@ public interface IQueriedFhirResourceManager
 {
     Task<QueryResultsModel> GetQueryResultsAsync(string queryType, string correlationId, bool successOnly,
         CancellationToken cancellationToken = default);
+
+    Task<QueriedFhirResourceRecord> AddAsync(QueriedFhirResourceRecord entity,  CancellationToken cancellationToken = default);
 }
 
 public class QueriedFhirResourceManager : IQueriedFhirResourceManager
@@ -19,6 +22,11 @@ public class QueriedFhirResourceManager : IQueriedFhirResourceManager
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
+    }
+
+    public async Task<QueriedFhirResourceRecord> AddAsync(QueriedFhirResourceRecord entity, CancellationToken cancellationToken = default)
+    {
+        return await _database.QueriedFhirResourceRepository.AddAsync(entity, cancellationToken);
     }
 
     public async Task<QueryResultsModel> GetQueryResultsAsync(string queryType, string correlationId, bool successOnly, CancellationToken cancellationToken = default)

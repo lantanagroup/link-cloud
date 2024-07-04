@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Context;
+﻿using DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Microsoft.EntityFrameworkCore;

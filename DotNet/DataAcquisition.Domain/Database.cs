@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
-namespace DataAcquisition.Domain.Context
+namespace DataAcquisition.Domain
 {
     public interface IDatabase
     {
@@ -19,11 +19,12 @@ namespace DataAcquisition.Domain.Context
         public IEntityRepository<QueriedFhirResourceRecord> QueriedFhirResourceRepository { get; set; }
         public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
 
-        public Database(IEntityRepository<QueryPlan> queryPlans,
+        public Database(
             IEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
             IEntityRepository<FhirListConfiguration> fhirListQueryListConfigurationRepository,
             IEntityRepository<QueriedFhirResourceRecord> queriedFhirResourceRepository,
-            IEntityRepository<ReferenceResources> referenceResourcesRepository)
+            IEntityRepository<ReferenceResources> referenceResourcesRepository,
+            IEntityRepository<QueryPlan> queryPlans)
         {
             QueryPlanRepository = queryPlans;
             FhirQueryConfigurationRepository = queryConfigurationRepository;

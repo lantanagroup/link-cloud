@@ -7,30 +7,80 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using MediatR;
 using System.Net.Http.Headers;
 
-namespace LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
+namespace LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
-public class FhirApiRepository : IFhirApiRepository
+public interface IFhirApiService
 {
-    private readonly ILogger<FhirApiRepository> _logger;
+    Task<Bundle> GetPagedBundledResultsAsync(
+        string baseUrl,
+        string patientIdReference,
+        string correlationId,
+        string facilityId,
+        string queryType,
+        Bundle bundle,
+        PagedParameterQueryFactoryResult pagedQuery,
+        ParameterQueryConfig config,
+        ScheduledReport report,
+        AuthenticationConfiguration authConfig);
+
+    Task<Bundle> GetSingularBundledResultsAsync(
+        string baseUrl,
+        string patientIdReference,
+        string correlationId,
+        string facilityId,
+        string queryType,
+        Bundle bundle,
+        SingularParameterQueryFactoryResult query,
+        ParameterQueryConfig config,
+        ScheduledReport report,
+        AuthenticationConfiguration authConfig);
+
+    Task<Patient> GetPatient(
+        string baseUrl,
+        string patientId,
+        string correlationId,
+        string facilityId,
+        AuthenticationConfiguration authConfig,
+        CancellationToken cancellationToken = default);
+
+    Task<List> GetPatientList(
+        string baseUrl,
+        string listId,
+        AuthenticationConfiguration authConfig,
+        CancellationToken cancellationToken = default);
+
+    Task<List<DomainResource>> GetReferenceResource(
+        string baseUrl,
+        string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
+        List<ResourceReference> referenceIds,
+        ReferenceQueryConfig config,
+        AuthenticationConfiguration authConfig);
+}
+
+public class FhirApiService : IFhirApiService
+{
+    private readonly ILogger<FhirApiService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
-    private readonly IMediator _mediator;
-    private readonly IQueriedFhirResourceRepository _queriedFhirResourceRepository;
+    private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
 
-    public FhirApiRepository(ILogger<FhirApiRepository> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IMediator mediator, IQueriedFhirResourceRepository queriedFhirResourceRepository, IDataAcquisitionServiceMetrics metrics)
+    public FhirApiService(ILogger<FhirApiService> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IQueriedFhirResourceManager queriedFhirResourceManager, IDataAcquisitionServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _queriedFhirResourceRepository = queriedFhirResourceRepository ?? throw new ArgumentNullException(nameof(queriedFhirResourceRepository));
+        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
@@ -40,9 +90,9 @@ public class FhirApiRepository : IFhirApiRepository
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle, 
-        PagedParameterQueryFactoryResult pagedQuery, 
-        ParameterQueryConfig config, 
+        Bundle bundle,
+        PagedParameterQueryFactoryResult pagedQuery,
+        ParameterQueryConfig config,
         ScheduledReport report,
         AuthenticationConfiguration authConfig)
     {
@@ -66,9 +116,9 @@ public class FhirApiRepository : IFhirApiRepository
                 var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
                 parameters.Add(kvPair.Key, kvPair.Value);
             }
-            
+
             var resultBundle = await SearchFhirEndpointAsync(parameters, fhirClient, config.ResourceType);
-            foreach(var b in resultBundle.Entry)
+            foreach (var b in resultBundle.Entry)
             {
                 bundle.AddResourceEntry(b.Resource, b.FullUrl);
             }
@@ -82,9 +132,9 @@ public class FhirApiRepository : IFhirApiRepository
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle, 
-        SingularParameterQueryFactoryResult query, 
-        ParameterQueryConfig config, 
+        Bundle bundle,
+        SingularParameterQueryFactoryResult query,
+        ParameterQueryConfig config,
         ScheduledReport report,
         AuthenticationConfiguration authConfig)
     {
@@ -135,7 +185,7 @@ public class FhirApiRepository : IFhirApiRepository
             }
 
             var resourceBundle = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, patientIdReference, correlationId, facilityId, queryType);
-            resourceBundle.Entry.ForEach(x => 
+            resourceBundle.Entry.ForEach(x =>
             {
                 if (!(x.Resource.TypeName == nameof(OperationOutcome)))
                 {
@@ -146,23 +196,23 @@ public class FhirApiRepository : IFhirApiRepository
         }
 
         return bundle;
-    }    
+    }
 
     public async Task<Patient> GetPatient(
-        string baseUrl, 
-        string patientId, 
-        string correlationId, 
-        string facilityId, 
-        AuthenticationConfiguration authConfig, 
+        string baseUrl,
+        string patientId,
+        string correlationId,
+        string facilityId,
+        AuthenticationConfiguration authConfig,
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
-            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),  
+            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
             new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
         ]);
 
-        patientId = patientId.Contains("Patient/",StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
+        patientId = patientId.Contains("Patient/", StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
 
         var fhirClient = GenerateFhirClient(baseUrl);
 
@@ -172,7 +222,7 @@ public class FhirApiRepository : IFhirApiRepository
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        return (Patient)(await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.InitialQueries.ToString()));
+        return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.InitialQueries.ToString());
     }
 
     public async Task<List> GetPatientList(string baseUrl, string listId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
@@ -189,11 +239,11 @@ public class FhirApiRepository : IFhirApiRepository
     }
 
     private async Task<Bundle> SearchFhirEndpointAsync(
-        SearchParams searchParams, 
-        FhirClient fhirClient, 
-        string resourceType, 
-        string? patientId = default, 
-        string? correlationId = default, 
+        SearchParams searchParams,
+        FhirClient fhirClient,
+        string resourceType,
+        string? patientId = default,
+        string? correlationId = default,
         string? facilityId = default,
         string? queryType = default,
         CancellationToken cancellationToken = default)
@@ -207,13 +257,13 @@ public class FhirApiRepository : IFhirApiRepository
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);          
+            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
 
             if (resultBundle != null && resultBundle.Entry.Count > 0)
             {
                 foreach (var entry in resultBundle.Entry)
                 {
-                    await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+                    await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
                     {
                         ResourceId = entry.Resource.Id,
                         ResourceType = entry.Resource.TypeName,
@@ -225,10 +275,10 @@ public class FhirApiRepository : IFhirApiRepository
                     }, cancellationToken);
                 }
             }
-            
+
             return resultBundle;
         }
-        catch(FhirOperationException ex)
+        catch (FhirOperationException ex)
         {
             _logger.LogError(ex.Message, ex);
             return null;
@@ -236,9 +286,9 @@ public class FhirApiRepository : IFhirApiRepository
     }
 
     private async Task<DomainResource> ReadFhirEndpointAsync(
-        FhirClient fhirClient, 
-        string resourceType, 
-        string id, 
+        FhirClient fhirClient,
+        string resourceType,
+        string id,
         string? patientId = default,
         string? correlationId = default,
         string? facilityId = default,
@@ -282,7 +332,7 @@ public class FhirApiRepository : IFhirApiRepository
 
         if (readResource != null)
         {
-            await _queriedFhirResourceRepository.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+            await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
             {
                 ResourceId = id,
                 ResourceType = resourceType,
@@ -296,9 +346,9 @@ public class FhirApiRepository : IFhirApiRepository
             if (readResource is not OperationOutcome)
             {
                 IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
-            } 
+            }
         }
-        
+
 
         return readResource;
     }
@@ -311,14 +361,14 @@ public class FhirApiRepository : IFhirApiRepository
     }
 
     public async Task<List<DomainResource>> GetReferenceResource(
-        string baseUrl, 
+        string baseUrl,
         string resourceType,
         string patientIdReference,
         string facilityIdReference,
         string correlationId,
         string queryPlanType,
-        List<ResourceReference> referenceIds, 
-        ReferenceQueryConfig config, 
+        List<ResourceReference> referenceIds,
+        ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig)
     {
         var fhirClient = GenerateFhirClient(baseUrl);
@@ -331,9 +381,9 @@ public class FhirApiRepository : IFhirApiRepository
 
         List<DomainResource> domainResources = new List<DomainResource>();
 
-        if(config.OperationType == OperationType.Read) 
+        if (config.OperationType == OperationType.Read)
         {
-            foreach(var reference in referenceIds)
+            foreach (var reference in referenceIds)
             {
                 var refIdResult = GetRefId(reference, resourceType);
 
@@ -376,7 +426,7 @@ public class FhirApiRepository : IFhirApiRepository
                     _logger.LogWarning($"No appropriate ID found for reference.\n{reference.ToJson()}");
                     continue;
                 }
-                
+
                 if (authBuilderResults.isQueryParam)
                 {
                     var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
@@ -384,9 +434,9 @@ public class FhirApiRepository : IFhirApiRepository
                 }
 
                 var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType);
-                if(result != null)
+                if (result != null)
                 {
-                    domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && (x.Resource.TypeName != nameof(OperationOutcome))).Select(x => (DomainResource)x.Resource).ToList());
+                    domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && x.Resource.TypeName != nameof(OperationOutcome)).Select(x => (DomainResource)x.Resource).ToList());
                 }
             }
         }
