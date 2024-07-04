@@ -1,54 +1,53 @@
 using Azure.Identity;
+using DataAcquisition.Domain;
 using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
+using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Quartz.Impl;
+using Microsoft.OpenApi.Models;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
+using Serilog.Settings.Configuration;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using System.Diagnostics;
-using Serilog.Settings.Configuration;
-using LantanaGroup.Link.Shared.Application.Services;
-using Quartz.Spi;
-using LantanaGroup.Link.DataAcquisition.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Application.Middleware;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.DataAcquisition.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
-using DataAcquisition.Domain;
-using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -165,8 +164,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
     builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
     builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, DataEntityRepository<QueriedFhirResourceRecord>>();
-    builder.Services.AddTransient<IRetryRepository, RetryRepository_SQL_DataAcq>();
-    builder.Services.AddTransient<IFhirApiService, FhirApiService>();
+    builder.Services.AddTransient<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
 
     builder.Services.AddTransient<IDatabase, Database>();
 
@@ -182,6 +180,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
+    builder.Services.AddTransient<IFhirApiService, FhirApiService>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
