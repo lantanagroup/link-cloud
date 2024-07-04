@@ -1,19 +1,18 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
 using Quartz;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Utilities;
-using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Census.Application.Settings;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace LantanaGroup.Link.Census.Listeners;
 
@@ -27,7 +26,7 @@ public class RetryListener : BackgroundService
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IRetryRepository retryRepository, IOptions<ConsumerSettings> consumerSettings, ISchedulerFactory schedulerFactory, IServiceScopeFactory serviceScopeFactory)
+    public RetryListener(ILogger<RetryListener> logger, IKafkaConsumerFactory<string, string> kafkaConsumerFactory, IRetryEntityFactory retryEntityFactory, IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, IOptions<ConsumerSettings> consumerSettings, ISchedulerFactory schedulerFactory, IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
@@ -71,7 +70,7 @@ public class RetryListener : BackgroundService
                         try
                         {
                             using var scope = _serviceScopeFactory.CreateScope();
-                            var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+                            var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
                             if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                             {

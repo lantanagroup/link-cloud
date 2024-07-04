@@ -179,7 +179,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add repositories
     builder.Services.AddScoped<IAuditRepository, AuditLogRepository>();
     builder.Services.AddScoped<ISearchRepository, AuditLogSearchRepository>();
-    builder.Services.AddScoped<IRetryRepository, AuditLogRetryRepository>();
+    builder.Services.AddScoped<IEntityRepository<RetryEntity>, AuditEntityRepository<RetryEntity>>();
 
     //Add Hosted Services
     builder.Services.AddHostedService<AuditEventListener>();

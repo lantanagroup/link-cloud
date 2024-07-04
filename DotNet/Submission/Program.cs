@@ -108,7 +108,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add services to the container.
     builder.Services.AddHttpClient();
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<IRetryRepository, RetryRepositoryMongo>();
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoDbRepository<RetryEntity>>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
     builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
     builder.Services.AddTransient<ITenantSubmissionRepository, TenantSubmissionRepository>();

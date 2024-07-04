@@ -151,7 +151,7 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 builder.Services.AddScoped<IScheduledReportRepository, ScheduledReportRepo>();
 builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
 builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
-builder.Services.AddScoped<IRetryRepository, RetryRepositorySQL_QD>();
+builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
 //Add Queries
 builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();

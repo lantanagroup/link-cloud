@@ -63,7 +63,7 @@ public class RetryListener : BackgroundService
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+            var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
             consumer.Subscribe(new List<string>() { KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() });
 

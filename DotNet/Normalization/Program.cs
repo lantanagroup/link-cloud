@@ -174,7 +174,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IRetryRepository, RetryRepository_SQL_Norm>();
+    builder.Services.AddTransient<IEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();

@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Shared.Application.Services
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+            var retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
             scheduler.JobFactory = _jobFactory;

@@ -136,15 +136,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
     });
 
-    //builder.Services.AddGrpc();
-    //builder.Services.AddGrpcReflection();
-    //builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    //builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
-    //{
-    //    //TODO: figure out how to handle service url. Need some sort of service discovery.
-    //    o.Address = new Uri("TBD on what to do here.");
-    //});
-
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
     builder.Services.AddSingleton<BasicAuth>();
@@ -164,7 +155,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
     builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
     builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, DataEntityRepository<QueriedFhirResourceRecord>>();
-    builder.Services.AddTransient<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
+
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
 
     builder.Services.AddTransient<IDatabase, Database>();
 
