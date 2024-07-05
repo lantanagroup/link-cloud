@@ -4,7 +4,6 @@ using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
@@ -166,8 +165,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
     builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
     builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
-    builder.Services.AddTransient<IPatientDataRequestManager, PatientDataRequestManager>();
-    builder.Services.AddTransient<IPatientCensusRequestManager, PatientCensusRequestManager>();
+    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
+    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
@@ -17,16 +16,16 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
     private readonly IMediator _mediator;
     private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
-    private readonly IPatientDataRequestManager _patientDataRequestManager;
+    private readonly IPatientDataService _patientDataService;
 
     public DataAcquisitionRequestedProcessingLogic(
         ILogger<DataAcquisitionRequestedProcessingLogic> logger,
-        IPatientDataRequestManager patientDataRequestManager,
+        IPatientDataService patientDataService,
         IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientDataRequestManager = patientDataRequestManager;
+        _patientDataService = patientDataService;
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
@@ -68,7 +67,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         List<IBaseMessage> results = new List<IBaseMessage>();
         try
         {
-            results = await _patientDataRequestManager.GetPatientDataRequestManager(new GetPatientDataRequest
+            results = await _patientDataService.GetPatientDataRequest(new GetPatientDataRequest
             {
                 Message = consumeResult.Message.Value,
                 FacilityId = facilityId,
