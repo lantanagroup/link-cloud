@@ -103,6 +103,37 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
+        public virtual void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId)
+        {
+            try
+            {
+                var consumeResult = new ConsumeResult<string, string>();
+
+                consumeResult.Message = new Message<string, string>();
+
+                consumeResult.Message.Key = key;
+                consumeResult.Message.Value = value;
+                consumeResult.Message.Headers = headers;
+
+                var message = new AuditEventMessage
+                {
+                    FacilityId = facilityId,
+                    Action = ex.AuditEventType,
+                    ServiceName = ServiceName,
+                    EventDate = DateTime.UtcNow,
+                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
+                };
+
+                ProduceAuditEvent(message, consumeResult.Message.Headers);
+                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                HandleException(e, facilityId ?? string.Empty, ex?.AuditEventType ?? AuditEventType.Create);
+            }
+        }
+
         public virtual void HandleException(DeadLetterException ex, string facilityId)
         {
             try
