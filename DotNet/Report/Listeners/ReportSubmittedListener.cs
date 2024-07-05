@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -187,8 +188,33 @@ namespace LantanaGroup.Link.Report.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        var message = new Message<string, string>()
+                        {
+                            Headers = ex.ConsumerRecord.Message.Headers,
+                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                  ex.ConsumerRecord.Message.Key != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                                : string.Empty,
+                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                    ex.ConsumerRecord.Message.Value != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                                : string.Empty,
+                        };
+
+                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
+                        {
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -202,6 +228,18 @@ namespace LantanaGroup.Link.Report.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
         }
     }
 }
