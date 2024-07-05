@@ -95,12 +95,12 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 };
 
                 intialResults =
-                    await _patientDataService.GetPatientDataRequest(patientDataRequest,
+                    await _patientDataService.Get(patientDataRequest,
                         cancellationToken);
 
                 patientDataRequest.QueryPlanType = QueryPlanType.SupplementalQueries;
                 patientDataRequest.Message.QueryType = "Supplemental";
-                supplementalResults = await _patientDataService.GetPatientDataRequest(patientDataRequest, cancellationToken);
+                supplementalResults = await _patientDataService.Get(patientDataRequest, cancellationToken);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||

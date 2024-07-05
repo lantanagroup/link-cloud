@@ -58,7 +58,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
         try
         {
-            result = await _patientCensusService.GetPatientCensusRequestManager(facilityId, cancellationToken);
+            result = await _patientCensusService.Get(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {

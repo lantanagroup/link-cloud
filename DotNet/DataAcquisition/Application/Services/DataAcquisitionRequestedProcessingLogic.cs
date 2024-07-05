@@ -67,7 +67,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         List<IBaseMessage> results = new List<IBaseMessage>();
         try
         {
-            results = await _patientDataService.GetPatientDataRequest(new GetPatientDataRequest
+            results = await _patientDataService.Get(new GetPatientDataRequest
             {
                 Message = consumeResult.Message.Value,
                 FacilityId = facilityId,

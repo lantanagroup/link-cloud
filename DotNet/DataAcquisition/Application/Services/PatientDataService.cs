@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
     public interface IPatientDataService
     {
-        Task<List<IBaseMessage>> GetPatientDataRequest(GetPatientDataRequest request, CancellationToken cancellationToken);
+        Task<List<IBaseMessage>> Get(GetPatientDataRequest request, CancellationToken cancellationToken);
     }
 
     public class PatientDataService : IPatientDataService
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             _fhirRepo = fhirRepo;
         }
 
-        public async Task<List<IBaseMessage>> GetPatientDataRequest(GetPatientDataRequest request, CancellationToken cancellationToken)
+        public async Task<List<IBaseMessage>> Get(GetPatientDataRequest request, CancellationToken cancellationToken)
         {
             List<IBaseMessage> messages = new List<IBaseMessage>();
 
