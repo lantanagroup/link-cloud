@@ -7,22 +7,22 @@ using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 
-namespace LantanaGroup.Link.DataAcquisition.Application.Managers
+namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
-    public interface IPatientCensusRequestManager
+    public interface IPatientCensusService
     {
         Task<IBaseMessage> GetPatientCensusRequestManager(string facilityId, CancellationToken cancellationToken);
     }
 
-    public class PatientCensusRequestManager : IPatientCensusRequestManager
+    public class PatientCensusService : IPatientCensusService
     {
-        private readonly ILogger<PatientCensusRequestManager> _logger;
+        private readonly ILogger<PatientCensusService> _logger;
         private readonly IAuthenticationRetrievalService _authRetrievalService;
         private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
         private readonly IFhirApiService _fhirApiManager;
 
-        public PatientCensusRequestManager(
-            ILogger<PatientCensusRequestManager> logger,
+        public PatientCensusService(
+            ILogger<PatientCensusService> logger,
             IAuthenticationRetrievalService authRetrievalService,
             IFhirQueryListConfigurationManager fhirQueryListConfigurationManager,
             IFhirApiService fhirApiManager

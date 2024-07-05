@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
@@ -13,17 +12,17 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
 {
     private readonly ILogger<PatientCensusScheduledProcessingLogic> _logger;
-    private readonly IPatientCensusRequestManager _patientCensusRequestManager;
+    private readonly IPatientCensusService _patientCensusService;
     private readonly IKafkaProducerFactory<string, PatientIDsAcquiredMessage> _kafkaProducerFactory;
 
     public PatientCensusScheduledProcessingLogic(
         ILogger<PatientCensusScheduledProcessingLogic> logger,
-        IPatientCensusRequestManager patientCensusRequestManager, 
+        IPatientCensusService patientCensusService, 
         IKafkaProducerFactory<string, PatientIDsAcquiredMessage> kafkaProducerFactory
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientCensusRequestManager = patientCensusRequestManager ?? throw new ArgumentNullException(nameof(patientCensusRequestManager));
+        _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
@@ -59,7 +58,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
         try
         {
-            result = await _patientCensusRequestManager.GetPatientCensusRequestManager(facilityId, cancellationToken);
+            result = await _patientCensusService.GetPatientCensusRequestManager(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {

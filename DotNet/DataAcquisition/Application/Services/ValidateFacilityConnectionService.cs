@@ -1,12 +1,9 @@
 ﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services
@@ -31,14 +28,14 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
     {
         private readonly ILogger<ValidateFacilityConnectionService> _logger;
         private readonly IMediator _mediator;
-        private readonly IPatientDataRequestManager _patientDataRequestManager;
+        private readonly IPatientDataService _patientDataService;
 
         public ValidateFacilityConnectionService(
             ILogger<ValidateFacilityConnectionService> logger,
-            IPatientDataRequestManager patientDataRequestManager)
+            IPatientDataService patientDataService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _patientDataRequestManager = patientDataRequestManager;
+            _patientDataService = patientDataService;
         }
 
         public async Task<FacilityConnectionResult> ValidateConnection(ValidateFacilityConnectionRequest request, CancellationToken cancellationToken)
@@ -98,12 +95,12 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 };
 
                 intialResults =
-                    await _patientDataRequestManager.GetPatientDataRequestManager(patientDataRequest,
+                    await _patientDataService.GetPatientDataRequest(patientDataRequest,
                         cancellationToken);
 
                 patientDataRequest.QueryPlanType = QueryPlanType.SupplementalQueries;
                 patientDataRequest.Message.QueryType = "Supplemental";
-                supplementalResults = await _patientDataRequestManager.GetPatientDataRequestManager(patientDataRequest, cancellationToken);
+                supplementalResults = await _patientDataService.GetPatientDataRequest(patientDataRequest, cancellationToken);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||

@@ -2,7 +2,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
@@ -10,33 +9,33 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuer
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using Newtonsoft.Json;
 using System.Text.Json;
-using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
-namespace LantanaGroup.Link.DataAcquisition.Application.Managers
+namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
-    public interface IPatientDataRequestManager
+    public interface IPatientDataService
     {
-        Task<List<IBaseMessage>> GetPatientDataRequestManager(GetPatientDataRequest request, CancellationToken cancellationToken);
+        Task<List<IBaseMessage>> GetPatientDataRequest(GetPatientDataRequest request, CancellationToken cancellationToken);
     }
 
-    public class PatientDataRequestManager : IPatientDataRequestManager
+    public class PatientDataService : IPatientDataService
     {
         private readonly IDatabase _database;
 
-        private readonly ILogger<PatientDataRequestManager> _logger;
+        private readonly ILogger<PatientDataService> _logger;
         private readonly IFhirQueryConfigurationManager _fhirQueryManager;
         private readonly IQueryPlanManager _queryPlanManager;
         private readonly IReferenceResourcesManager _referenceResourcesManager;
         private readonly IFhirApiService _fhirRepo;
 
-        public PatientDataRequestManager(
+        public PatientDataService(
             IDatabase database,
-            ILogger<PatientDataRequestManager> logger,
+            ILogger<PatientDataService> logger,
             IFhirQueryConfigurationManager fhirQueryManager,
             IQueryPlanManager queryPlanManager,
             IReferenceResourcesManager referenceResourcesManager,
@@ -51,11 +50,11 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
             _fhirRepo = fhirRepo;
         }
 
-        public async Task<List<IBaseMessage>> GetPatientDataRequestManager(GetPatientDataRequest request, CancellationToken cancellationToken)
+        public async Task<List<IBaseMessage>> GetPatientDataRequest(GetPatientDataRequest request, CancellationToken cancellationToken)
         {
             List<IBaseMessage> messages = new List<IBaseMessage>();
 
-            if (!(await ValidateRequest(request)))
+            if (!await ValidateRequest(request))
             {
                 return null;
             }
@@ -108,12 +107,13 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
                         fhirQueryConfiguration.FhirServerBaseUrl,
                         patientId, request.CorrelationId,
                         request.FacilityId,
-                        fhirQueryConfiguration.Authentication);
+                        fhirQueryConfiguration.Authentication, cancellationToken);
 
                     bundle.AddResourceEntry(patient, patientId);
                 }
 
-                var queryPlan = queryPlans.Where(x => x.ReportType == scheduledReport.ReportType).FirstOrDefault();
+                var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
+
                 if (queryPlan != null)
                 {
                     var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -214,7 +214,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
 
                 if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
                 {
-                    var queryInfo = ((ParameterQueryConfig)queryConfig);
+                    var queryInfo = (ParameterQueryConfig)queryConfig;
                     _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
                     bundle = await _fhirRepo.GetSingularBundledResultsAsync(
@@ -232,7 +232,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
 
                 if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
                 {
-                    var queryInfo = ((ParameterQueryConfig)queryConfig);
+                    var queryInfo = (ParameterQueryConfig)queryConfig;
                     _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
                     bundle = await _fhirRepo.GetPagedBundledResultsAsync(
@@ -252,7 +252,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
                 {
                     var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
 
-                    var queryInfo = ((ReferenceQueryConfig)queryConfig);
+                    var queryInfo = (ReferenceQueryConfig)queryConfig;
                     _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
                     if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
@@ -284,7 +284,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Managers
                     fullRefResourceList.AddRange(existingReferenceResources);
 
                     var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-                    var currentDateTime = System.DateTime.UtcNow;
+                    var currentDateTime = DateTime.UtcNow;
                     var fhirDateTime = new FhirDateTime(
                         currentDateTime.Year,
                         currentDateTime.Month,

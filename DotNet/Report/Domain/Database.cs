@@ -45,33 +45,5 @@ namespace LantanaGroup.Link.Report.Domain
             ReportConfigRepository = reportConfigRepository;
             ReportSubmissionRepository = reportSubmissionRepository;
         }
-
-        public async Task<MeasureReportScheduleModel?> GetMeasureReportSchedule(string facilityId, DateTime startDate,
-        DateTime endDate, string reportType, CancellationToken cancellationToken = default)
-        {
-            // find existing report scheduled for this facility, report type, and date range
-            return (await ReportScheduledRepository.FindAsync(
-                r => r.FacilityId == facilityId && r.ReportStartDate == startDate && r.ReportEndDate == endDate &&
-                     r.ReportType == reportType, cancellationToken))?.SingleOrDefault();
-        }
-
-        public async Task<List<MeasureReportScheduleModel>?> GetMeasureReportSchedules(string facilityId,
-            DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
-        {
-            // find existing report scheduled for this facility, report type, and date range
-            return (await ReportScheduledRepository.FindAsync(
-                r => r.FacilityId == facilityId && r.ReportStartDate == startDate && r.ReportEndDate == endDate,
-                cancellationToken))?.ToList();
-        }
-
-        public async Task<MeasureReportSubmissionEntryModel?> GetPatientSubmissionEntry(string measureReportScheduleId,
-            string patientId, CancellationToken cancellationToken = default)
-        {
-            // find existing report scheduled for this facility, report type, and date range
-            return (await SubmissionEntryRepository.FindAsync(
-                    s => s.MeasureReportScheduleId == measureReportScheduleId && s.PatientId == patientId,
-                    cancellationToken))
-                ?.SingleOrDefault();
-        }
     }
 }
