@@ -10,7 +10,7 @@ telemetry:
 
 loki:
   enabled: true
-  url: http://localhost:3100
+  url: https://loki.nhsnlink.org
 
 springdoc:
   api-docs:
@@ -63,5 +63,5 @@ secret-management:
   key-vault-uri: https://link-vault.vault.azure.net/
 
 authentication:
-  anonymous: false
+  anonymous: true
   authority: 'https://localhost:7004'
