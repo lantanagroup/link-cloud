@@ -4,6 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Identity.Web;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
@@ -158,6 +159,26 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 logger.Debug("Set JWT Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
                 logger.Debug("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority"));
                 logger.Debug("Audience: {Audience}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience"));
+            }
+
+            //Add AzureAD authorization scheme if enabled
+            if (configuration.GetValue<bool>("Authentication:Schemas:AzureAd:Enabled"))
+            { 
+                logger.Debug("Registering AzureAD authentication scheme: {scheme}", LinkAdminConstants.AuthenticationSchemes.AzureAD);
+                if (!LinkAdminConstants.AuthenticationSchemes.AzureAD.Equals(defaultChallengeScheme))
+                    authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.AzureAD);
+
+                authBuilder.AddMicrosoftIdentityWebApp(options =>
+                {
+                    options.Domain = configuration.GetValue<string>("Authentication:Schemas:AzureAd:Authority");
+                    options.ClientId = configuration.GetValue<string>("Authentication:Schemas:AzureAd:ClientId");
+                    options.ClientSecret = configuration.GetValue<string>("Authentication:Schemas:AzureAd:ClientSecret");
+                    options.Instance = configuration.GetValue<string>("Authentication:Schemas:AzureAd:Instance");
+                    options.TenantId = configuration.GetValue<string>("Authentication:Schemas:AzureAd:TenantId");
+                    options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:AzureAd:CallbackPath");                    
+                }, 
+                openIdConnectScheme: LinkAdminConstants.AuthenticationSchemes.AzureAD);
+
             }
 
             // Add Link Bearer Token authorization schema
