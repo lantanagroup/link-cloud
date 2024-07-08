@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuer
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 
@@ -33,11 +34,10 @@ public interface IFhirApiRepository
         AuthenticationConfiguration authConfig);
 
     Task<Patient> GetPatient(
-        string baseUrl,
+        FhirQueryConfiguration queryConfig,
         string patientId,
         string correlationId,
         string facilityId,
-        AuthenticationConfiguration authConfig,
         CancellationToken cancellationToken = default);
 
     Task<List> GetPatientList(

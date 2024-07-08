@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -149,11 +150,10 @@ public class FhirApiRepository : IFhirApiRepository
     }    
 
     public async Task<Patient> GetPatient(
-        string baseUrl, 
+        FhirQueryConfiguration queryConfig,
         string patientId, 
         string correlationId, 
-        string facilityId, 
-        AuthenticationConfiguration authConfig, 
+        string facilityId,  
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
@@ -164,9 +164,9 @@ public class FhirApiRepository : IFhirApiRepository
 
         patientId = patientId.Contains("Patient/",StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
 
-        var fhirClient = GenerateFhirClient(baseUrl);
+        var fhirClient = GenerateFhirClient(queryConfig.FhirServerBaseUrl);
 
-        var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
+        var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, queryConfig.Authentication);
         if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
         {
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;

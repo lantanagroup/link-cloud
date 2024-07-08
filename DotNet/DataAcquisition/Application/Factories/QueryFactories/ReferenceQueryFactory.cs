@@ -27,6 +27,21 @@ public class ReferenceQueryFactory
         return new ReferenceQueryFactoryResult(config.ResourceType, resources);
     }
 
+    public static ReferenceQueryFactoryResult Build(ReferenceQueryConfig config, List<Resource> resources)
+    {
+        var references =
+            resources
+            .SelectMany(x => Collect(x, config.ResourceType))
+            .Where(x =>
+            {
+                return x is ResourceReference;
+            })
+            .Select(x => (ResourceReference)x)
+            .ToList();
+
+        return new ReferenceQueryFactoryResult(config.ResourceType, references);
+    }
+
     private static List<Base> Collect(Base ancestor, string resourceName)
     {
         List<Base> result = new List<Base>();

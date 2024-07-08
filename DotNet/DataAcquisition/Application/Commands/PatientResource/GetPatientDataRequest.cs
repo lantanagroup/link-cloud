@@ -106,11 +106,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
 
             if (request.Message.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
             {
-                patient = await _fhirRepo.GetPatient(
-                fhirQueryConfiguration.FhirServerBaseUrl,
-                patientId, request.CorrelationId,
-                request.FacilityId,
-                fhirQueryConfiguration.Authentication);
+                patient = await _fhirRepo.GetPatient(fhirQueryConfiguration, patientId, request.CorrelationId, request.FacilityId);
 
                 bundle.AddResourceEntry(patient, patientId);
             }
@@ -261,6 +257,7 @@ public class GetPatientDataRequestHandler : IRequestHandler<GetPatientDataReques
                 bundle = AddExisitngReferenceListToBundle(existingReferenceResources, bundle);
 
                 List<ResourceReference> missingReferences = referenceQueryFactoryResult.ReferenceIds.Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.ElementId)).ToList();
+                
                 var fullMissingResources = await _fhirRepo.GetReferenceResource(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     referenceQueryFactoryResult.ResourceType,

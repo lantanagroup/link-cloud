@@ -46,6 +46,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.DataAcquisition.Application.Commands.QueryResource;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -182,6 +183,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
     builder.Services.AddScoped<IJobFactory, JobFactory>();
+    builder.Services.AddTransient<QuerySharedResource, QuerySharedResource>();
+    builder.Services.AddTransient<QueryPatientResource, QueryPatientResource>();
 
     //Custom Logic
     builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
