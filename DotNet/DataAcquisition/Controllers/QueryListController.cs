@@ -68,7 +68,7 @@ public class QueryListController : Controller
     /// <param name="fhirListConfiguration"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpPost("{facilityId}/fhirQueryList")]
+    [HttpPost("fhirQueryList")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]

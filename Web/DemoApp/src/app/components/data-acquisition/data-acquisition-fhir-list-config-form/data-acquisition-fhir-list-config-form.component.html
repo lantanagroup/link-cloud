@@ -2,7 +2,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [readonly]="viewOnly">
+      <input matInput formControlName="facilityId" [readonly]="viewOnly" placeholder="Facility Id">
       <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
         <mat-icon>close</mat-icon>
       </button>
@@ -15,7 +15,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
-      <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly">
+      <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly" placeholder="Fhir Server Base URL">
       <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
         <mat-icon>close</mat-icon>
       </button>
@@ -53,11 +53,11 @@
             <div style="flex: auto;">
               <mat-form-field appearance="outline" class="data-acq-list-task-input">
                 <mat-label>Measure ID</mat-label>
-                <input matInput formControlName="measureId" [readonly]="viewOnly">
+                <input matInput formControlName="measureId" [readonly]="viewOnly" placeholder="Measure Id">
               </mat-form-field>
               <mat-form-field appearance="outline" class="data-acq-list-task-input">
                 <mat-label>List ID</mat-label>
-                <input matInput formControlName="listId" [readonly]="viewOnly">
+                <input matInput formControlName="listId" [readonly]="viewOnly" placeholder="List Id">
               </mat-form-field>
             </div>
             <div style="flex-shrink: 2;">
