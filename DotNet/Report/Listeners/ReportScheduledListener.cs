@@ -123,8 +123,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var startDate = startDateOffset.UtcDateTime;
                                 var endDate = endDateOffset.UtcDateTime;
 
-                                // create or update the consumed report schedule
-                                var existing = await _measureReportScheduledManager.FindAsync(x => x.FacilityId == facilityId 
+                                // Check if this already exists
+                                var existing = await _measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
                                                                                                         && x.ReportEndDate == endDate 
                                                                                                         && x.ReportType == key.ReportType, cancellationToken);

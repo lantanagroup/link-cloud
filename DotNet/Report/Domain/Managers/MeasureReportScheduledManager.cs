@@ -19,6 +19,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<List<MeasureReportScheduleModel>> FindAsync(Expression<Func<MeasureReportScheduleModel, bool>> predicate,
             CancellationToken cancellationToken = default);
+
+        Task<MeasureReportScheduleModel?> SingleOrDefaultAsync(
+            Expression<Func<MeasureReportScheduleModel, bool>> predicate,
+            CancellationToken cancellationToken = default);
     }
 
 
@@ -44,6 +48,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             // find existing report scheduled for this facility, report type, and date range
             return (await _database.ReportScheduledRepository.FindAsync(
                 r => r.FacilityId == facilityId && r.ReportStartDate == startDate && r.ReportEndDate == endDate, cancellationToken))?.ToList();
+        }
+
+        public async Task<MeasureReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<MeasureReportScheduleModel, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await _database.ReportScheduledRepository.SingleOrDefaultAsync(predicate, cancellationToken);
         }
 
         public async Task<List<MeasureReportScheduleModel>> FindAsync(Expression<Func<MeasureReportScheduleModel, bool>> predicate, CancellationToken cancellationToken = default)
