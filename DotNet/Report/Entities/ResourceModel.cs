@@ -3,11 +3,12 @@ using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Domain.Attributes;
+using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
 {
-    public class ResourceModel : ReportEntity, IFacilityResource
+    public class ResourceModel : BaseEntity, IFacilityResource
     {
         public ResourceCategoryType ResourceCategoryType { get; set; }
         public string FacilityId { get; set; }
