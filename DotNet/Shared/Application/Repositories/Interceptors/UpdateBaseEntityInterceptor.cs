@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Shared.Application.Repositories.Interceptors
                     return base.SavingChangesAsync(eventData, result, cancellationToken);
                 }
 
-                var entries = context.ChangeTracker.Entries<BaseEntityExtended>();
+                var entries = context.ChangeTracker.Entries<BaseEntity>();
 
                 foreach (var entry in entries)
                 {

@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("queryPlan")]
-public class QueryPlan : BaseEntityExtended
+public class QueryPlan : BaseEntity
 {
     public string PlanName { get; set; }
     public string ReportType { get; set; }

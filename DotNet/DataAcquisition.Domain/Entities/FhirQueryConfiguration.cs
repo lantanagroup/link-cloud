@@ -1,14 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Domain.Attributes;
-using System.ComponentModel.DataAnnotations.Schema;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("fhirQueryConfiguration")]
-public class FhirQueryConfiguration : BaseEntityExtended
+public class FhirQueryConfiguration : BaseEntity
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string FacilityId { get; set; }

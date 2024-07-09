@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("referenceResources")]
-public class ReferenceResources : BaseEntityExtended
+public class ReferenceResources : BaseEntity
 {
     public string FacilityId { get; set; }
     public string ResourceId { get; set; }
