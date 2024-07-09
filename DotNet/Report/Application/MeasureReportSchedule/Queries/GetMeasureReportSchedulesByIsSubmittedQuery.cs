@@ -23,6 +23,12 @@ namespace LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries
 
         public async Task<IEnumerable<MeasureReportScheduleModel>> Handle(GetMeasureReportSchedulesByIsSubmittedQuery request, CancellationToken cancellationToken)
         {
+            //Daniel - RC 0.1 Hotfix - LNK-2629
+            if (request.IsSubmitted == false)
+            {
+                return (await _repository.FindAsync(x => x.SubmittedDate == null && x.PatientsToQueryDataRequested != true)).ToEnumerable();
+            }
+
             return (await _repository.FindAsync(x => x.SubmittedDate.HasValue == request.IsSubmitted)).ToEnumerable();
         }
     }
