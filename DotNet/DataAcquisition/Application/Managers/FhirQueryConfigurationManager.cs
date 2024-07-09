@@ -111,7 +111,7 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
 
     public async Task<FhirQueryConfiguration?> GetAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        return await _database.FhirQueryConfigurationRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
+        return await _database.FhirQueryConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
     }
 
     public async Task<FhirQueryConfiguration> UpdateAsync(FhirQueryConfiguration entity, CancellationToken cancellationToken = default)

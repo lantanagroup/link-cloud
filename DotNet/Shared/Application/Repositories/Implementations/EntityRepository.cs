@@ -65,12 +65,12 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual T Get(string id)
     {
-        return _dbContext.Set<T>().FirstOrDefault(o => o.Id == id);
+        return _dbContext.Set<T>().SingleOrDefault(o => o.Id == id);
     }
 
     public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<T>().FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+        return await _dbContext.Set<T>().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
 
     public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
