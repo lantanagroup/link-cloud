@@ -3,7 +3,7 @@ import { IDataAcquisitionAuthenticationConfigModel } from "./data-acquisition-au
 export interface IDataAcquisitionFhirListConfigModel {
     id: string;
     facilityId: string;
-    fhirServerBaseUrl: string;
+    fhirBaseServerUrl: string;
     authentication?: IDataAcquisitionAuthenticationConfigModel;
     eHRPatientLists: IEhrPatientListModel[];
 }
