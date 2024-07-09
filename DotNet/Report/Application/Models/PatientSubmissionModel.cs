@@ -1,11 +1,11 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Shared.Application.Converters;
-using LantanaGroup.Link.Shared.Domain.Entities;
+using Hl7.Fhir.Serialization;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Application.Converters;
 
 namespace LantanaGroup.Link.Report.Entities
 {
-    public class PatientSubmissionModel : BaseEntity
+    public class PatientSubmissionModel : ReportEntity
     {
         public string FacilityId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;

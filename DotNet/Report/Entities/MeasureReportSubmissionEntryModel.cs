@@ -4,7 +4,6 @@ using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
@@ -13,7 +12,7 @@ namespace LantanaGroup.Link.Report.Entities
 
     [BsonCollection("measureReportSubmissionEntry")]
     [BsonIgnoreExtraElements]
-    public class MeasureReportSubmissionEntryModel : BaseEntity
+    public class MeasureReportSubmissionEntryModel : ReportEntity
     {
         public string FacilityId { get; set; } = string.Empty;
         public string MeasureReportScheduleId { get; set; } = string.Empty;
