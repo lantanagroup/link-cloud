@@ -6,7 +6,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -14,7 +13,6 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>
 {
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
-    private readonly IMediator _mediator;
     private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
     private readonly IPatientDataService _patientDataService;
 

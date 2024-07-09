@@ -7,7 +7,7 @@ namespace DataAcquisition.Domain
 {
     public class DataEntityRepository<T> : EntityRepository<T> where T : BaseEntity
     {
-        //This is important so that the Data Acquisition entities have an instance of DataAcquisitionDbContext instead of the base DbContext
+        //This is important so that the Data Acquisition Entity Repos have an instance of DataAcquisitionDbContext instead of the base DbContext
         public DataEntityRepository(ILogger<EntityRepository<T>> logger, DataAcquisitionDbContext dbContext) : base(logger, dbContext)
         {
 

@@ -143,8 +143,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                 //TODO Find long term solution Daniel Vargas
                                 if (value.IsReportable)
                                 {
-                                    var entry = await _submissionEntryManager.GetPatientSubmissionEntry(schedule.Id,
-                                        value.PatientId, cancellationToken);
+                                    var entry = (await _submissionEntryManager.FindAsync(e => 
+                                        e.MeasureReportScheduleId == schedule.Id 
+                                        && e.PatientId ==  value.PatientId, cancellationToken))
+                                        .SingleOrDefault();
 
                                     if (entry == null)
                                     {

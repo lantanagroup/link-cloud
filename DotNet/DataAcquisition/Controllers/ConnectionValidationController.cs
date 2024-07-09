@@ -3,7 +3,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
