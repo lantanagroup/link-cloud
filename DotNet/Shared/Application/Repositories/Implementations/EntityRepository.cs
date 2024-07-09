@@ -75,7 +75,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task<List<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Set<T>().ToListAsync( cancellationToken);
+        return await _dbContext.Set<T>().ToListAsync(cancellationToken);
     }
 
     public virtual T Update(T entity)
@@ -98,7 +98,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         _dbContext.SaveChanges();
     }
 
-    public async Task Remove(T entity)
+    public async Task RemoveAsync(T entity)
     {
         _dbContext.Remove(entity);
 
@@ -115,6 +115,26 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         }
 
         return await query.ToListAsync(cancellationToken);
+    }
+
+    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().FirstOrDefaultAsync(predicate, cancellationToken);
+    }
+
+    public async Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().FirstAsync(predicate, cancellationToken);
+    }
+
+    public async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().SingleOrDefaultAsync(predicate, cancellationToken);
+    }
+
+    public async Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().SingleAsync(predicate, cancellationToken);
     }
 
     public async Task<bool> HealthCheck(int eventId)

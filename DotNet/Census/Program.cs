@@ -141,7 +141,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepositorySQLCensus>();
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();

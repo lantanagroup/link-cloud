@@ -1,19 +1,11 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Config;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryConfig;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Entities;
-using MediatR;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAcquisitionUnitTests.Controllers
 {
@@ -26,7 +18,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void GetFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetFhirQueryConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfiguration());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -39,7 +31,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void GetFhirConfigurationNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetFhirQueryConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync((FhirQueryConfiguration)null);
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -70,7 +62,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void CreateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveFhirQueryConfigCommand>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.AddAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfiguration());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -99,9 +91,10 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void UpdateFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetFhirQueryConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAsync(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfiguration());
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<SaveFhirQueryConfigCommand>(), CancellationToken.None))
+
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAsync(It.IsAny<FhirQueryConfiguration>(), CancellationToken.None))
                 .ReturnsAsync(new FhirQueryConfiguration());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
@@ -128,8 +121,8 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void DeleteFhirConfigurationTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteFhirQueryConfigurationCommand>(), CancellationToken.None))
-                .ReturnsAsync(Unit.Value);
+            _mocker.GetMock<IFhirQueryConfigurationManager>()
+                .Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None));
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
@@ -141,20 +134,16 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void DeleteFhirConfigurationNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteFhirQueryConfigurationCommand>(), CancellationToken.None))
-                .Throws(new Exception());
+            _mocker.GetMock<IFhirQueryConfigurationManager>()
+                .Setup(x => x.DeleteAsync(It.IsAny<string>(), CancellationToken.None))
+                .Throws(new NotFoundException());
 
             var _controller = _mocker.CreateInstance<QueryConfigController>();
 
-            try
-            {
-                var result = await _controller.DeleteFhirConfiguration(facilityId, CancellationToken.None);
-                Assert.True(false);
-            }
-            catch (Exception)
-            {
-                Assert.True(true);
-            }
+
+            var result = await _controller.DeleteFhirConfiguration("NOT VALID", CancellationToken.None);
+            var x = (ObjectResult)result;
+            Assert.True(x.StatusCode == (int)HttpStatusCode.NotFound);
         }
 
         [Fact]

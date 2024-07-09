@@ -1,51 +1,52 @@
 using Azure.Identity;
+using DataAcquisition.Domain;
 using DataAcquisition.Domain.Extensions;
 using HealthChecks.UI.Client;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
+using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Quartz.Impl;
+using Microsoft.OpenApi.Models;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
+using Serilog.Settings.Configuration;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using System.Diagnostics;
-using Serilog.Settings.Configuration;
-using LantanaGroup.Link.Shared.Application.Services;
-using Quartz.Spi;
-using LantanaGroup.Link.DataAcquisition.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Jobs;
-using LantanaGroup.Link.Shared.Application.Middleware;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using LantanaGroup.Link.DataAcquisition.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -133,14 +134,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
     });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
-    {
-        //TODO: figure out how to handle service url. Need some sort of service discovery.
-        o.Address = new Uri("TBD on what to do here.");
-    });
 
     //Fhir Authentication Handlers
     builder.Services.AddSingleton<EpicAuth>();
@@ -156,16 +149,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
 
     //Repositories
-    builder.Services.AddScoped<IFhirQueryConfigurationRepository, FhirQueryConfigurationRepository>();
-    builder.Services.AddScoped<IFhirQueryListConfigurationRepository, FhirQueryListConfigurationRepository>();
-    builder.Services.AddScoped<IEntityRepository<QueryPlan>, QueryPlanRepository>();
-    builder.Services.AddScoped<IReferenceResourcesRepository,ReferenceResourcesRepository>();
-    builder.Services.AddScoped<IFhirApiRepository,FhirApiRepository>();
-    builder.Services.AddScoped<IQueriedFhirResourceRepository,QueriedFhirResourceRepository>();
-    builder.Services.AddScoped<IRetryRepository, RetryRepository_SQL_DataAcq>();
+    builder.Services.AddTransient<IEntityRepository<FhirListConfiguration>, DataEntityRepository<FhirListConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<FhirQueryConfiguration>, DataEntityRepository<FhirQueryConfiguration>>();
+    builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
+    builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
+    builder.Services.AddTransient<IEntityRepository<QueriedFhirResourceRecord>, DataEntityRepository<QueriedFhirResourceRecord>>();
+
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
+
+    builder.Services.AddTransient<IDatabase, Database>();
+
+    //Managers
+    builder.Services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+    builder.Services.AddTransient<IFhirQueryListConfigurationManager, FhirQueryListConfigurationManager>();
+    builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
+    builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
+    builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
+    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
+    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
+    builder.Services.AddTransient<IFhirApiService, FhirApiService>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
@@ -346,10 +352,6 @@ static void SetupMiddleware(WebApplication app)
 
     app.MapControllers();
 
-    // Configure the HTTP request pipeline.
-    app.MapGrpcService<DataAcquisitionService>();
-    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
-    
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
     {

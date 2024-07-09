@@ -5,7 +5,6 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -23,7 +22,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ILogger<RetryListener> _logger;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IRetryRepository _retryRepository;
+        private readonly IEntityRepository<RetryEntity> _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string,string> _deadLetterExceptionHandler;
@@ -31,7 +30,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            IRetryRepository retryRepository,
+            IEntityRepository<RetryEntity> retryRepository,
             IOptions<ConsumerSettings> consumerSettings, 
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)

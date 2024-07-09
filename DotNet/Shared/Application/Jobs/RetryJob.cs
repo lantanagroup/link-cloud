@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Shared.Jobs
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+                var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
                 var triggerMap = context.Trigger.JobDataMap;
                 var retryEntity = (RetryEntity)triggerMap["RetryEntity"];
