@@ -1,9 +1,8 @@
-﻿using LantanaGroup.Link.Shared.Domain.Entities;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Census.Domain.Entities;
 
-public class BaseEntity : BaseEntityExtended
+public class BaseEntity : Shared.Domain.Entities.BaseEntity
 {
     [Key]
     public new Guid Id { get; set; }
