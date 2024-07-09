@@ -1,7 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.TenantCheck;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -9,13 +6,8 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using Task = System.Threading.Tasks.Task;
 
 namespace DataAcquisitionUnitTests.Controllers
@@ -29,7 +21,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void GetAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
@@ -57,7 +49,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async Task GetAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync((AuthenticationConfiguration)null);
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
@@ -74,7 +66,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async Task CreateAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<CreateAuthConfigCommand>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAuthenticationConfiguration(It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
@@ -119,8 +111,8 @@ namespace DataAcquisitionUnitTests.Controllers
         public async Task CreateAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
-                .Throws(new MissingFacilityConfigurationException());
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.CreateAuthenticationConfiguration(It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
+                .Throws(new NotFoundException());
 
             var controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
@@ -129,16 +121,17 @@ namespace DataAcquisitionUnitTests.Controllers
             Assert.True(result.Value == null);
             Assert.IsType<ObjectResult>(result.Result);
             var objectResult = (ObjectResult)result.Result;
-            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.InternalServerError);
+            Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.NotFound);
         }
 
         [Fact]
         public async Task UpdateAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
+
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAuthenticationConfiguration(It.IsAny<string>(),It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
@@ -182,21 +175,13 @@ namespace DataAcquisitionUnitTests.Controllers
         public async Task UpdateAuthenticationSettingsNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<GetAuthConfigQuery>(), CancellationToken.None))
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.GetAuthenticationConfigurationByFacilityId(It.IsAny<string>(), CancellationToken.None))
                 .ReturnsAsync(new AuthenticationConfiguration());
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<UpdateAuthConfigCommand>(), CancellationToken.None))
+
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x => x.UpdateAuthenticationConfiguration(It.IsAny<string>(), It.IsAny<AuthenticationConfiguration>(), CancellationToken.None))
                 .Throws(new Exception());
 
-            _mocker.GetMock<IMediator>()
-                .Setup(r => r.Send(It.IsAny<TriggerAuditEventCommand>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Unit.Value);
-
-            _mocker.GetMock<IMediator>()
-                .Setup(m => m.Send(It.IsAny<CheckIfTenantExistsQuery>(), It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(true));
-
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
-
 
             try
             {
@@ -213,8 +198,11 @@ namespace DataAcquisitionUnitTests.Controllers
         public async Task DeleteAuthenticationSettingsTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IMediator>().Setup(x => x.Send(It.IsAny<DeleteAuthConfigCommand>(), CancellationToken.None))
-                .ReturnsAsync(new Unit());
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x =>
+                x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
+
+            _mocker.GetMock<IFhirQueryListConfigurationManager>().Setup(x =>
+                x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 

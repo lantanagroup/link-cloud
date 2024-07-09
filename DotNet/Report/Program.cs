@@ -142,7 +142,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<PatientsToQueryModel>, MongoDbRepository<PatientsToQueryModel>>();
     builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoDbRepository<SharedResourceModel>>();
     builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoDbRepository<PatientResourceModel>>();
-    builder.Services.AddSingleton<IRetryRepository, RetryRepositoryMongo>();
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoDbRepository<RetryEntity>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
 
