@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
 [Table("fhirListConfiguration")]
-public class FhirListConfiguration : BaseEntity
+public class FhirListConfiguration : BaseEntityExtended
 {
     public string FacilityId { get; set; }
     public string FhirBaseServerUrl { get; set; }
