@@ -66,9 +66,6 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
     {
         if (cancellationToken.IsCancellationRequested) return null;
 
-        if (!string.IsNullOrWhiteSpace(entity.Id))
-            throw new EntityPotentiallyExistsException("Entity ID already has a value. This indicates that a record already exists.");
-
         entity.Id = Guid.NewGuid().ToString();
 
         try
