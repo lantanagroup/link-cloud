@@ -138,7 +138,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var ent = new MeasureReportScheduleModel
                                 {
-                                    Id = Guid.NewGuid().ToString(),
                                     FacilityId = key.FacilityId,
                                     ReportStartDate = startDate,
                                     ReportEndDate = endDate,
