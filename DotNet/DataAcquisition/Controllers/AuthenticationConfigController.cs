@@ -1,15 +1,11 @@
-﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
