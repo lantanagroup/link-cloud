@@ -4,9 +4,11 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.github.loki4j.logback.Loki4jAppender;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
+import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+@Component
 public class DelayedHttpAppender extends Loki4jAppender implements ApplicationListener<ApplicationReadyEvent> {
 
   private static boolean applicationReady = false;
