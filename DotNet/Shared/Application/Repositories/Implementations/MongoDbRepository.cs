@@ -45,9 +45,6 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual T Add(T entity)
     {
-        if (!string.IsNullOrWhiteSpace(entity.Id))
-            throw new EntityPotentiallyExistsException("Entity ID already has a value. This indicates that a record already exists.");
-
         entity.Id = Guid.NewGuid().ToString();
 
         try
