@@ -85,6 +85,22 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
         );
 
+        //-------------------ReferenceResources-------------------
+        modelBuilder.Entity<ReferenceResources>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
+        //-------------------QueriedFhirResourceRecord-------------------
+        modelBuilder.Entity<QueriedFhirResourceRecord>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
         //Retry Repository
         modelBuilder.Entity<RetryEntity>()
             .Property(x => x.Headers)
