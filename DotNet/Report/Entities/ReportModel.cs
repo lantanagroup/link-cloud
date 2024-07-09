@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Domain.Attributes;
-using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace LantanaGroup.Link.Report.Entities
@@ -7,7 +6,7 @@ namespace LantanaGroup.Link.Report.Entities
 
     [BsonCollection("report")]
     [BsonIgnoreExtraElements]
-    public class ReportModel : BaseEntity
+    public class ReportModel : ReportEntity
     {
         public string? FacilityId { get; set; }
 
