@@ -11,7 +11,7 @@
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
-            <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <appender name="LOKI"  class="com.lantanagroup.link.shared.logging.DelayedHttpAppender">
                 <http>
                     <url>${loki_url}/loki/api/v1/push</url>
                 </http>
