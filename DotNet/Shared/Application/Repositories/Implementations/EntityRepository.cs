@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
@@ -137,8 +138,25 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return await _dbContext.Set<T>().SingleAsync(predicate, cancellationToken);
     }
 
-    public async Task<bool> HealthCheck(int eventId)
+    public async Task<HealthCheckResult> HealthCheck(int eventId)
     {
-        return _dbContext != null;
+        try
+        {
+            bool outcome = await _dbContext.Database.CanConnectAsync();
+
+            if (outcome)
+            {
+                return HealthCheckResult.Healthy();
+            }
+            else
+            {
+                return HealthCheckResult.Unhealthy();
+            }
+
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy(exception: ex);
+        }
     }
 }
