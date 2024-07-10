@@ -16,12 +16,16 @@
 	<ItemGroup>
 		<Compile Remove="Application\Enums\**" />
 		<Compile Remove="Application\Submission\**" />
+		<Compile Remove="Domain\Interfaces\**" />
 		<Content Remove="Application\Enums\**" />
 		<Content Remove="Application\Submission\**" />
+		<Content Remove="Domain\Interfaces\**" />
 		<EmbeddedResource Remove="Application\Enums\**" />
 		<EmbeddedResource Remove="Application\Submission\**" />
+		<EmbeddedResource Remove="Domain\Interfaces\**" />
 		<None Remove="Application\Enums\**" />
 		<None Remove="Application\Submission\**" />
+		<None Remove="Domain\Interfaces\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -47,10 +51,6 @@
 		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
 		<PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Folder Include="Domain\Interfaces\" />
 	</ItemGroup>
 
 	<ItemGroup>

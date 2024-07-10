@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Jobs;
@@ -20,15 +21,15 @@ using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Models;
-using LantanaGroup.Link.Submission.Application.Queries;
-using LantanaGroup.Link.Submission.Application.Repositories;
 using LantanaGroup.Link.Submission.Application.Services;
+using LantanaGroup.Link.Submission.Domain;
+using LantanaGroup.Link.Submission.Domain.Entities;
+using LantanaGroup.Link.Submission.Infrastructure;
 using LantanaGroup.Link.Submission.Listeners;
-using LantanaGroup.Link.Submission.Persistence.Interceptors;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
 using Quartz;
@@ -39,8 +40,6 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
-using LantanaGroup.Link.Submission.Persistence;
-using LantanaGroup.Link.Submission.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,11 +106,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container.
     builder.Services.AddHttpClient();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoDbRepository<RetryEntity>>();
+    builder.Services.AddScoped<IEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IEntityRepository<TenantSubmissionConfigEntity>, SubmissionEntityRepository<TenantSubmissionConfigEntity>>();
     builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
-    builder.Services.AddTransient<ITenantSubmissionQueries, TenantSubmissionQueries>();
-    builder.Services.AddTransient<ITenantSubmissionRepository, TenantSubmissionRepository>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -143,11 +140,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<SubmissionHealthCheck>("Submission");
 
     //Add persistence interceptors
-    builder.Services.AddSingleton<UpdateTenantSubmissionConfigEntityInterceptor>();
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
     //Add database context
     builder.Services.AddDbContext<TenantSubmissionDbContext>((sp, options) => {
-        var updateTenantSubmissionConfigEntityInterceptor = sp.GetRequiredService<UpdateTenantSubmissionConfigEntityInterceptor>();
+        var updateTenantSubmissionConfigEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
         switch (builder.Configuration.GetValue<string>(SubmissionConstants.AppSettingsSectionNames.DatabaseProvider))
         {
             case "SqlServer":

@@ -16,24 +16,7 @@ namespace LantanaGroup.Link.Report.Services
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                bool outcome = await _datastore.HealthCheck(ReportConstants.MeasureReportLoggingIds.HealthCheck);
-
-                if (outcome)
-                {
-                    return HealthCheckResult.Healthy();
-                }
-                else
-                {
-                    return HealthCheckResult.Unhealthy();
-                }
-
-            }
-            catch (Exception ex)
-            {
-                return HealthCheckResult.Unhealthy(exception: ex);
-            }
+            return await _datastore.HealthCheck(ReportConstants.MeasureReportLoggingIds.HealthCheck);
         }
     }
 

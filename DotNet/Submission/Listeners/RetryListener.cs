@@ -22,15 +22,17 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ILogger<RetryListener> _logger;
         private readonly IKafkaConsumerFactory<string, string> _kafkaConsumerFactory;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IEntityRepository<RetryEntity> _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string,string> _deadLetterExceptionHandler;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private IEntityRepository<RetryEntity> _retryRepository;
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            IEntityRepository<RetryEntity> retryRepository,
+            IServiceScopeFactory serviceScopeFactory,
             IOptions<ConsumerSettings> consumerSettings, 
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
@@ -38,7 +40,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
             _consumerSettings = consumerSettings ?? throw new ArgumentException(nameof(consumerSettings));
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -66,6 +68,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Subscribe(KafkaTopic.SubmitReportRetry.GetStringValue());
 
                 _logger.LogInformation($"Started Submission Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+
+                using var scope = _serviceScopeFactory.CreateScope();
+                _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
