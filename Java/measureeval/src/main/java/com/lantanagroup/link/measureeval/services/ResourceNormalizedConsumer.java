@@ -49,7 +49,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
     return NormalizationStatus.NORMALIZED;
   }
 
-  @KafkaListener(topics = Topics.RESOURCE_NORMALIZED)
+  //@KafkaListener(topics = Topics.RESOURCE_NORMALIZED)
   public void consume (
           @Header(Headers.CORRELATION_ID) String correlationId,
           ConsumerRecord<String, ResourceNormalized> record) {
