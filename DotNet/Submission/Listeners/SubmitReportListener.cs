@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -13,13 +11,13 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
-using MediatR;
 using Microsoft.Extensions.Options;
-using StackExchange.Redis;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -27,9 +25,7 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private readonly ILogger<SubmitReportListener> _logger;
         private readonly IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> _kafkaConsumerFactory;
-        private readonly IMediator _mediator;
         private readonly SubmissionServiceConfig _submissionConfig;
-        private readonly FileSystemConfig _fileSystemConfig;
         private readonly IHttpClientFactory _httpClient;
 
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
@@ -42,16 +38,15 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
             IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
-            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig,
-            IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
+            IOptions<SubmissionServiceConfig> submissionConfig,
+            IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
             _submissionConfig = submissionConfig.Value;
-            _fileSystemConfig = fileSystemConfig.Value;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
 
             _transientExceptionHandler = transientExceptionHandler ??

@@ -1,8 +1,8 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
@@ -12,14 +12,14 @@ using System.Reflection;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
-public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
+public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 {
-    private readonly ILogger<MongoDbRepository<T>> _logger;
+    private readonly ILogger<MongoEntityRepository<T>> _logger;
     protected readonly IMongoCollection<T> _collection;
     protected readonly IMongoDatabase _database;
     protected readonly MongoClient _client;
 
-    public MongoDbRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoDbRepository<T>> logger)
+    public MongoEntityRepository(IOptions<MongoConnection> mongoSettings, ILogger<MongoEntityRepository<T>> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -172,18 +172,18 @@ public class MongoDbRepository<T> : IEntityRepository<T> where T : BaseEntity
         return await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<bool> HealthCheck(int eventId)
+    public async Task<HealthCheckResult> HealthCheck(int eventId)
     {
         try
         {
             await _database.RunCommandAsync((Command<BsonDocument>)"{ping:1}");
+            return HealthCheckResult.Healthy();
         }
         catch (Exception ex)
         {
             _logger.LogError(new EventId(eventId, "Database Health Check"), ex, "Health check failed for database connection.");
-            return false;
         }
 
-        return true;
+        return HealthCheckResult.Unhealthy();
     }
 }
