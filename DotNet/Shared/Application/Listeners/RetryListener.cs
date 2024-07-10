@@ -2,10 +2,9 @@
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Application.Utilities;
+
 using Quartz;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
@@ -13,9 +12,12 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Settings;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
-using LantanaGroup.Link.Report.Settings;
 
-namespace LantanaGroup.Link.Report.Listeners
+using LantanaGroup.Link.Report.Application.Models;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace LantanaGroup.Link.Shared.Application.Listeners
 {
     public class RetryListener : BackgroundService
     {
@@ -29,6 +31,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
+     //   private readonly string _serviceName;
+      //  private readonly string[] _topics;
+        private readonly RetryListenerSettings _retryListenerSettings;
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
@@ -36,7 +41,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IEntityRepository<RetryEntity> retryRepository,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
-            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
+            RetryListenerSettings retryListenerSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -46,7 +52,10 @@ namespace LantanaGroup.Link.Report.Listeners
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
-            _deadLetterExceptionHandler.ServiceName = "Report";
+            _deadLetterExceptionHandler.ServiceName = retryListenerSettings._serviceName;
+            //_serviceName = serviceName;
+            //_topics = topics;
+            _retryListenerSettings = retryListenerSettings;
             //_deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
         }
 
@@ -59,7 +68,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _retryListenerSettings._serviceName,
                 EnableAutoCommit = false
             };
 
@@ -67,14 +76,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             try
             {
-                consumer.Subscribe(new List<string>() 
-                { 
-                    KafkaTopic.ReportScheduledRetry.GetStringValue(), 
-                    KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), 
-                    KafkaTopic.ReportSubmittedRetry.GetStringValue(), 
-                    KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(),
-                    KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()
-                });
+                consumer.Subscribe(_retryListenerSettings._topics);
 
                 _logger.LogInformation($"Started Report Service Retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 
@@ -93,7 +95,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                                 {
                                     //If retry event is not from the Report service, disregard the retry event
-                                    if (Encoding.UTF8.GetString(exceptionService) != "Report Service")
+                                    if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings._serviceName)
                                     {
                                         consumer.Commit(consumeResult);
                                         //continue;
