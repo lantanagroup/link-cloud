@@ -48,7 +48,7 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
         return NormalizationStatus.ERROR;
     }
 
-    //@KafkaListener(topics = Topics.RESOURCE_ACQUIRED_ERROR)
+    @KafkaListener(topics = Topics.RESOURCE_ACQUIRED_ERROR)
     public void consume(
             @Header(Headers.CORRELATION_ID) String correlationId,
             ConsumerRecord<String, ResourceAcquired> record) {
