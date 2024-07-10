@@ -138,15 +138,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
 
     // Add repositories
-    builder.Services.AddTransient<IEntityRepository<MeasureReportScheduleModel>, MongoDbRepository<MeasureReportScheduleModel>>();
-    builder.Services.AddTransient<IEntityRepository<MeasureReportConfigModel>, MongoDbRepository<MeasureReportConfigModel>>();
-    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionModel>, MongoDbRepository<MeasureReportSubmissionModel>>();
-    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionEntryModel>, MongoDbRepository<MeasureReportSubmissionEntryModel>>();
-    builder.Services.AddTransient<IEntityRepository<ReportModel>, MongoDbRepository<ReportModel>>();
-    builder.Services.AddTransient<IEntityRepository<PatientsToQueryModel>, MongoDbRepository<PatientsToQueryModel>>();
-    builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoDbRepository<SharedResourceModel>>();
-    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoDbRepository<PatientResourceModel>>();
-    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoDbRepository<RetryEntity>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportScheduleModel>, MongoEntityRepository<MeasureReportScheduleModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportConfigModel>, MongoEntityRepository<MeasureReportConfigModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionModel>, MongoEntityRepository<MeasureReportSubmissionModel>>();
+    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionEntryModel>, MongoEntityRepository<MeasureReportSubmissionEntryModel>>();
+    builder.Services.AddTransient<IEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
+    builder.Services.AddTransient<IEntityRepository<PatientsToQueryModel>, MongoEntityRepository<PatientsToQueryModel>>();
+    builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
+    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
+    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
     builder.Services.AddTransient<IDatabase, Database>();
 
 

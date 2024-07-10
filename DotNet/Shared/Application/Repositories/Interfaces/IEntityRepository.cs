@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
@@ -21,6 +22,6 @@ public interface IEntityRepository<T>
     Task<T> UpdateAsync(T entity, CancellationToken cancellationToken = default);
     void Delete(string id);
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
-    Task<bool> HealthCheck(int eventId);
+    Task<HealthCheckResult> HealthCheck(int eventId);
 
 }
