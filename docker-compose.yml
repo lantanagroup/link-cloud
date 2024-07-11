@@ -586,6 +586,8 @@ services:
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
+      spring_profiles_active: dev
+      loki.enabled: false
     ports:
       - "8067:8067"
     build:
