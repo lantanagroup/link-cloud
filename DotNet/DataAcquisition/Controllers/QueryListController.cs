@@ -4,7 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 

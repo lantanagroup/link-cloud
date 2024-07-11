@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.ElementModel;
+﻿using Confluent.Kafka;
+using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
@@ -68,8 +69,6 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             if (!string.IsNullOrWhiteSpace(request.PatientId) && !request.PatientId.StartsWith("Patient/"))
                 request.PatientId = $"Patient/{request.PatientId}";
 
-            List<IBaseMessage> intialResults = null;
-            List<IBaseMessage> supplementalResults = null;
             try
             {
                 var patientDataRequest = new GetPatientDataRequest
@@ -77,30 +76,30 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                     FacilityId = request.FacilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
                     QueryPlanType = QueryPlanType.InitialQueries,
-                    Message = new DataAcquisitionRequested
+                    ConsumeResult = new ConsumeResult<string, DataAcquisitionRequested>
                     {
-                        PatientId = request.PatientId,
-                        QueryType = "Initial",
-                        Topic = "ConnectionValidation",
-                        ScheduledReports = new List<ScheduledReport>
-                    {
-                        new ScheduledReport
+                        Message = new Message<string, DataAcquisitionRequested>
                         {
-                            ReportType = request.MeasureId,
-                            StartDate = request.Start.ToString(),
-                            EndDate = request.End.ToString()
+                            Value = new DataAcquisitionRequested
+                            {
+                                PatientId = request.PatientId,
+                                QueryType = "Initial",
+                                Topic = "ConnectionValidation",
+                                ScheduledReports = new List<ScheduledReport>
+                                {
+                                    new ScheduledReport
+                                    {
+                                        ReportType = request.MeasureId,
+                                        StartDate = request.Start.ToString(),
+                                        EndDate = request.End.ToString()
+                                    }
+                                }
+                            }
                         }
-                    }
                     }
                 };
 
-                intialResults =
-                    await _patientDataService.Get(patientDataRequest,
-                        cancellationToken);
-
-                patientDataRequest.QueryPlanType = QueryPlanType.SupplementalQueries;
-                patientDataRequest.Message.QueryType = "Supplemental";
-                supplementalResults = await _patientDataService.Get(patientDataRequest, cancellationToken);
+                await _patientDataService.Get(patientDataRequest, cancellationToken);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||
@@ -119,18 +118,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
 
             FacilityConnectionResult? result;
 
-            //create bundle
-            var bundle = new Bundle();
-
-            //add initial results
-            var entries = intialResults.Select(r => new Bundle.EntryComponent { Resource = ((ResourceAcquired)r).Resource });
-            bundle.Entry.AddRange(entries);
-
-            //add supplemental results
-            entries = supplementalResults.Select(r => new Bundle.EntryComponent { Resource = ((ResourceAcquired)r).Resource });
-            bundle.Entry.AddRange(entries);
-
-            return new FacilityConnectionResult(true, true, bundle: bundle);
+            return new FacilityConnectionResult(true, true);
         }
     }
 
