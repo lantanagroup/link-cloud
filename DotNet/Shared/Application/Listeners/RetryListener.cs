@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LantanaGroup.Link.Shared.Application.Listeners
 {
@@ -31,30 +32,26 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
-     //   private readonly string _serviceName;
-      //  private readonly string[] _topics;
         private readonly RetryListenerSettings _retryListenerSettings;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public RetryListener(ILogger<RetryListener> logger,
             IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            IEntityRepository<RetryEntity> retryRepository,
             IOptions<ConsumerSettings> consumerSettings,
             IRetryEntityFactory retryEntityFactory,
             IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
-            RetryListenerSettings retryListenerSettings)
+            RetryListenerSettings retryListenerSettings,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _retryRepository = retryRepository ?? throw new ArgumentException(nameof(retryRepository));
             _consumerSettings = consumerSettings ?? throw new ArgumentException(nameof(consumerSettings));
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
-
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
             _deadLetterExceptionHandler.ServiceName = retryListenerSettings._serviceName;
-            //_serviceName = serviceName;
-            //_topics = topics;
             _retryListenerSettings = retryListenerSettings;
             //_deadLetterExceptionHandler.Topic = nameof(KafkaTopic.SubmitReport) + "-Error";
         }
@@ -112,6 +109,10 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                         throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
                                     }
                                 }
+
+                                using var scope = _serviceScopeFactory.CreateScope();
+
+                                var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
                                 var retryEntity = _retryEntityFactory.CreateRetryEntity(consumeResult, _consumerSettings.Value);
 
