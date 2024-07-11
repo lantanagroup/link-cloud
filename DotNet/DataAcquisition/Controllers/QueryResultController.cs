@@ -1,6 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

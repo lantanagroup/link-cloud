@@ -10,7 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Listeners;
@@ -167,6 +167,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
     builder.Services.AddTransient<IPatientDataService, PatientDataService>();
     builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
+    builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();

@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Validators;

@@ -23,7 +23,6 @@ public interface IFhirApiService
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle,
         PagedParameterQueryFactoryResult pagedQuery,
         ParameterQueryConfig config,
         ScheduledReport report,
@@ -35,7 +34,6 @@ public interface IFhirApiService
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle,
         SingularParameterQueryFactoryResult query,
         ParameterQueryConfig config,
         ScheduledReport report,
@@ -90,12 +88,12 @@ public class FhirApiService : IFhirApiService
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle,
         PagedParameterQueryFactoryResult pagedQuery,
         ParameterQueryConfig config,
         ScheduledReport report,
         AuthenticationConfiguration authConfig)
     {
+        var bundle = new Bundle();
         var fhirClient = GenerateFhirClient(baseUrl);
 
         var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
@@ -132,12 +130,13 @@ public class FhirApiService : IFhirApiService
         string correlationId,
         string facilityId,
         string queryType,
-        Bundle bundle,
         SingularParameterQueryFactoryResult query,
         ParameterQueryConfig config,
         ScheduledReport report,
         AuthenticationConfiguration authConfig)
     {
+        var bundle = new Bundle();
+
         var fhirClient = GenerateFhirClient(baseUrl);
 
         var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
