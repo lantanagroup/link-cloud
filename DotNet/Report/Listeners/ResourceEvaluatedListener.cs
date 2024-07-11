@@ -143,10 +143,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 //TODO Find long term solution Daniel Vargas
                                 if (value.IsReportable)
                                 {
-                                    var entry = (await _submissionEntryManager.FindAsync(e => 
-                                        e.MeasureReportScheduleId == schedule.Id 
-                                        && e.PatientId ==  value.PatientId, cancellationToken))
-                                        .SingleOrDefault();
+                                    var entry = (await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                        e.MeasureReportScheduleId == schedule.Id
+                                        && e.PatientId == value.PatientId, cancellationToken));
 
                                     if (entry == null)
                                     {
@@ -225,7 +224,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         var patientIds = submissionEntries.Select(s => s.PatientId).ToList();
 
-                                        var parser = new FhirJsonParser();
                                         List<MeasureReport?> measureReports = submissionEntries
                                             .Select(e => e.MeasureReport)
                                             .ToList();
@@ -259,6 +257,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                             });
 
                                         prod.Flush(cancellationToken);
+
+                                        
+                                        schedule.SubmitReportDateTime = DateTime.UtcNow;
+                                        await _measureReportScheduledManager.UpdateAsync(schedule, cancellationToken);
                                     }
                                 }
 
