@@ -40,6 +40,8 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.Census.Application.Models.Messages;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -141,7 +143,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
     builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
     builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
-    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+    builder.Services.AddScoped<IEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
@@ -264,7 +266,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
-        builder.Services.AddHostedService<RetryListener>(); 
+        builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
+        builder.Services.AddHostedService<LantanaGroup.Link.Shared.Application.Listeners.RetryListener>();
     }
 
     //Add CORS

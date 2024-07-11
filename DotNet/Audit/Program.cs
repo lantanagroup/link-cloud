@@ -1,6 +1,6 @@
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Audit.Application.Interfaces;
-using LantanaGroup.Link.Audit.Listeners;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
 using LantanaGroup.Link.Audit.Application.Audit.Queries;
@@ -44,6 +44,9 @@ using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Audit.Listeners;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -192,7 +195,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<IJobFactory, JobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
-        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
+        builder.Services.AddHostedService<LantanaGroup.Link.Shared.Application.Listeners.RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
