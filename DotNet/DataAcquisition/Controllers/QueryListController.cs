@@ -77,6 +77,10 @@ public class QueryListController : Controller
 
             return Ok(entity);
         }
+        catch (EntityAlreadyExistsException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (MissingFacilityConfigurationException ex)
         {
             return BadRequest(ex.Message);
