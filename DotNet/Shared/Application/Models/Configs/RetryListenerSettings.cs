@@ -1,6 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
-
-namespace LantanaGroup.Link.Report.Application.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
     public class RetryListenerSettings
     {
