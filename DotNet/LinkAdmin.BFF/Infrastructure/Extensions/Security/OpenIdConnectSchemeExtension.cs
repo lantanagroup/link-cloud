@@ -32,25 +32,25 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 options.Events.OnTokenValidated = context => {                    
 
-                    //get claims principal
-                    if (context.Principal?.Identity is not ClaimsIdentity claimsIdentity)
-                    {
-                        return Task.CompletedTask;
-                    }
+                    ////get claims principal
+                    //if (context.Principal?.Identity is not ClaimsIdentity claimsIdentity)
+                    //{
+                    //    return Task.CompletedTask;
+                    //}
 
-                    // Define the claim types to keep
-                    var allowedClaims = new HashSet<string> { "email", "family_name", "given_name", "sub" };
+                    //// Define the claim types to keep
+                    //var allowedClaims = new HashSet<string> { "email", "family_name", "given_name", "sub" };
 
-                    //Define all claims that should be removed
-                    var claimsToRemove = claimsIdentity.Claims
-                        .Where(claim => !allowedClaims.Contains(claim.Type))
-                        .ToList();
+                    ////Define all claims that should be removed
+                    //var claimsToRemove = claimsIdentity.Claims
+                    //    .Where(claim => !allowedClaims.Contains(claim.Type))
+                    //    .ToList();
 
-                    //remove uneeeded claims
-                    foreach (var claim in claimsToRemove)
-                    {
-                        claimsIdentity.RemoveClaim(claim);
-                    }
+                    ////remove uneeeded claims
+                    //foreach (var claim in claimsToRemove)
+                    //{
+                    //    claimsIdentity.RemoveClaim(claim);
+                    //}
 
                     //increment login counter
                     var metrics = context.HttpContext.RequestServices.GetRequiredService<ILinkAdminMetrics>();

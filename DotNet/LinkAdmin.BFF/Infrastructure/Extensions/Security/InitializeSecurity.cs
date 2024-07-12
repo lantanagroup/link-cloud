@@ -92,7 +92,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     var allowedClaims = new HashSet<string> {                          
                         "family_name", 
                         "given_name", 
-                        "name",
                         LinkAuthorizationConstants.LinkSystemClaims.Email,
                         LinkAuthorizationConstants.LinkSystemClaims.Subject,
                         LinkAuthorizationConstants.LinkSystemClaims.Role,
