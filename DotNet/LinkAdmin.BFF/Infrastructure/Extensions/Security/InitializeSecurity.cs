@@ -5,6 +5,7 @@ using Link.Authorization.Infrastructure;
 using Link.Authorization.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Identity.Web;
+using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 {
@@ -78,6 +79,40 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 {
                     options.Cookie.Domain = configuration.GetValue<string>("Authentication:Schemas:Cookie:Domain");
                 }
+
+                options.Events.OnSigningIn = context =>
+                {
+                    //get claims principal
+                    if (context.Principal?.Identity is not ClaimsIdentity claimsIdentity)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    // Define the claim types to keep
+                    var allowedClaims = new HashSet<string> {                          
+                        "family_name", 
+                        "given_name", 
+                        "name",
+                        LinkAuthorizationConstants.LinkSystemClaims.Email,
+                        LinkAuthorizationConstants.LinkSystemClaims.Subject,
+                        LinkAuthorizationConstants.LinkSystemClaims.Role,
+                        LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions
+                    };
+
+                    //Define all claims that should be removed
+                    var claimsToRemove = claimsIdentity.Claims
+                        .Where(claim => !allowedClaims.Contains(claim.Type))
+                        .ToList();
+
+                    //remove uneeeded claims
+                    foreach (var claim in claimsToRemove)
+                    {
+                        claimsIdentity.RemoveClaim(claim);
+                    }
+
+                    logger.Debug("User {User} is signing in.", claimsIdentity.Name);
+                    return Task.CompletedTask;
+                };
                     
             });
 
@@ -129,7 +164,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     options.Environment = securityServiceOptions.Environment;
                     options.Authority = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority")!;
                     options.ClientId = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId")!;
-                    options.ClientSecret = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret")!;
+                    options.ClientSecret = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret")!;  
+                    options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:CallbackPath")!;
                     options.NameClaimType = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:NameClaimType");
                     options.RoleClaimType = configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:RoleClaimType");
                 });
@@ -159,26 +195,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 logger.Debug("Set JWT Authentication Scheme: {Scheme} with the following settings: ", LinkAdminConstants.AuthenticationSchemes.JwtBearerToken);
                 logger.Debug("Authority: {Authority}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Authority"));
                 logger.Debug("Audience: {Audience}", configuration.GetValue<string>("Authentication:Schemas:Jwt:Audience"));
-            }
-
-            //Add AzureAD authorization scheme if enabled
-            if (configuration.GetValue<bool>("Authentication:Schemas:AzureAd:Enabled"))
-            { 
-                logger.Debug("Registering AzureAD authentication scheme: {scheme}", LinkAdminConstants.AuthenticationSchemes.AzureAD);
-                if (!LinkAdminConstants.AuthenticationSchemes.AzureAD.Equals(defaultChallengeScheme))
-                    authSchemas.Add(LinkAdminConstants.AuthenticationSchemes.AzureAD);
-
-                authBuilder.AddMicrosoftIdentityWebApp(options =>
-                {
-                    options.Domain = configuration.GetValue<string>("Authentication:Schemas:AzureAd:Authority");
-                    options.ClientId = configuration.GetValue<string>("Authentication:Schemas:AzureAd:ClientId");
-                    options.ClientSecret = configuration.GetValue<string>("Authentication:Schemas:AzureAd:ClientSecret");
-                    options.Instance = configuration.GetValue<string>("Authentication:Schemas:AzureAd:Instance");
-                    options.TenantId = configuration.GetValue<string>("Authentication:Schemas:AzureAd:TenantId");
-                    options.CallbackPath = configuration.GetValue<string>("Authentication:Schemas:AzureAd:CallbackPath");                    
-                }, 
-                openIdConnectScheme: LinkAdminConstants.AuthenticationSchemes.AzureAD);
-
             }
 
             // Add Link Bearer Token authorization schema
