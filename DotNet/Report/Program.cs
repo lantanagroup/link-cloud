@@ -37,6 +37,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -237,6 +238,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+
+    //Add persistence interceptors
+    builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
     #region Exception Handling
     //Report Scheduled Listener
