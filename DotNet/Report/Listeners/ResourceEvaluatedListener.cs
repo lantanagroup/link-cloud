@@ -205,7 +205,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 #region Patients To Query & Submision Report Handling
 
-                                if (schedule.PatientsToQueryDataRequested.GetValueOrDefault())
+                                if (schedule.PatientsToQueryDataRequested)
                                 {
                                     if (schedule.PatientsToQuery?.Contains(value.PatientId) ?? false)
                                     {
