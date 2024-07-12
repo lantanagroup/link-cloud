@@ -36,7 +36,7 @@ public class QueryListController : Controller
 
         try
         {
-            var result = await _fhirQueryListConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var result = await _fhirQueryListConfigurationManager.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -73,7 +73,7 @@ public class QueryListController : Controller
 
         try
         {
-            var entity = _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
+            var entity = await _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
 
             return Ok(entity);
         }
