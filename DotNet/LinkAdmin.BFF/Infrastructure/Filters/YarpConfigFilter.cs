@@ -29,6 +29,7 @@ public class YarpConfigFilter : IProxyConfigFilter
             "MeasureEvaluationService" => _serviceRegistry.MeasureServiceUrl ?? string.Empty,
             "NormalizationService" => _serviceRegistry.NormalizationServiceUrl ?? string.Empty,
             "NotificationService" => _serviceRegistry.NotificationServiceUrl ?? string.Empty,
+            "QueryDispatchService" => _serviceRegistry.QueryDispatchServiceUrl ?? string.Empty,
             "ReportService" => _serviceRegistry.ReportServiceUrl ?? string.Empty,
             "SubmissionService" => _serviceRegistry.SubmissionServiceUrl ?? string.Empty,
             "TenantService" => _serviceRegistry.TenantService.TenantServiceUrl ?? string.Empty,

@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string MeasureServiceUrl { get; set; } = null!;
         public string NormalizationServiceUrl { get; set; } = null!;
         public string NotificationServiceUrl { get; set; } = null!;
+        public string QueryDispatchServiceUrl { get; set; } = null!;
         public string ReportServiceUrl { get; set; } = null!;
         public string SubmissionServiceUrl { get; set; } = null!;
         public TenantServiceRegistration TenantService { get; set; } = null!;
@@ -89,6 +90,17 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (this.NotificationServiceUrl != null)
                     return this.NotificationServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
+        public string QueryDispatchServiceApiUrl
+        {
+            get
+            {
+                if (this.QueryDispatchServiceUrl != null)
+                    return this.QueryDispatchServiceUrl.TrimEnd('/') + "/api";
 
                 return null;
             }
