@@ -21,6 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 options.SaveTokens = false;
                 options.ResponseType = "code";
                 options.CallbackPath = openIdConnectOptions.CallbackPath;
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {
