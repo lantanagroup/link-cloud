@@ -21,7 +21,6 @@
             public const string LinkBearerToken = "link_admin_bearer";
             public const string Oauth2 = "link_oauth2";
             public const string OpenIdConnect = "link_openid_connect";
-            public const string AzureAD = "link_azure_ad";
         }
 
         public static class LinkDataProtectors
