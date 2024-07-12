@@ -4,7 +4,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Identity.Web;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
@@ -90,8 +90,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                     // Define the claim types to keep
                     var allowedClaims = new HashSet<string> {                          
-                        "family_name", 
-                        "given_name", 
+                        JwtRegisteredClaimNames.FamilyName,
+                        JwtRegisteredClaimNames.GivenName,
                         LinkAuthorizationConstants.LinkSystemClaims.Email,
                         LinkAuthorizationConstants.LinkSystemClaims.Subject,
                         LinkAuthorizationConstants.LinkSystemClaims.Role,
