@@ -5,6 +5,8 @@ using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services
@@ -29,14 +31,17 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
     {
         private readonly ILogger<ValidateFacilityConnectionService> _logger;
         private readonly IMediator _mediator;
-        private readonly IPatientDataService _patientDataService;
+        private readonly IFhirApiService _fhirApiService;
+        private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
 
         public ValidateFacilityConnectionService(
             ILogger<ValidateFacilityConnectionService> logger,
-            IPatientDataService patientDataService)
+            IFhirApiService fhirApiService,
+            IFhirQueryConfigurationManager fhirQueryConfigurationManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _patientDataService = patientDataService;
+            _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
+            _fhirQueryConfigurationManager = fhirQueryConfigurationManager ?? throw new ArgumentNullException(nameof(fhirQueryConfigurationManager));
         }
 
         public async Task<FacilityConnectionResult> ValidateConnection(ValidateFacilityConnectionRequest request, CancellationToken cancellationToken)
@@ -71,35 +76,14 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
 
             try
             {
-                var patientDataRequest = new GetPatientDataRequest
-                {
-                    FacilityId = request.FacilityId,
-                    CorrelationId = Guid.NewGuid().ToString(),
-                    QueryPlanType = QueryPlanType.InitialQueries,
-                    ConsumeResult = new ConsumeResult<string, DataAcquisitionRequested>
-                    {
-                        Message = new Message<string, DataAcquisitionRequested>
-                        {
-                            Value = new DataAcquisitionRequested
-                            {
-                                PatientId = request.PatientId,
-                                QueryType = "Initial",
-                                Topic = "ConnectionValidation",
-                                ScheduledReports = new List<ScheduledReport>
-                                {
-                                    new ScheduledReport
-                                    {
-                                        ReportType = request.MeasureId,
-                                        StartDate = request.Start.ToString(),
-                                        EndDate = request.End.ToString()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
+                var authenticationConfig = await _fhirQueryConfigurationManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+                var queryConfig = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId, cancellationToken);
+                var patient = await _fhirApiService.GetPatient(queryConfig.FhirServerBaseUrl, request.PatientId, Guid.NewGuid().ToString(), request.FacilityId, authenticationConfig, cancellationToken);
 
-                await _patientDataService.Get(patientDataRequest, cancellationToken);
+                if(patient != null)
+                    return new FacilityConnectionResult(true, false);
+                else
+                    return new FacilityConnectionResult(true, true, patient: patient);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||
@@ -115,10 +99,6 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 _logger.LogError(ex, "Error validating facility connection for facility {FacilityId}. Please check your configuration.", request.FacilityId);
                 throw;
             }
-
-            FacilityConnectionResult? result;
-
-            return new FacilityConnectionResult(true, true);
         }
     }
 
