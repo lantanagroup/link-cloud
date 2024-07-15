@@ -186,15 +186,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
 
-    if (consumerSettings == null || !consumerSettings.DisableConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
          builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
 
-    if (!consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
-        builder.Services.AddHostedService<LantanaGroup.Link.Shared.Application.Listeners.RetryListener>();
+        builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 

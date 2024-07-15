@@ -18,7 +18,6 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -40,8 +39,8 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.Census.Application.Models.Messages;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Listeners;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -258,16 +257,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
 
-    if(consumerSettings == null || !consumerSettings.DisableConsumer)
+    if(consumerSettings != null && !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<CensusListener>();
     }
 
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
         builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
-        builder.Services.AddHostedService<LantanaGroup.Link.Shared.Application.Listeners.RetryListener>();
+        builder.Services.AddHostedService<RetryListener>();
     }
 
     //Add CORS

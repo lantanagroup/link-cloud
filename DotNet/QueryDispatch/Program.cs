@@ -174,7 +174,7 @@ builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventVal
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
-if (consumerSettings == null || !consumerSettings.DisableConsumer)
+if (consumerSettings != null && !consumerSettings.DisableConsumer)
 {
     builder.Services.AddHostedService<PatientEventListener>();
     builder.Services.AddHostedService<ReportScheduledEventListener>();
@@ -184,10 +184,10 @@ if (consumerSettings == null || !consumerSettings.DisableConsumer)
 }
 
 
-if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
     builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
-    builder.Services.AddHostedService<LantanaGroup.Link.Shared.Application.Listeners.RetryListener>();
+    builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
 }
