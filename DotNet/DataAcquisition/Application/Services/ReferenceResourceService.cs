@@ -84,58 +84,61 @@ public class ReferenceResourceService : IReferenceResourceService
         List<ResourceReference> missingReferences = validReferenceResources
             .Where(x => !existingReferenceResources.Any(y => y.ResourceId == SplitReference(x.Reference))).ToList();
 
-        var fullMissingResources = await _fhirRepo.GetReferenceResource(
+        missingReferences.ForEach(async x =>
+        {
+            var fullMissingResources = await _fhirRepo.GetReferenceResource(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
             request.ConsumeResult.Message.Value.PatientId,
             request.FacilityId,
             request.CorrelationId,
             queryPlanType,
-            missingReferences,
+            x,
             referenceQueryConfig,
             fhirQueryConfiguration.Authentication);
 
-        var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-        var currentDateTime = DateTime.UtcNow;
-        var fhirDateTime = new FhirDateTime(
-            currentDateTime.Year,
-            currentDateTime.Month,
-            currentDateTime.Day,
-            currentDateTime.Hour,
-            currentDateTime.Minute,
-            currentDateTime.Second,
-            TimeSpan.Zero);
-
-        foreach (var resource in fullMissingResources)
-        {
-            if (resource.TypeName == nameof(OperationOutcome))
+            foreach (var resource in fullMissingResources)
             {
-                var opOutcome = (OperationOutcome)resource;
-                var message = $"Operation Outcome encountered:\n {opOutcome.Text}";
-                _logger.LogWarning(message);
-                continue;
+                if (resource.TypeName == nameof(OperationOutcome))
+                {
+                    var opOutcome = (OperationOutcome)resource;
+                    var message = $"Operation Outcome encountered:\n {opOutcome.Text}";
+                    _logger.LogWarning(message);
+                    continue;
+                }
+
+                var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+                var currentDateTime = DateTime.UtcNow;
+                var fhirDateTime = new FhirDateTime(
+                    currentDateTime.Year,
+                    currentDateTime.Month,
+                    currentDateTime.Day,
+                    currentDateTime.Hour,
+                    currentDateTime.Minute,
+                    currentDateTime.Second,
+                    TimeSpan.Zero);
+
+                var refResource = new ReferenceResources
+                {
+                    FacilityId = request.FacilityId,
+                    ResourceId = resource.Id,
+                    ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
+                    ResourceType = referenceQueryFactoryResult.ResourceType,
+                    CreateDate = currentDateTime,
+                    ModifyDate = currentDateTime,
+                };
+
+                GenerateMessage(
+                resource,
+                request.FacilityId,
+                request.ConsumeResult.Message.Value.PatientId,
+                queryPlanType,
+                request.CorrelationId,
+                request.ConsumeResult.Message.Value.ScheduledReports);
+
+                await _referenceResourcesManager.AddAsync(refResource);
             }
-
-            var refResource = new ReferenceResources
-            {
-                FacilityId = request.FacilityId,
-                ResourceId = resource.Id,
-                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
-                ResourceType = referenceQueryFactoryResult.ResourceType,
-                CreateDate = currentDateTime,
-                ModifyDate = currentDateTime,
-            };
-
-            GenerateMessage(
-            resource,
-            request.FacilityId,
-            request.ConsumeResult.Message.Value.PatientId,
-            queryPlanType,
-            request.CorrelationId,
-            request.ConsumeResult.Message.Value.ScheduledReports);
-
-            await _referenceResourcesManager.AddAsync(refResource);
-        }
+        });
     }
 
     private string SplitReference(string reference)

@@ -63,6 +63,17 @@ public interface IFhirApiService
         List<ResourceReference> referenceIds,
         ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig);
+
+    Task<List<DomainResource>> GetReferenceResource(
+        string baseUrl,
+        string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
+        ResourceReference referenceId,
+        ReferenceQueryConfig config,
+        AuthenticationConfiguration authConfig);
 }
 
 public class FhirApiService : IFhirApiService
@@ -357,6 +368,84 @@ public class FhirApiService : IFhirApiService
         var separatedPatientUrl = fullPatientUrl.Split('/');
         var patientIdPart = string.Join("/", separatedPatientUrl.Skip(Math.Max(0, separatedPatientUrl.Length - 2)));
         return patientIdPart;
+    }
+
+    public async Task<List<DomainResource>> GetReferenceResource(
+        string baseUrl,
+        string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
+        ResourceReference referenceId,
+        ReferenceQueryConfig config,
+        AuthenticationConfiguration authConfig)
+    {
+        var fhirClient = GenerateFhirClient(baseUrl);
+
+        var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
+        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+        {
+            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+        }
+
+        List<DomainResource> domainResources = new List<DomainResource>();
+
+        if(config.OperationType == OperationType.Read)
+        {
+            var refIdResult = GetRefId(referenceId, resourceType);
+
+            if (!refIdResult.success)
+                return domainResources;
+
+            var refId = refIdResult.refId;
+
+            if (authBuilderResults.isQueryParam)
+            {
+                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
+                if (refId.Contains("?"))
+                {
+                    refId = $"{refId}&{kvPair.Key}={kvPair.Value}";
+                }
+                else
+                {
+                    refId = $"{refId}?{kvPair.Key}={kvPair.Value}";
+                }
+            }
+
+            var result = await ReadFhirEndpointAsync(fhirClient, resourceType, refId, patientIdReference, correlationId, facilityIdReference, queryPlanType);
+            domainResources.Add(result);
+        }
+        else
+        {
+            SearchParams searchParams = new SearchParams();
+            try
+            {
+                var id = (string.IsNullOrWhiteSpace(referenceId.ElementId) ? referenceId.Url.ToString() : referenceId.ElementId).Split("/").LastOrDefault();
+                if (string.IsNullOrWhiteSpace(id))
+                    return domainResources;
+                searchParams.Add("_id", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"No appropriate ID found for reference.\n{referenceId.ToJson()}");
+                return domainResources;
+            }
+
+            if (authBuilderResults.isQueryParam)
+            {
+                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
+                searchParams.Add(kvPair.Key, kvPair.Value);
+            }
+
+            var result = await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, correlationId: correlationId, facilityId: facilityIdReference, queryType: queryPlanType);
+            if (result != null)
+            {
+                domainResources.AddRange(result.Entry.Where(x => x.Resource is DomainResource && x.Resource.TypeName != nameof(OperationOutcome)).Select(x => (DomainResource)x.Resource).ToList());
+            }
+        }
+
+        return domainResources;
     }
 
     public async Task<List<DomainResource>> GetReferenceResource(
