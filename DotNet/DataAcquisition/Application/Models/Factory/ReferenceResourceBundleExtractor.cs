@@ -8,7 +8,10 @@ public class ReferenceResourceBundleExtractor
     {
         return
         Collect(resource, validResourceTypes)
-            .Where(x => x is ResourceReference reference && validResourceTypes.Contains(reference.Reference, StringComparer.InvariantCultureIgnoreCase))
+            .Where(x =>
+            {
+                return x is ResourceReference;
+            })
             .Select(x => (ResourceReference)x)
             .ToList();
     }
@@ -19,7 +22,10 @@ public class ReferenceResourceBundleExtractor
         bundle
             .Entry
             .SelectMany(x => Collect(x.Resource, validResourceTypes))
-            .Where(x => x is ResourceReference reference && validResourceTypes.Contains(reference.Reference, StringComparer.InvariantCultureIgnoreCase))
+            .Where(x =>
+            {
+                return x is ResourceReference;
+            })
             .Select(x => (ResourceReference)x)
             .ToList();
     }
@@ -33,13 +39,17 @@ public class ReferenceResourceBundleExtractor
 
     private static void Walk(Base ancestor, List<Base> results, List<string> validResourceTypes)
     {
-        results.Add(ancestor);
+        if (validResourceTypes.Contains(ancestor.TypeName,StringComparer.InvariantCultureIgnoreCase))
+        {
+            results.Add(ancestor);
+        }
 
         foreach (var property in ancestor.NamedChildren)
         {
-            var candidate = property.Value;
-            if(candidate is ResourceReference reference && validResourceTypes.Contains(reference.Reference, StringComparer.InvariantCultureIgnoreCase))
+            if (validResourceTypes.Contains(property.ElementName, StringComparer.InvariantCultureIgnoreCase))
+            {
                 results.Add(property.Value);
+            }
 
             Walk(property.Value, results, validResourceTypes);
         }

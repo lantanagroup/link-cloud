@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
@@ -60,15 +61,20 @@ public class ReferenceResourceService : IReferenceResourceService
             return;
         }
 
-        var validReferenceResources = referenceQueryFactoryResult.ReferenceIds.Where(x => x.TypeName == referenceQueryConfig.ResourceType).ToList();
+        var validReferenceResources = 
+            referenceQueryFactoryResult
+            ?.ReferenceIds
+            ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
+            .ToList();
 
         var existingReferenceResources =
             await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => x.ElementId).ToList(),
+                validReferenceResources.Select(x => SplitReference(x.Reference)).ToList(),
                 request.FacilityId);
 
         existingReferenceResources.ForEach(x => GenerateMessage(
-            JsonSerializer.Deserialize<DomainResource>(x.ReferenceResource),
+            FhirResourceDeserializer.DeserializeFhirResource(x),
+            request.FacilityId,
             request.ConsumeResult.Message.Value.PatientId,
             queryPlanType,
             request.CorrelationId,
@@ -76,7 +82,7 @@ public class ReferenceResourceService : IReferenceResourceService
             
 
         List<ResourceReference> missingReferences = validReferenceResources
-            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.ElementId)).ToList();
+            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == SplitReference(x.Reference))).ToList();
 
         var fullMissingResources = await _fhirRepo.GetReferenceResource(
             fhirQueryConfiguration.FhirServerBaseUrl,
@@ -122,6 +128,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
             GenerateMessage(
             resource,
+            request.FacilityId,
             request.ConsumeResult.Message.Value.PatientId,
             queryPlanType,
             request.CorrelationId,
@@ -131,8 +138,15 @@ public class ReferenceResourceService : IReferenceResourceService
         }
     }
 
+    private string SplitReference(string reference)
+    {
+        var splitReference = reference.Split("/");
+        return splitReference[splitReference.Length - 1];
+    }
+
     private void GenerateMessage(
             Resource resource,
+            string facilityId,
             string patientId,
             string queryType,
             string correlationId,
@@ -145,7 +159,7 @@ public class ReferenceResourceService : IReferenceResourceService
             KafkaTopic.ResourceAcquired.ToString(),
             new Message<string, ResourceAcquired>
             {
-                Key = patientId,
+                Key = facilityId,
                 Headers = new Headers
                 {
                     new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
