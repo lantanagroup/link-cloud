@@ -10,7 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Listeners;
@@ -165,25 +165,27 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
     builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
     builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
-    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
-    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
     builder.Services.AddTransient<IFhirApiService, FhirApiService>();
+    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
+    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
+    builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
+    builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
+    builder.Services.AddSingleton<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
