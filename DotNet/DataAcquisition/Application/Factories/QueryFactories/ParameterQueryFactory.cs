@@ -17,7 +17,7 @@ public class ParameterQueryFactory
     /// </summary>
     /// <param name="config"></param>
     /// <returns></returns>
-    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, Hl7.Fhir.Model.Bundle bundle)
+    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, Hl7.Fhir.Model.Bundle bundle = null)
     {
         var isPaged = false;
         var searchParams = new SearchParams();
