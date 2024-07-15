@@ -173,6 +173,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
     builder.Services.AddTransient<IFhirApiService, FhirApiService>();
+    builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
 
     //Factories
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();

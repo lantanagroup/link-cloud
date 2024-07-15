@@ -68,7 +68,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 request.FacilityId);
 
         existingReferenceResources.ForEach(x => GenerateMessage(
-            System.Text.Json.JsonSerializer.Deserialize<DomainResource>(x.ReferenceResource),
+            JsonSerializer.Deserialize<DomainResource>(x.ReferenceResource),
             request.ConsumeResult.Message.Value.PatientId,
             queryPlanType,
             request.CorrelationId,
@@ -88,9 +88,6 @@ public class ReferenceResourceService : IReferenceResourceService
             missingReferences,
             referenceQueryConfig,
             fhirQueryConfiguration.Authentication);
-
-        var fullRefResourceList = new List<ReferenceResources>();
-        fullRefResourceList.AddRange(existingReferenceResources);
 
         var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
         var currentDateTime = DateTime.UtcNow;
