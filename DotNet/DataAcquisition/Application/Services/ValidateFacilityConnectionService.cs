@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 {
                     FacilityId = request.FacilityId,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    QueryPlanType = QueryPlanType.InitialQueries,
+                    QueryPlanType = QueryPlanType.Initial,
                     ConsumeResult = new ConsumeResult<string, DataAcquisitionRequested>
                     {
                         Message = new Message<string, DataAcquisitionRequested>
