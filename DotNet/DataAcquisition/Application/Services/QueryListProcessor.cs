@@ -35,14 +35,14 @@ public class QueryListProcessor : IQueryListProcessor
     private readonly ILogger<QueryListProcessor> _logger;
     private readonly IFhirApiService _fhirRepo;
     private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
-    private readonly ReferenceResourceService _referenceResourceService;
+    private readonly IReferenceResourceService _referenceResourceService;
     private readonly ProducerConfig _producerConfig;
 
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger, 
         IFhirApiService fhirRepo, 
         IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory, 
-        ReferenceResourceService referenceResourceService)
+        IReferenceResourceService referenceResourceService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));

@@ -165,14 +165,14 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
     builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
     builder.Services.AddTransient<IQueriedFhirResourceManager, QueriedFhirResourceManager>();
-    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
-    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
-    builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
     builder.Services.AddTransient<IFhirApiService, FhirApiService>();
+    builder.Services.AddTransient<IPatientDataService, PatientDataService>();
+    builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
+    builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
     builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
 
     //Factories
