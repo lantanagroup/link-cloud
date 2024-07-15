@@ -72,13 +72,16 @@ public class ReferenceResourceService : IReferenceResourceService
                 validReferenceResources.Select(x => SplitReference(x.Reference)).ToList(),
                 request.FacilityId);
 
-        existingReferenceResources.ForEach(x => GenerateMessage(
-            FhirResourceDeserializer.DeserializeFhirResource(x),
+        foreach(var existingReference in existingReferenceResources)
+        {
+            GenerateMessage(
+            FhirResourceDeserializer.DeserializeFhirResource(existingReference),
             request.FacilityId,
             request.ConsumeResult.Message.Value.PatientId,
             queryPlanType,
             request.CorrelationId,
-            request.ConsumeResult.Message.Value.ScheduledReports));
+            request.ConsumeResult.Message.Value.ScheduledReports);
+        }
             
 
         List<ResourceReference> missingReferences = validReferenceResources

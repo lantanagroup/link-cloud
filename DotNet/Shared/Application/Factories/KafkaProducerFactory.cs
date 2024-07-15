@@ -14,10 +14,14 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
     private readonly ILogger<KafkaProducerFactory<TProducerKey, TProducerValue>> _logger;
     private readonly IOptions<KafkaConnection> _kafkaConnection;
 
+    private static IProducer<TProducerKey, TProducerValue>? _producer;
+
     public KafkaProducerFactory(ILogger<KafkaProducerFactory<TProducerKey, TProducerValue>> logger, IOptions<KafkaConnection> kafkaConnection)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
+
+        _producer = null;
     }
 
     public IProducer<string, AuditEventMessage> CreateAuditEventProducer(bool useOpenTelemetry = true)
@@ -39,36 +43,41 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
     {
         try
         {
-            config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
-            config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
-            config.ClientId = _kafkaConnection.Value.ClientId;
-
-            if (_kafkaConnection.Value.SaslProtocolEnabled)
+            if (_producer == null)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                config.SaslMechanism = SaslMechanism.Plain;
-                config.SaslUsername = _kafkaConnection.Value.SaslUsername;
-                config.SaslPassword = _kafkaConnection.Value.SaslPassword;
+                config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
+                config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
+                config.ClientId = _kafkaConnection.Value.ClientId;
+
+                if (_kafkaConnection.Value.SaslProtocolEnabled)
+                {
+                    config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                    config.SaslMechanism = SaslMechanism.Plain;
+                    config.SaslUsername = _kafkaConnection.Value.SaslUsername;
+                    config.SaslPassword = _kafkaConnection.Value.SaslPassword;
+                }
+
+                var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
+
+                if (typeof(TProducerKey) != typeof(string))
+                {
+                    producerBuilder.SetKeySerializer(keySerializer ?? new JsonWithFhirMessageSerializer<TProducerKey>());
+                }
+
+                if (typeof(TProducerValue) != typeof(string))
+                {
+                    producerBuilder.SetValueSerializer(valueSerializer ?? new JsonWithFhirMessageSerializer<TProducerValue>());
+                }
+
+                _producer = useOpenTelemetry ? producerBuilder.BuildWithInstrumentation() : producerBuilder.Build(); 
             }
-
-            var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
-
-            if (typeof(TProducerKey) != typeof(string))
-            {
-                producerBuilder.SetKeySerializer(keySerializer ?? new JsonWithFhirMessageSerializer<TProducerKey>());
-            }
-
-            if (typeof(TProducerValue) != typeof(string))
-            {
-                producerBuilder.SetValueSerializer(valueSerializer ?? new JsonWithFhirMessageSerializer<TProducerValue>());
-            }
-
-            return useOpenTelemetry ? producerBuilder.BuildWithInstrumentation() : producerBuilder.Build();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create Kafka producer.");
             throw;
         }
+
+        return _producer;
     }
 }
