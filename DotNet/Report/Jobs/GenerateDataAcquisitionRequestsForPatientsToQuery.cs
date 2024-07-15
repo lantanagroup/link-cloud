@@ -99,42 +99,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
 
-                    using (var producer = _dataAcquisitionProducerFactory.CreateAuditEventProducer())
-                    {
-                        try
-                        {
-                            string notes =
-                                $"DataAcquisitionRequested topics published for {schedule.PatientsToQuery.Count} patients for {schedule.FacilityId} for Report Type: {schedule.ReportType} for Report Dates: {schedule.ReportStartDate.ToString("G")} - {schedule.ReportEndDate.ToString("G")}";
-                            var val = new AuditEventMessage
-                            {
-                                FacilityId = schedule.FacilityId,
-                                ServiceName = ReportConstants.ServiceName,
-                                Action = AuditEventType.Create,
-                                EventDate = DateTime.UtcNow,
-                                Resource = typeof(MeasureReportScheduleModel).Name,
-                                Notes = notes
-                            };
-                            var headers = new Headers
-                            {
-                                { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                            };
-
-                            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
-                                new Message<string, AuditEventMessage>
-                                {
-                                    Value = val,
-                                    Headers = headers
-                                });
-                            producer.Flush();
-                            _logger.LogInformation(notes);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(
-                                $"Failed to generate a {nameof(KafkaTopic.AuditableEventOccurred)} message",
-                                ex);
-                        }
-                    }
+                    _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Type: {schedule.ReportType} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
                 else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {
