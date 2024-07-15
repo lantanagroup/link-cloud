@@ -102,8 +102,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 if (resource.TypeName == nameof(OperationOutcome))
                 {
                     var opOutcome = (OperationOutcome)resource;
-                    var message = $"Operation Outcome encountered:\n {opOutcome.Text}";
-                    _logger.LogWarning(message);
+                    _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
                     continue;
                 }
 
