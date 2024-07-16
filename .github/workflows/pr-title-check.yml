@@ -2,7 +2,7 @@
 name: "PR Title Check"
 on:
   pull_request:
-    branches: [ LNK-2726-Enforce-Jira-key-in-PR-message ]
+    branches: [ dev, LNK-2726-Enforce-Jira-key-in-PR-message ]
     types: [opened, edited, synchronize]
 jobs:
   check-title:
