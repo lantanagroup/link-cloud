@@ -175,7 +175,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.ForFhir();
     });
 
-    builder.Services.AddGrpc();
     builder.Services.AddGrpcReflection();
 
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
@@ -290,11 +289,9 @@ static void SetupMiddleware(WebApplication app)
 
     app.ConfigureSwagger();
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-    
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
     app.AutoMigrateEF<CensusContext>();
 
     if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("Local", StringComparison.InvariantCultureIgnoreCase))
@@ -325,7 +322,4 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
-
-    //app.MapGrpcService<CensusConfigService>();
-    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
 }
