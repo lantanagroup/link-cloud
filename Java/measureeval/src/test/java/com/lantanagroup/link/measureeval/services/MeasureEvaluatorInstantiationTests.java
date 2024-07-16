@@ -1,6 +1,5 @@
 package com.lantanagroup.link.measureeval.services;
 
-import ca.uhn.fhir.context.ConfigurationException;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import org.hl7.fhir.r4.model.Bundle;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.NoSuchElementException;
 
 class MeasureEvaluatorInstantiationTests {
 
@@ -21,15 +19,17 @@ class MeasureEvaluatorInstantiationTests {
         FhirContext r5FhirContext = FhirContext.forR5Cached();
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(new Measure());
-        Assertions.assertThrows(ConfigurationException.class, () -> MeasureEvaluator.compile(r5FhirContext, bundle),
-                "HAPI-1731: This context is for FHIR version \"R5\" but the class \"org.hl7.fhir.r4.model.Bundle\" is for version \"R4\"");
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> MeasureEvaluator.compile(r5FhirContext, bundle),
+                "Unsupported FHIR version!");
     }
 
     @Test
     void newInstanceEmptyBundleTest() {
         Bundle emptyBundle = new Bundle();
-        Assertions.assertThrows(NoSuchElementException.class,
-                () -> MeasureEvaluator.compile(fhirContext, emptyBundle), "No value present");
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> MeasureEvaluator.compile(fhirContext, emptyBundle),
+                "Please provide the necessary artifacts (e.g. Measure and Library resources) in the Bundle entry!");
     }
 
     @Test
