@@ -12,8 +12,6 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
     public KafkaConnection KafkaConnection { get => _kafkaConnection; }
     private readonly KafkaConnection _kafkaConnection;
 
-    private static IProducer<TProducerKey, TProducerValue>? _producer;
-
     public KafkaProducerFactory(KafkaConnection kafkaConnection)
     {
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
@@ -37,40 +35,36 @@ public class KafkaProducerFactory<TProducerKey, TProducerValue> : IKafkaProducer
     {
         try
         {
-            if (_producer == null)
+            config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
+            config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
+            config.ClientId = _kafkaConnection.ClientId;
+
+            if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
-                config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
-                config.ClientId = _kafkaConnection.ClientId;
-
-                if (_kafkaConnection.SaslProtocolEnabled)
-                {
-                    config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
-                    config.SaslMechanism = SaslMechanism.Plain;
-                    config.SaslUsername = _kafkaConnection.SaslUsername;
-                    config.SaslPassword = _kafkaConnection.SaslPassword;
-                }
-
-                var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
-
-                if (typeof(TProducerKey) != typeof(string))
-                {
-                    producerBuilder.SetKeySerializer(keySerializer ?? new JsonWithFhirMessageSerializer<TProducerKey>());
-                }
-
-                if (typeof(TProducerValue) != typeof(string))
-                {
-                    producerBuilder.SetValueSerializer(valueSerializer ?? new JsonWithFhirMessageSerializer<TProducerValue>());
-                }
-
-                _producer = useOpenTelemetry ? producerBuilder.BuildWithInstrumentation() : producerBuilder.Build(); 
+                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                config.SaslMechanism = SaslMechanism.Plain;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
             }
+
+            var producerBuilder = new ProducerBuilder<TProducerKey, TProducerValue>(config);
+
+            if (typeof(TProducerKey) != typeof(string))
+            {
+                producerBuilder.SetKeySerializer(keySerializer ?? new JsonWithFhirMessageSerializer<TProducerKey>());
+            }
+
+            if (typeof(TProducerValue) != typeof(string))
+            {
+                producerBuilder.SetValueSerializer(valueSerializer ?? new JsonWithFhirMessageSerializer<TProducerValue>());
+            }
+
+            return useOpenTelemetry ? producerBuilder.BuildWithInstrumentation() : producerBuilder.Build();
+
         }
         catch (Exception ex)
         {
             throw;
         }
-
-        return _producer;
     }
 }
