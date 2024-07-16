@@ -215,6 +215,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(
         builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     //Factories - Retry
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
