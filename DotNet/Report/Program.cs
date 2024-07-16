@@ -38,6 +38,10 @@ using Serilog.Exceptions;
 using System.Reflection;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Application.Listeners;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.DependencyInjection;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -228,6 +232,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ReportSubmittedListener>();
     builder.Services.AddHostedService<PatientIdsAcquiredListener>();
     builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
+
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.ReportSubmittedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
 
     builder.Services.AddHostedService<RetryScheduleService>();
