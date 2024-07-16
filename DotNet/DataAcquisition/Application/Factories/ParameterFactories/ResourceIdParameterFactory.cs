@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 

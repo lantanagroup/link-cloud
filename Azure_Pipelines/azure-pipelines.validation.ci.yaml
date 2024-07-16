@@ -28,4 +28,5 @@ steps:
     inputs:
       mavenPomFile: 'Java/pom.xml'
       goals: install
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
       options: '-pl validation -am'

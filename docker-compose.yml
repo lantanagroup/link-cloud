@@ -340,6 +340,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
       SecretManagement__Enabled: false
       SecretManagement__Manager:
       SecretManagement__ManagerUri:
@@ -375,6 +376,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8062:8062"
     build:
@@ -398,7 +400,6 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__1__Args__uri: http://loki:3100
-      ServiceRegistry__AccountServiceUrl: http://account:8060
       ConnectionStrings__Redis: redis_cache:6379
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
@@ -407,6 +408,17 @@ services:
       LinkTokenService__LinkAdminEmail:      
       LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
+      ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
+      ServiceRegistry__AccountServiceUrl: http://account:8060
+      ServiceRegistry__AuditServiceUrl: http://audit:8062
+      ServiceRegistry__CensusServiceUrl: http://census:8064
+      ServiceRegistry__DataAcquisitionServiceUrl: http://dataacquisition:8065
+      ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
+      ServiceRegistry__NormalizationServiceUrl: http://normalization:8068
+      ServiceRegistry__NotificationServiceUrl: http://notification:8069
+      ServiceRegistry__ReportServiceUrl: http://report:8072
+      ServiceRegistry__SubmissionServiceUrl: http://submission:8073
+      ServiceRegistry__QueryDispatchServiceUrl: http://querydispatch:8071
       ReverseProxy__Routes__route1__ClusterId: AccountService
       ReverseProxy__Routes__route1__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route1__Match__Path: api/account/{**catch-all}
@@ -434,6 +446,9 @@ services:
       ReverseProxy__Routes__route9__ClusterId: TenantService
       ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route9__Match__Path: api/facility/{**catch-all}
+      ReverseProxy__Routes__route10__ClusterId: QueryDispatchService
+      ReverseProxy__Routes__route10__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route10__Match__Path: api/querydispatch/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -444,6 +459,7 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
+      ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
@@ -491,7 +507,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
-      
+      Authentication__EnableAnonymousAccess: true      
     ports:
       - "8064:8064"
     build:
@@ -528,6 +544,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8065:8065"
     build:
@@ -569,6 +586,8 @@ services:
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
+      spring_profiles_active: dev
+      loki.enabled: false
     ports:
       - "8067:8067"
     build:
@@ -603,6 +622,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8068:8068"
     build:
@@ -639,6 +659,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8069:8069"
     build:
@@ -674,6 +695,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8071:8071"
     build:
@@ -708,6 +730,7 @@ services:
       ServiceRegistry__TenantService__CheckIfTenantExists: false
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8072:8072"
     build:
@@ -738,9 +761,9 @@ services:
       # DatabaseProvider: SqlServer
       # AutoMigrate: true
       # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report/GetSubmissionBundle
-      SubmissionServiceConfig__CensusServiceUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionServiceUrl: http://dataacquisition:8065/api
+      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
+      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
+      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
       SubmissionServiceConfig__SubmissionDirectory: submissions
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
@@ -757,6 +780,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
     ports:
       - "8073:8073"
     build:
@@ -793,6 +817,7 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
     ports:
       - "8074:8074"

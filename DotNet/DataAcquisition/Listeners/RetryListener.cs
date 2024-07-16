@@ -1,7 +1,7 @@
 ﻿
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -63,7 +63,7 @@ public class RetryListener : BackgroundService
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var _retryRepository = scope.ServiceProvider.GetRequiredService<IRetryRepository>();
+            var _retryRepository = scope.ServiceProvider.GetRequiredService<IEntityRepository<RetryEntity>>();
 
             consumer.Subscribe(new List<string>() { KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() });
 

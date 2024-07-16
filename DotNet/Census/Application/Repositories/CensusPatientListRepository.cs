@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;
 
-public class CensusPatientListRepository : BaseSqlConfigurationRepo<CensusPatientListEntity>, ICensusPatientListRepository
+public class CensusPatientListRepository : EntityRepository<CensusPatientListEntity>, ICensusPatientListRepository
 {
     private readonly ILogger<CensusPatientListRepository> _logger;
     private readonly CensusContext _context;

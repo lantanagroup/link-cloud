@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Census;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -13,17 +12,17 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
 {
     private readonly ILogger<PatientCensusScheduledProcessingLogic> _logger;
-    private readonly IMediator _mediator;
+    private readonly IPatientCensusService _patientCensusService;
     private readonly IKafkaProducerFactory<string, PatientIDsAcquiredMessage> _kafkaProducerFactory;
 
     public PatientCensusScheduledProcessingLogic(
-        ILogger<PatientCensusScheduledProcessingLogic> logger, 
-        IMediator mediator, 
+        ILogger<PatientCensusScheduledProcessingLogic> logger,
+        IPatientCensusService patientCensusService, 
         IKafkaProducerFactory<string, PatientIDsAcquiredMessage> kafkaProducerFactory
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
         _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
@@ -59,10 +58,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
         try
         {
-            result = await _mediator.Send(new GetPatientCensusRequest
-            {
-                FacilityId = facilityId
-            }, cancellationToken);
+            result = await _patientCensusService.Get(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {

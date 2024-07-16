@@ -20,6 +20,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "");
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId);
+        void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId);
         void HandleException(DeadLetterException ex, string facilityId);
         void HandleException(Exception ex, string facilityId, AuditEventType auditEventType);
         void HandleException(string message, string facilityId, AuditEventType auditEventType);

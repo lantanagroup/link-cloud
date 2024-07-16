@@ -1,8 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -10,7 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
+using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -23,7 +22,8 @@ namespace LantanaGroup.Link.Report.Listeners
         //Doesn't actually generate a SubmissionReport but prevents us from having to declare a new factory type in the initialization
         //for a ProducerFactory that's only used for an AuditEvent
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
-        private readonly IMediator _mediator;
+
+        private readonly IDatabase _database;
 
         private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
@@ -31,14 +31,14 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IMediator mediator,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IDatabase database,
             ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _database = database;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -107,9 +107,13 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report schedule
-                                MeasureReportScheduleModel schedule = await _mediator.Send(
-                                    new GetMeasureReportScheduleByBundleIdQuery
-                                        { ReportBundleId = value.ReportBundleId });
+                                var subEntry =
+                                    (await _database.ReportSubmissionRepository.FindAsync(e =>
+                                        e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken)).Single();
+
+                                var schedule =
+                                    (await _database.ReportScheduledRepository.FindAsync(s =>
+                                        s.Id == subEntry.MeasureReportScheduleId, cancellationToken)).SingleOrDefault();
 
                                 if (schedule is null)
                                 {
@@ -120,8 +124,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // update report schedule with submitted date
                                 schedule.SubmittedDate = DateTime.UtcNow;
-                                await _mediator.Send(new UpdateMeasureReportScheduleCommand
-                                    { ReportSchedule = schedule });
+                                await _database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
 
                                 // produce audit message signalling the report service acknowledged the report has been submitted
                                 using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
@@ -185,8 +188,33 @@ namespace LantanaGroup.Link.Report.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        var message = new Message<string, string>()
+                        {
+                            Headers = ex.ConsumerRecord.Message.Headers,
+                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                  ex.ConsumerRecord.Message.Key != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                                : string.Empty,
+                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                    ex.ConsumerRecord.Message.Value != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                                : string.Empty,
+                        };
+
+                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
+                        {
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -200,6 +228,18 @@ namespace LantanaGroup.Link.Report.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
         }
     }
 }

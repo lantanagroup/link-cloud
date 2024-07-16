@@ -1,27 +1,25 @@
-﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using MediatR;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/")]
+[Route("api/data")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class QueryListController : Controller
 {
     private readonly ILogger<QueryConfigController> _logger;
-    private readonly IMediator _mediator;
-    private readonly CompareLogic _compareLogic;
+    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
 
-    public QueryListController(ILogger<QueryConfigController> logger, IMediator mediator)
+    public QueryListController(ILogger<QueryConfigController> logger, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _compareLogic = new CompareLogic();
-        _compareLogic.Config.MaxDifferences = 25;
+        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
     }
 
     [HttpGet("{facilityId}/fhirQueryList")]
@@ -38,10 +36,7 @@ public class QueryListController : Controller
 
         try
         {
-            var result = await _mediator.Send(new GetFhirListConfigQuery
-            {
-                FacilityId = facilityId
-            });
+            var result = await _fhirQueryListConfigurationManager.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -65,7 +60,7 @@ public class QueryListController : Controller
     /// <param name="fhirListConfiguration"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpPost("{facilityId}/fhirQueryList")]
+    [HttpPost("fhirQueryList")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -78,13 +73,13 @@ public class QueryListController : Controller
 
         try
         {
-            await _mediator.Send(new SaveFhirListCommand
-            {
-                FacilityId = facilityId,
-                FhirListConfiguration = fhirListConfiguration
-            });
+            var entity = await _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
 
-            return Ok();
+            return Ok(entity);
+        }
+        catch (EntityAlreadyExistsException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (MissingFacilityConfigurationException ex)
         {

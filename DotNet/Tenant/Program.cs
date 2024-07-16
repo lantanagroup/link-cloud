@@ -27,6 +27,7 @@ using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Middleware;
 
 namespace Tenant
 {
@@ -97,6 +98,7 @@ namespace Tenant
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
             builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+            builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
             builder.Services.AddScoped<FacilityConfigurationService>();
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
@@ -168,6 +170,18 @@ namespace Tenant
             builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck>("Database");
 
+            // Add Link Security
+            bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            builder.Services.AddLinkBearerServiceAuthentication(options =>
+            {
+                options.Environment = builder.Environment;
+                options.AllowAnonymous = allowAnonymousAccess;
+                options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+                options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+                options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+                options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+            });
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
@@ -229,6 +243,16 @@ namespace Tenant
 
             app.UseRouting();            
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+            //check for anonymous access
+            var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            if (!allowAnonymousAccess)
+            {
+                app.UseAuthentication();
+                app.UseMiddleware<UserScopeMiddleware>();
+            }
+            app.UseAuthorization();
+
             app.MapControllers();
 
             //map health check middleware

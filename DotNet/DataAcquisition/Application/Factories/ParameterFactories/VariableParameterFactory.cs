@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
@@ -16,7 +16,7 @@ public class VariableParameterFactory
             Variable.LookbackStart => new ParameterFactoryResult(parameter.Name, CalculateLookBackStartDate(parameter, scheduledReport, lookback)),
             Variable.PeriodStart => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.StartDate, nameof(scheduledReport.StartDate))),
             Variable.PeriodEnd => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.EndDate, nameof(scheduledReport.EndDate))),
-            Variable.PatientId => new ParameterFactoryResult(parameter.Name, TEMPORARYPatientIdPart(request.Message.PatientId)),
+            Variable.PatientId => new ParameterFactoryResult(parameter.Name, TEMPORARYPatientIdPart(request.ConsumeResult.Message.Value.PatientId)),
             _ => throw new Exception("Invalid or null Variable type provided."),
         };
 

@@ -1,37 +1,31 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Audit;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryPlanConfig;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using MediatR;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using System.Net;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/{facilityId}")]
+[Route("api/data/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 public class QueryPlanConfigController : Controller
 {
     private readonly ILogger<QueryPlanConfigController> _logger;
-    private readonly IMediator _mediator;
+    private readonly IQueryPlanManager _queryPlanManager;
 
-    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IMediator mediator)
+    public QueryPlanConfigController(ILogger<QueryPlanConfigController> logger, IQueryPlanManager queryPlanManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
     }
 
     /// <summary>
-    /// Gets a QueryPlanConfig record for a given facilityId, queryPlanType, and systemPlans.
+    /// Gets a QueryPlanConfig record for a given facilityId.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <param name="queryPlanType"></param>
-    /// <param name="systemPlans"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 200
@@ -39,46 +33,46 @@ public class QueryPlanConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpGet("{queryPlanType}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthenticationConfiguration))]
+    [HttpGet("QueryPlan")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryPlan))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IQueryPlan>> GetQueryPlan(
-        string facilityId, 
-        QueryPlanType queryPlanType,
-        bool systemPlans,
+    public async Task<ActionResult> GetQueryPlan(
+        string facilityId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest("facilityId is required.");
-        }
-
         try
         {
-            var result = await _mediator.Send(new GetQueryPlanQuery
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                FacilityId = facilityId
-            });
+                throw new BadRequestException("parameter facilityId is required.");
+            }
+
+            var result = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
 
             if (result == null)
             {
-                return NotFound();
+                throw new NotFoundException(
+                    $"No Query Plan found for facilityId: {facilityId}.");
             }
 
             return Ok(result);
         }
+        catch (BadRequestException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
         catch (Exception ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Query,
-                null);
             _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", facilityId);
-            throw;
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -86,7 +80,6 @@ public class QueryPlanConfigController : Controller
     /// Creates a QueryPlanConfig for a facility
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <param name="queryPlanType"></param>
     /// <param name="queryPlan"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
@@ -96,54 +89,75 @@ public class QueryPlanConfigController : Controller
     ///     Facility Already Exists: 409
     ///     Server Error: 500
     /// </returns>
-    [HttpPost("{queryPlanType}")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [HttpPost("QueryPlan")]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(QueryPlan))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
         string facilityId, 
-        QueryPlanType queryPlanType, 
-        [FromBody] IQueryPlan queryPlan, 
+        [FromBody] QueryPlan? queryPlan, 
         CancellationToken cancellationToken)
     {
-        if (queryPlan == null)
-        {
-            return BadRequest("No request body");
-        }
-
         try
         {
-            var result = await _mediator.Send(new SaveQueryPlanCommand
+            if (queryPlan == null)
             {
-                FacilityId = facilityId,
-                QueryPlanResult = queryPlan,
-                QueryPlanType = queryPlanType
-            });
+                throw new BadRequestException("request body is null");
+            }
 
-            return Accepted();
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException("facilityId is required.");
+            }
+
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
+
+            if (existing != null) 
+            {
+                throw new EntityAlreadyExistsException($"A Query Plan already exists for facilityId: {facilityId}.");
+            }
+
+            var result = await _queryPlanManager.AddAsync(queryPlan, cancellationToken);
+
+            if (result == null)
+            {
+                return Problem("QueryPlan not created.", statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+
+            return CreatedAtAction(nameof(CreateQueryPlan),
+                new
+                {
+                    FacilityId = facilityId,
+                    QueryPlan = result
+                }, result);
+        }
+        catch (EntityAlreadyExistsException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Entity Already Exists", detail: ex.Message, statusCode: (int)HttpStatusCode.Conflict);
+        }
+        catch (BadRequestException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException?.Message}\n{ex.InnerException?.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Create,
-                null);
-            return BadRequest(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}", 
-                "", 
-                facilityId, 
-                AuditEventType.Create, 
-                null);
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "CreateQueryPlan"), ex, "An exception occurred while attempting to create a query place with a facility id of {id}", facilityId);
-            throw;
+            string message = $"An exception occurred while attempting to create a QueryPlan for facility id of {facilityId}.";
+            _logger.LogError(ex, message, facilityId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -160,53 +174,59 @@ public class QueryPlanConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpPut("{queryPlanType}")]
-    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [HttpPut("QueryPlan")]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(QueryPlan))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> UpdateQueryPlan(
+    public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        QueryPlanType queryPlanType,
-        [FromBody] IQueryPlan queryPlan,
+        [FromBody] QueryPlan? queryPlan,
         CancellationToken cancellationToken)
     {
-        if (queryPlan == null)
-        {
-            return BadRequest("No request body");
-        }
-
         try
         {
-            var result = await _mediator.Send(new SaveQueryPlanCommand
+            if (queryPlan == null)
             {
-                FacilityId = facilityId,
-                QueryPlanResult = queryPlan,
-                QueryPlanType = queryPlanType
-            });
+                throw new BadRequestException("request body is null");
+            }
 
-            return Accepted();
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException("parameter facilityId is required.");
+            }
+
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
+
+            if (existing == null)
+            {
+                throw new NotFoundException($"A Query Plan was not found for facilityId: {facilityId}.");
+            }
+
+            var result = await _queryPlanManager.UpdateAsync(queryPlan, cancellationToken);
+
+            return result != null ? Accepted(result) : Problem("QueryPlan not updated.", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+        catch (BadRequestException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Update,
-                null);
-            return BadRequest(ex.Message);
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Update,
-                null);
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "UpdateQueryPlan"), ex, "An exception occurred while attempting to update a query place with a facility id of {id}", facilityId);
-            throw;
+            string message = $"An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.";
+            _logger.LogError(ex, message, facilityId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -214,7 +234,6 @@ public class QueryPlanConfigController : Controller
     /// Hard deletes a QueryPlanConfig for a given facilityId and queryPlanType.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <param name="queryPlanType"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 202
@@ -222,65 +241,53 @@ public class QueryPlanConfigController : Controller
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [HttpDelete("{queryPlanType}")]
+    [HttpDelete("QueryPlan")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> DeleteQueryPlan(
+    public async Task<ActionResult> DeleteQueryPlan(
         string facilityId,
-        QueryPlanType queryPlanType,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
-        {
-            return BadRequest("FacilityId is required.");
-        }
 
         try
         {
-            var result = await _mediator.Send(new DeleteQueryPlanCommand
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                FacilityId = facilityId
-            });
-
-            if (result == null)
-            {
-                return NotFound("No Config Found.");
+                throw new BadRequestException("parameter facilityId is required.");
             }
+
+            var existing = await _queryPlanManager.GetAsync(facilityId, cancellationToken);
+            if (existing == null)
+            {
+                throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
+            }
+
+            await _queryPlanManager.DeleteAsync(facilityId, cancellationToken);
 
             return Accepted();
         }
+        catch (BadRequestException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
+        catch (MissingFacilityConfigurationException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+        }
         catch (Exception ex)
         {
-            await SendAudit(
-                $"Error creating query plan for facility {facilityId}: {ex.Message}\n{ex.StackTrace}\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}",
-                "",
-                facilityId,
-                AuditEventType.Query,
-                null);
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteQueryPlan"), ex, "An exception occurred while attempting to delete a query place with a facility id of {id}", facilityId);
-            throw;
+            string message = $"An exception occurred while attempting to update a QueryPlan for facility id of {facilityId}.";
+            _logger.LogError(ex, message, facilityId);
+            return Problem(title: "Internal Server Error", detail: message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
-    }
-
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type, List<PropertyChangeModel> changes)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = "",
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = DataAcquisitionConstants.ServiceName,
-                PropertyChanges = changes != null ? changes : new List<PropertyChangeModel>(),
-                Resource = "DataAcquisition",
-                User = "",
-                UserId = "",
-                Notes = $"{message}"
-            }
-        });
     }
 }

@@ -17,6 +17,7 @@ import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -26,6 +27,7 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaUtils;
@@ -49,6 +51,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final Predicate<MeasureReport> reportabilityPredicate;
     private final MeasureEvalMetrics measureEvalMetrics;
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
+    @Qualifier("compressedKafkaTemplate")
     private final KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate;
 
     public AbstractResourceConsumer(
@@ -76,6 +79,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     protected abstract NormalizationStatus getNormalizationStatus();
 
     protected void doConsume(String correlationId, ConsumerRecord<String, T> record) {
+
+        Span currentSpan = Span.current();
+        MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
+        MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
+
         String facilityId = record.key();
 
         if(facilityId == null || facilityId.isEmpty()) {
@@ -83,15 +91,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             throw new ValidationException("Facility ID is null or empty.");
         }
 
-        if(correlationId == null || correlationId.isEmpty()) {
-            logger.error("Correlation ID is null or empty. Exiting.");
-            throw new ValidationException("Correlation ID is null or empty.");
-        }
-
         T value = record.value();
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
                 KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId());
+
 
         logger.info("Beginning resource update");
         AbstractResourceEntity resource = Objects.requireNonNullElseGet(
@@ -320,9 +324,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 put(stringKey("endDate"), report.getEndDate().toString()).
                 put(stringKey("queryType"), queryType).
                 put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
-        logger.info("Measure evaluation duration for Patient {}: {}", patientStatus.getPatientId(), timeElapsed);
+        logger.info("Measure evaluation duration for Patient {} on {} query: {}", patientStatus.getPatientId(), queryType, timeElapsed + " milliseconds");
         // Record the duration of the evaluation
-        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes );
+        measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
 
         // count the number of patients evaluated (reportable or non-reportable)
         measureEvalMetrics.IncrementPatientEvaluatedCounter(attributes);
