@@ -2,7 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -65,9 +65,9 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         List<IBaseMessage> results = new List<IBaseMessage>();
         try
         {
-            results = await _patientDataService.Get(new GetPatientDataRequest
+            await _patientDataService.Get(new GetPatientDataRequest
             {
-                Message = consumeResult.Message.Value,
+                ConsumeResult = consumeResult,
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
             }, cancellationToken);
@@ -80,43 +80,13 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         {
             throw new TransientException("Error fetching FHIR API: " + ex.Message, AuditEventType.Query, ex);
         }
+        catch (ProduceException<string, object> ex)
+        {
+            throw new TransientException($"Failed to produce message to {consumeResult.Topic} for {facilityId}", AuditEventType.Query, ex);
+        }
         catch (Exception ex)
         {
             throw new TransientException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
-        }
-
-        if (results?.Count > 0)
-        {
-            var producerSettings = new ProducerConfig();
-            producerSettings.CompressionType = CompressionType.Zstd;
-
-            using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
-
-            try
-            {
-                foreach (var responseMessage in results)
-                {
-                    var headers = new Headers
-                    {
-                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                    };
-                    var produceMessage = new Message<string, ResourceAcquired>
-                    {
-                        Key = facilityId,
-                        Headers = headers,
-                        Value = (ResourceAcquired)responseMessage
-                    };
-                    await producer.ProduceAsync(KafkaTopic.ResourceAcquired.ToString(), produceMessage, cancellationToken);
-                }
-            }
-            catch (ProduceException<string, object> ex)
-            {
-                throw new TransientException($"Failed to produce message to {consumeResult.Topic} for {facilityId}", AuditEventType.Query, ex);
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
         }
     }
 

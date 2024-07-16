@@ -1,5 +1,5 @@
 ﻿
-namespace LantanaGroup.Link.DataAcquisition.Application.Settings;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Settings;
 
 public static class DataAcquisitionConstants
 {

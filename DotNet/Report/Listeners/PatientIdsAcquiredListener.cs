@@ -100,7 +100,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         $"{Name}: No Scheduled Reports found for facilityId: {key}", AuditEventType.Query);
                                 }
 
-                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested.GetValueOrDefault()))
+                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested))
                                 {
                                     if (scheduledReport.PatientsToQuery == null)
                                     {

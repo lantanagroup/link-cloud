@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
@@ -13,6 +14,7 @@ public interface IFhirQueryListConfigurationManager
     Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration> AddAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<FhirListConfiguration?> SingleOrDefaultAsync(Expression<Func<FhirListConfiguration, bool>> predicate, CancellationToken cancellationToken = default);
     Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity,
         CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -108,6 +110,10 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
 
     public async Task<FhirListConfiguration> AddAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default)
     {
+        if (await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(l => l.FacilityId == entity.FacilityId, cancellationToken) != null)
+            throw new EntityAlreadyExistsException(
+                $"A FhirListConfiguration already exists for facilityId: {entity.FacilityId}");
+
         return await _database.FhirListConfigurationRepository.AddAsync(entity, cancellationToken);
     }
 
@@ -127,6 +133,11 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
 
         await _database.FhirListConfigurationRepository.RemoveAsync(entity);
         return true;
+    }
+
+    public async Task<FhirListConfiguration?> SingleOrDefaultAsync(Expression<Func<FhirListConfiguration, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(predicate, cancellationToken);
     }
 
     public async Task<FhirListConfiguration> GetAsync(string facilityId, CancellationToken cancellationToken = default)
