@@ -34,18 +34,18 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IFhirApiService _fhirRepo;
-    private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
+    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
-        IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory)
+        IProducer<string, ResourceAcquired> kafkaProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
-        _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     public async Task Execute(
@@ -74,7 +74,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach(var existingReference in existingReferenceResources)
         {
-            GenerateMessage(
+            await GenerateMessage(
             FhirResourceDeserializer.DeserializeFhirResource(existingReference),
             request.FacilityId,
             request.ConsumeResult.Message.Value.PatientId,
@@ -130,7 +130,7 @@ public class ReferenceResourceService : IReferenceResourceService
                     ModifyDate = currentDateTime,
                 };
 
-                GenerateMessage(
+                await GenerateMessage(
                 resource,
                 request.FacilityId,
                 request.ConsumeResult.Message.Value.PatientId,
@@ -149,7 +149,7 @@ public class ReferenceResourceService : IReferenceResourceService
         return splitReference[splitReference.Length - 1];
     }
 
-    private void GenerateMessage(
+    private async Task GenerateMessage(
             Resource resource,
             string facilityId,
             string patientId,
@@ -160,7 +160,7 @@ public class ReferenceResourceService : IReferenceResourceService
         var producerConfig = new ProducerConfig();
         producerConfig.CompressionType = CompressionType.Zstd;
 
-        _kafkaProducerFactory.CreateProducer(producerConfig).Produce(
+        await _kafkaProducer.ProduceAsync(
             KafkaTopic.ResourceAcquired.ToString(),
             new Message<string, ResourceAcquired>
             {
