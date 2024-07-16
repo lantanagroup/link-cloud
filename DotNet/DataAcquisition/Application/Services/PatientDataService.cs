@@ -154,7 +154,7 @@ public class PatientDataService : IPatientDataService
                             scheduledReport,
                             queryPlan,
                             referenceTypes,
-                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.InitialQueries.ToString() : QueryPlanType.SupplementalQueries.ToString());
+                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
 
                 }
                 catch(ProduceException<string, ResourceAcquired>)

@@ -2,5 +2,7 @@
 
 public enum QueryPlanType
 {
-    QueryPlans, InitialQueries, SupplementalQueries
+    QueryPlans, 
+    Initial, 
+    Supplemental
 }
