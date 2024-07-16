@@ -16,11 +16,11 @@ jobs:
           const payload = context.payload
           const prTitle = payload.pull_request.title
           // The pattern for JIRA ticket format
-          const jiraPattern = /LNK+-\d+/g
+          const jiraPattern = ^LNK-\d+[:|-]
           if (!jiraPattern.test(prTitle)) {
-            console.log('Could not find Jira ticket in PR title!')
+            console.log('Could not find a LNK Jira ticket in PR title!')
             // Fails the workflow
-            core.setFailed('Could not find Jira ticket in PR title!')
+            core.setFailed('Could not find a LNK Jira ticket in PR title!')
           } else {
             console.log('PR title format is correct.')
           }
