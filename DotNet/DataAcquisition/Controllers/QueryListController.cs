@@ -4,7 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -36,7 +36,7 @@ public class QueryListController : Controller
 
         try
         {
-            var result = await _fhirQueryListConfigurationManager.GetAsync(facilityId, cancellationToken);
+            var result = await _fhirQueryListConfigurationManager.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -73,9 +73,13 @@ public class QueryListController : Controller
 
         try
         {
-            var entity = _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
+            var entity = await _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
 
             return Ok(entity);
+        }
+        catch (EntityAlreadyExistsException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (MissingFacilityConfigurationException ex)
         {
