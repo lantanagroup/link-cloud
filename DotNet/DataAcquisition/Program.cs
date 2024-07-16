@@ -13,10 +13,8 @@ using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -49,6 +47,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.DataAcquisition.Listeners;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -206,7 +205,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (consumerSettings != null || !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.PatientCensusScheduledRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+       // builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.PatientCensusScheduledRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
