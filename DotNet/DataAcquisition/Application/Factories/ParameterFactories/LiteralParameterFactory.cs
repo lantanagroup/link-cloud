@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Factories.ParameterFactories;

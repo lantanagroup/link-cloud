@@ -26,6 +26,13 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------QueryPlan-------------------
 
         modelBuilder.Entity<QueryPlan>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
+        modelBuilder.Entity<QueryPlan>()
         .Property(b => b.InitialQueries)
         .HasConversion(
             v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
@@ -42,6 +49,13 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------FhirQueryConfiguration-------------------
 
         modelBuilder.Entity<FhirQueryConfiguration>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
+        modelBuilder.Entity<FhirQueryConfiguration>()
             .Property(b => b.Authentication)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
@@ -49,6 +63,14 @@ public class DataAcquisitionDbContext : DbContext
         );
 
         //-------------------FhirListConfiguration-------------------
+
+        modelBuilder.Entity<FhirListConfiguration>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
         modelBuilder.Entity<FhirListConfiguration>()
             .Property(b => b.Authentication)
             .HasConversion(
@@ -62,6 +84,22 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions())
         );
+
+        //-------------------ReferenceResources-------------------
+        modelBuilder.Entity<ReferenceResources>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
+        //-------------------QueriedFhirResourceRecord-------------------
+        modelBuilder.Entity<QueriedFhirResourceRecord>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
 
         //Retry Repository
         modelBuilder.Entity<RetryEntity>()

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Microsoft.AspNetCore.Authentication;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
@@ -20,11 +21,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 options.SaveTokens = false;
                 options.ResponseType = "code";
                 options.CallbackPath = openIdConnectOptions.CallbackPath;
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new()
                 {
                     NameClaimType = openIdConnectOptions.NameClaimType,
                     RoleClaimType = openIdConnectOptions.RoleClaimType
+                };
+
+                options.Events.OnTokenValidated = context => {
+                    
+                    //increment login counter
+                    var metrics = context.HttpContext.RequestServices.GetRequiredService<ILinkAdminMetrics>();
+                    metrics.IncrementUserLoginCounter([
+                        new KeyValuePair<string, object?>("auth.scheme", LinkAdminConstants.AuthenticationSchemes.OpenIdConnect)
+                    ]);
+                    return Task.CompletedTask;
                 };
             });
 
@@ -40,7 +52,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             public string ClientSecret { get; set; } = null!;
             public string? NameClaimType { get; set; } = null!;
             public string? RoleClaimType { get; set; } = null!;
-            public string CallbackPath { get; set; } = "/signin-oidc";
+            public string CallbackPath { get; set; } = "/api/signin-oidc";
 
 
         }

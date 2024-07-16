@@ -1,24 +1,26 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Commands.Validate;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
-using MediatR;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/connectionValidation")]
+[Route("api/data/connectionValidation")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class ConnectionValidationController : Controller
 {
     private readonly ILogger<ConnectionValidationController> _logger;
-    private readonly IMediator _mediator;
+    private readonly IValidateFacilityConnectionService _validateFacilityConnectionService;
 
-    public ConnectionValidationController(ILogger<ConnectionValidationController> logger, IMediator mediator)
+    public ConnectionValidationController(ILogger<ConnectionValidationController> logger, IValidateFacilityConnectionService validateFacilityConnectionService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _validateFacilityConnectionService = validateFacilityConnectionService ?? throw new ArgumentNullException(nameof(validateFacilityConnectionService));
     }
 
     /// <summary>
@@ -62,7 +64,7 @@ public class ConnectionValidationController : Controller
 
         try
         {
-            var result = await _mediator.Send(new ValidateFacilityConnectionQuery
+            var result = await _validateFacilityConnectionService.ValidateConnection(new ValidateFacilityConnectionRequest
             {
                 FacilityId = facilityId,
                 PatientId = patientId,

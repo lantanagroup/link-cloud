@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -57,7 +56,7 @@ namespace LantanaGroup.Link.Normalization.Listeners
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
             var repository = _serviceScopeFactory.CreateScope().ServiceProvider
-                .GetRequiredService<IRetryRepository>();
+                .GetRequiredService<IEntityRepository<RetryEntity>>();
 
             var config = new ConsumerConfig()
             {

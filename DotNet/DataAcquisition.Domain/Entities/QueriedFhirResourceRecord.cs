@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Shared.Domain.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
