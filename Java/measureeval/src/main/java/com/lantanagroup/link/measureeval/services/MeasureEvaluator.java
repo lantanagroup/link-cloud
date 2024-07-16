@@ -30,6 +30,7 @@ public class MeasureEvaluator {
     private final Measure measure;
 
     private MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
+        // TODO add check for R4 FhirContext
         this.fhirContext = fhirContext;
         options = MeasureEvaluationOptions.defaultOptions();
         EvaluationSettings evaluationSettings = options.getEvaluationSettings();
@@ -43,6 +44,7 @@ public class MeasureEvaluator {
                 .setSearchParameterMode(RetrieveSettings.SEARCH_FILTER_MODE.FILTER_IN_MEMORY)
                 .setProfileMode(RetrieveSettings.PROFILE_MODE.DECLARED);
         this.bundle = bundle;
+        // TODO: Add catch with log
         measure = bundle.getEntry().stream()
                 .map(Bundle.BundleEntryComponent::getResource)
                 .filter(Measure.class::isInstance)
