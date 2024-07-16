@@ -35,11 +35,11 @@ public class QueriedFhirResourceManager : IQueriedFhirResourceManager
         //TODO: Doing this for now to not interfere with any other dependecies of the QueryPlanType enum. The return of this is to align with Query Type values that are sent before and after DataAcquisitionRequested events
         if (string.Equals(queryType, "initial", StringComparison.InvariantCultureIgnoreCase))
         {
-            queryType = QueryPlanType.InitialQueries.ToString();
+            queryType = QueryPlanType.Initial.ToString();
         }
         else if (string.Equals(queryType, "supplemental", StringComparison.InvariantCultureIgnoreCase))
         {
-            queryType = QueryPlanType.SupplementalQueries.ToString();
+            queryType = QueryPlanType.Supplemental.ToString();
         }
 
         var resultSet = await _database.QueriedFhirResourceRepository
@@ -56,7 +56,7 @@ public class QueriedFhirResourceManager : IQueriedFhirResourceManager
 
             resultSet.ForEach(x => queryResults.QueryResults.Add(new Models.QueryResult
             {
-                QueryType = x.QueryType == QueryPlanType.InitialQueries.ToString() ? "Initial" : "Supplemental",
+                QueryType = x.QueryType == QueryPlanType.Initial.ToString() ? "Initial" : "Supplemental",
                 ResourceId = x.ResourceId,
                 ResourceType = x.ResourceType,
                 IsSuccessful = x.IsSuccessful

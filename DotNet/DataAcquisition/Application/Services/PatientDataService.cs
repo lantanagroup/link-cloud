@@ -37,7 +37,7 @@ public class PatientDataService : IPatientDataService
     private readonly IFhirQueryConfigurationManager _fhirQueryManager;
     private readonly IQueryPlanManager _queryPlanManager;
     private readonly IFhirApiService _fhirRepo;
-    private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
+    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IQueryListProcessor _queryListProcessor;
     private readonly ProducerConfig _producerConfig;
 
@@ -48,7 +48,7 @@ public class PatientDataService : IPatientDataService
         IQueryPlanManager queryPlanManager,
         IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
-        IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory,
+        IProducer<string, ResourceAcquired> kafkaProducer,
         IReferenceResourceService referenceResourceService,
         IQueryListProcessor queryListProcessor)
     {
@@ -58,7 +58,7 @@ public class PatientDataService : IPatientDataService
         _queryPlanManager = queryPlanManager ?? throw new ArgumentNullException(nameof(queryPlanManager));
 
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
-        _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
@@ -114,7 +114,7 @@ public class PatientDataService : IPatientDataService
                     request.FacilityId,
                     fhirQueryConfiguration.Authentication, cancellationToken);
 
-                _kafkaProducerFactory.CreateProducer(_producerConfig).Produce(
+                await _kafkaProducer.ProduceAsync(
                     KafkaTopic.ResourceAcquired.ToString(), 
                     new Message<string, ResourceAcquired>
                     {
@@ -154,7 +154,7 @@ public class PatientDataService : IPatientDataService
                             scheduledReport,
                             queryPlan,
                             referenceTypes,
-                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.InitialQueries.ToString() : QueryPlanType.SupplementalQueries.ToString());
+                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
 
                 }
                 catch(ProduceException<string, ResourceAcquired>)

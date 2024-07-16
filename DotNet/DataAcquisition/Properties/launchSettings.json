@@ -4,8 +4,6 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Local",
-        "Mongo__ConnectionString": "mongodb://root:test@localhost:27017",
-        "Kafka__BootstrapServers__0": "20.97.104.23:9094"
       },
       "applicationUrl": "http://localhost:5194;https://localhost:7194",
       "dotnetRunMessages": true

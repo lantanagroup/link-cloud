@@ -13,17 +13,17 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 {
     private readonly ILogger<PatientCensusScheduledProcessingLogic> _logger;
     private readonly IPatientCensusService _patientCensusService;
-    private readonly IKafkaProducerFactory<string, PatientIDsAcquiredMessage> _kafkaProducerFactory;
+    private readonly IProducer<string, PatientIDsAcquiredMessage> _kafkaProducer;
 
     public PatientCensusScheduledProcessingLogic(
         ILogger<PatientCensusScheduledProcessingLogic> logger,
         IPatientCensusService patientCensusService, 
-        IKafkaProducerFactory<string, PatientIDsAcquiredMessage> kafkaProducerFactory
+        IProducer<string, PatientIDsAcquiredMessage> kafkaProducer
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
-        _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     public ConsumerConfig createConsumerConfig()
@@ -68,9 +68,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
         if(result != null)
         {
-            var producerSettings = new ProducerConfig();
-            using var producer = _kafkaProducerFactory.CreateProducer(producerSettings, useOpenTelemetry: true);
-
+            
             var produceMessage = new Message<string, PatientIDsAcquiredMessage>
             {
                 Key = facilityId,
@@ -79,7 +77,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
             try
             {
-                await producer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
+                await _kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
             }
             catch (Exception ex)
             {

@@ -9,12 +9,12 @@ using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.QueryDispatch.Listeners;
 using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
 using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
 using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -47,6 +47,8 @@ using QueryDispatch.Domain.Context;
 using QueryDispatch.Persistence.Retry;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.QueryDispatch.Listeners;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,7 +94,7 @@ else
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
 
-builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
+builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
@@ -152,6 +154,7 @@ builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
 builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
 builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
+
 //Add Queries
 builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();
 builder.Services.AddScoped<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
@@ -169,23 +172,28 @@ builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventVal
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
-if (consumerSettings == null || !consumerSettings.DisableConsumer)
+if (consumerSettings != null && !consumerSettings.DisableConsumer)
 {
     builder.Services.AddHostedService<PatientEventListener>();
     builder.Services.AddHostedService<ReportScheduledEventListener>();
     builder.Services.AddHostedService<ScheduleService>();
     builder.Services.AddSingleton<QueryDispatchJob>();
+
 }
 
-if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+
+if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
+    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
 }
 
+
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+
 
 
 //Add problem details

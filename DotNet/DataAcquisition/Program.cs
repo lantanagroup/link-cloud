@@ -13,7 +13,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
 using LantanaGroup.Link.Shared.Application;
@@ -30,6 +29,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -47,6 +47,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.DataAcquisition.Listeners;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -88,6 +89,18 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    // Logging using Serilog
+    builder.Logging.AddSerilog();
+    var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
+    Log.Logger = new LoggerConfiguration()
+                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
+                    .Filter.ByExcluding("RequestPath like '/health%'")
+                    //.Enrich.WithExceptionDetails()
+                    .Enrich.FromLogContext()
+                    .Enrich.WithSpan()
+                    .Enrich.With<ActivityEnricher>()
+                    .CreateLogger();
+
     var serviceInformation = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     builder.Services.Configure<ServiceInformation>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation));
 
@@ -107,7 +120,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-    IConfigurationSection consumerSettingsSection = builder.Configuration.GetSection(nameof(ConsumerSettings));
+    IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
@@ -175,17 +188,35 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
     builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
 
-    //Factories
+    //Factories - Consumer
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, ResourceAcquired>, KafkaProducerFactory<string, ResourceAcquired>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, PatientIDsAcquiredMessage>, KafkaProducerFactory<string, PatientIDsAcquiredMessage>>();
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+
+    //Factories - Producer
+    builder.Services.RegisterKafkaProducer<string, object>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd});
+    builder.Services.RegisterKafkaProducer<string, string>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, DataAcquisitionRequested>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, PatientCensusScheduled>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, ResourceAcquired>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, PatientIDsAcquiredMessage>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+
+    //Factories - Retry
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
@@ -196,29 +227,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
 
     //Add Hosted Services
-    if (consumerSettings == null || !consumerSettings.DisableConsumer)
+    if (consumerSettings != null || !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
         builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
     }
 
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null || !consumerSettings.DisableRetryConsumer)
     {
+       // builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.PatientCensusScheduledRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
-    Log.Logger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                    .Filter.ByExcluding("RequestPath like '/health%'")
-                    //.Enrich.WithExceptionDetails()
-                    .Enrich.FromLogContext()
-                    .Enrich.WithSpan()
-                    .Enrich.With<ActivityEnricher>()
-                    .CreateLogger();
+    
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
