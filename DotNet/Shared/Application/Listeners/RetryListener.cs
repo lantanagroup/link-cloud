@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
-            _deadLetterExceptionHandler.ServiceName = retryListenerSettings._serviceName;
+            _deadLetterExceptionHandler.ServiceName = retryListenerSettings.ServiceName;
             _retryListenerSettings = retryListenerSettings;
         }
 
@@ -63,7 +63,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = _retryListenerSettings._serviceName,
+                GroupId = _retryListenerSettings.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -71,9 +71,9 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
             try
             {
-                consumer.Subscribe(_retryListenerSettings._topics);
+                consumer.Subscribe(_retryListenerSettings.Topics);
 
-                _logger.LogInformation($"Started {_retryListenerSettings._serviceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
+                _logger.LogInformation($"Started {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -90,7 +90,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 if (consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var exceptionService))
                                 {
                                     //If retry event is not from the exception service, disregard the retry event
-                                    if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings._serviceName)
+                                    if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings.ServiceName)
                                     {
                                         consumer.Commit(consumeResult);
                                         //continue;
@@ -132,7 +132,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, $"Error in {_retryListenerSettings._serviceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                                _logger.LogError(ex, $"Error in {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
                             }
 
                         }, cancellationToken);
