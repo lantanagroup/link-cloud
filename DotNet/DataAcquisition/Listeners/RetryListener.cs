@@ -1,4 +1,3 @@
-﻿
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -28,11 +27,11 @@ public class RetryListener : BackgroundService
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public RetryListener(
-        ILogger<RetryListener> logger, 
-        IKafkaConsumerFactory<string, string> kafkaConsumerFactory, 
-        IRetryEntityFactory retryEntityFactory, 
-        IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler, 
-        IOptions<ConsumerSettings> consumerSettings, 
+        ILogger<RetryListener> logger,
+        IKafkaConsumerFactory<string, string> kafkaConsumerFactory,
+        IRetryEntityFactory retryEntityFactory,
+        IDeadLetterExceptionHandler<string, string> deadLetterExceptionHandler,
+        IOptions<ConsumerSettings> consumerSettings,
         ISchedulerFactory schedulerFactory,
         IServiceScopeFactory serviceScopeFactory
         )
