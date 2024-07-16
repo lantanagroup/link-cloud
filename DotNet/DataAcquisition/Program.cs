@@ -326,11 +326,6 @@ static void SetupMiddleware(WebApplication app)
 
     app.AutoMigrateEF<DataAcquisitionDbContext>();
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();

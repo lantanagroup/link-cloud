@@ -235,8 +235,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
     });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
@@ -291,16 +289,12 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
 
+    app.AutoMigrateEF<NormalizationDbContext>();
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
     // Configure the HTTP request pipeline.
-    app.MapGrpcService<NormalizationService>();
-    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
-
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
-    app.AutoMigrateEF<NormalizationDbContext>();    
+    app.MapControllers();
 }
 
 #endregion

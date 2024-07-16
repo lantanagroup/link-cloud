@@ -92,8 +92,6 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddGrpc();
-            builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
@@ -262,11 +260,6 @@ namespace Tenant
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
-
-            if (app.Configuration.GetValue<bool>("AllowReflection"))
-            {
-                app.MapGrpcReflectionService();
-            }
 
             // Ensure database created
             using (var scope = app.Services.CreateScope())
