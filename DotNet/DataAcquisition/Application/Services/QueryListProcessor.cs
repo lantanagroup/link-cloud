@@ -34,19 +34,19 @@ public class QueryListProcessor : IQueryListProcessor
 {
     private readonly ILogger<QueryListProcessor> _logger;
     private readonly IFhirApiService _fhirRepo;
-    private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
+    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly ProducerConfig _producerConfig;
 
     public QueryListProcessor(
         ILogger<QueryListProcessor> logger, 
         IFhirApiService fhirRepo, 
-        IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory, 
+        IProducer<string, ResourceAcquired> kafkaProducer, 
         IReferenceResourceService referenceResourceService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
-        _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
 
         _producerConfig = new ProducerConfig();
@@ -147,11 +147,11 @@ public class QueryListProcessor : IQueryListProcessor
         List<ScheduledReport> scheduledReports,
         CancellationToken cancellationToken)
     {
-        bundle.Entry.ForEach(e =>
+        foreach(var e in bundle.Entry)
         {
             if (e.Resource is Resource resource)
             {
-                _kafkaProducerFactory.CreateProducer(_producerConfig).Produce(
+                await _kafkaProducer.ProduceAsync(
                     KafkaTopic.ResourceAcquired.ToString(),
                     new Message<string, ResourceAcquired>
                     {
@@ -169,7 +169,7 @@ public class QueryListProcessor : IQueryListProcessor
                         }
                     });
             }
-        });
+        }
     }
 
     private bool RemovePatientId(Resource resource)

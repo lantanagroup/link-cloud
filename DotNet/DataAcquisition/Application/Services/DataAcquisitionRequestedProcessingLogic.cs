@@ -13,18 +13,15 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>
 {
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
-    private readonly IKafkaProducerFactory<string, ResourceAcquired> _kafkaProducerFactory;
     private readonly IPatientDataService _patientDataService;
 
     public DataAcquisitionRequestedProcessingLogic(
         ILogger<DataAcquisitionRequestedProcessingLogic> logger,
-        IPatientDataService patientDataService,
-        IKafkaProducerFactory<string, ResourceAcquired> kafkaProducerFactory
+        IPatientDataService patientDataService
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _patientDataService = patientDataService;
-        _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
     }
 
     public ConsumerConfig createConsumerConfig()

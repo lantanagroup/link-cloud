@@ -1,13 +1,9 @@
-﻿using Confluent.Kafka;
-using Hl7.Fhir.ElementModel;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
@@ -30,7 +26,6 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
     public class ValidateFacilityConnectionService : IValidateFacilityConnectionService
     {
         private readonly ILogger<ValidateFacilityConnectionService> _logger;
-        private readonly IMediator _mediator;
         private readonly IFhirApiService _fhirApiService;
         private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
 
