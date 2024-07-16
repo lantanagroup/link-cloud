@@ -81,9 +81,9 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 var patient = await _fhirApiService.GetPatient(queryConfig.FhirServerBaseUrl, request.PatientId, Guid.NewGuid().ToString(), request.FacilityId, authenticationConfig, cancellationToken);
 
                 if(patient != null)
-                    return new FacilityConnectionResult(true, false);
-                else
                     return new FacilityConnectionResult(true, true, patient: patient);
+                else
+                    return new FacilityConnectionResult(true, false);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||
