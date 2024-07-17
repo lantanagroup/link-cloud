@@ -31,6 +31,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -157,6 +158,13 @@ static void RegisterServices(WebApplicationBuilder builder)
                 pb.RequireAssertion(context => true);
             });
     }
+
+    // Add header forwarding
+    Log.Logger.Information("Registering Header Forwarding for the Link Admin API.");
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    });
 
     // Add Endpoints
     if (!allowAnonymousAccess)
@@ -296,6 +304,7 @@ static void SetupMiddleware(WebApplication app)
     }
     else
     {
+        app.UseForwardedHeaders();
         app.UseExceptionHandler();
     }
 
