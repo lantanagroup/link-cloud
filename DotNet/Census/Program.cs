@@ -92,7 +92,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+    builder.Services.AddSingleton(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
@@ -113,10 +113,10 @@ static void RegisterServices(WebApplicationBuilder builder)
                 string? connectionString =
                     builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
                         .DatabaseConnection);
-                
+
                 if (string.IsNullOrEmpty(connectionString))
                     throw new InvalidOperationException("Database connection string is null or empty.");
-                
+
                 options.UseSqlServer(connectionString)
                    .AddInterceptors(updateBaseEntityInterceptor);
                 break;
@@ -147,7 +147,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientIDsAcquired>, DeadLetterExceptionHandler<string, PatientIDsAcquired>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string,string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, PatientIDsAcquired>, TransientExceptionHandler<string, PatientIDsAcquired>>();
 
     //Services
@@ -256,12 +256,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<SchedulePatientListRetrieval>();
 
-    if(consumerSettings != null && !consumerSettings.DisableConsumer)
+    if (consumerSettings == null || !consumerSettings.DisableConsumer)
     {
         builder.Services.AddHostedService<CensusListener>();
     }
 
-    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddHostedService<ScheduleService>();
         builder.Services.AddSingleton(new RetryListenerSettings(CensusConstants.ServiceName, [KafkaTopic.PatientIDsAcquiredRetry.GetStringValue()]));
