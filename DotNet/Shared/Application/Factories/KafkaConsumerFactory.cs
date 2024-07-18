@@ -11,9 +11,9 @@ namespace LantanaGroup.Link.Shared.Application.Factories;
 public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumerFactory<TConsumerKey, TConsumerValue>
 {
     private readonly ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> _logger;
-    private readonly IOptions<KafkaConnection> _kafkaConnection;
+    private readonly KafkaConnection _kafkaConnection;
 
-    public KafkaConsumerFactory(ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> logger, IOptions<KafkaConnection> kafkaConnection)
+    public KafkaConsumerFactory(ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> logger, KafkaConnection kafkaConnection)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
@@ -28,16 +28,16 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 throw new ArgumentException("No Kafka Group Id set in consumer configuration");
             }
 
-            config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
-            config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
-            config.ClientId = _kafkaConnection.Value.ClientId;
+            config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
+            config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
+            config.ClientId = _kafkaConnection.ClientId;
 
-            if (_kafkaConnection.Value.SaslProtocolEnabled)
+            if (_kafkaConnection.SaslProtocolEnabled)
             {
                 config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
                 config.SaslMechanism = SaslMechanism.Plain;
-                config.SaslUsername = _kafkaConnection.Value.SaslUsername;
-                config.SaslPassword = _kafkaConnection.Value.SaslPassword;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
             var consumerBuilder = new ConsumerBuilder<TConsumerKey, TConsumerValue>(config);
