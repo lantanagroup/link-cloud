@@ -849,7 +849,8 @@ services:
       secretManagement.managerUri: https://link-vault.vault.azure.net/
       spring.jpa.hibernate.ddl-auto: update
       authentication.anonymous: true
-      loki.enabled: true
+      spring_profiles_active: dev
+      loki.enabled: false
       loki.url: http://loki:3100
     ports:
       - "8075:8075"
