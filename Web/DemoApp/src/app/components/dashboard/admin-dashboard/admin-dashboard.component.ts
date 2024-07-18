@@ -21,7 +21,7 @@ export class AdminDashboardComponent {
   async ngOnInit(): Promise<void> {
     let result: Array<any> = await firstValueFrom(this.http.get<Array<any>>('/api/user'));
     console.log('got result:', result);
-    let profile = new UserProfile(result[4]?.value || "", result[2]?.value || "", result[3]?.value || "", result[5]?.value || [''], [''], ['']);
+    let profile = new UserProfile(result[4]?.value || "", result[2]?.value || "", result[1]?.value || "", result[5]?.value || [''], [''], ['']);
     this.name = profile.firstName + ' ' + profile.lastName;
     this.userProfileService.setProfile(profile);
   }
