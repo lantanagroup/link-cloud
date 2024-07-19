@@ -37,6 +37,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services
 
         public async System.Threading.Tasks.Task TriggerAuditEvent(TriggerAuditEventCommand request, CancellationToken cancellationToken)
         {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+        {
             using var producer = _producerFactory.CreateAuditEventProducer();
             var headers = new Headers();
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(request.CorrelationId));
