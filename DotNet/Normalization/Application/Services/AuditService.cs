@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         public string FacilityId { get; set; }
         public string CorrelationId { get; set; }
 
-        public ResourceAcquiredMessage resourceAcquiredMessage { get; set; }
+        public ResourceAcquiredMessage? resourceAcquiredMessage { get; set; }
         public List<Shared.Application.Models.Kafka.PropertyChangeModel> PropertyChanges { get; set; }
     }
 
