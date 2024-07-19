@@ -76,8 +76,9 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
             {
                 throw new TenantNotFoundException($"{request.NormalizationConfigModel.FacilityId} not found in Tenant Service.");
             }
+
             var facilityId = request.Source == SaveTypeSource.Create
-            ? request.NormalizationConfigModel.FacilityId
+                ? request.NormalizationConfigModel.FacilityId
                 : request.FacilityId;
 
             var existingEntity = await _repository.FirstOrDefaultAsync(c => c.FacilityId == facilityId, cancellationToken);
@@ -100,18 +101,16 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
 
                 return await _repository.AddAsync(entity, cancellationToken);
             }
-            else
+
+            if (existingEntity == null)
             {
-                if (existingEntity == null)
-                {
-                    throw new NoEntityFoundException();
-                }
-
-                existingEntity.OperationSequence = request.NormalizationConfigModel.OperationSequence;
-                existingEntity.ModifyDate = DateTime.UtcNow;
-
-                return await _repository.UpdateAsync(existingEntity, cancellationToken);
+                throw new NoEntityFoundException();
             }
+
+            existingEntity.OperationSequence = request.NormalizationConfigModel.OperationSequence;
+            existingEntity.ModifyDate = DateTime.UtcNow;
+
+            return await _repository.UpdateAsync(existingEntity, cancellationToken);
         }
 
     }
