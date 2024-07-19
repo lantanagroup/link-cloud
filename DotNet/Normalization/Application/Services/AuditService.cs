@@ -43,22 +43,30 @@ namespace LantanaGroup.Link.Normalization.Application.Services
             var headers = new Headers();
             headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(request.CorrelationId));
 
-            await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(),
-                new Message<string, Shared.Application.Models.Kafka.AuditEventMessage>
-                {
-                    Key = request.FacilityId,
-                    Headers = headers,
-                    Value = new Shared.Application.Models.Kafka.AuditEventMessage
+            try
+            {
+                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(),
+                    new Message<string, Shared.Application.Models.Kafka.AuditEventMessage>
                     {
-                        Notes = request.Notes ?? "",
-                        Action = Shared.Application.Models.AuditEventType.Update,
-                        EventDate = DateTime.UtcNow,
-                        ServiceName = "NormalizationService",
-                        PropertyChanges = request.PropertyChanges,
-                        Resource = nameof(Bundle),
+                        Key = request.FacilityId,
+                        Headers = headers,
+                        Value = new Shared.Application.Models.Kafka.AuditEventMessage
+                        {
+                            Notes = request.Notes ?? "",
+                            Action = Shared.Application.Models.AuditEventType.Update,
+                            EventDate = DateTime.UtcNow,
+                            ServiceName = "NormalizationService",
+                            PropertyChanges = request.PropertyChanges,
+                            Resource = nameof(Bundle),
+                        }
                     }
-                }
-            );
+                );
+            }
+            catch (ProduceException<string, Shared.Application.Models.Kafka.AuditEventMessage> ex)
+            {
+                _logger.LogError(ex, "Error producing audit event to Kafka.");
+                throw;
+            }
         }
     }
 }
