@@ -37,13 +37,13 @@ public class ResourceAcquiredListener : BackgroundService
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly INormalizationConfigManager _configManager;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
         IOptions<ServiceInformation> serviceInformation,
-        INormalizationService normalizationService,
-        IAuditService auditService, 
-        INormalizationConfigManager normalizationConfigManager,
+        IServiceScopeFactory scopeFactory,
+        IAuditService auditService,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
@@ -52,7 +52,6 @@ public class ResourceAcquiredListener : BackgroundService
         INormalizationServiceMetrics metrics)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _normalizationService = normalizationService ?? throw new ArgumentNullException(nameof(normalizationService));
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
@@ -66,17 +65,10 @@ public class ResourceAcquiredListener : BackgroundService
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _configManager = normalizationConfigManager;
-    }
 
-    ~ResourceAcquiredListener()
-    {
-     
-    }
-
-    public async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
-    {
-        await base.StartAsync(cancellationToken);
+        using var scope = scopeFactory.CreateScope();
+        _normalizationService = scope.ServiceProvider.GetRequiredService<INormalizationService>();
+        _configManager = scope.ServiceProvider.GetRequiredService<INormalizationConfigManager>();
     }
 
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
