@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
     {
         Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
         Task<NormalizationConfig> SingleOrDefaultAsync(Expression<Func<NormalizationConfig, bool>> predicate, CancellationToken cancellationToken = default);
-        Task<NormalizationConfig> SaveConfigEntity(SaveConfigEntityCommand request, CancellationToken cancellationToken);
+        Task<NormalizationConfig> SaveConfigEntity(SaveConfigEntityCommand request, CancellationToken cancellationToken = default);
     }
 
     public class NormalizationConfigManager : INormalizationConfigManager
@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
             await _repository.DeleteAsync(entity.Id, cancellationToken);
         }
 
-        public async Task<NormalizationConfig> SaveConfigEntity(SaveConfigEntityCommand request, CancellationToken cancellationToken)
+        public async Task<NormalizationConfig> SaveConfigEntity(SaveConfigEntityCommand request, CancellationToken cancellationToken = default)
         {
             if (request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
             {
