@@ -176,7 +176,7 @@ public class ResourceAcquiredListener : BackgroundService
                         //fix resource ids
                         try
                         {
-                            operationCommandResult = await _normalizationService.FixResourceID(new FixResourceIDCommand
+                            operationCommandResult = await _normalizationService.FixResourceId(new FixResourceIDCommand
                             {
                                 Resource = resource,
                                 PropertyChanges = operationCommandResult.PropertyChanges

@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -25,13 +24,11 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
     public class NormalizationConfigManager : INormalizationConfigManager
     {
         private readonly IEntityRepository<NormalizationConfig> _repository;
-        private readonly IConditionalTransformationEvaluationService _conditionalTransformationEvaluationService;
         private readonly ITenantApiService _tenantApiService;
         private readonly ILogger<NormalizationConfigManager> _logger;
-        public NormalizationConfigManager(ILogger<NormalizationConfigManager> logger, IEntityRepository<NormalizationConfig> repository, ITenantApiService tenantApiService, IConditionalTransformationEvaluationService conditionalTransformationEvaluationService)
+        public NormalizationConfigManager(ILogger<NormalizationConfigManager> logger, IEntityRepository<NormalizationConfig> repository, ITenantApiService tenantApiService)
         {
             _repository = repository;
-            _conditionalTransformationEvaluationService = conditionalTransformationEvaluationService;
             _tenantApiService = tenantApiService;
             _logger = logger;
         }
