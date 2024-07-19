@@ -96,7 +96,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(kafkaConnection);
 
     // Add Kafka Producer Factories
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
