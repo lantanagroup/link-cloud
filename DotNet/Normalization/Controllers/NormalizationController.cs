@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     NormalizationConfigModel = config,
                     Source = SaveTypeSource.Create
-                }, CancellationToken.None);
+                });
             }
             catch (TenantNotFoundException ex)
             {
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     NormalizationConfigModel = config,
                     Source = SaveTypeSource.Update,
                     FacilityId = facilityId,
-                }, CancellationToken.None);
+                });
             }
             catch (TenantNotFoundException ex)
             {
@@ -184,7 +184,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _configManager.DeleteAsync(facilityId, CancellationToken.None);
+                await _configManager.DeleteAsync(facilityId);
             }
             catch (ConfigOperationNullException ex)
             {
