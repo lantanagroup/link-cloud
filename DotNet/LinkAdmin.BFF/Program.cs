@@ -84,12 +84,16 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
-    // Add IOptions
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
+    // Add IOptions    
     builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+
+    // Add kafka connection singleton
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
+    builder.Services.AddSingleton(kafkaConnection);
 
     // Add Kafka Producer Factories
     builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
