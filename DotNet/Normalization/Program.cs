@@ -116,6 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<IAuditService, AuditService>();
 
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
@@ -183,6 +184,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Managers
     builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
+
+    builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();

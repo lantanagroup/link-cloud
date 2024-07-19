@@ -72,7 +72,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
         Task<OperationCommandResult> CopyElement(CopyElementCommand request, CancellationToken cancellationToken);
         Task<OperationCommandResult> ConditionalTransformation(ConditionalTransformationCommand request, CancellationToken cancellationToken);
         Task<OperationCommandResult> CopyLocationIdentifierToType(CopyLocationIdentifierToTypeCommand request, CancellationToken cancellationToken);
-        Task<OperationCommandResult> FixResourceID(FixResourceIDCommand request, CancellationToken cancellationToken);
+        Task<OperationCommandResult> FixResourceId(FixResourceIDCommand request, CancellationToken cancellationToken);
         Task<OperationCommandResult> FixPeriodDates(PeriodDateFixerCommand request, CancellationToken cancellationToken);
         Task<OperationCommandResult> UnknownOperation(UnknownOperationCommand request, CancellationToken cancellationToken);
     }
@@ -236,7 +236,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
             };
         }
 
-        public async Task<OperationCommandResult> FixResourceID(FixResourceIDCommand request, CancellationToken cancellationToken)
+        public async Task<OperationCommandResult> FixResourceId(FixResourceIDCommand request, CancellationToken cancellationToken)
         {
             var resource = (Resource)request.Resource;
             var propertyChanges = request.PropertyChanges;
