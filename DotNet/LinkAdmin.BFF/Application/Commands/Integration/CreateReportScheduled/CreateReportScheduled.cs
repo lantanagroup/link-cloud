@@ -67,9 +67,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             },
                         };
 
-                        await producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);
+                        await producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);                        
+                        _logger.LogKafkaProducerReportScheduled(correlationId);
 
-                        _logger.LogInformation("New Report Scheduled ({correlationId}) created.", correlationId);
                         return correlationId;
 
                     }

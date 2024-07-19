@@ -2,7 +2,6 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -22,9 +21,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public async Task<string> Execute(DataAcquisitionRequested model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Data Acquisition Requested Event");
             using var scope = _scopeFactory.CreateScope();
-            var _kafkaProducerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, object>>();
 
             string correlationId = Guid.NewGuid().ToString();
 
@@ -32,12 +30,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 var producerConfig = new ProducerConfig();
 
-                using (var producer = _kafkaProducerFactory.CreateProducer(producerConfig, useOpenTelemetry: true))
+                using (var producer = scope.ServiceProvider.GetRequiredService<IProducer<string, object>>())
                 {
                     try
                     {
-                        var headers = new Headers();
-                        headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
+                        var headers = new Headers
+                        {
+                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
+                        };
 
                         var message = new Message<string, object>
                         {
@@ -47,8 +47,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         };
 
                         await producer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), message);
-
                         _logger.LogKafkaProducerDataAcquisitionRequested(correlationId);
+
                         return correlationId;
 
                     }
