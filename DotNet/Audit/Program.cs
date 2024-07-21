@@ -120,12 +120,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
-    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+
+    // Add kafka connection singleton
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
+    builder.Services.AddSingleton(kafkaConnection);
 
     //Add commands
     builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
