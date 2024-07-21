@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         private readonly IAuditFactory _factory;
         private readonly IAuditServiceMetrics _metrics;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, IAuditServiceMetrics metrics, IAuditHelper auditHelper) {
+        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, IAuditServiceMetrics metrics) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));        

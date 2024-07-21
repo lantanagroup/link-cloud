@@ -4,7 +4,6 @@ using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
 using LantanaGroup.Link.Audit.Application.Audit.Queries;
-using LantanaGroup.Link.Audit.Infrastructure.AuditHelper;
 using Serilog;
 using Serilog.Enrichers.Span;
 using LantanaGroup.Link.Audit.Infrastructure;
@@ -126,7 +125,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
     //Add commands
