@@ -79,7 +79,12 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 {
                                     if (result is null)
                                     {
-                                        throw new DeadLetterException("Invalid Auditable Event", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Auditable Event: The message received was null", AuditEventType.Create);
+                                    }
+
+                                    if (result.Message.Value is null)
+                                    {
+                                        throw new DeadLetterException("Invalid Auditable Event: The message value received was null", AuditEventType.Create);
                                     }
 
                                     AuditEventMessage messageValue = result.Message.Value;
