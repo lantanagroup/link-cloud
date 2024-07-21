@@ -13,12 +13,6 @@
             public const string Serilog = "Serilog";
         }
 
-        public static class AuditExceptionMessages 
-        {
-            public const string NullOrWhiteSpaceFacilityId = "No facility id was given and is required for Audit events.";
-            public const string NullOrWhiteSpaceServiceName = "No service name was given and is required for Audit events.";
-        }
-
         public static class AuditLoggingIds 
         {
             public const int GenerateItems = 1000;

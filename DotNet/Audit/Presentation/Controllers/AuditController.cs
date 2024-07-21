@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
         private int maxAuditEventsPageSize = 20;
 
-        public AuditController(ILogger<AuditController> logger, IAuditHelper auditHelper, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery)
+        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));

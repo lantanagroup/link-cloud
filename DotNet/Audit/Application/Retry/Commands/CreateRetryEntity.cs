@@ -6,7 +6,6 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
-using LantanaGroup.Link.Audit.Persistance.Repositories;
 
 namespace LantanaGroup.Link.Audit.Application.Retry.Commands
 {
