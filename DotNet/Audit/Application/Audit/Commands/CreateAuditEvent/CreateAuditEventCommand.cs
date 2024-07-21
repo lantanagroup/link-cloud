@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
         /// <summary>
         /// A command to create a new audit event
         /// </summary>
-        /// <param name="model">A model that represents to optoinal fields that can be used when creating an audit event (facilityId, serviceName, correlationId, eventDate, userId, user, action, resource, propertyChanges, and notes).</param>
+        /// <param name="model">A model that represents to optional fields that can be used when creating an audit event (facilityId, serviceName, correlationId, eventDate, userId, user, action, resource, propertyChanges, and notes).</param>
         /// <param name="cancellationToken"></param>
         /// <returns>The id of the new autid event created</returns>
         /// <exception cref="ArgumentException"></exception>
@@ -41,12 +41,7 @@ namespace LantanaGroup.Link.Audit.Application.Commands
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, model.FacilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.AuditLogAction, model.Action),
                     new KeyValuePair<string, object?>(DiagnosticNames.Resource, model.Resource)
-                ]);                                    
-
-            if (string.IsNullOrWhiteSpace(model.ServiceName))
-            {
-                throw new ArgumentException((string?)AuditExceptionMessages.NullOrWhiteSpaceServiceName);
-            }
+                ]);                                   
 
             model.EventDate ??= DateTime.Now;
 

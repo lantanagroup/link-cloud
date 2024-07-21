@@ -2,7 +2,10 @@
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
+using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Threading;
 
 namespace LantanaGroup.Link.Audit.Presentation.Controllers
 {
@@ -20,21 +24,21 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     {
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
-        private readonly IGetAuditEventListQuery _getAuditEventListQuery;
+        private readonly ISearchRepository _datastore;
         private readonly IGetFacilityAuditEventsQuery _getFacilityAuditEventsQuery;
         private readonly IGetAuditEventQuery _getAuditEventQuery;        
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
         private int maxAuditEventsPageSize = 20;
 
-        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IGetAuditEventListQuery getAuditEventListQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery)
+        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery, ISearchRepository datastore)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
-            _getAuditEventListQuery = getAuditEventListQuery ?? throw new ArgumentNullException(nameof(getAuditEventListQuery));
+            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));           
             _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
             _getFacilityAuditEventsQuery = getFacilityAuditEventsQuery ?? throw new ArgumentNullException(nameof(getFacilityAuditEventsQuery));
+            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
 
         /// <summary>
@@ -75,21 +79,45 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 //make sure page size does not exceed the max page size allowed
                 if (pageSize > maxAuditEventsPageSize) { pageSize = maxAuditEventsPageSize; }
-
                 if (pageNumber < 1) { pageNumber = 1; }
 
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQuery(searchFilter);
 
-                //Get list of audit events using supplied filters and pagination
-                PagedAuditModel auditEventList = await _getAuditEventListQuery.Execute(searchFilter, HttpContext.RequestAborted);
+                using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
+                activity?.EnrichWithAuditSearchFilter(searchFilter);
 
-                if(auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
+                //Get list of audit events using supplied filters and pagination              
+                var (result, metadata) = await _datastore.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy,
+                    searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder,
+                    searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
-                //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
-                                
-                return Ok(auditEventList);
+                //convert AuditEntity to AuditModel
+                using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
+                {
+                    List<AuditModel> auditEvents = result.Select(x => new AuditModel
+                    {
+                        Id = x.AuditId.Value.ToString(),
+                        FacilityId = x.FacilityId,
+                        CorrelationId = x.CorrelationId,
+                        ServiceName = x.ServiceName,
+                        EventDate = x.EventDate,
+                        User = x.User,
+                        Action = x.Action,
+                        Resource = x.Resource,
+                        PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                        Notes = x.Notes
+                    }).ToList();
+
+                    if (auditEvents == null || !(auditEvents.Count > 0)) { return NoContent(); }
+
+                    PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
+
+                    //add X-Pagination header for machine-readable pagination metadata
+                    Response.Headers["X-Pagination"] = JsonSerializer.Serialize(pagedAuditEvents.Metadata);
+
+                    return Ok(pagedAuditEvents);
+                }
             }
             catch (Exception ex)
             {

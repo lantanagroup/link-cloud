@@ -134,7 +134,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add queries
     builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
     builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
-    builder.Services.AddTransient<IGetAuditEventListQuery, GetAuditEventListQuery>();
 
     //Add factories
     builder.Services.AddTransient<IAuditFactory, AuditFactory>();
