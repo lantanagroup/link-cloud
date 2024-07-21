@@ -13,6 +13,11 @@
             public const string Serilog = "Serilog";
         }
 
+        public static class ProblemTypes
+        {
+            public const string NotFound = "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.5";
+        }
+
         public static class AuditLoggingIds 
         {
             public const int GenerateItems = 1000;

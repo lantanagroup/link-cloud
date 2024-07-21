@@ -5,6 +5,7 @@ using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Policies;
@@ -13,7 +14,6 @@ using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Threading;
 
 namespace LantanaGroup.Link.Audit.Presentation.Controllers
 {
@@ -24,21 +24,21 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     {
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
-        private readonly ISearchRepository _datastore;
-        private readonly IGetFacilityAuditEventsQuery _getFacilityAuditEventsQuery;
-        private readonly IGetAuditEventQuery _getAuditEventQuery;        
+        private readonly IAuditRepository _auditRepository;
+        private readonly ISearchRepository _searchRepository;
+        private readonly IGetFacilityAuditEventsQuery _getFacilityAuditEventsQuery;      
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
         private int maxAuditEventsPageSize = 20;
 
-        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IGetAuditEventQuery getAuditEventQuery, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery, ISearchRepository datastore)
+        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery, ISearchRepository datastore, IAuditRepository auditRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));           
-            _getAuditEventQuery = getAuditEventQuery ?? throw new ArgumentNullException(nameof(getAuditEventQuery));
+            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
             _getFacilityAuditEventsQuery = getFacilityAuditEventsQuery ?? throw new ArgumentNullException(nameof(getFacilityAuditEventsQuery));
-            _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _auditRepository = auditRepository ?? throw new ArgumentNullException(nameof(auditRepository));
+            _searchRepository = datastore ?? throw new ArgumentNullException(nameof(datastore));            
         }
 
         /// <summary>
@@ -88,14 +88,14 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 activity?.EnrichWithAuditSearchFilter(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination              
-                var (result, metadata) = await _datastore.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy,
+                var (res, metadata) = await _searchRepository.SearchAsync(searchFilter.SearchText, searchFilter.FilterFacilityBy, searchFilter.FilterCorrelationBy,
                     searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder,
                     searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
                 //convert AuditEntity to AuditModel
                 using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
                 {
-                    List<AuditModel> auditEvents = result.Select(x => new AuditModel
+                    List<AuditModel> auditEvents = res.Select(x => new AuditModel
                     {
                         Id = x.AuditId.Value.ToString(),
                         FacilityId = x.FacilityId,
@@ -126,14 +126,13 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
-            }
-                    
-        }        
+            }                    
+        }
 
         /// <summary>
-        /// Returns an audit event with the provided Id.
+        /// Returns an audit event with the provided Audit Log Id.
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="auditId"></param>
         /// <returns>
         ///     Success: 200
         ///     Bad Request: 400
@@ -141,35 +140,57 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpGet("{id}")]
+        [HttpGet("{auditId:guid}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuditModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<AuditModel>> GetAuditEvent(Guid id)
+        public async Task<ActionResult<AuditModel>> GetAuditEvent(Guid auditId)
         {
             //add id to current activity
             var activity = Activity.Current;
-            activity?.AddTag("audit-log.id", id);
+            activity?.AddTag("audit-log.id", auditId);
 
-            if (id == Guid.Empty) { return BadRequest("No audit event id provided."); }
-            _logger.LogGetAuditEventById(id.ToString());
+            if (auditId == Guid.Empty) { return BadRequest("No audit event id provided."); }
+            _logger.LogGetAuditEventById(auditId.ToString());
 
             try
-            {
-                AuditModel auditEvent = await _getAuditEventQuery.Execute(new AuditId(id), HttpContext.RequestAborted);                
+            {                
+                var res = await _auditRepository.GetAsync(new AuditId(auditId), true, HttpContext.RequestAborted);
 
-                if (auditEvent == null) { return NotFound(); }
-                
-                return Ok(auditEvent);
+                if (res is null) 
+                {
+                    return Problem(
+                        type: AuditConstants.ProblemTypes.NotFound,
+                        title: $"Audit Event Not Found.",
+                        statusCode: 404,
+                        detail: $"No audit event found with an id of '{auditId}'."                      
+                    );
+                }
+
+                //convert AuditEntity to AuditModel
+                AuditModel auditEvent = new()
+                {
+                    Id = res.AuditId.Value.ToString(),
+                    FacilityId = res.FacilityId,
+                    ServiceName = res.ServiceName,
+                    EventDate = res.EventDate,
+                    User = res.User,
+                    Action = res.Action,
+                    Resource = res.Resource,
+                    PropertyChanges = res.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                    Notes = res.Notes
+                };
+
+                return Ok(auditEvent);                
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 Activity.Current?.RecordException(ex);
-                ex.Data.Add("audit-log.id", id);
-                _logger.LogGetAuditEventByIdException(id.ToString(), ex.Message);
+                ex.Data.Add("audit-log.id", auditId);
+                _logger.LogGetAuditEventByIdException(auditId.ToString(), ex.Message);
                 throw;
             }
 
