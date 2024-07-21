@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.Audit.Application.Models
 {
-    public class AuditModel
+    public record AuditModel
     {
         public string Id { get; set; } = null!;
         public string? FacilityId { get; set; }
