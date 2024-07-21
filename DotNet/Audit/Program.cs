@@ -98,8 +98,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add problem details
     builder.Services.AddProblemDetails(options => {
         options.CustomizeProblemDetails = ctx =>
-        {            
-            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+        {
+            if (ctx.ProblemDetails.Status >= 500)
+            {
+                ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+            }
+            
             if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
             {
                 string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
@@ -136,7 +140,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
 
     //Add queries
-    builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
     builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
 
     //Add factories
