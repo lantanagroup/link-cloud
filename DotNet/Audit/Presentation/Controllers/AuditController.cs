@@ -1,11 +1,11 @@
-﻿using LantanaGroup.Link.Audit.Application.Audit.Queries;
-using LantanaGroup.Link.Audit.Application.Interfaces;
+﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Audit.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Policies;
@@ -25,20 +25,18 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         private readonly ILogger<AuditController> _logger;
         private readonly IAuditFactory _auditFactory;
         private readonly IAuditRepository _auditRepository;
-        private readonly ISearchRepository _searchRepository;
-        private readonly IGetFacilityAuditEventsQuery _getFacilityAuditEventsQuery;      
+        private readonly ISearchRepository _searchRepository;  
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
-        private int maxAuditEventsPageSize = 20;
+        private readonly int maxAuditEventsPageSize = 20;
 
-        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IAuditServiceMetrics auditServiceMetrics, IGetFacilityAuditEventsQuery getFacilityAuditEventsQuery, ISearchRepository datastore, IAuditRepository auditRepository)
+        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IAuditServiceMetrics auditServiceMetrics, ISearchRepository datastore, IAuditRepository auditRepository)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
-            _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
-            _getFacilityAuditEventsQuery = getFacilityAuditEventsQuery ?? throw new ArgumentNullException(nameof(getFacilityAuditEventsQuery));
+            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));                     
             _auditRepository = auditRepository ?? throw new ArgumentNullException(nameof(auditRepository));
-            _searchRepository = datastore ?? throw new ArgumentNullException(nameof(datastore));            
+            _searchRepository = datastore ?? throw new ArgumentNullException(nameof(datastore));
+            _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
         }
 
         /// <summary>
@@ -92,6 +90,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                     searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder,
                     searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
+                if (res is null || !res.Any()) { return NoContent(); }
+
                 //convert AuditEntity to AuditModel
                 using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
                 {
@@ -107,14 +107,12 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                         Resource = x.Resource,
                         PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
                         Notes = x.Notes
-                    }).ToList();
-
-                    if (auditEvents == null || !(auditEvents.Count > 0)) { return NoContent(); }
+                    }).ToList();                    
 
                     PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
 
                     //add X-Pagination header for machine-readable pagination metadata
-                    Response.Headers["X-Pagination"] = JsonSerializer.Serialize(pagedAuditEvents.Metadata);
+                    Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
 
                     return Ok(pagedAuditEvents);
                 }
@@ -223,20 +221,51 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 //make sure page size does not exceed the max page size allowed
                 if (pageSize > maxAuditEventsPageSize) { pageSize = maxAuditEventsPageSize; }
-
                 if (pageNumber < 1) { pageNumber = 1; }
 
                 _logger.LogGetFacilityAuditEventsQuery(facilityId);
 
-                //Get list of audit events using supplied filters and pagination
-                PagedAuditModel auditEventList = await _getFacilityAuditEventsQuery.Execute(facilityId, sortBy, sortOrder, pageNumber, pageSize, HttpContext.RequestAborted);
+                //Get list of audit events using supplied filters and pagination                
+                using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Get Audit Events by Facility Query",
+                [
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.SortBy, sortBy),
+                    new KeyValuePair<string, object?>(DiagnosticNames.SortOrder, sortOrder),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PageSize, pageSize),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PageNumber, pageNumber)
+                ]);
 
-                if (auditEventList == null || !(auditEventList.Records.Count > 0)) { return NoContent(); }
+                var (res, metadata) = await _auditRepository.GetByFacilityAsync(facilityId, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
+
+                if (res is null || !res.Any()) 
+                {
+                    return Problem(
+                        type: AuditConstants.ProblemTypes.NotFound,
+                        title: $"Facility Audit Events Not Found.",
+                        statusCode: 404,
+                        detail: $"No audit events found for facility '{facilityId}'."
+                    );
+                }
+
+                List<AuditModel> auditEvents = res.Select(x => new AuditModel
+                {
+                    Id = x.AuditId.Value.ToString(),
+                    FacilityId = x.FacilityId,
+                    ServiceName = x.ServiceName,
+                    EventDate = x.EventDate,
+                    User = x.User,
+                    Action = x.Action,
+                    Resource = x.Resource,
+                    PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
+                    Notes = x.Notes
+                }).ToList();
+
+                PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);                
 
                 //add X-Pagination header for machine-readable pagination metadata
-                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(auditEventList.Metadata);
+                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
 
-                return Ok(auditEventList);
+                return Ok(pagedAuditEvents);
             }
             catch (Exception ex)
             {

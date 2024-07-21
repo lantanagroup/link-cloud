@@ -3,7 +3,6 @@ using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
-using LantanaGroup.Link.Audit.Application.Audit.Queries;
 using Serilog;
 using Serilog.Enrichers.Span;
 using LantanaGroup.Link.Audit.Infrastructure;
@@ -138,9 +137,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add commands
     builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
     builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
-
-    //Add queries
-    builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
 
     //Add factories
     builder.Services.AddTransient<IAuditFactory, AuditFactory>();
