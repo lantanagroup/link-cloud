@@ -31,6 +31,13 @@ public partial class NormalizationDbContext : DbContext
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
         });
 
+        modelBuilder.Entity<NormalizationConfig>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
         OnModelCreatingPartial(modelBuilder);
 
         modelBuilder.Entity<NormalizationConfig>()
