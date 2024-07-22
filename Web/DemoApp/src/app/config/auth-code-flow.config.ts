@@ -3,16 +3,16 @@ import { environment } from '../../environments/environment';
 
 export const authCodeFlowConfig: AuthConfig = {
   // Url of the Identity Provider
-  issuer: environment.idpIssuer,
+ // issuer: environment.idpIssuer,
 
   // URL of the SPA to redirect the user to after login
-  redirectUri: environment.redirectUri,
-  loginUrl: environment.loginUrl,
+  //redirectUri: environment.redirectUri,
+  //loginUrl: environment.loginUrl,
 
   // The SPA's id. The SPA is registerd with this id at the auth-server
-  clientId: environment.idpClientId,
+  //clientId: environment.idpClientId,
 
-  dummyClientSecret: environment.idpClientSecret,
+ // dummyClientSecret: environment.idpClientSecret,
 
   // Just needed if your auth server demands a secret. In general, this
   // is a sign that the auth server is not configured with SPAs in mind
@@ -26,7 +26,7 @@ export const authCodeFlowConfig: AuthConfig = {
   // The first four are defined by OIDC.
   // Important: Request offline_access to get a refresh token
   // The api scope is a usecase specific one
-  scope: environment.idpScope,
+ // scope: environment.idpScope,
 
   showDebugInformation: true,
 };

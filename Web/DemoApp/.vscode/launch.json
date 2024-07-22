@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "msedge",
+      "type": "edge",
       "request": "launch",
       "name": "localhost (Edge)",
       "url": "http://localhost:4200",

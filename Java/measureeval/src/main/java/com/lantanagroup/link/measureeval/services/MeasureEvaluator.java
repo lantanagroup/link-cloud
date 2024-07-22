@@ -110,10 +110,14 @@ public class MeasureEvaluator {
 
     public MeasureReport evaluate(Date periodStart, Date periodEnd, String patientId, Bundle additionalData) {
         TimeZone utc = TimeZone.getTimeZone(ZoneOffset.UTC);
+        // if patientId is in the form "Patient/123", remove the "Patient/" prefix
+        /*if (patientId.startsWith("Patient/")) {
+            patientId = patientId.replace("Patient/", "");
+        }*/
         return evaluate(
                 new DateTimeType(periodStart, TemporalPrecisionEnum.MILLI, utc),
                 new DateTimeType(periodEnd, TemporalPrecisionEnum.MILLI, utc),
-                new StringType(new IdType(ResourceType.Patient.name(), patientId).getValue()),
+                new StringType(new IdType(ResourceType.Patient.name(), "Patient/" + patientId).getValue()),
                 additionalData);
     }
 
