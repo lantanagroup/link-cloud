@@ -2,12 +2,12 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Commands;
-using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
+using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
+using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
@@ -18,18 +18,17 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using MediatR;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
 public class ResourceAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourceAcquiredListener> _logger;
-    private readonly IMediator _mediator;
+    private readonly INormalizationService _normalizationService;
+    private readonly IAuditService _auditService;
     private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
     private readonly IKafkaProducerFactory<string, ResourceNormalizedMessage> _producerFactory;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
@@ -37,11 +36,14 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
+    private readonly INormalizationConfigManager _configManager;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
         IOptions<ServiceInformation> serviceInformation,
-        IMediator mediator,
+        IServiceScopeFactory scopeFactory,
+        IAuditService auditService,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
         IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
@@ -50,7 +52,7 @@ public class ResourceAcquiredListener : BackgroundService
         INormalizationServiceMetrics metrics)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
         _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
@@ -63,16 +65,10 @@ public class ResourceAcquiredListener : BackgroundService
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-    }
 
-    ~ResourceAcquiredListener()
-    {
-     
-    }
-
-    public async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
-    {
-        await base.StartAsync(cancellationToken);
+        using var scope = scopeFactory.CreateScope();
+        _normalizationService = scope.ServiceProvider.GetRequiredService<INormalizationService>();
+        _configManager = scope.ServiceProvider.GetRequiredService<INormalizationConfigManager>();
     }
 
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
@@ -126,10 +122,7 @@ public class ResourceAcquiredListener : BackgroundService
                         NormalizationConfig? config = null;
                         try
                         {
-                            config = await _mediator.Send(new GetConfigurationEntityQuery
-                            {
-                                FacilityId = messageMetaData.facilityId
-                            });
+                            config = await _configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
                         }
                         catch(DbContextNullException ex)
                         {
@@ -175,11 +168,11 @@ public class ResourceAcquiredListener : BackgroundService
                         //fix resource ids
                         try
                         {
-                            operationCommandResult = await _mediator.Send(new FixResourceIDCommand
+                            operationCommandResult = await _normalizationService.FixResourceId(new FixResourceIDCommand
                             {
                                 Resource = resource,
                                 PropertyChanges = operationCommandResult.PropertyChanges
-                            });
+                            }, cancellationToken);
                         }
                         catch (Exception ex)
                         {
@@ -212,39 +205,39 @@ public class ResourceAcquiredListener : BackgroundService
 
                                 operationCommandResult = op.Value switch
                                 {
-                                    ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
+                                    ConceptMapOperation => await _normalizationService.ApplyConceptMap(new ApplyConceptMapCommand
                                     {
                                         Resource = resource,
                                         Operation = conceptMapOperation,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    ConditionalTransformationOperation => await _mediator.Send(new ConditionalTransformationCommand
+                                    }, cancellationToken),
+                                    ConditionalTransformationOperation => await _normalizationService.ConditionalTransformation(new ConditionalTransformationCommand
                                     {
                                         Resource = resource,
                                         Operation = (ConditionalTransformationOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    CopyElementOperation => await _mediator.Send(new CopyElementCommand
+                                    }, cancellationToken),
+                                    CopyElementOperation => await _normalizationService.CopyElement(new CopyElementCommand
                                     {
                                         Resource = resource,
                                         Operation = (CopyElementOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    CopyLocationIdentifierToTypeOperation => await _mediator.Send(new CopyLocationIdentifierToTypeCommand
+                                    }, cancellationToken),
+                                    CopyLocationIdentifierToTypeOperation => await _normalizationService.CopyLocationIdentifierToType(new CopyLocationIdentifierToTypeCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
+                                    }, cancellationToken),
+                                    PeriodDateFixerOperation => await _normalizationService.FixPeriodDates(new PeriodDateFixerCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    _ => await _mediator.Send(new UnknownOperationCommand
+                                    }, cancellationToken),
+                                    _ => await _normalizationService.UnknownOperation(new UnknownOperationCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
+                                    }, cancellationToken)
                                 };
 
                                 _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
@@ -268,13 +261,13 @@ public class ResourceAcquiredListener : BackgroundService
 
                         try
                         {
-                            await _mediator.Send(new TriggerAuditEventCommand
+                            await _auditService.TriggerAuditEvent(new TriggerAuditEventCommand
                             {
                                 CorrelationId = messageMetaData.correlationId,
                                 FacilityId = messageMetaData.facilityId,
                                 resourceAcquiredMessage = message.Value,
                                 PropertyChanges = operationCommandResult.PropertyChanges
-                            });
+                            }, cancellationToken);
 
                             var serializedResource = JsonSerializer.SerializeToElement(operationCommandResult.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
 
