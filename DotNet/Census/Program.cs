@@ -127,15 +127,21 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHttpClient();
 
-    //Factories
+    //Consumers
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIDsAcquired>, KafkaConsumerFactory<string, PatientIDsAcquired>>();
+
+    //Producers
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIDsAcquired>, KafkaProducerFactory<string, PatientIDsAcquired>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, Null>, KafkaProducerFactory<string, Null>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, Ignore>, KafkaProducerFactory<string, Ignore>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
+
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, new ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
+
+    //Factories
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Repositories
