@@ -63,7 +63,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while processing the message.");
-            throw new TransientException("Error occurred while processing the message.", AuditEventType.Query, ex);
+            throw new TransientException("Error occurred while processing the message.", ex);
         }
 
         if(result != null)
@@ -81,7 +81,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
             }
             catch (Exception ex)
             {
-                throw new TransientException("An error producing a PatientIdsAcquiredMessage", AuditEventType.Query, ex);
+                throw new TransientException("An error producing a PatientIdsAcquiredMessage", ex);
             }
         }
     }
