@@ -6,7 +6,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -82,7 +81,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQuery(searchFilter);
 
-                using Activity? activity = ServiceActivitySource.Instance.StartActivity("List Audit Event Query");
+                using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Audit Events");
                 activity?.EnrichWithAuditSearchFilter(searchFilter);
 
                 //Get list of audit events using supplied filters and pagination              
@@ -90,32 +89,17 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                     searchFilter.FilterServiceBy, searchFilter.FilterActionBy, searchFilter.FilterUserBy, searchFilter.SortBy, searchFilter.SortOrder,
                     searchFilter.PageSize, searchFilter.PageNumber, HttpContext.RequestAborted);
 
-                if (res is null || !res.Any()) { return NoContent(); }
+                if (res is null || !res.Any()) { return NoContent(); }              
+             
+                List<AuditModel> auditEvents = res.Select(AuditModel.FromDomain).ToList();                    
 
-                //convert AuditEntity to AuditModel
-                using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
-                {
-                    List<AuditModel> auditEvents = res.Select(x => new AuditModel
-                    {
-                        Id = x.AuditId.Value.ToString(),
-                        FacilityId = x.FacilityId,
-                        CorrelationId = x.CorrelationId,
-                        ServiceName = x.ServiceName,
-                        EventDate = x.EventDate,
-                        User = x.User,
-                        Action = x.Action,
-                        Resource = x.Resource,
-                        PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                        Notes = x.Notes
-                    }).ToList();                    
+                PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
 
-                    PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);
+                //add X-Pagination header for machine-readable pagination metadata
+                Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
 
-                    //add X-Pagination header for machine-readable pagination metadata
-                    Response.Headers["X-Pagination"] = JsonSerializer.Serialize(metadata);
-
-                    return Ok(pagedAuditEvents);
-                }
+                return Ok(pagedAuditEvents);
+                
             }
             catch (Exception ex)
             {
@@ -165,23 +149,9 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                         statusCode: 404,
                         detail: $"No audit event found with an id of '{auditId}'."                      
                     );
-                }
+                }              
 
-                //convert AuditEntity to AuditModel
-                AuditModel auditEvent = new()
-                {
-                    Id = res.AuditId.Value.ToString(),
-                    FacilityId = res.FacilityId,
-                    ServiceName = res.ServiceName,
-                    EventDate = res.EventDate,
-                    User = res.User,
-                    Action = res.Action,
-                    Resource = res.Resource,
-                    PropertyChanges = res.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                    Notes = res.Notes
-                };
-
-                return Ok(auditEvent);                
+                return Ok(AuditModel.FromDomain(res));                
             }
             catch (Exception ex)
             {
@@ -225,8 +195,8 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
 
                 _logger.LogGetFacilityAuditEventsQuery(facilityId);
 
-                //Get list of audit events using supplied filters and pagination                
-                using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Get Audit Events by Facility Query",
+                //Get list of audit events for the specified facility               
+                using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("Get Facility Audit Events",
                 [
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.SortBy, sortBy),
@@ -247,18 +217,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                     );
                 }
 
-                List<AuditModel> auditEvents = res.Select(x => new AuditModel
-                {
-                    Id = x.AuditId.Value.ToString(),
-                    FacilityId = x.FacilityId,
-                    ServiceName = x.ServiceName,
-                    EventDate = x.EventDate,
-                    User = x.User,
-                    Action = x.Action,
-                    Resource = x.Resource,
-                    PropertyChanges = x.PropertyChanges?.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList(),
-                    Notes = x.Notes
-                }).ToList();
+                List<AuditModel> auditEvents = res.Select(AuditModel.FromDomain).ToList();
 
                 PagedAuditModel pagedAuditEvents = new PagedAuditModel(auditEvents, metadata);                
 
