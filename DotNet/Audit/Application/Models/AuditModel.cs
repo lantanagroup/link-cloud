@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Audit.Application.Models
         {
             return new AuditModel
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = log.AuditId.Value.ToString(),
                 FacilityId = log.FacilityId,
                 CorrelationId = log.CorrelationId,
                 ServiceName = log.ServiceName,
