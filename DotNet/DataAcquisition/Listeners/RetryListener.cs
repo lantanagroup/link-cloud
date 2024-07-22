@@ -97,7 +97,7 @@ public class RetryListener : BackgroundService
                                 //Dead letter if the retry count exceeds the configured retry duration count
                                 if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
                                 {
-                                    throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
+                                    throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}");
                                 }
                             }
 
@@ -115,7 +115,7 @@ public class RetryListener : BackgroundService
                         {
                             var facilityId = GetFacilityIdFromHeader(consumeResult.Message.Headers);
                             _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
-                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
+                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             consumer.Commit(consumeResult);
                             //continue;
                         }
@@ -145,7 +145,7 @@ public class RetryListener : BackgroundService
                     };
 
                     _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
-                    _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, AuditEventType.Create, facilityId);
+                    _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, facilityId);
                     _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                     continue;
                 }

@@ -51,7 +51,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
         catch (MissingFacilityIdException ex)
         {
             _logger.LogError(ex, "FacilityId is missing from the message key.");
-            throw new DeadLetterException("FacilityId is missing from the message key.", AuditEventType.Query, ex);
+            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
         IBaseMessage? result;
