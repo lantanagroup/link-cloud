@@ -21,20 +21,19 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ''
-  datasource:
-    url: jdbc:sqlserver://localhost;encrypt=true;database=link-dev-botw-validation;user=sa;password=Temp123;trustServerCertificate=true
+  #datasource:
+  #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
+  #  username: link-user
+  #  password: link-password
   jpa:
+    hibernate:
+      ddl-auto: none
     properties:
       show_sql: true
       hibernate:
         dialect: org.hibernate.dialect.SQLServerDialect
-      jakarta:
-        persistence:
-          schema-generation.scripts.action: create
-          schema-generation.scripts.create-target: src/main/resources/db/schema.sql
-          schema-generation.create-source: metadata
   kafka:
-    bootstrap-servers: 'localhost:9092'
+    bootstrap-servers: ''
     consumer:
       group-id: validation
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
