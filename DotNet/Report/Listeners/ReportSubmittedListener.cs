@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (consumeResult == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: consumeResult is null", AuditEventType.Create);
+                                        $"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -97,13 +97,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (string.IsNullOrWhiteSpace(key?.FacilityId))
                                 {
-                                    throw new DeadLetterException("FacilityId is null or empty", AuditEventType.Submit);
+                                    throw new DeadLetterException("FacilityId is null or empty");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
                                 {
-                                    throw new DeadLetterException("ReportBundleId is null or empty",
-                                        AuditEventType.Submit);
+                                    throw new DeadLetterException("ReportBundleId is null or empty");
                                 }
 
                                 // find existing report schedule
@@ -118,8 +117,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (schedule is null)
                                 {
                                     throw new TransientException(
-                                        $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}",
-                                        AuditEventType.Query);
+                                        $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}");
                                 }
 
                                 // update report schedule with submitted date
@@ -165,13 +163,13 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
                             }
                             finally
                             {
@@ -202,7 +200,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 : string.Empty,
                         };
 
-                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        var dlEx = new DeadLetterException(ex.Message);
                         _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
@@ -218,7 +216,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
                     }
                 }
             }

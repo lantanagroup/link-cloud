@@ -46,7 +46,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         catch (ArgumentNullException ex)
         {
             _logger.LogError(ex, "CorrelationId is missing from the message headers.");
-            throw new DeadLetterException("CorrelationId is missing from the message headers.", Shared.Application.Models.AuditEventType.Query, ex);
+            throw new DeadLetterException("CorrelationId is missing from the message headers.", ex);
         }
 
         try
@@ -56,7 +56,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         catch (ArgumentNullException ex)
         {
             _logger.LogError(ex, "FacilityId is missing from the message key.");
-            throw new DeadLetterException("FacilityId is missing from the message key.", Shared.Application.Models.AuditEventType.Query, ex);
+            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
         List<IBaseMessage> results = new List<IBaseMessage>();

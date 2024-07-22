@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (consumeResult == null)
                                 {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -115,13 +115,13 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
                                 }
 
                                 string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(CorrelationIdStr))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) ||
@@ -130,8 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     key.EndDate == DateTime.MinValue)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.",
-                                        AuditEventType.Create);
+                                        $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
@@ -163,8 +162,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     if (resource == null)
                                     {
-                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
-                                            AuditEventType.Create);
+                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
                                     }
 
                                     if (resource.TypeName == "MeasureReport")
@@ -276,13 +274,13 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
                             }
                             finally
                             {
@@ -311,7 +309,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 : string.Empty,
                         };
 
-                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        var dlEx = new DeadLetterException(ex.Message);
                         _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
@@ -327,7 +325,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
                     }
                 }
             }

@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 {
                                     if (result is null)
                                     {
-                                        throw new DeadLetterException("Invalid Auditable Event", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Auditable Event");
                                     }
 
                                     AuditEventMessage messageValue = result.Message.Value;
@@ -155,7 +155,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 }
                             };
 
-                            var deadLetterException = new DeadLetterException($"Consume Result exception: {ex.InnerException?.Message}", AuditEventType.Create);
+                            var deadLetterException = new DeadLetterException($"Consume Result exception: {ex.InnerException?.Message}");
                             _consumerExceptionDeadLetterHandler.HandleException(converted_record, deadLetterException, facilityId);
 
                             _consumer.Commit();

@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 return sharedResource;
             }
 
-            throw new DeadLetterException("parameter resource is not of an expected type", AuditEventType.Update);
+            throw new DeadLetterException("parameter resource is not of an expected type");
         }
 
         public async Task<IFacilityResource> CreateResourceAsync(string facilityId, Resource resource, string patientId = "", CancellationToken cancellationToken = default)
@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (resourceTypeCategory == null)
             {
-                throw new DeadLetterException(resource.TypeName + " is not a valid FHIR resouce", AuditEventType.Create);
+                throw new DeadLetterException(resource.TypeName + " is not a valid FHIR resouce");
             }
 
             if (resourceTypeCategory == ResourceCategoryType.Patient)

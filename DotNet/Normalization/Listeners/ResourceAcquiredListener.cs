@@ -105,12 +105,12 @@ public class ResourceAcquiredListener : BackgroundService
 
                         if (message.Key == null || string.IsNullOrWhiteSpace(message.Key))
                         {
-                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.", AuditEventType.Query);
+                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
 
                         if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
                         {
-                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.", AuditEventType.Query);
+                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.");
                         }
 
                         (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
@@ -120,7 +120,7 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", ex);
                         }
 
                         NormalizationConfig? config = null;
@@ -133,20 +133,20 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch(DbContextNullException ex)
                         {
-                            throw new TransientException("Database context is null.", AuditEventType.Query, ex);
+                            throw new TransientException("Database context is null.", ex);
                         }
                         catch (NoEntityFoundException ex)
                         {
-                            throw new DeadLetterException("Config for facilityId does not exist.", AuditEventType.Query, ex);
+                            throw new TransientException("Config for facilityId does not exist.", ex);
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", ex);
                         }
 
                         if (config.OperationSequence == null || config.OperationSequence.Count == 0)
                         {
-                            throw new DeadLetterException("No operation sequence found for facility.", AuditEventType.Query);
+                            throw new DeadLetterException("No operation sequence found for facility.");
                         }
 
                         var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
@@ -160,10 +160,10 @@ public class ResourceAcquiredListener : BackgroundService
                         {
                             if(ex is JsonException || ex is NotSupportedException)
                             {
-                                throw new TransientException("Failed to deserialize resource.", AuditEventType.Query, ex);
+                                throw new TransientException("Failed to deserialize resource.", ex);
                             }
 
-                            throw new DeadLetterException("Failed to deserialize resource.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("Failed to deserialize resource.", ex);
                         }
 
                         var operationCommandResult = new OperationCommandResult
@@ -183,7 +183,7 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new TransientException("An error occurred fixing resource Ids.", AuditEventType.Update, ex);
+                            throw new TransientException("An error occurred fixing resource Ids.", ex);
                         }
 
                         try
@@ -207,7 +207,7 @@ public class ResourceAcquiredListener : BackgroundService
                                 catch (Exception ex)
                                 {
 
-                                    throw new TransientException("Error deserializing Concept Map Operation.", AuditEventType.Query, ex);
+                                    throw new TransientException("Error deserializing Concept Map Operation.", ex);
                                 }
 
                                 operationCommandResult = op.Value switch
@@ -263,7 +263,7 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("An error was encountered processing Operation Commands.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("An error was encountered processing Operation Commands.", ex);
                         }
 
                         try
@@ -301,7 +301,7 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new TransientException("An error was encountered triggering audit event.", AuditEventType.Create, ex);
+                            throw new TransientException("An error was encountered triggering audit event.", ex);
                         }
                     }
                     catch (DeadLetterException ex)
@@ -325,7 +325,7 @@ public class ResourceAcquiredListener : BackgroundService
                             Notes = $"Data Acquisition processing failure \nException Message: {ex}",
                         };
 
-                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), message.Message.Key);
+                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
                     {
@@ -355,7 +355,7 @@ public class ResourceAcquiredListener : BackgroundService
                         Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? Array.Empty<byte>())
                     }
                 };
-                _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
+                _consumeExceptionHandler.HandleException(result, ex, facilityId);
                 TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
                 if (offset == null)
                 {
