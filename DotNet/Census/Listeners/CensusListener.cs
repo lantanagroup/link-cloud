@@ -41,7 +41,7 @@ public class CensusListener : BackgroundService
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _nonTransientExceptionHandler = nonTransientExceptionHandler ?? throw new ArgumentNullException(nameof(nonTransientExceptionHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
-        _consumeErrorHandler = consumeErrorHandler ?? throw new ArgumentNullException(nameof(consumeErrorHandler);
+        _consumeErrorHandler = consumeErrorHandler ?? throw new ArgumentNullException(nameof(consumeErrorHandler));
 
         _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
