@@ -138,7 +138,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
-    builder.Services.RegisterKafkaProducer<string, PatientIDsAcquired>(kafkaConnection, new ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new ProducerConfig());
     builder.Services.RegisterKafkaProducer<string, Null>(kafkaConnection, new ProducerConfig());
 
     //Factories
