@@ -3,9 +3,9 @@
     "Query": {
       "commandName": "Project",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Local",
+        "ASPNETCORE_ENVIRONMENT": "Local"
       },
-      "applicationUrl": "http://localhost:5194;https://localhost:7194",
+      "applicationUrl": "http://localhost:5195;https://localhost:7194",
       "dotnetRunMessages": true
     },
     "Docker": {

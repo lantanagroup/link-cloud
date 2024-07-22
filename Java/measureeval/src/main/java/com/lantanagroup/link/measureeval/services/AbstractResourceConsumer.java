@@ -92,6 +92,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
 
         T value = record.value();
+        String patientId = value.getPatientId() != null? value.getPatientId() : "";
+        logger.info("Patient Id is: " +  patientId);
         logger.info(
                 "Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] RESOURCE=[{}/{}]",
                 KafkaUtils.format(record), facilityId, correlationId, value.getResourceType(), value.getResourceId());
