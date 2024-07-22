@@ -22,17 +22,15 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
     public class AuditController : ControllerBase
     {
         private readonly ILogger<AuditController> _logger;
-        private readonly IAuditFactory _auditFactory;
         private readonly IAuditRepository _auditRepository;
         private readonly ISearchRepository _searchRepository;  
         private readonly IAuditServiceMetrics _auditServiceMetrics;
 
         private readonly int maxAuditEventsPageSize = 20;
 
-        public AuditController(ILogger<AuditController> logger, IAuditFactory auditFactory, IAuditServiceMetrics auditServiceMetrics, ISearchRepository datastore, IAuditRepository auditRepository)
+        public AuditController(ILogger<AuditController> logger, IAuditServiceMetrics auditServiceMetrics, ISearchRepository datastore, IAuditRepository auditRepository)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));                     
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));                   
             _auditRepository = auditRepository ?? throw new ArgumentNullException(nameof(auditRepository));
             _searchRepository = datastore ?? throw new ArgumentNullException(nameof(datastore));
             _auditServiceMetrics = auditServiceMetrics ?? throw new ArgumentNullException(nameof(auditServiceMetrics));
@@ -78,7 +76,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 if (pageSize > maxAuditEventsPageSize) { pageSize = maxAuditEventsPageSize; }
                 if (pageNumber < 1) { pageNumber = 1; }
 
-                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = new(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQuery(searchFilter);
 
                 using Activity? activity = ServiceActivitySource.Instance.StartActivity("Search Audit Events");
@@ -105,7 +103,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 Activity.Current?.RecordException(ex);
-                AuditSearchFilterRecord searchFilter = _auditFactory.CreateAuditSearchFilterRecord(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
+                AuditSearchFilterRecord searchFilter = new(searchText, filterFacilityBy, filterCorrelationBy, filterServiceBy, filterActionBy, filterUserBy, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
                 throw;
             }                    
