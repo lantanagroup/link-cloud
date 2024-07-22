@@ -12,19 +12,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     public class CreateReportScheduled : ICreateReportScheduled
     {
         private readonly ILogger<CreateReportScheduled> _logger;
-        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IProducer<string, object> _producer;
 
-        public CreateReportScheduled(ILogger<CreateReportScheduled> logger, IServiceScopeFactory scopeFactory)
+        public CreateReportScheduled(ILogger<CreateReportScheduled> logger, IProducer<string, object> producer)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));            
-            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task<string> Execute(ReportScheduled model, string? userId = null)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Report Scheduled Event");
-            using var scope = _scopeFactory.CreateScope();            
-
             string correlationId = Guid.NewGuid().ToString();
 
             List<KeyValuePair<string, object>> parameters = [];
@@ -40,57 +38,40 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             try
             {
-                var producerConfig = new ProducerConfig();
-
-                using (var producer = scope.ServiceProvider.GetRequiredService<IProducer<string, object>>())
+                var headers = new Headers
                 {
-                    try
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
+                };
+
+                ReportScheduledKey Key = new()
+                {
+                    FacilityId = model.FacilityId,
+                    ReportType = model.ReportType
+                };
+
+                var message = new Message<string, object>
+                {
+                    Key = JsonSerializer.Serialize(Key),
+                    Headers = headers,
+                    Value = new ReportScheduledMessage()
                     {
-                        var headers = new Headers
-                        {
-                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
-                        };
+                        Parameters = parameters
+                    },
+                };
 
-                        ReportScheduledKey Key = new()
-                        {
-                            FacilityId = model.FacilityId,
-                            ReportType = model.ReportType
-                        };
+                await _producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);
+                _logger.LogKafkaProducerReportScheduled(correlationId);
 
-                        var message = new Message<string, object>
-                        {
-                            Key = JsonSerializer.Serialize(Key),
-                            Headers = headers,
-                            Value = new ReportScheduledMessage()
-                            {
-                                Parameters = parameters
-                            },
-                        };
+                return correlationId;
 
-                        await producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);                        
-                        _logger.LogKafkaProducerReportScheduled(correlationId);
-
-                        return correlationId;
-
-                    }
-                    catch (Exception ex)
-                    {
-                        Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                        Activity.Current?.RecordException(ex);
-                        _logger.LogKafkaProducerException(correlationId, ex.Message);
-                        throw;
-                    }
-
-                }
             }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
+                _logger.LogKafkaProducerException(correlationId, ex.Message);
                 throw;
             }
-
 
         }
     }
