@@ -141,7 +141,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
 
     //Add factories
-    builder.Services.AddTransient<IAuditFactory, AuditFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
