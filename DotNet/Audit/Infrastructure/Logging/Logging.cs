@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Audit.Application.Commands;
-using LantanaGroup.Link.Audit.Application.Models;
+﻿using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
@@ -19,7 +18,7 @@ namespace LantanaGroup.Link.Audit.Infrastructure.Logging
             AuditLoggingIds.EventConsumerObserved, 
             LogLevel.Information, 
             "New auditable event observed for facility {facility} from service {serviceName}.")]
-        public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties]CreateAuditEventModel auditEvent);
+        public static partial void LogAuditableEventConsumption(this ILogger logger, string facility, string serviceName, [LogProperties]AuditModel auditEvent);
 
         [LoggerMessage(
             AuditLoggingIds.DeadLetterException, 

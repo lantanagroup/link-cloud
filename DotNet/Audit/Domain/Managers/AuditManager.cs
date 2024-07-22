@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
+using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
@@ -8,31 +9,27 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using static LantanaGroup.Link.Audit.Settings.AuditConstants;
 
-namespace LantanaGroup.Link.Audit.Application.Commands
+namespace LantanaGroup.Link.Audit.Domain.Managers
 {
-    public class CreateAuditEventCommand : ICreateAuditEventCommand
+    public interface IAuditManager
     {
-        private readonly ILogger<CreateAuditEventCommand> _logger;
+        Task<AuditLog> CreateAuditLog(AuditModel model, CancellationToken cancellationToken = default);
+    }
+
+    public class AuditManager : IAuditManager
+    {
+        private readonly ILogger<AuditManager> _logger;
         private readonly IAuditRepository _datastore;
-        private readonly IAuditFactory _factory;
         private readonly IAuditServiceMetrics _metrics;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IAuditRepository datastore, IAuditFactory factory, IAuditServiceMetrics metrics) {
+        public AuditManager(ILogger<AuditManager> logger, IAuditRepository datastore, IAuditServiceMetrics metrics)
+        {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
-            _factory = factory ?? throw new ArgumentNullException(nameof(factory));        
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         }
 
-        /// <summary>
-        /// A command to create a new audit event
-        /// </summary>
-        /// <param name="model">A model that represents to optional fields that can be used when creating an audit event (facilityId, serviceName, correlationId, eventDate, userId, user, action, resource, propertyChanges, and notes).</param>
-        /// <param name="cancellationToken"></param>
-        /// <returns>The id of the new autid event created</returns>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="ApplicationException"></exception>
-        public async Task<AuditLog> Execute(CreateAuditEventModel model, CancellationToken cancellationToken = default)
+        public async Task<AuditLog> CreateAuditLog(AuditModel model, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance
                 .StartActivityWithTags(DiagnosticNames.CreateAuditEvent,
@@ -41,12 +38,11 @@ namespace LantanaGroup.Link.Audit.Application.Commands
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, model.FacilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.AuditLogAction, model.Action),
                     new KeyValuePair<string, object?>(DiagnosticNames.Resource, model.Resource)
-                ]);                                   
+                ]);
 
             model.EventDate ??= DateTime.Now;
+            AuditLog auditLog = AuditModel.ToDomain(model);
 
-            AuditLog auditLog = _factory.Create(model.FacilityId, model.ServiceName, model.CorrelationId, model.EventDate, model.UserId, model.User, model.Action, model.Resource, model.PropertyChanges, model.Notes);
-                       
             try
             {
                 await _datastore.AddAsync(auditLog, cancellationToken);
@@ -66,10 +62,9 @@ namespace LantanaGroup.Link.Audit.Application.Commands
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, auditLog.FacilityId),
                 new KeyValuePair<string, object?>(DiagnosticNames.AuditLogAction, auditLog.Action),
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, auditLog.Resource)
-            ]);                
-          
-            return auditLog;           
-         
+            ]);
+
+            return auditLog;
         }
     }
 }

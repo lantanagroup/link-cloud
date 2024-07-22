@@ -1,7 +1,6 @@
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
-using LantanaGroup.Link.Audit.Application.Commands;
 using LantanaGroup.Link.Audit.Application.Factory;
 using Serilog;
 using Serilog.Enrichers.Span;
@@ -44,6 +43,7 @@ using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Audit.Listeners;
+using LantanaGroup.Link.Audit.Domain.Managers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -134,8 +134,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
     builder.Services.AddSingleton(kafkaConnection);
 
+    //Add Managers
+    builder.Services.AddScoped<IAuditManager, AuditManager>();
+
     //Add commands
-    builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
     builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
 
     //Add factories

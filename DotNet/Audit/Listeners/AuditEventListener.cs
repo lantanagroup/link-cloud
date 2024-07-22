@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Audit.Application.Commands;
-using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Settings;
@@ -12,7 +10,8 @@ using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Domain.Managers;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
@@ -20,17 +19,15 @@ namespace LantanaGroup.Link.Audit.Listeners
     {
         private readonly ILogger<AuditEventListener> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly IAuditFactory _auditFactory;
         private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
         private readonly IDeadLetterExceptionHandler<string, AuditEventMessage> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumerExceptionDeadLetterHandler;
         private readonly ITransientExceptionHandler<string, AuditEventMessage> _transientExceptionHandler;
 
-        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory<string, AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumerExceptionDeadLetterHandler, ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
+        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IKafkaConsumerFactory<string, AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, IDeadLetterExceptionHandler<string, string> consumerExceptionDeadLetterHandler, ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));            
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
             _consumerExceptionDeadLetterHandler = consumerExceptionDeadLetterHandler ?? throw new ArgumentNullException(nameof(consumerExceptionDeadLetterHandler));
@@ -94,9 +91,9 @@ namespace LantanaGroup.Link.Audit.Listeners
                                         messageValue.CorrelationId = Encoding.UTF8.GetString(headerValue);
                                     }
 
-                                    //create audit event
-                                    CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);
-                                    _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, eventModel);
+                                    //create audit event                                   
+                                    var auditEventModel = AuditModel.FromMessage(messageValue);
+                                    _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, auditEventModel);
 
                                     //create scoped create audit event command
                                     //deals with issue of non-singleton services being used within singleton hosted service
@@ -104,8 +101,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     {
                                         using var scope = _scopeFactory.CreateScope();
 
-                                        var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
-                                        _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
+                                        var _auditManager = scope.ServiceProvider.GetRequiredService<IAuditManager>();
+                                        _ = await _auditManager.CreateAuditLog(auditEventModel, cancellationToken);
                                     }
                                     catch (Exception ex)
                                     {
