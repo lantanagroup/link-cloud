@@ -27,7 +27,6 @@ namespace LantanaGroup.Link.Normalization.Listeners;
 public class ResourceAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourceAcquiredListener> _logger;
-    private readonly INormalizationService _normalizationService;
     private readonly IAuditService _auditService;
     private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
     private readonly IKafkaProducerFactory<string, ResourceNormalizedMessage> _producerFactory;
@@ -36,7 +35,6 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
-    private readonly INormalizationConfigManager _configManager;
     private readonly IServiceScopeFactory _scopeFactory;
 
     public ResourceAcquiredListener(
@@ -66,9 +64,7 @@ public class ResourceAcquiredListener : BackgroundService
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 
-        using var scope = scopeFactory.CreateScope();
-        _normalizationService = scope.ServiceProvider.GetRequiredService<INormalizationService>();
-        _configManager = scope.ServiceProvider.GetRequiredService<INormalizationConfigManager>();
+        _scopeFactory = scopeFactory;
     }
 
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
@@ -97,6 +93,10 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     try
                     {
+                        using var scope = _scopeFactory.CreateScope();
+                        var normalizationService = scope.ServiceProvider.GetRequiredService<INormalizationService>();
+                        var configManager = scope.ServiceProvider.GetRequiredService<INormalizationConfigManager>();
+
                         message = result;
 
                         if (message.Key == null || string.IsNullOrWhiteSpace(message.Key))
@@ -122,7 +122,7 @@ public class ResourceAcquiredListener : BackgroundService
                         NormalizationConfig? config = null;
                         try
                         {
-                            config = await _configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
+                            config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
                         }
                         catch(DbContextNullException ex)
                         {
@@ -168,7 +168,7 @@ public class ResourceAcquiredListener : BackgroundService
                         //fix resource ids
                         try
                         {
-                            operationCommandResult = await _normalizationService.FixResourceId(new FixResourceIDCommand
+                            operationCommandResult = await normalizationService.FixResourceId(new FixResourceIDCommand
                             {
                                 Resource = resource,
                                 PropertyChanges = operationCommandResult.PropertyChanges
@@ -205,35 +205,35 @@ public class ResourceAcquiredListener : BackgroundService
 
                                 operationCommandResult = op.Value switch
                                 {
-                                    ConceptMapOperation => await _normalizationService.ApplyConceptMap(new ApplyConceptMapCommand
+                                    ConceptMapOperation => await normalizationService.ApplyConceptMap(new ApplyConceptMapCommand
                                     {
                                         Resource = resource,
                                         Operation = conceptMapOperation,
                                         PropertyChanges = operationCommandResult.PropertyChanges
                                     }, cancellationToken),
-                                    ConditionalTransformationOperation => await _normalizationService.ConditionalTransformation(new ConditionalTransformationCommand
+                                    ConditionalTransformationOperation => await normalizationService.ConditionalTransformation(new ConditionalTransformationCommand
                                     {
                                         Resource = resource,
                                         Operation = (ConditionalTransformationOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
                                     }, cancellationToken),
-                                    CopyElementOperation => await _normalizationService.CopyElement(new CopyElementCommand
+                                    CopyElementOperation => await normalizationService.CopyElement(new CopyElementCommand
                                     {
                                         Resource = resource,
                                         Operation = (CopyElementOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
                                     }, cancellationToken),
-                                    CopyLocationIdentifierToTypeOperation => await _normalizationService.CopyLocationIdentifierToType(new CopyLocationIdentifierToTypeCommand
+                                    CopyLocationIdentifierToTypeOperation => await normalizationService.CopyLocationIdentifierToType(new CopyLocationIdentifierToTypeCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
                                     }, cancellationToken),
-                                    PeriodDateFixerOperation => await _normalizationService.FixPeriodDates(new PeriodDateFixerCommand
+                                    PeriodDateFixerOperation => await normalizationService.FixPeriodDates(new PeriodDateFixerCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
                                     }, cancellationToken),
-                                    _ => await _normalizationService.UnknownOperation(new UnknownOperationCommand
+                                    _ => await normalizationService.UnknownOperation(new UnknownOperationCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges

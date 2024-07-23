@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
 
         public async System.Threading.Tasks.Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default)
         {
-            var entity = await _repository.SingleAsync(c => c.FacilityId == facilityId);
+            var entity = await _repository.SingleAsync(c => c.FacilityId == facilityId, cancellationToken);
             await _repository.DeleteAsync(entity.Id, cancellationToken);
         }
 
