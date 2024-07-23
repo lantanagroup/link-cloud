@@ -1,25 +1,16 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Newtonsoft.Json;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -46,10 +37,8 @@ public class PatientDataService : IPatientDataService
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
-        IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
-        IReferenceResourceService referenceResourceService,
         IQueryListProcessor queryListProcessor)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -76,8 +65,7 @@ public class PatientDataService : IPatientDataService
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans =
-                await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
+            queryPlans = await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
 
             if (fhirQueryConfiguration == null || queryPlans == null)
             {

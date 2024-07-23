@@ -4,7 +4,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
@@ -13,15 +12,16 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
     private readonly ILogger<PatientCensusScheduledProcessingLogic> _logger;
     private readonly IPatientCensusService _patientCensusService;
     private readonly IProducer<string, PatientIDsAcquiredMessage> _kafkaProducer;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public PatientCensusScheduledProcessingLogic(
         ILogger<PatientCensusScheduledProcessingLogic> logger,
-        IPatientCensusService patientCensusService, 
+        IServiceScopeFactory serviceScopeFactory,
         IProducer<string, PatientIDsAcquiredMessage> kafkaProducer
         )
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
@@ -43,6 +43,10 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
     {
         string? facilityId;
 
+
+        var scope = _serviceScopeFactory.CreateScope();
+        var patientCensusService = scope.ServiceProvider.GetRequiredService<IPatientCensusService>();
+
         try
         {
             facilityId = extractFacilityId(consumeResult);
@@ -57,7 +61,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
 
         try
         {
-            result = await _patientCensusService.Get(facilityId, cancellationToken);
+            result = await patientCensusService.Get(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {
