@@ -86,7 +86,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                         {
                             if (consumeResult != null)
                             {
-                                await _consumerLogic.executeLogic(consumeResult);
+                                await _consumerLogic.executeLogic(consumeResult, cancellationToken);
                             }
                         }
                         catch (DeadLetterException ex)
