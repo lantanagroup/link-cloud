@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.ElementModel;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
@@ -26,17 +27,12 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
     public class ValidateFacilityConnectionService : IValidateFacilityConnectionService
     {
         private readonly ILogger<ValidateFacilityConnectionService> _logger;
-        private readonly IFhirApiService _fhirApiService;
-        private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
+        private readonly IPatientDataService _patientDataService;
 
-        public ValidateFacilityConnectionService(
-            ILogger<ValidateFacilityConnectionService> logger,
-            IFhirApiService fhirApiService,
-            IFhirQueryConfigurationManager fhirQueryConfigurationManager)
+        public ValidateFacilityConnectionService(ILogger<ValidateFacilityConnectionService> logger, IPatientDataService patientDataService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
-            _fhirQueryConfigurationManager = fhirQueryConfigurationManager ?? throw new ArgumentNullException(nameof(fhirQueryConfigurationManager));
+            _patientDataService = patientDataService ?? throw new ArgumentNullException(nameof(patientDataService));
         }
 
         public async Task<FacilityConnectionResult> ValidateConnection(ValidateFacilityConnectionRequest request, CancellationToken cancellationToken)
@@ -71,14 +67,39 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
 
             try
             {
-                var authenticationConfig = await _fhirQueryConfigurationManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
-                var queryConfig = await _fhirQueryConfigurationManager.GetAsync(request.FacilityId, cancellationToken);
-                var patient = await _fhirApiService.GetPatient(queryConfig.FhirServerBaseUrl, request.PatientId, Guid.NewGuid().ToString(), request.FacilityId, authenticationConfig, cancellationToken);
+                var results = await _patientDataService.Get_NoKafka(
+                    new GetPatientDataRequest
+                    {
+                        ConsumeResult = new Confluent.Kafka.ConsumeResult<string, Models.Kafka.DataAcquisitionRequested>
+                        {
+                            Message = new Confluent.Kafka.Message<string, Models.Kafka.DataAcquisitionRequested>
+                            {
+                                Value = new Models.Kafka.DataAcquisitionRequested
+                                {
+                                    PatientId = request.PatientId,
+                                    QueryType = QueryPlanType.Initial.ToString(),
+                                    ScheduledReports = new List<Models.Kafka.ScheduledReport>
+                                    {
+                                        new Models.Kafka.ScheduledReport
+                                        {
+                                            ReportType = request.MeasureId,
+                                            StartDate = request.Start.Value.ToString(),
+                                            EndDate = request.End.Value.ToString()
+                                        }
+                                    }
+                                },
+                                Key = request.FacilityId,
+                                Headers = new Confluent.Kafka.Headers()
+                            }
+                        }
+                    });
 
-                if(patient != null)
-                    return new FacilityConnectionResult(true, true, patient: patient);
-                else
-                    return new FacilityConnectionResult(true, false);
+                if (results == null || results.Count == 0)
+                {
+                    return new FacilityConnectionResult(false, false, "Patient not found for facility.");
+                }
+
+                return new FacilityConnectionResult(true, true, "Connection successful.", results);
             }
             catch (Exception ex) when (
                 ex is FhirConnectionFailedException ||
@@ -88,6 +109,16 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             {
                 _logger.LogError(ex, "Error validating facility connection for facility {FacilityId}", request.FacilityId);
                 throw new FhirConnectionFailedException($"Error validating facility connection for facility {request.FacilityId}", ex);
+            }
+            catch (MissingFacilityConfigurationException ex)
+            {
+                _logger.LogError(ex, "No configuration found for Facility ID {facilityId}.", request.FacilityId);
+                throw new FhirConnectionFailedException($"No configuration found for Facility ID {request.FacilityId}", ex);
+            }
+            catch (NotFoundException ex)
+            {
+                _logger.LogError(ex, "Patient not found for facility {FacilityId}", request.FacilityId);
+                throw new FhirConnectionFailedException($"Patient {request.PatientId} not found for facility {request.FacilityId}", ex);
             }
             catch (Exception ex)
             {
