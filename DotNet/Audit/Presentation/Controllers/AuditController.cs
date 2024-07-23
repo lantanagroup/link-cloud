@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
         ///     Forbidden: 403
         ///     Server Error: 500
         /// </returns>
-        [HttpGet("{auditId:guid}")]
+        [HttpGet("{auditId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuditModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
