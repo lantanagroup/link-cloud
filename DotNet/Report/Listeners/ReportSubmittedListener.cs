@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -23,7 +24,7 @@ namespace LantanaGroup.Link.Report.Listeners
         //for a ProducerFactory that's only used for an AuditEvent
         private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
 
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
@@ -31,14 +32,14 @@ namespace LantanaGroup.Link.Report.Listeners
         private string Name => this.GetType().Name;
 
         public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IDatabase database,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IServiceScopeFactory serviceScopeFactory,
             ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -85,6 +86,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+
                                 if (consumeResult == null)
                                 {
                                     throw new DeadLetterException(
@@ -106,13 +110,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report schedule
-                                var subEntry =
-                                    (await _database.ReportSubmissionRepository.FindAsync(e =>
-                                        e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken)).Single();
+                                var subEntry = await database.ReportSubmissionRepository.SingleAsync(e =>
+                                        e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken);
 
-                                var schedule =
-                                    (await _database.ReportScheduledRepository.FindAsync(s =>
-                                        s.Id == subEntry.MeasureReportScheduleId, cancellationToken)).SingleOrDefault();
+                                var schedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s =>
+                                    s.Id == subEntry.MeasureReportScheduleId, cancellationToken);
 
                                 if (schedule is null)
                                 {
@@ -122,7 +124,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // update report schedule with submitted date
                                 schedule.SubmittedDate = DateTime.UtcNow;
-                                await _database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
+                                await database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
 
                                 // produce audit message signalling the report service acknowledged the report has been submitted
                                 using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
