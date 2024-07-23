@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;

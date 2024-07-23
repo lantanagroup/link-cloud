@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     {
                                         Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                         Activity.Current?.RecordException(ex);
-                                        throw new TransientException($"Unable to create audit log entry", AuditEventType.Create);
+                                        throw new TransientException($"Unable to create audit log entry");
                                     }
 
                                     //consume the result and offset
