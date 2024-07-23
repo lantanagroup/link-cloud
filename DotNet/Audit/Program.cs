@@ -10,7 +10,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using System.Diagnostics;
 using Serilog.Settings.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
@@ -95,30 +94,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add problem details
-    builder.Services.AddProblemDetails(options => {
-        options.CustomizeProblemDetails = ctx =>
-        {
-            if (ctx.ProblemDetails.Status >= 500)
-            {
-                ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-            }
-            
-            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-            {
-                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-            }      
-
-            if (builder.Environment.IsDevelopment())
-            {
-                ctx.ProblemDetails.Extensions.Add("service", "Audit");
-            }
-            else 
-            {
-                ctx.ProblemDetails.Extensions.Remove("exception");
-            }
-            
-        };                        
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = AuditConstants.ServiceName;
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
     // Add services to the container. 
