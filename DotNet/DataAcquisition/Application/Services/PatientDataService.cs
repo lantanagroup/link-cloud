@@ -27,6 +27,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public interface IPatientDataService
 {
     Task Get(GetPatientDataRequest request, CancellationToken cancellationToken);
+    Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default);
 }
 
 public class PatientDataService : IPatientDataService
@@ -64,6 +65,50 @@ public class PatientDataService : IPatientDataService
         _producerConfig.CompressionType = CompressionType.Zstd;
 
         _queryListProcessor = queryListProcessor ?? throw new ArgumentNullException(nameof(queryListProcessor));
+    }
+
+    public async Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default)
+    {
+        var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+        var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+        var patient = await _fhirRepo.GetPatient(queryConfig.FhirServerBaseUrl, request.ConsumeResult.Value.PatientId, Guid.NewGuid().ToString(), request.FacilityId, authenticationConfig, cancellationToken);
+
+        if (patient == null)
+            throw new NotFoundException("Patient not found.");
+
+        var queryPlan = (await _queryPlanManager.FindAsync(q => q.FacilityId.Equals(request.FacilityId, StringComparison.InvariantCultureIgnoreCase)
+            && q.PlanName.Equals(request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType, StringComparison.InvariantCultureIgnoreCase), cancellationToken)).FirstOrDefault();
+
+        if (queryPlan == null)
+            throw new MissingFacilityConfigurationException("Query Plan not found.");
+
+        var resources = new List<Resource>();
+
+        var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
+        var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+
+        var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
+        referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.InitialQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Initial.ToString()));
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.SupplementalQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Supplemental.ToString()));
+
+        return resources;
     }
 
     public async Task Get(GetPatientDataRequest request, CancellationToken cancellationToken)
@@ -115,7 +160,7 @@ public class PatientDataService : IPatientDataService
                     fhirQueryConfiguration.Authentication, cancellationToken);
 
                 await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(), 
+                    KafkaTopic.ResourceAcquired.ToString(),
                     new Message<string, ResourceAcquired>
                     {
                         Key = request.FacilityId,
@@ -134,7 +179,7 @@ public class PatientDataService : IPatientDataService
             }
 
             var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
-            
+
 
             if (queryPlan != null)
             {
@@ -157,7 +202,7 @@ public class PatientDataService : IPatientDataService
                             dataAcqRequested.QueryType == "Initial" ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
 
                 }
-                catch(ProduceException<string, ResourceAcquired>)
+                catch (ProduceException<string, ResourceAcquired>)
                 {
                     throw;
                 }

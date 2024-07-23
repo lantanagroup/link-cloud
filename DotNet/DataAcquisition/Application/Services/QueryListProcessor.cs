@@ -20,6 +20,17 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
 public interface IQueryListProcessor
 {
+    Task<List<Resource>> Process_NoKafka(
+        IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
+        GetPatientDataRequest request,
+        FhirQueryConfiguration fhirQueryConfiguration,
+        ScheduledReport scheduledReport,
+        QueryPlan queryPlan,
+        List<string> referenceTypes,
+        string queryPlanType,
+        CancellationToken cancellationToken = default
+        );
+
     Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
@@ -51,6 +62,93 @@ public class QueryListProcessor : IQueryListProcessor
 
         _producerConfig = new ProducerConfig();
         _producerConfig.CompressionType = CompressionType.Zstd;
+    }
+
+    public async Task<List<Resource>> Process_NoKafka(
+        IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
+        GetPatientDataRequest request,
+        FhirQueryConfiguration fhirQueryConfiguration,
+        ScheduledReport scheduledReport,
+        QueryPlan queryPlan,
+        List<string> referenceTypes,
+        string queryPlanType,
+        CancellationToken cancellationToken = default
+        )
+    {
+        var resources = new List<Resource>();   
+        List<ResourceReference> referenceResources = new List<ResourceReference>();
+        foreach (var query in queryList)
+        {
+            var queryConfig = query.Value;
+            QueryFactoryResult builtQuery = queryConfig switch
+            {
+                ParameterQueryConfig => ParameterQueryFactory.Build((ParameterQueryConfig)queryConfig, request,
+                    scheduledReport, queryPlan.LookBack),
+                ReferenceQueryConfig => ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, referenceResources),
+                _ => throw new Exception("Unable to identify type for query operation."),
+            };
+
+            _logger.LogInformation("Processing Query for:");
+
+            if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
+            {
+                var queryInfo = (ParameterQueryConfig)queryConfig;
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                var bundle = await _fhirRepo.GetSingularBundledResultsAsync(
+                    fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.ConsumeResult.Message.Value.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
+                    (SingularParameterQueryFactoryResult)builtQuery,
+                    (ParameterQueryConfig)queryConfig,
+                    scheduledReport,
+                    fhirQueryConfiguration.Authentication);
+
+                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
+                resources.AddRange(bundle.Entry.Select(e => e.Resource));
+            }
+
+            if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
+            {
+                var queryInfo = (ParameterQueryConfig)queryConfig;
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                var bundle = await _fhirRepo.GetPagedBundledResultsAsync(
+                    fhirQueryConfiguration.FhirServerBaseUrl,
+                    request.ConsumeResult.Message.Value.PatientId,
+                    request.CorrelationId,
+                    request.FacilityId,
+                    queryPlanType,
+                    (PagedParameterQueryFactoryResult)builtQuery,
+                    (ParameterQueryConfig)queryConfig,
+                    scheduledReport,
+                    fhirQueryConfiguration.Authentication);
+
+                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
+                resources.AddRange(bundle.Entry.Select(e => e.Resource));
+            }
+
+            if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
+            {
+                var referenceQueryFactoryResult = (ReferenceQueryFactoryResult)builtQuery;
+
+                var queryInfo = (ReferenceQueryConfig)queryConfig;
+                _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
+
+                var results = await _referenceResourceService.Execute_NoKafka(
+                    referenceQueryFactoryResult,
+                    request,
+                    fhirQueryConfiguration,
+                    queryInfo,
+                    queryPlanType);
+
+                resources.AddRange(results);
+            }
+        }
+
+        return resources;
     }
 
     public async Task Process(
