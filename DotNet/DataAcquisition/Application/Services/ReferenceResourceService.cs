@@ -19,6 +19,14 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
 public interface IReferenceResourceService
 {
+    Task<List<Resource>> Execute_NoKafka(
+        ReferenceQueryFactoryResult referenceQueryFactoryResult,
+        GetPatientDataRequest request,
+        FhirQueryConfiguration fhirQueryConfiguration,
+        ReferenceQueryConfig referenceQueryConfig,
+        string queryPlanType,
+        CancellationToken cancellationToken = default);
+
     Task Execute(
         ReferenceQueryFactoryResult referenceQueryFactoryResult, 
         GetPatientDataRequest request,
@@ -45,6 +53,49 @@ public class ReferenceResourceService : IReferenceResourceService
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
+    }
+
+    public async Task<List<Resource>> Execute_NoKafka(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
+    {
+        var resources = new List<Resource>();
+        if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
+        {
+            return resources;
+        }
+
+        var validReferenceResources =
+            referenceQueryFactoryResult
+            ?.ReferenceIds
+            ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
+            .ToList();
+
+        var existingReferenceResources =
+            await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
+                validReferenceResources.Select(x => SplitReference(x.Reference)).ToList(),
+                request.FacilityId);
+
+        resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
+
+        List<ResourceReference> missingReferences = validReferenceResources
+            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == SplitReference(x.Reference))).ToList();
+
+        missingReferences.ForEach(async x =>
+        {
+            var fullMissingResources = await _fhirRepo.GetReferenceResource(
+            fhirQueryConfiguration.FhirServerBaseUrl,
+            referenceQueryFactoryResult.ResourceType,
+            request.ConsumeResult.Message.Value.PatientId,
+            request.FacilityId,
+            request.CorrelationId,
+            queryPlanType,
+            x,
+            referenceQueryConfig,
+            fhirQueryConfiguration.Authentication);
+
+            resources.AddRange(fullMissingResources);
+        });
+
+        return resources;
     }
 
     public async Task Execute(
@@ -178,4 +229,6 @@ public class ReferenceResourceService : IReferenceResourceService
             });
 
     }
+
+    
 }
