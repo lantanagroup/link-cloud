@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -51,7 +50,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
         catch (MissingFacilityIdException ex)
         {
             _logger.LogError(ex, "FacilityId is missing from the message key.");
-            throw new DeadLetterException("FacilityId is missing from the message key.", AuditEventType.Query, ex);
+            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
         IBaseMessage? result;
@@ -63,7 +62,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while processing the message.");
-            throw new TransientException("Error occurred while processing the message.", AuditEventType.Query, ex);
+            throw new TransientException("Error occurred while processing the message.", ex);
         }
 
         if(result != null)
@@ -81,7 +80,7 @@ public class PatientCensusScheduledProcessingLogic : IConsumerLogic<string, Pati
             }
             catch (Exception ex)
             {
-                throw new TransientException("An error producing a PatientIdsAcquiredMessage", AuditEventType.Query, ex);
+                throw new TransientException("An error producing a PatientIdsAcquiredMessage", ex);
             }
         }
     }

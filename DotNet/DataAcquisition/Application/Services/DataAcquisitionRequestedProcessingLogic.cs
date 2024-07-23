@@ -5,7 +5,6 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -46,7 +45,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         catch (ArgumentNullException ex)
         {
             _logger.LogError(ex, "CorrelationId is missing from the message headers.");
-            throw new DeadLetterException("CorrelationId is missing from the message headers.", Shared.Application.Models.AuditEventType.Query, ex);
+            throw new DeadLetterException("CorrelationId is missing from the message headers.", ex);
         }
 
         try
@@ -56,7 +55,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         catch (ArgumentNullException ex)
         {
             _logger.LogError(ex, "FacilityId is missing from the message key.");
-            throw new DeadLetterException("FacilityId is missing from the message key.", Shared.Application.Models.AuditEventType.Query, ex);
+            throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
         List<IBaseMessage> results = new List<IBaseMessage>();
@@ -71,19 +70,19 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         }
         catch (MissingFacilityConfigurationException ex)
         {
-            throw new TransientException("Facility configuration is missing: " + ex.Message, AuditEventType.Query, ex);
+            throw new TransientException("Facility configuration is missing: " + ex.Message, ex);
         }
         catch (FhirApiFetchFailureException ex)
         {
-            throw new TransientException("Error fetching FHIR API: " + ex.Message, AuditEventType.Query, ex);
+            throw new TransientException("Error fetching FHIR API: " + ex.Message, ex);
         }
         catch (ProduceException<string, object> ex)
         {
-            throw new TransientException($"Failed to produce message to {consumeResult.Topic} for {facilityId}", AuditEventType.Query, ex);
+            throw new TransientException($"Failed to produce message to {consumeResult.Topic} for {facilityId}", ex);
         }
         catch (Exception ex)
         {
-            throw new TransientException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
+            throw new TransientException("Error processing message: " + ex.Message, ex);
         }
     }
 
