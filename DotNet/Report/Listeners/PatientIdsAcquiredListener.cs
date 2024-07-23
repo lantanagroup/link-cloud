@@ -19,17 +19,17 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
         public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
           ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IDatabase database)
+          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
 
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
@@ -74,6 +74,9 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             try
                             {
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+
                                 consumeResult = result;
 
                                 if (consumeResult == null)
@@ -91,7 +94,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var scheduledReports =
-                                    await _database.ReportScheduledRepository.FindAsync(x =>
+                                    await database.ReportScheduledRepository.FindAsync(x =>
                                         x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
@@ -120,7 +123,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
+                                        await database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
                                     }
                                     catch (Exception)
                                     {
