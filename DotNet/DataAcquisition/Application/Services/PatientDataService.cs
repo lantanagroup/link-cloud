@@ -118,7 +118,7 @@ public class PatientDataService : IPatientDataService
                             PatientId = patientId,
                             QueryType = dataAcqRequested.QueryType
                         }
-                    });
+                    }, cancellationToken);
             }
 
             var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
