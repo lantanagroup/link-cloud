@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (consumeResult == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: consumeResult is null", AuditEventType.Create);
+                                        $"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -97,8 +97,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     string.IsNullOrWhiteSpace(key.ReportType))
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null or empty.",
-                                        AuditEventType.Create);
+                                        $"{Name}: One or more required Key/Value properties are null or empty.");
                                 }
 
                                 DateTimeOffset startDateOffset;
@@ -106,8 +105,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
                                         out startDateOffset))
                                 {
-                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed",
-                                        AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed");
                                 }
 
                                 DateTimeOffset endDateOffset;
@@ -115,8 +113,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
                                         out endDateOffset))
                                 {
-                                    throw new DeadLetterException($"{Name}: End Date could not be parsed",
-                                        AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: End Date could not be parsed");
                                 }
 
                                 
@@ -132,8 +129,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (existing != null)
                                 {
                                     throw new DeadLetterException(
-                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.",
-                                        AuditEventType.Create);
+                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.");
                                 }
 
                                 var ent = new MeasureReportScheduleModel
@@ -160,13 +156,13 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
                             }
                             finally
                             {
@@ -196,7 +192,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 : string.Empty,
                         };
                         
-                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        var dlEx = new DeadLetterException(ex.Message);
                         _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
@@ -212,7 +208,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
                     }
                 }
             }
