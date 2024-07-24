@@ -112,8 +112,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ScheduledReportEntity scheduledReport = _getScheduledReportQuery.Execute(consumeResult.Message.Key);
 
-                                    var now = DateTime.UtcNow;
-                                    scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
+                                    if (scheduledReport != null)
+                                    {
+                                        var now = DateTime.UtcNow;
+                                        scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
+                                    }
 
                                     QueryDispatchConfigurationEntity dispatchSchedule = await _getQueryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
 
