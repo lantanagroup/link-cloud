@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Normalization.Migrations
 {
     [DbContext(typeof(NormalizationDbContext))]
-    partial class NormalizationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240722135217_Config_Standardization")]
+    partial class Config_Standardization
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -25,10 +28,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.NormalizationConfig", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<Guid>("Id"));
 
                     b.Property<DateTime>("CreateDate")
                         .ValueGeneratedOnAdd()
