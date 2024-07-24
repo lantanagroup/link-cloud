@@ -21,15 +21,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         public string ServiceName { get; set; } = string.Empty;
 
         public TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
             IKafkaProducerFactory<K, V> producerFactory)
         {
             Logger = logger;
-            AuditProducerFactory = auditProducerFactory;
             ProducerFactory = producerFactory;
         }
 
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "")
+        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, string message = "")
         {
             try
             {
@@ -42,17 +40,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
 
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = auditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId, message);
             }
@@ -63,9 +50,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId)
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
-            var tEx = new TransientException(ex.Message, auditEventType, ex.InnerException);
+            var tEx = new TransientException(ex.Message, ex.InnerException);
             HandleException(consumeResult, tEx, facilityId);
         }
 
@@ -81,17 +68,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
                 Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
 
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = ex.AuditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
                     consumeResult.Message.Headers, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
@@ -100,17 +76,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
                 throw;
             }
-        }
-
-        public virtual void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
-        {
-            using var producer = AuditProducerFactory.CreateAuditEventProducer(useOpenTelemetry:false);
-            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditValue,
-                Headers = headers
-            });
-            producer.Flush();
         }
 
         public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId, string message = "", string stackTrace = "")
@@ -152,5 +117,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 
             producer.Flush();
         }
+
+ 
     }
 }

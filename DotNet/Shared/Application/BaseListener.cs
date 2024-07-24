@@ -86,7 +86,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                         {
                             if (consumeResult != null)
                             {
-                                await _consumerLogic.executeLogic(consumeResult);
+                                await _consumerLogic.executeLogic(consumeResult, cancellationToken);
                             }
                         }
                         catch (DeadLetterException ex)
@@ -99,7 +99,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                         }
                         catch (Exception ex)
                         {
-                            _deadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), _consumerLogic.extractFacilityId(consumeResult));
+                            _deadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), _consumerLogic.extractFacilityId(consumeResult));
                         }
                         finally
                         {
@@ -126,7 +126,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                         }
                     };
 
-                    _deadLetterConsumerErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
+                    _deadLetterConsumerErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
                     continue;
                 }
                 catch (OperationCanceledException)
@@ -135,7 +135,7 @@ public class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, Produce
                 }
                 catch (Exception ex)
                 {
-                    _deadLetterConsumerHandler.HandleException(consumeResult, ex, AuditEventType.Query, "");
+                    _deadLetterConsumerHandler.HandleException(consumeResult, ex, "");
                     continue;
                 }
             }

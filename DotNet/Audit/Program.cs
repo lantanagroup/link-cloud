@@ -31,18 +31,16 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
-using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.DeadLetter;
-using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.Transient;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Impl;
 using Quartz;
-using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -118,7 +116,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IAuditManager, AuditManager>();
 
     //Add commands
-    builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
 
     //Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
@@ -127,9 +124,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();    
 
     //Add event exception handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, AuditDeadLetterExceptionHandler<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, AuditDeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, AuditTransientExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, DeadLetterExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, TransientExceptionHandler<string, AuditEventMessage>>();
         
 
     //Add persistence interceptors
