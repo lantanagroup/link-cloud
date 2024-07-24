@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     return;
                 }
 
-                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: new Exception(message));
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
             }
@@ -90,6 +90,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 consumeResult.Message.Value = value;
                 consumeResult.Message.Headers = headers;
 
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+
                 ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
             }
             catch (Exception e)
@@ -110,6 +112,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 consumeResult.Message.Key = ex.Message;
                 consumeResult.Message.Value = ex.StackTrace;
                 consumeResult.Message.Headers = new Headers();
+
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+
                 ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
             }
             catch (Exception e)
@@ -131,6 +136,8 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 consumeResult.Message.Value = ex.StackTrace;
                 consumeResult.Message.Headers = new Headers();
 
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
+
                 ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
             }
             catch (Exception e)
@@ -151,7 +158,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                 consumeResult.Message.Key = message;
                 consumeResult.Message.Value = message;
                 consumeResult.Message.Headers = new Headers();
-           
+
+                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: new Exception(message));
+
                 ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
             }
             catch (Exception e)
