@@ -8,6 +8,11 @@ public class ResourceIdParameterFactory
 {
     public static ParameterFactoryResult Build(ResourceIdsParameter parameter, GetPatientDataRequest request, List<string> resourceIds)
     {
+        if (resourceIds == null || !resourceIds.Any())
+        {
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(parameter.Paged))
         {
             int pageSize = int.Parse(parameter.Paged);
