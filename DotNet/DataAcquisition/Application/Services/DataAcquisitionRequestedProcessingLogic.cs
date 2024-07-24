@@ -12,15 +12,11 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>
 {
     private readonly ILogger<DataAcquisitionRequestedProcessingLogic> _logger;
-    private readonly IPatientDataService _patientDataService;
-
-    public DataAcquisitionRequestedProcessingLogic(
-        ILogger<DataAcquisitionRequestedProcessingLogic> logger,
-        IPatientDataService patientDataService
-        )
+    private readonly IServiceScopeFactory _serviceScopeFactory;
+    public DataAcquisitionRequestedProcessingLogic(ILogger<DataAcquisitionRequestedProcessingLogic> logger, IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientDataService = patientDataService;
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
     public ConsumerConfig createConsumerConfig()
@@ -37,6 +33,8 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
     {
         string correlationId;
         string facilityId;
+        var scope = _serviceScopeFactory.CreateScope();
+        var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
 
         try
         {
@@ -61,7 +59,7 @@ public class DataAcquisitionRequestedProcessingLogic : IConsumerLogic<string, Da
         List<IBaseMessage> results = new List<IBaseMessage>();
         try
         {
-            await _patientDataService.Get(new GetPatientDataRequest
+            await patientDataService.Get(new GetPatientDataRequest
             {
                 ConsumeResult = consumeResult,
                 FacilityId = facilityId,
