@@ -27,7 +27,6 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             _kafkaConsumerFactory;
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IEntityRepository<RetryEntity> _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
