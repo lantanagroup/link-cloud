@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Quartz;
 using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
@@ -41,7 +39,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             var configModelToDto = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<FacilityConfigModel, FacilityConfigDto>();
-                cfg.CreateMap<PagedConfigModel<FacilityConfigModel>, PagedFacilityConfigDto>();
+                cfg.CreateMap<PagedFacilityConfigModel, PagedFacilityConfigDto>();
                 cfg.CreateMap<ScheduledTaskModel.ReportTypeSchedule, ScheduledTaskDto.ReportTypeDtoSchedule>();
                 cfg.CreateMap<ScheduledTaskModel, ScheduledTaskDto>();
                 cfg.CreateMap<MonthlyReportingPlanModel, MonthlyReportingPlanDto>();
@@ -50,7 +48,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             var configDtoToModel = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<FacilityConfigDto, FacilityConfigModel>();
-                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<FacilityConfigModel>>();
+                cfg.CreateMap<PagedFacilityConfigDto, PagedFacilityConfigModel>();
                 cfg.CreateMap<ScheduledTaskDto.ReportTypeDtoSchedule, ScheduledTaskModel.ReportTypeSchedule>();
                 cfg.CreateMap<ScheduledTaskDto, ScheduledTaskModel>();
                 cfg.CreateMap<MonthlyReportingPlanDto, MonthlyReportingPlanModel>();
@@ -71,11 +69,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="pageSize"></param>
         /// <param name="pageNumber"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityConfigModel>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedFacilityConfigModel))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
-        public async Task<ActionResult<PagedConfigModel<FacilityConfigModel>>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<PagedFacilityConfigModel>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             List<FacilityConfigDto> facilitiesDtos;
             PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
@@ -84,8 +82,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (pageNumber < 1) { pageNumber = 1; }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
-
-            PagedConfigModel<FacilityConfigModel> pagedFacilityConfigModel = await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+            PagedFacilityConfigModel pagedFacilityConfigModel = await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
 
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
@@ -193,7 +190,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFacility(string id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateFacility(Guid id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
         {
             _logger.LogInformation($"Update Facility with Id: {updatedFacility.Id} and Facility Name: {updatedFacility.FacilityName}");
 
