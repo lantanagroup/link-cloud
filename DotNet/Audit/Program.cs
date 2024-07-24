@@ -41,6 +41,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Audit.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,7 +116,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add Managers
     builder.Services.AddScoped<IAuditManager, AuditManager>();
 
-    //Add commands
+    //Add event processors
+    builder.Services.AddTransient<IAuditEventProcessor, AuditEventProcessor>();
 
     //Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
