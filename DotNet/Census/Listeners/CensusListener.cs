@@ -91,7 +91,7 @@ public class CensusListener : BackgroundService
                             {                              
                                 if(rawmessage.Message.Value == null)
                                 {
-                                    throw new DeadLetterException("Message value is null", AuditEventType.Query, new MissingFacilityIdException("No message value provided. Unable to process message."));
+                                    throw new DeadLetterException("Message value is null", new MissingFacilityIdException("No message value provided. Unable to process message."));
                                 }
 
                                 var msgValue = rawmessage.Message.Value;
@@ -101,12 +101,12 @@ public class CensusListener : BackgroundService
                                     messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
                                     if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                                     {
-                                        throw new DeadLetterException("Facility ID is null or empty", AuditEventType.Query, new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
+                                        throw new TransientException("Facility ID is null or empty", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                     }
                                 }
                                 catch (MissingFacilityIdException ex)
                                 {
-                                    throw new DeadLetterException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, ex);
                                 }
 
                                 try
@@ -125,12 +125,12 @@ public class CensusListener : BackgroundService
                                 }
                                 catch(SqlException ex)
                                 {
-                                    throw new TransientException("DB Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new TransientException("DB Error processing message: " + ex.Message, ex);
                                 }
                                 catch (Exception ex)
                                 {
 
-                                    throw new DeadLetterException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new DeadLetterException("Error processing message: " + ex.Message, ex);
                                 }
 
                                 kafkaConsumer.Commit(rawmessage);
@@ -163,7 +163,7 @@ public class CensusListener : BackgroundService
 
                             await ProduceAuditMessage(null, rawmessage?.Key, auditValue);
 
-                            _nonTransientExceptionHandler.HandleException(rawmessage, new DeadLetterException("Census Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
+                            _nonTransientExceptionHandler.HandleException(rawmessage, new DeadLetterException("Census Exception thrown: " + ex.Message), rawmessage.Message.Key);
                             kafkaConsumer.Commit(rawmessage);
 
                             //continue;
@@ -190,7 +190,7 @@ public class CensusListener : BackgroundService
                         }
                     };
 
-                    _consumeErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
+                    _consumeErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
 
                     kafkaConsumer.Commit();
                     continue;
@@ -198,7 +198,7 @@ public class CensusListener : BackgroundService
                 catch (Exception ex)
                 {
                     _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
-                    _nonTransientExceptionHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
+                    _nonTransientExceptionHandler.HandleException(rawmessage, ex, "");
                     continue;
                 }
             }

@@ -36,6 +36,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -115,6 +116,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<IAuditService, AuditService>();
 
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
@@ -177,7 +179,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
     builder.Services.AddTransient<IEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
+
+    //Managers
+    builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
+
+    builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();

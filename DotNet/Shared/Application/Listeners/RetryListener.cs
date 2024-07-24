@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     //Dead letter if the retry count exceeds the configured retry duration count
                                     if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
                                     {
-                                        throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
+                                        throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}");
                                     }
                                 }
 
@@ -126,7 +126,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             {
                                 var facilityId = GetStringValueFromHeader(consumeResult.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                                 consumer.Commit(consumeResult);
                                 //continue;
                             }
@@ -152,7 +152,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                         };
 
                         _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
-                        _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, AuditEventType.Create, facilityId);
+                        _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, facilityId);
                         _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
                         continue;
                     }                    

@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
                                     {
-                                        throw new DeadLetterException("Invalid Report Scheduled event", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
                                     string correlationId = string.Empty;
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
                                     else
                                     {
-                                        throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
+                                        throw new DeadLetterException("Correlation Id missing");
                                     }
 
                                     ReportScheduledKey key = consumeResult.Message.Key;
@@ -108,14 +108,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                             value.Parameters.Single(x => x.Key.Equals("startdate", StringComparison.CurrentCultureIgnoreCase)).Value,
                                             out DateTimeOffset startDateOffset))
                                     {
-                                        throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
+                                        throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}");
                                     }
 
                                     if (!DateTimeOffset.TryParse(
                                             value.Parameters.Single(x => x.Key.Equals("enddate", StringComparison.CurrentCultureIgnoreCase)).Value,
                                             out DateTimeOffset endDateOffset))
                                     {
-                                        throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
+                                        throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}");
                                     }
 
                                     var startDate = startDateOffset.UtcDateTime;
@@ -160,7 +160,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key.FacilityId);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key.FacilityId);
 
                                     _reportScheduledConsumer.Commit(consumeResult);
 
@@ -186,7 +186,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                             };
 
-                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), string.Empty);
+                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), string.Empty);
 
                             _reportScheduledConsumer.Commit();
 

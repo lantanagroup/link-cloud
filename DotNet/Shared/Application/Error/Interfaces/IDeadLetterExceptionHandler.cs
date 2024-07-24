@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {
@@ -17,14 +15,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         /// </summary>
         public string ServiceName { get; set; }
 
-        void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "");
-        void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId);
+        void HandleException(ConsumeResult<K, V> consumeResult, string facilityId,string message = "");
+        void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId);
         void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId);
         void HandleException(DeadLetterException ex, string facilityId);
-        void HandleException(Exception ex, string facilityId, AuditEventType auditEventType);
-        void HandleException(string message, string facilityId, AuditEventType auditEventType);
-        void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers);
+        void HandleException(Exception ex, string facilityId);
+        void HandleException(string message, string facilityId);
         void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage);
         void ProduceNullConsumeResultDeadLetter(string key, string value, Headers headers, string exceptionMessage);
     }

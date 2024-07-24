@@ -75,13 +75,13 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 try
                                 {
                                     if (result is null)
-                                    {
-                                        throw new DeadLetterException("Invalid Auditable Event: The message received was null", AuditEventType.Create);
+                                    {                                        
+                                        throw new DeadLetterException("Invalid Auditable Event: The message received was null");
                                     }
 
                                     if (result.Message.Value is null)
                                     {
-                                        throw new DeadLetterException("Invalid Auditable Event: The message value received was null", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Auditable Event: The message value received was null");
                                     }
 
                                     AuditEventMessage messageValue = result.Message.Value;
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                     {
                                         Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                         Activity.Current?.RecordException(ex);
-                                        throw new TransientException($"Unable to create audit log entry", AuditEventType.Create);
+                                        throw new TransientException($"Unable to create audit log entry");
                                     }
 
                                     //consume the result and offset
@@ -157,7 +157,7 @@ namespace LantanaGroup.Link.Audit.Listeners
                                 }
                             };
 
-                            var deadLetterException = new DeadLetterException($"Consume Result exception: {ex.InnerException?.Message}", AuditEventType.Create);
+                            var deadLetterException = new DeadLetterException($"Consume Result exception: {ex.InnerException?.Message}");
                             _consumerExceptionDeadLetterHandler.HandleException(converted_record, deadLetterException, facilityId);
 
                             _consumer.Commit();
