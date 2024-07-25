@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
     public interface IPatientCensusService
     {
-        Task<IBaseMessage> Get(string facilityId, CancellationToken cancellationToken);
+        Task<PatientIDsAcquiredMessage> Get(string facilityId, CancellationToken cancellationToken);
     }
 
     public class PatientCensusService : IPatientCensusService
@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             _fhirApiManager = fhirApiManager ?? throw new ArgumentNullException(nameof(fhirApiManager));
         }
 
-        public async Task<IBaseMessage> Get(string facilityId, CancellationToken cancellationToken)
+        public async Task<PatientIDsAcquiredMessage> Get(string facilityId, CancellationToken cancellationToken)
         {
             PatientIDsAcquiredMessage result = new PatientIDsAcquiredMessage();
             var facilityConfig = await _fhirQueryListConfigurationManager.GetAsync(facilityId, cancellationToken);

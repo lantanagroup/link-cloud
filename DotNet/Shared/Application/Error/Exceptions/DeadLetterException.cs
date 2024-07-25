@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Exceptions
 
         public DeadLetterException(string message, Exception innerEx) : base(message, innerEx)
         {
+            
         }
     }
 }

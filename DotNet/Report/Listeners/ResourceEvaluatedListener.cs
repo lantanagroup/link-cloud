@@ -139,7 +139,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // find existing report scheduled for this facility, report type, and date range
                                 var schedule = await measureReportScheduledManager.GetMeasureReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, cancellationToken) ??
-                                            throw new TransactionException(
+                                            throw new TransientException(
                                                 $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
                                 
 
