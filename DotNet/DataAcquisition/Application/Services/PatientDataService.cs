@@ -65,8 +65,11 @@ public class PatientDataService : IPatientDataService
         if (patient == null)
             throw new NotFoundException("Patient not found.");
 
-        var queryPlan = (await _queryPlanManager.FindAsync(q => q.FacilityId.Equals(request.FacilityId, StringComparison.InvariantCultureIgnoreCase)
-            && q.PlanName.Equals(request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType, StringComparison.InvariantCultureIgnoreCase), cancellationToken)).FirstOrDefault();
+        var queryPlan = (
+            await _queryPlanManager.FindAsync(
+                q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
+            && q.PlanName.ToLower() == request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType.ToLower(), cancellationToken))
+            .FirstOrDefault();
 
         if (queryPlan == null)
             throw new MissingFacilityConfigurationException("Query Plan not found.");

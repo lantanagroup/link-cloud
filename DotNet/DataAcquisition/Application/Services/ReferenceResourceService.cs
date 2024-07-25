@@ -72,29 +72,29 @@ public class ReferenceResourceService : IReferenceResourceService
 
         var existingReferenceResources =
             await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => SplitReference(x.Reference)).ToList(),
+                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
                 request.FacilityId);
 
         resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
 
         List<ResourceReference> missingReferences = validReferenceResources
-            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == SplitReference(x.Reference))).ToList();
+            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.Reference.SplitReference())).ToList();
 
-        missingReferences.ForEach(async x =>
+        foreach(var x in missingReferences)
         {
             var fullMissingResources = await _fhirRepo.GetReferenceResource(
-            fhirQueryConfiguration.FhirServerBaseUrl,
-            referenceQueryFactoryResult.ResourceType,
-            request.ConsumeResult.Message.Value.PatientId,
-            request.FacilityId,
-            request.CorrelationId,
-            queryPlanType,
-            x,
-            referenceQueryConfig,
-            fhirQueryConfiguration.Authentication);
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                referenceQueryFactoryResult.ResourceType,
+                request.ConsumeResult.Message.Value.PatientId,
+                request.FacilityId,
+                request.CorrelationId,
+                queryPlanType,
+                x,
+                referenceQueryConfig,
+                fhirQueryConfiguration.Authentication);
 
             resources.AddRange(fullMissingResources);
-        });
+        }
 
         return resources;
     }
