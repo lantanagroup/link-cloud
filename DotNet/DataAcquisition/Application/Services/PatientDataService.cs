@@ -133,41 +133,39 @@ public class PatientDataService : IPatientDataService
             throw;
         }
 
+        Patient patient = null;
+        var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
+
+        if (dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+        {
+            patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
+                fhirQueryConfiguration.Authentication, cancellationToken);
+
+            await _kafkaProducer.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                new Message<string, ResourceAcquired>
+                {
+                    Key = request.FacilityId,
+                    Headers = new Headers
+                    {
+                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.CorrelationId))
+                    },
+                    Value = new ResourceAcquired
+                    {
+                        Resource = patient,
+                        ScheduledReports = request.ConsumeResult.Value.ScheduledReports,
+                        PatientId = patientId,
+                        QueryType = dataAcqRequested.QueryType
+                    }
+                }, cancellationToken);
+        }
+
         foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
         {
-            var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
-
-            Patient patient = null;
-
-            if (dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
-            {
-                patient = await _fhirRepo.GetPatient(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    patientId, request.CorrelationId,
-                    request.FacilityId,
-                    fhirQueryConfiguration.Authentication, cancellationToken);
-
-                await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = request.FacilityId,
-                        Headers = new Headers
-                        {
-                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.CorrelationId))
-                        },
-                        Value = new ResourceAcquired
-                        {
-                            Resource = patient,
-                            ScheduledReports = new List<ScheduledReport> { scheduledReport },
-                            PatientId = patientId,
-                            QueryType = dataAcqRequested.QueryType
-                        }
-                    });
-            }
-
             var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
-
 
             if (queryPlan != null)
             {
@@ -181,13 +179,13 @@ public class PatientDataService : IPatientDataService
                 try
                 {
                     await _queryListProcessor.Process(
-                            dataAcqRequested.QueryType == "Initial" ? initialQueries : supplementalQueries,
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
                             request,
                             fhirQueryConfiguration,
                             scheduledReport,
                             queryPlan,
                             referenceTypes,
-                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
 
                 }
                 catch (ProduceException<string, ResourceAcquired>)

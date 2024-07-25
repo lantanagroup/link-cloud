@@ -1,17 +1,17 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using Confluent.Kafka.Extensions.Diagnostics;
 using QueryDispatch.Application.Settings;
+using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -80,9 +80,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                    var _createScheduledReportCommand = scope.ServiceProvider.GetRequiredService<ICreateScheduledReportCommand>();
-                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var _updateScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IUpdateScheduledReportCommand>();
+                                    var scheduledReportCommand = scope.ServiceProvider.GetRequiredService<ICreateScheduledReportCommand>();
+                                    var scheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
+                                    var updateScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IUpdateScheduledReportCommand>();
 
                                     if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
                                     {
@@ -123,18 +123,18 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key.FacilityId, key.ReportType, startDate, endDate);
 
-                                    var existingRecord = _getScheduledReportQuery.Execute(key.FacilityId);
+                                    var existingRecord = scheduledReportQuery.Execute(key.FacilityId);
 
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key.FacilityId);
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await _updateScheduledReportQuery.Execute(existingRecord, scheduledReport);
+                                        await updateScheduledReportQuery.Execute(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await _createScheduledReportCommand.Execute(scheduledReport);
+                                        await scheduledReportCommand.Execute(scheduledReport);
                                     }
 
                                     _reportScheduledConsumer.Commit(consumeResult);

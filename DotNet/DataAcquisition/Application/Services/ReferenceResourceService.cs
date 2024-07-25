@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
@@ -119,7 +120,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         var existingReferenceResources =
             await _referenceResourcesManager.GetReferenceResourcesForListOfIds(
-                validReferenceResources.Select(x => SplitReference(x.Reference)).ToList(),
+                validReferenceResources.Select(x => x.Reference.SplitReference()).ToList(),
                 request.FacilityId);
 
         foreach(var existingReference in existingReferenceResources)
@@ -135,7 +136,7 @@ public class ReferenceResourceService : IReferenceResourceService
             
 
         List<ResourceReference> missingReferences = validReferenceResources
-            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == SplitReference(x.Reference))).ToList();
+            .Where(x => !existingReferenceResources.Any(y => y.ResourceId.Equals(x.Reference.SplitReference(), StringComparison.InvariantCultureIgnoreCase))).ToList();
 
         missingReferences.ForEach(async x =>
         {
@@ -191,12 +192,6 @@ public class ReferenceResourceService : IReferenceResourceService
                 await _referenceResourcesManager.AddAsync(refResource);
             }
         });
-    }
-
-    private string SplitReference(string reference)
-    {
-        var splitReference = reference.Split("/");
-        return splitReference[splitReference.Length - 1];
     }
 
     private async Task GenerateMessage(

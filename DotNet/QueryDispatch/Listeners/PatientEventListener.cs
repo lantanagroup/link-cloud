@@ -1,18 +1,18 @@
-﻿using LantanaGroup.Link.QueryDispatch.Application.Models;
+﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
-using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
+using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using QueryDispatch.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using Confluent.Kafka.Extensions.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -87,9 +87,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                    var _createPatientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
-                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var _getQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
+                                    var patientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
+                                    var getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
+                                    var queryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
 
                                     if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
                                     {
@@ -110,9 +110,17 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
 
-                                    ScheduledReportEntity scheduledReport = _getScheduledReportQuery.Execute(consumeResult.Message.Key);
+                                    ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
 
-                                    QueryDispatchConfigurationEntity dispatchSchedule = await _getQueryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
+                                    if (scheduledReport == null)
+                                    {
+                                        throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                    }
+
+                                    var now = DateTime.UtcNow;
+                                    scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
+
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
 
                                     if (dispatchSchedule == null)
                                     {
@@ -133,7 +141,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}");
                                     }
 
-                                    await _createPatientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
+                                    await patientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
 
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
