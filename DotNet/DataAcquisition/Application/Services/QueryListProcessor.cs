@@ -88,7 +88,7 @@ public class QueryListProcessor : IQueryListProcessor
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
 
-            _logger.LogInformation("Processing Query for:");
+            _logger.LogInformation("Processing Query for {QueryType}: {ResourceType}", builtQuery.GetType().Name, queryConfig.ResourceType);
 
             if (builtQuery.GetType() == typeof(SingularParameterQueryFactoryResult))
             {
