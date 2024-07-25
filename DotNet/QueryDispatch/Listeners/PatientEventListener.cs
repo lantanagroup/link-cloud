@@ -114,14 +114,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (scheduledReport == null)
                                     {
-                                        throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                       throw new TransientException("PatientEventListener: scheduleReport is null.");
                                     }
 
-                                    if (scheduledReport != null)
-                                    {
-                                        var now = DateTime.UtcNow;
-                                        scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
-                                    }
+                                    var now = DateTime.UtcNow;
+                                    scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
                                     QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
 
