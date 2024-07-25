@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka
 {
-    public class DataAcquiredMessage : IBaseMessage
+    public class DataAcquiredMessage
     {
         public string CorrelationId { get; set; }
         public List<DataAcquisitionTypes> Type { get; set; }

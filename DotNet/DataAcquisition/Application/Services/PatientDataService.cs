@@ -140,7 +140,7 @@ public class PatientDataService : IPatientDataService
                             scheduledReport,
                             queryPlan,
                             referenceTypes,
-                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
 
                 }
                 catch(ProduceException<string, ResourceAcquired>)
