@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.Audit.Application.Services
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                throw new TransientException($"Unable to create audit log entry");
+                throw new TransientException($"Unable to create audit log entry: {ex.Message}", ex);
             }
 
             return true;
