@@ -6,10 +6,5 @@ namespace LantanaGroup.Link.Tenant.Repository.Implementations.Sql;
 
 public class FacilityConfigurationRepo : EntityRepository<FacilityConfigModel>, IFacilityConfigurationRepo
 {
-
-    public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base(logger, dbContext)
-    {
-     
-    }
-  
+    public FacilityConfigurationRepo(ILogger<FacilityConfigurationRepo> logger, FacilityDbContext dbContext) : base(logger, dbContext){} 
 }
