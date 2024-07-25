@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuer
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
@@ -70,7 +71,7 @@ public class QueryListProcessor : IQueryListProcessor
             QueryFactoryResult builtQuery = queryConfig switch
             {
                 ParameterQueryConfig => ParameterQueryFactory.Build((ParameterQueryConfig)queryConfig, request,
-                    scheduledReport, queryPlan.LookBack),
+                    scheduledReport, queryPlan.LookBack, referenceResources.Select(x => x.Reference.SplitReference()).Distinct().ToList()),
                 ReferenceQueryConfig => ReferenceQueryFactory.Build((ReferenceQueryConfig)queryConfig, referenceResources),
                 _ => throw new Exception("Unable to identify type for query operation."),
             };
