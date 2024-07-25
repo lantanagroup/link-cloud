@@ -2,7 +2,7 @@
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 
-public class PatientAcquiredMessage : IBaseMessage
+public class PatientAcquiredMessage
 {
     public string PatientId { get; set; }
     public object PatientBundle { get; set; }

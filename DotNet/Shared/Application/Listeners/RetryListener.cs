@@ -1,21 +1,19 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Services;
-
-using Quartz;
-using System.Text;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Options;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Settings;
-using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
-
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Quartz;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Listeners
 {
@@ -27,7 +25,6 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             _kafkaConsumerFactory;
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IEntityRepository<RetryEntity> _retryRepository;
         private readonly IOptions<ConsumerSettings> _consumerSettings;
         private readonly IRetryEntityFactory _retryEntityFactory;
         private readonly IDeadLetterExceptionHandler<string, string> _deadLetterExceptionHandler;
@@ -104,7 +101,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     //Dead letter if the retry count exceeds the configured retry duration count
                                     if (countValue >= _consumerSettings.Value.ConsumerRetryDuration.Count())
                                     {
-                                        throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}", AuditEventType.Create);
+                                        throw new DeadLetterException($"Retry count exceeded for message with key: {consumeResult.Message.Key}");
                                     }
                                 }
 
@@ -126,7 +123,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             {
                                 var facilityId = GetStringValueFromHeader(consumeResult.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, AuditEventType.Create, facilityId);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                                 consumer.Commit(consumeResult);
                                 //continue;
                             }
@@ -152,7 +149,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                         };
 
                         _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
-                        _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, AuditEventType.Create, facilityId);
+                        _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, facilityId);
                         _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
                         continue;
                     }                    

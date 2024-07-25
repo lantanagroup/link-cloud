@@ -19,17 +19,17 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<string, PatientIdsAcquiredValue> _kafkaConsumerFactory;
         private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
-        private readonly IDatabase _database;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
         public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
           ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
-          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IDatabase database)
+          IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _database = database;
+            _serviceScopeFactory = serviceScopeFactory;
 
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
@@ -74,11 +74,14 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             try
                             {
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+
                                 consumeResult = result;
 
                                 if (consumeResult == null)
                                 {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -87,17 +90,17 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (string.IsNullOrWhiteSpace(key) || value == null || value.PatientIds == null)
                                 {
-                                    throw new DeadLetterException("Invalid Patient Id's Acquired Event", AuditEventType.Create);
+                                    throw new DeadLetterException("Invalid Patient Id's Acquired Event");
                                 }
 
                                 var scheduledReports =
-                                    await _database.ReportScheduledRepository.FindAsync(x =>
+                                    await database.ReportScheduledRepository.FindAsync(x =>
                                         x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
-                                    throw new DeadLetterException(
-                                        $"{Name}: No Scheduled Reports found for facilityId: {key}", AuditEventType.Query);
+                                    throw new TransientException(
+                                        $"{Name}: No Scheduled Reports found for facilityId: {key}");
                                 }
 
                                 foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested))
@@ -120,11 +123,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     try
                                     {
-                                        await _database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
+                                        await database.ReportScheduledRepository.UpdateAsync(scheduledReport, cancellationToken);
                                     }
                                     catch (Exception)
                                     {
-                                        throw new TransientException("Failed to update ReportSchedule", AuditEventType.Create);
+                                        throw new TransientException("Failed to update ReportSchedule");
                                     }
                                 }
                             }
@@ -138,7 +141,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message, AuditEventType.Create), facilityId);
+                                _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {
@@ -169,7 +172,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 : string.Empty,
                         };
 
-                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
+                        var dlEx = new DeadLetterException(ex.Message);
                         _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
                         _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 

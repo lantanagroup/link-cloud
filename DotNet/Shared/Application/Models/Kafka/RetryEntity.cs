@@ -1,9 +1,6 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Domain.Attributes;
+﻿using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
-using StackExchange.Redis;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Shared.Application.Models
