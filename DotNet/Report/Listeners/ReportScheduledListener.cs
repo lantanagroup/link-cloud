@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
@@ -31,12 +31,12 @@ namespace LantanaGroup.Link.Report.Listeners
             ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
-            IMeasureReportScheduledManager measureReportScheduledManager)
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _measureReportScheduledManager = measureReportScheduledManager;
+            _serviceScopeFactory = serviceScopeFactory;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -83,6 +83,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager =
+                                    scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
+
                                 if (consumeResult == null)
                                 {
                                     throw new DeadLetterException(
@@ -121,7 +125,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var endDate = endDateOffset.UtcDateTime;
 
                                 // Check if this already exists
-                                var existing = await _measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
+                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
                                                                                                         && x.ReportEndDate == endDate 
                                                                                                         && x.ReportType == key.ReportType, cancellationToken);
@@ -140,7 +144,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportType = key.ReportType
                                 };
 
-                                var reportSchedule = await _measureReportScheduledManager.AddAsync(ent, cancellationToken);
+                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, cancellationToken);
 
                                 await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                     await _schedulerFactory.GetScheduler(cancellationToken));
