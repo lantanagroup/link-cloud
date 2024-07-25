@@ -70,6 +70,8 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 var results = await _patientDataService.Get_NoKafka(
                     new GetPatientDataRequest
                     {
+                        FacilityId = request.FacilityId,
+                        CorrelationId = Guid.NewGuid().ToString(),
                         ConsumeResult = new Confluent.Kafka.ConsumeResult<string, Models.Kafka.DataAcquisitionRequested>
                         {
                             Message = new Confluent.Kafka.Message<string, Models.Kafka.DataAcquisitionRequested>
