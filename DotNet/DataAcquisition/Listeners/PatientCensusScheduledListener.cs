@@ -56,10 +56,10 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         var patientCensusService =
             scope.ServiceProvider.GetRequiredService<IPatientCensusService>();
 
-        IBaseMessage? baseMessage;
+        PatientIDsAcquiredMessage? patientIDsAcquiredMessage;
         try
         {
-            baseMessage = await patientCensusService.Get(facilityId, cancellationToken);
+            patientIDsAcquiredMessage = await patientCensusService.Get(facilityId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -70,7 +70,7 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         var produceMessage = new Message<string, PatientIDsAcquiredMessage>
         {
             Key = facilityId,
-            Value = (PatientIDsAcquiredMessage)baseMessage
+            Value = patientIDsAcquiredMessage
         };
 
         try

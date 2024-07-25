@@ -2,7 +2,6 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
@@ -22,7 +21,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     protected readonly IOptions<ServiceInformation> ServiceInformation;
     protected readonly string TopicName;
 
-    public BaseListener(
+    protected BaseListener(
         ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> logger,
         IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> kafkaConsumerFactory,
         IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> deadLetterConsumerHandler,
@@ -102,7 +101,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         finally
                         {
-                            consumer.Commit();
+                            consumer.Commit(consumeResult);
                         }
                     }, cancellationToken);
                 }
