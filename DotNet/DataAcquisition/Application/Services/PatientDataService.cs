@@ -60,11 +60,13 @@ public class PatientDataService : IPatientDataService
     {
         var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
         var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-        var patient = await _fhirRepo.GetPatient(queryConfig.FhirServerBaseUrl, request.ConsumeResult.Value.PatientId, Guid.NewGuid().ToString(), request.FacilityId, authenticationConfig, cancellationToken);
-
-        if (patient == null)
-            throw new NotFoundException("Patient not found.");
-
+        var patient = await _fhirRepo.GetPatient(
+            queryConfig.FhirServerBaseUrl,
+            request.ConsumeResult.Value.PatientId,
+            Guid.NewGuid().ToString(),
+            request.FacilityId,
+            authenticationConfig,
+            cancellationToken) ?? throw new NotFoundException("Patient not found.");
         var queryPlan = (
             await _queryPlanManager.FindAsync(
                 q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
