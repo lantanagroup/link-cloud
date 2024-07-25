@@ -10,18 +10,19 @@ using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Listeners;
 using LantanaGroup.Link.DataAcquisition.Services;
 using LantanaGroup.Link.DataAcquisition.Services.Auth;
-using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -29,7 +30,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -47,7 +47,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.DataAcquisition.Listeners;
+using LantanaGroup.Link.Shared.Application;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -231,27 +232,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<RetryJob>();
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
-    //Custom Logic
-    builder.Services.AddTransient<IConsumerLogic<string, DataAcquisitionRequested, string, ResourceAcquired>, DataAcquisitionRequestedProcessingLogic>();
-    builder.Services.AddTransient<IConsumerLogic<string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>, PatientCensusScheduledProcessingLogic>();
-
     //Add Hosted Services
-    if (consumerSettings != null || !consumerSettings.DisableConsumer)
+    if (!consumerSettings?.DisableConsumer ?? true)
     {
-        builder.Services.AddHostedService<BaseListener<DataAcquisitionRequested, string, DataAcquisitionRequested, string, ResourceAcquired>>();
-        builder.Services.AddHostedService<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>>();
+        builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
+        builder.Services.AddHostedService<PatientCensusScheduledListener>();
     }
 
-    if (consumerSettings != null || !consumerSettings.DisableRetryConsumer)
+    if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
-       // builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.PatientCensusScheduledRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+        
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, new []{ KafkaTopic.DataAcquisitionRequested.GetStringValue(), KafkaTopic.PatientCensusScheduled.GetStringValue() }));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
-
-    
-
-    //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
