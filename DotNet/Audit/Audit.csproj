@@ -49,7 +49,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Infrastructure\Extensions\" />
     <Folder Include="Migrations\" />
+    <Folder Include="Presentation\Models\" />
   </ItemGroup>
 
 </Project>

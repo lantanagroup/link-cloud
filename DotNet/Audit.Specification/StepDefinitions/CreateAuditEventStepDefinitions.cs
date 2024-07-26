@@ -1,8 +1,10 @@
-﻿using LantanaGroup.Link.Audit.Application.Commands;
-using LantanaGroup.Link.Audit.Application.Interfaces;
+﻿using LantanaGroup.Link.Audit.Application.Interfaces;
+using LantanaGroup.Link.Audit.Application.Models;
 using LantanaGroup.Link.Audit.Domain.Entities;
+using LantanaGroup.Link.Audit.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Moq;
 using Moq.AutoMock;
 using NUnit.Framework;
 using Task = System.Threading.Tasks.Task;
@@ -14,9 +16,9 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
     {
         private AutoMocker mocker;
         private AuditEventMessage auditMessage;
-        private CreateAuditEventModel createAuditEventModel;
-        private CreateAuditEventCommand command;
+        private AuditManager manager;        
         private AuditId createdAuditEventId = AuditId.Empty;
+        private AuditModel model;
         private AuditLog auditEntity;
 
         private static readonly string Id = new Guid("aa7d82c3-8ca0-47b2-8e9f-c2b4c3baf856").ToString();
@@ -38,62 +40,7 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
 
             #region Set Up Models
 
-            auditMessage = new AuditEventMessage();
-            createAuditEventModel = new CreateAuditEventModel(); 
-
-            //set up audit entity
-            auditEntity = new AuditLog();
-            auditEntity.AuditId = AuditId.NewId();
-            auditEntity.FacilityId = FacilityId;
-            auditEntity.ServiceName = ServiceName;
-            auditEntity.CorrelationId = CorrelationId;
-            auditEntity.EventDate = EventDate;
-            auditEntity.UserId = UserId;
-            auditEntity.User = User;
-            auditEntity.Action = Action;
-            auditEntity.Resource = Resource;
-            auditEntity.CreatedOn = DateTime.UtcNow;
-
-            if (PropertyChanges is not null)
-            {
-                if (auditEntity.PropertyChanges is not null)
-                    auditEntity.PropertyChanges.Clear();
-                else
-                    auditEntity.PropertyChanges = new List<EntityPropertyChange>();
-
-                auditEntity.PropertyChanges.AddRange(PropertyChanges.Select(p => new EntityPropertyChange { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList());
-            }
-            auditEntity.Notes = Notes;
-
-            #endregion
-
-            mocker = new AutoMocker();                
-
-            command = mocker.CreateInstance<CreateAuditEventCommand>();
-
-            mocker.GetMock<IAuditFactory>()
-                .Setup(p => p.Create(
-                    FacilityId,
-                    ServiceName,
-                    CorrelationId,
-                    EventDate,
-                    UserId,
-                    User,
-                    Action,
-                    Resource,
-                    PropertyChanges,
-                Notes))
-                .Returns(auditEntity);
-
-            mocker.GetMock<IAuditRepository>()
-                .Setup(p => p.AddAsync(auditEntity, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
-
-        }
-
-        [Given(@"I have received an AuditEventMessage")]
-        public void GivenIHaveReceivedAnAuditEventMessage()
-        {
-            auditMessage = new AuditEventMessage();
+            auditMessage = new AuditEventMessage();               
             auditMessage.FacilityId = FacilityId;
             auditMessage.ServiceName = ServiceName;
             auditMessage.CorrelationId = CorrelationId;
@@ -102,40 +49,44 @@ namespace LantanaGroup.Link.Audit.Specification.StepDefinitions
             auditMessage.User = User;
             auditMessage.Action = AuditEventType.Create;
             auditMessage.Resource = Resource;
-            auditMessage.PropertyChanges = PropertyChanges;
+
+            if (PropertyChanges is not null)
+            {
+                if (auditMessage.PropertyChanges is not null)
+                    auditMessage.PropertyChanges.Clear();
+                else
+                    auditMessage.PropertyChanges = [];
+
+                auditMessage.PropertyChanges.AddRange(PropertyChanges.Select(p => new PropertyChangeModel { PropertyName = p.PropertyName, InitialPropertyValue = p.InitialPropertyValue, NewPropertyValue = p.NewPropertyValue }).ToList());
+            }
             auditMessage.Notes = Notes;            
+
+            #endregion
+
+            mocker = new AutoMocker();     
+
+            manager = mocker.CreateInstance<AuditManager>();
+            
+            mocker.GetMock<IAuditManager>()
+                .Setup(m => m.CreateAuditLog(It.IsAny<AuditModel>(), CancellationToken.None)).Returns(It.IsAny<Task<AuditLog>>);
+
+            mocker.GetMock<IAuditRepository>()
+                .Setup(p => p.AddAsync(It.IsAny<AuditLog>(), CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+
+        }
+
+        [Given(@"I have received an AuditEventMessage")]
+        public void GivenIHaveReceivedAnAuditEventMessage()
+        {
+            model = AuditModel.FromMessage(auditMessage);            
         }
 
         [When(@"I create a new AuditEvent based on this AuditEventMessage")]
         public void WhenISetTheIdPropertyTo()
         {
-            createAuditEventModel = new CreateAuditEventModel();
-            createAuditEventModel.FacilityId = auditMessage.FacilityId;
-            createAuditEventModel.ServiceName = auditMessage.ServiceName;
-            createAuditEventModel.CorrelationId = auditMessage.CorrelationId;
-            createAuditEventModel.EventDate = auditMessage.EventDate;
-            createAuditEventModel.UserId = auditMessage.UserId;
-            createAuditEventModel.User = auditMessage.User;
-            createAuditEventModel.Action = auditMessage.Action.ToString();
-            createAuditEventModel.Resource = auditMessage.Resource;
-
-
-            if (auditMessage.PropertyChanges is not null)
-            {
-                if (createAuditEventModel.PropertyChanges is not null)
-                    createAuditEventModel.PropertyChanges.Clear();
-                else
-                    createAuditEventModel.PropertyChanges = new List<PropertyChangeModel>();
-
-                createAuditEventModel.PropertyChanges.AddRange(auditMessage.PropertyChanges);
-            }
-
-            createAuditEventModel.Notes = auditMessage.Notes;
-
-
-            Task<AuditLog> outcome = command.Execute(createAuditEventModel);
-
-            createdAuditEventId = outcome.Result.AuditId;
+            Task<AuditLog> outcome = manager.CreateAuditLog(model);
+            auditEntity = outcome.Result;
+            createdAuditEventId = auditEntity.AuditId;
 
         }
 
