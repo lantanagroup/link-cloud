@@ -125,7 +125,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                     };
 
                     DeadLetterConsumerErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
-                    continue;
+
+                    try
+                    {
+                        consumer.Commit(consumeResult);
+                    }
+                    catch (Exception)
+                    {
+                        consumer.Commit();
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -134,7 +142,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 catch (Exception ex)
                 {
                     DeadLetterConsumerHandler.HandleException(consumeResult, ex, "");
-                    continue;
+                    consumer.Commit(consumeResult);
                 }
             }
         }
@@ -146,6 +154,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "BaseListener Exception Encountered: {1}", ex.Message);
             throw;
         }
     }
