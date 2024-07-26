@@ -126,13 +126,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 
                     DeadLetterConsumerErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
 
-                    try
-                    {
-                        consumer.Commit(consumeResult);
-                    }
-                    catch (Exception)
+
+                    TopicPartitionOffset? offset = e.ConsumerRecord?.TopicPartitionOffset;
+                    if (offset == null)
                     {
                         consumer.Commit();
+                    }
+                    else
+                    {
+                        consumer.Commit(new List<TopicPartitionOffset> { offset });
                     }
                 }
                 catch (OperationCanceledException)
@@ -142,7 +144,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 catch (Exception ex)
                 {
                     DeadLetterConsumerHandler.HandleException(consumeResult, ex, "");
-                    consumer.Commit(consumeResult);
+
+
+                    if(consumeResult != null) { 
+                        consumer.Commit(consumeResult);
+                    }
+                    else
+                    {
+                        consumer.Commit();
+                    }
                 }
             }
         }
