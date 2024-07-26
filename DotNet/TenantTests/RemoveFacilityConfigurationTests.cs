@@ -36,7 +36,7 @@ namespace TenantTests
 
             _model = new FacilityConfigModel()
             {
-                Id = new Guid(id),
+                Id = id,
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledTasks = new List<ScheduledTaskModel>(),
@@ -50,10 +50,10 @@ namespace TenantTests
             };
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-              .Setup(p => p.GetAsyncByFacilityId(facilityId, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+              .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.RemoveAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
+                .Setup(p => p.DeleteAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));
 
             _mocker.GetMock<IKafkaProducerFactory<string, object>>()
             .Setup(p => p.CreateAuditEventProducer(false))
@@ -69,7 +69,7 @@ namespace TenantTests
 
             Task<string> facility = _service.RemoveFacility(facilityId, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.RemoveAsync(_model.Id, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.DeleteAsync(_model.Id, CancellationToken.None), Times.Once);
 
             Assert.NotEmpty(facility.Result);
 
