@@ -16,5 +16,19 @@ namespace LantanaGroup.Link.Audit.Application.Models
         public int PageSize { get; init; }
         public int PageNumber { get; init; }
 
+        public AuditSearchFilterRecord(string? searchText, string? filterFacilityBy, string? filterCorrelationBy, string? filterServiceBy, string? filterActionBy, string? filterUserBy, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        {
+            SearchText = searchText;
+            FilterFacilityBy = filterFacilityBy;
+            FilterCorrelationBy = filterCorrelationBy;
+            FilterServiceBy = filterServiceBy;
+            FilterActionBy = filterActionBy;
+            FilterUserBy = filterUserBy;
+            SortBy = sortBy;
+            SortOrder = sortOrder ?? SortOrder.Ascending;
+            PageSize = pageSize;
+            PageNumber = pageNumber;
+        }
+
     }
 }
