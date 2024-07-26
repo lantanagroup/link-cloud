@@ -70,32 +70,7 @@ namespace LantanaGroup.Link.Tenant.Services
             PagedConfigModel<FacilityConfigModel> pagedNotificationConfigurations;
 
 
-          /*  // Build the expression for FacilityId
-            var parameter = Expression.Parameter(typeof(FacilityConfigModel), "p");
-
-            Expression facilityIdProperty = Expression.Property(parameter, "FacilityId");
-            Expression facilityIdValue = Expression.Constant(facilityId, typeof(string));
-            Expression facilityIdCondition = Expression.Equal(facilityIdProperty, facilityIdValue);
-            Expression facilityIdNotNull = Expression.NotEqual(facilityIdValue, Expression.Constant(null));
-            Expression facilityIdExpression = Expression.AndAlso(facilityIdNotNull, facilityIdCondition);
-
-            // Build the expression for FacilityName
-
-            Expression facilityNameProperty = Expression.Property(parameter, "FacilityName");
-            Expression facilityNameValue = Expression.Constant(facilityName, typeof(string));
-            Expression facilityNameCondition = Expression.Equal(facilityNameProperty, facilityNameValue);
-            Expression facilityNameNotNull = Expression.NotEqual(facilityNameValue, Expression.Constant(null));
-            Expression facilityNameExpression = Expression.AndAlso(facilityNameNotNull, facilityNameCondition);
-
-
-            Expression combinedExpression = Expression.OrElse(facilityIdExpression, facilityNameExpression);
-
-
-            Expression<Func<FacilityConfigModel, bool>> predicate  = Expression.Lambda<Func<FacilityConfigModel, bool>>(combinedExpression);*/
-
-           // Expression <Func<T, object>> = (x => x.FacilityId == facilityId && facilityId != null || x.FacilityName == facilityName && facilityName != null);
-
-            if (facilityId is not null || facilityName is not null)
+            if (!string.IsNullOrEmpty(facilityId) || !string.IsNullOrEmpty(facilityName))
             {
                 (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync((x => x.FacilityId == facilityId && facilityId != null || x.FacilityName == facilityName && facilityName != null), sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
                 pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
