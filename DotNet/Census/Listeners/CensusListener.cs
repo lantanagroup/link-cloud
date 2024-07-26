@@ -155,7 +155,7 @@ public class CensusListener : BackgroundService
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                            _nonTransientExceptionHandler.HandleException(rawmessage, new DeadLetterException("Census Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
+                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
 
                             kafkaConsumer.Commit(rawmessage);
                         }
