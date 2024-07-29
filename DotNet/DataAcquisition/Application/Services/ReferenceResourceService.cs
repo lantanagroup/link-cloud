@@ -156,7 +156,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
                 await _referenceResourcesManager.AddAsync(refResource);
             }
-        });
+        }
     }
 
     private async Task GenerateMessage(
