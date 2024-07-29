@@ -30,7 +30,6 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
 
     protected override async Task ExecuteListenerAsync(ConsumeResult<string, PatientCensusScheduled> consumeResult, CancellationToken cancellationToken)
     {
-        string correlationId;
         string facilityId;
 
         try
