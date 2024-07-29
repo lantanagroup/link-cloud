@@ -152,11 +152,14 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
         var count = await query.CountAsync(cancellationToken);
 
-        query = sortOrder switch
+        if (sortOrder != null)
         {
-            SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
-            SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
-        };
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
+            };
+        }
 
         var results = await query
             .Skip((pageNumber - 1) * pageSize)
