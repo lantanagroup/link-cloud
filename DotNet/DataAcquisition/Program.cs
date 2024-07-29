@@ -230,7 +230,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
-    builder.Services.AddScoped<IJobFactory, JobFactory>();
+    builder.Services.AddScoped<IJobFactory, JobFactory>(); 
 
     //Add Hosted Services
     if (!consumerSettings?.DisableConsumer ?? true)
