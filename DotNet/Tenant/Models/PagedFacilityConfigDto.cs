@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Tenant.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Tenant.Models;
 
 namespace LantanaGroup.Link.Tenant.Models
 {
