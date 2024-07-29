@@ -232,6 +232,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<RetryJob>();
     builder.Services.AddScoped<IJobFactory, JobFactory>();
 
+    builder.Services.Configure<HostOptions>(hostOptions =>
+    {
+        hostOptions.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+    });
+
     //Add Hosted Services
     if (!consumerSettings?.DisableConsumer ?? true)
     {
