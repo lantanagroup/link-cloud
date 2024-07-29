@@ -82,7 +82,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 CorrelationId = request.CorrelationId,
                 FacilityId = request.FacilityId,
                 IsSuccessful = true,
-                PatientId = request.ConsumeResult.Message.Value.PatientId,
+                PatientId = request.ConsumeResult.Message.Value.PatientId.SplitReference(),
                 QueryType = queryPlanType,
                 ResourceId = existingReference.ResourceId,
                 ResourceType = referenceQueryFactoryResult.ResourceType,
