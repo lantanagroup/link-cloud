@@ -47,8 +47,8 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
             _retryEntityFactory = retryEntityFactory ?? throw new ArgumentException(nameof(retryEntityFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentException(nameof(serviceScopeFactory));
-            _deadLetterExceptionHandler.ServiceName = retryListenerSettings.ServiceName;
-            _retryListenerSettings = retryListenerSettings;
+            _retryListenerSettings = retryListenerSettings ?? throw new ArgumentException(nameof(retryListenerSettings));
+            _deadLetterExceptionHandler.ServiceName = retryListenerSettings.ServiceName ?? throw new ArgumentException(nameof(retryListenerSettings.ServiceName));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -89,8 +89,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     //If retry event is not from the exception service, disregard the retry event
                                     if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings.ServiceName)
                                     {
-                                        consumer.Commit(consumeResult);
-                                        //continue;
+                                        return;
                                     }
                                 }
 
@@ -116,20 +115,20 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
                                 await RetryScheduleService.CreateJobAndTrigger(retryEntity, scheduler);
-
-                                consumer.Commit(consumeResult);
                             }
                             catch (DeadLetterException ex)
                             {
                                 var facilityId = GetStringValueFromHeader(consumeResult.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
                                 _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                                consumer.Commit(consumeResult);
-                                //continue;
                             }
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, $"Error in {_retryListenerSettings.ServiceName} retry consumer for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
+                            }
+                            finally
+                            {
+                                consumer.Commit(consumeResult);
                             }
 
                         }, cancellationToken);
