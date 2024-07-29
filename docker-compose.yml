@@ -443,12 +443,15 @@ services:
       ReverseProxy__Routes__route8__ClusterId: ReportService
       ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
-      ReverseProxy__Routes__route9__ClusterId: TenantService
+      ReverseProxy__Routes__route9__ClusterId: ReportService
       ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route9__Match__Path: api/facility/{**catch-all}
-      ReverseProxy__Routes__route10__ClusterId: QueryDispatchService
+      ReverseProxy__Routes__route9__Match__Path: api/reportconfig/{**catch-all}
+      ReverseProxy__Routes__route10__ClusterId: TenantService
       ReverseProxy__Routes__route10__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route10__Match__Path: api/querydispatch/{**catch-all}
+      ReverseProxy__Routes__route10__Match__Path: api/facility/{**catch-all}
+      ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
+      ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -457,7 +460,6 @@ services:
       ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
       ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
-      ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       Telemetry__EnableTelemetry: true
