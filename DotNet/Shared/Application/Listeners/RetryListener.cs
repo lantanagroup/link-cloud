@@ -89,6 +89,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                     //If retry event is not from the exception service, disregard the retry event
                                     if (Encoding.UTF8.GetString(exceptionService) != _retryListenerSettings.ServiceName)
                                     {
+                                        _logger.LogWarning("Service that Retry instance is running in ({instanceServiceName}) is different from the service that produced the message ({messageServiceName}). Message will be disregarded.", _retryListenerSettings.ServiceName, Encoding.UTF8.GetString(exceptionService));
                                         return;
                                     }
                                 }
