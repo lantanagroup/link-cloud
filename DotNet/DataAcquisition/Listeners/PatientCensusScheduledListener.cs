@@ -14,7 +14,8 @@ namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
 public class PatientCensusScheduledListener : BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
 {
-    private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly IServiceScopeFactory _serviceScopeFactory; 
+    private readonly IProducer<string, PatientIDsAcquiredMessage> _kafkaProducer;
 
     public PatientCensusScheduledListener(ILogger<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>> logger,
         IKafkaConsumerFactory<string, PatientCensusScheduled> kafkaConsumerFactory,
@@ -22,25 +23,17 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         IDeadLetterExceptionHandler<string, PatientCensusScheduled> deadLetterExceptionHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
-        IOptions<ServiceInformation> serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
+        IOptions<ServiceInformation> serviceInformation,
+        IProducer<string, PatientIDsAcquiredMessage> kafkaProducer) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
-        _serviceScopeFactory = serviceScopeFactory;
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     protected override async Task ExecuteListenerAsync(ConsumeResult<string, PatientCensusScheduled> consumeResult, CancellationToken cancellationToken)
     {
         string correlationId;
         string facilityId;
-
-        try
-        {
-            correlationId = ExtractCorrelationId(consumeResult);
-        }
-        catch (ArgumentNullException ex)
-        {
-            Logger.LogError(ex, "CorrelationId is missing from the message headers.");
-            throw new DeadLetterException("CorrelationId is missing from the message headers.", ex);
-        }
 
         try
         {
@@ -75,8 +68,7 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
 
         try
         {
-            var kafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, PatientIDsAcquiredMessage>>();
-            await kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
+            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
         }
         catch (Exception ex)
         {
