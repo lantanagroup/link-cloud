@@ -129,7 +129,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var value = consumeResult.Message.Value;
                                 facilityId = key.FacilityId;
 
-                               // if (string.IsNullOrWhiteSpace(key.FacilityId))
+                                if (string.IsNullOrWhiteSpace(key.FacilityId))
                                 {
                                     throw new TransientException(
                                         $"{Name}: FacilityId is null or empty.");
