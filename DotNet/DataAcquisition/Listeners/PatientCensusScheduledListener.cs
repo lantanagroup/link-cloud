@@ -22,25 +22,15 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         IDeadLetterExceptionHandler<string, PatientCensusScheduled> deadLetterExceptionHandler,
         IDeadLetterExceptionHandler<string, string> deadLetterConsumerErrorHandler,
         IServiceScopeFactory serviceScopeFactory,
-        IOptions<ServiceInformation> serviceInformation) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
+        IOptions<ServiceInformation> serviceInformation,
+        IProducer<string, PatientIDsAcquiredMessage> kafkaProducer) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
-        _serviceScopeFactory = serviceScopeFactory;
+        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
     protected override async Task ExecuteListenerAsync(ConsumeResult<string, PatientCensusScheduled> consumeResult, CancellationToken cancellationToken)
     {
-        string correlationId;
         string facilityId;
-
-        try
-        {
-            correlationId = ExtractCorrelationId(consumeResult);
-        }
-        catch (ArgumentNullException ex)
-        {
-            Logger.LogError(ex, "CorrelationId is missing from the message headers.");
-            throw new DeadLetterException("CorrelationId is missing from the message headers.", ex);
-        }
 
         try
         {
@@ -52,7 +42,7 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
             throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientCensusService =
             scope.ServiceProvider.GetRequiredService<IPatientCensusService>();
 
