@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Quartz.Util;
 using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -64,9 +65,9 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration(string facilityId, [FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration([FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
+        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
             return BadRequest();
         }
@@ -87,7 +88,7 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", facilityId);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", fhirListConfiguration.FacilityId);
             throw;
         }
     }
