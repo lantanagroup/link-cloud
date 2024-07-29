@@ -281,7 +281,9 @@ public class FhirApiService : IFhirApiService
                         PatientId = patientId,
                         FacilityId = facilityId,
                         QueryType = queryType,
-                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome))
+                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                        CreateDate = DateTime.UtcNow,
+                        ModifyDate = DateTime.UtcNow
                     }, cancellationToken);
                 }
             }
@@ -351,6 +353,8 @@ public class FhirApiService : IFhirApiService
                 FacilityId = facilityId,
                 QueryType = queryType,
                 IsSuccessful = readResource is not OperationOutcome,
+                CreateDate = DateTime.UtcNow,
+                ModifyDate = DateTime.UtcNow
             }, cancellationToken);
 
             if (readResource is not OperationOutcome)
