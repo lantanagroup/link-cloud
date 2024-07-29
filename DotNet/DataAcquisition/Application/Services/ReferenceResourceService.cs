@@ -82,7 +82,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 CorrelationId = request.CorrelationId,
                 FacilityId = request.FacilityId,
                 IsSuccessful = true,
-                PatientId = request.ConsumeResult.Message.Value.PatientId,
+                PatientId = request.ConsumeResult.Message.Value.PatientId.SplitReference(),
                 QueryType = queryPlanType,
                 ResourceId = existingReference.ResourceId,
                 ResourceType = referenceQueryFactoryResult.ResourceType,
@@ -103,12 +103,12 @@ public class ReferenceResourceService : IReferenceResourceService
         List<ResourceReference> missingReferences = validReferenceResources
             .Where(x => !existingReferenceResources.Any(y => y.ResourceId.Equals(x.Reference.SplitReference(), StringComparison.InvariantCultureIgnoreCase))).ToList();
 
-        missingReferences.ForEach(async x =>
+        foreach(var x in missingReferences)
         {
             var fullMissingResources = await _fhirRepo.GetReferenceResource(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
-            request.ConsumeResult.Message.Value.PatientId,
+            request.ConsumeResult.Message.Value.PatientId.SplitReference(),
             request.FacilityId,
             request.CorrelationId,
             queryPlanType,
@@ -156,7 +156,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
                 await _referenceResourcesManager.AddAsync(refResource);
             }
-        });
+        }
     }
 
     private async Task GenerateMessage(
