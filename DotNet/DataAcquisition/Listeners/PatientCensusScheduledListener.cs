@@ -14,8 +14,7 @@ namespace LantanaGroup.Link.DataAcquisition.Listeners;
 
 public class PatientCensusScheduledListener : BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>
 {
-    private readonly IServiceScopeFactory _serviceScopeFactory; 
-    private readonly IProducer<string, PatientIDsAcquiredMessage> _kafkaProducer;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public PatientCensusScheduledListener(ILogger<BaseListener<PatientCensusScheduled, string, PatientCensusScheduled, string, PatientIDsAcquiredMessage>> logger,
         IKafkaConsumerFactory<string, PatientCensusScheduled> kafkaConsumerFactory,
@@ -27,7 +26,6 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         IProducer<string, PatientIDsAcquiredMessage> kafkaProducer) : base(logger, kafkaConsumerFactory, deadLetterExceptionHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
     {
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     protected override async Task ExecuteListenerAsync(ConsumeResult<string, PatientCensusScheduled> consumeResult, CancellationToken cancellationToken)
@@ -45,7 +43,7 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
             throw new DeadLetterException("FacilityId is missing from the message key.", ex);
         }
 
-        var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _serviceScopeFactory.CreateScope();
         var patientCensusService =
             scope.ServiceProvider.GetRequiredService<IPatientCensusService>();
 
@@ -68,7 +66,8 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
 
         try
         {
-            await _kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
+            var kafkaProducer = scope.ServiceProvider.GetRequiredService<IProducer<string, PatientIDsAcquiredMessage>>();
+            await kafkaProducer.ProduceAsync(KafkaTopic.PatientIDsAcquired.ToString(), produceMessage, cancellationToken);
         }
         catch (Exception ex)
         {
