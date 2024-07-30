@@ -46,6 +46,9 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         try
         {
             facilityId = ExtractFacilityId(consumeResult);
+
+            if (string.IsNullOrWhiteSpace(facilityId))
+                throw new ArgumentNullException("FacilityId is missing from the message key.");
         }
         catch (ArgumentNullException ex)
         {
@@ -78,9 +81,6 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
     protected override string ExtractFacilityId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
         var facilityId = consumeResult.Message.Key;
-
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentNullException("FacilityId is missing from the message key.");
 
         return facilityId;
     }

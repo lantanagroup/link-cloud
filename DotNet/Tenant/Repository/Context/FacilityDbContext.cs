@@ -13,8 +13,17 @@ namespace LantanaGroup.Link.Tenant.Repository.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfiguration(new FacilityConfigMap());
+
+            modelBuilder.Entity<FacilityConfigModel>()
+               .Property(b => b.Id)
+               .HasConversion(
+                   v => new Guid(v),
+                   v => v.ToString()
+               );
+
         }
 
         public DbSet<FacilityConfigModel> Facilities { get; set; }
+
     }
 }

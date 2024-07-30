@@ -1,7 +1,10 @@
-﻿namespace LantanaGroup.Link.Tenant.Entities
-{
+﻿using LantanaGroup.Link.Shared.Domain.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
-    public class FacilityConfigModel : BaseEntity
+namespace LantanaGroup.Link.Tenant.Entities
+{
+    [Table("Facilities")]
+    public class FacilityConfigModel : BaseEntityExtended
     {
         public string FacilityId { get; set; } = null!;
         public string? FacilityName { get; set; }

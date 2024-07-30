@@ -41,6 +41,7 @@ public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
+    private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
     private readonly IFhirApiService _fhirRepo;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
 
@@ -48,12 +49,14 @@ public class ReferenceResourceService : IReferenceResourceService
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
-        IProducer<string, ResourceAcquired> kafkaProducer)
+        IProducer<string, ResourceAcquired> kafkaProducer,
+        IQueriedFhirResourceManager queriedFhirResourceManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
+        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
     }
 
     public async Task<List<Resource>> Execute_NoKafka(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfiguration fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
@@ -125,6 +128,19 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach(var existingReference in existingReferenceResources)
         {
+            await _queriedFhirResourceManager.AddAsync(new QueriedFhirResourceRecord
+            {
+                CorrelationId = request.CorrelationId,
+                FacilityId = request.FacilityId,
+                IsSuccessful = true,
+                PatientId = request.ConsumeResult.Message.Value.PatientId.SplitReference(),
+                QueryType = queryPlanType,
+                ResourceId = existingReference.ResourceId,
+                ResourceType = referenceQueryFactoryResult.ResourceType,
+                CreateDate = DateTime.UtcNow,
+                ModifyDate = DateTime.UtcNow
+            });
+
             await GenerateMessage(
             FhirResourceDeserializer.DeserializeFhirResource(existingReference),
             request.FacilityId,
@@ -138,12 +154,12 @@ public class ReferenceResourceService : IReferenceResourceService
         List<ResourceReference> missingReferences = validReferenceResources
             .Where(x => !existingReferenceResources.Any(y => y.ResourceId.Equals(x.Reference.SplitReference(), StringComparison.InvariantCultureIgnoreCase))).ToList();
 
-        missingReferences.ForEach(async x =>
+        foreach(var x in missingReferences)
         {
             var fullMissingResources = await _fhirRepo.GetReferenceResource(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
-            request.ConsumeResult.Message.Value.PatientId,
+            request.ConsumeResult.Message.Value.PatientId.SplitReference(),
             request.FacilityId,
             request.CorrelationId,
             queryPlanType,
@@ -191,7 +207,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
                 await _referenceResourcesManager.AddAsync(refResource);
             }
-        });
+        }
     }
 
     private async Task GenerateMessage(
