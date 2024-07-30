@@ -200,7 +200,7 @@ public class FhirApiService : IFhirApiService
                 if (!(x.Resource.TypeName == nameof(OperationOutcome)))
                 {
                     bundle.AddResourceEntry(x.Resource, x.FullUrl);
-                    IncrementResourceAcquiredMetric(patientIdReference, facilityId, queryType, x.Resource.TypeName);
+                    IncrementResourceAcquiredMetric(correlationId, patientIdReference, facilityId, queryType, x.Resource.TypeName, x.Resource.Id);
                 }
             });
         }
@@ -219,7 +219,9 @@ public class FhirApiService : IFhirApiService
         using var _ = _metrics.MeasureDataRequestDuration([
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
-            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient")
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, "Patient"),
+            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, QueryPlanType.Initial.ToString())
         ]);
 
         patientId = patientId.Contains("Patient/", StringComparison.InvariantCultureIgnoreCase) ? patientId : $"Patient/{patientId}";
@@ -264,6 +266,7 @@ public class FhirApiService : IFhirApiService
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
                 new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
+                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
@@ -311,7 +314,9 @@ public class FhirApiService : IFhirApiService
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
             new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
-            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType),
+            new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, id)
         ]);
 
         DomainResource? readResource = null;
@@ -359,7 +364,7 @@ public class FhirApiService : IFhirApiService
 
             if (readResource is not OperationOutcome)
             {
-                IncrementResourceAcquiredMetric(patientId, facilityId, queryType, resourceType);
+                IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, id);
             }
         }
 
@@ -553,13 +558,15 @@ public class FhirApiService : IFhirApiService
         };
     }
 
-    private void IncrementResourceAcquiredMetric(string? patientIdReference, string? facilityId, string? queryType, string resourceType)
+    private void IncrementResourceAcquiredMetric(string? correlationId, string? patientIdReference, string? facilityId, string? queryType, string resourceType, string resourceId)
     {
         _metrics.IncrementResourceAcquiredCounter([
+            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientIdReference), //TODO: Can we keep this?
             new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
-            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
+            new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType),
+            new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resourceId)
         ]);
     }
 }
