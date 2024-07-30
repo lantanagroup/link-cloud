@@ -112,9 +112,10 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             await _patientListRepository.UpdateAsync(patient, cancellationToken);
             if (patient.IsDischarged)
             {
+                var correlationId = Guid.NewGuid().ToString();
                 eventList.Add(new PatientEventResponse
                 {
-                    CorrelationId = Guid.NewGuid().ToString(),
+                    CorrelationId = correlationId,
                     FacilityId = request.FacilityId,
                     PatientEvent = new PatientEvent
                     {
@@ -127,7 +128,8 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
                 _metrics.IncrementPatientDischargedCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.FacilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patient.PatientId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString())
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientEvent, PatientEvents.Discharge.ToString()),
+                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId)
                 ]);
             }
         }
