@@ -49,6 +49,8 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Model;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -147,6 +149,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
+        options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
     });
 
     //Fhir Authentication Handlers
