@@ -1,5 +1,3 @@
-version: '3.4'
-
 #### services and ports
 ## redis_cache: 6379
 ## mssql: 1433
