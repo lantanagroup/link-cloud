@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, 
-            ServiceRegistry serviceRegistry)
+            IOptions<ServiceRegistry> serviceRegistry)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
             
-            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+            _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
