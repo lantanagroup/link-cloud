@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (scheduledReport == null)
                                     {
-                                        throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                       throw new TransientException("PatientEventListener: scheduleReport is null.");
                                     }
 
                                     var now = DateTime.UtcNow;
