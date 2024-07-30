@@ -199,8 +199,7 @@ public class FhirApiService : IFhirApiService
             {
                 if (!(x.Resource.TypeName == nameof(OperationOutcome)))
                 {
-                    bundle.AddResourceEntry(x.Resource, x.FullUrl);
-                    IncrementResourceAcquiredMetric(correlationId, patientIdReference, facilityId, queryType, x.Resource.TypeName, x.Resource.Id);
+                    bundle.AddResourceEntry(x.Resource, x.FullUrl);                    
                 }
             });
         }
@@ -288,6 +287,8 @@ public class FhirApiService : IFhirApiService
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow
                     }, cancellationToken);
+
+                    IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
                 }
             }
 
