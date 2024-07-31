@@ -6,6 +6,8 @@ using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 {
@@ -86,9 +88,35 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         }
 
         public IResult GetUser(HttpContext context)
-        {
-            var user = context.User;
-            return Results.Ok(user.Claims.Select(x => new { x.Type, x.Value }).ToList());
+        {  
+            //get claims principal
+            if (context.User.Identity is not ClaimsIdentity claimsIdentity)
+            {
+                return Results.Problem("No claims found in the current user identity", statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            // Define the claim types to keep
+            var allowedClaims = new HashSet<string> {
+                    JwtRegisteredClaimNames.FamilyName,
+                    JwtRegisteredClaimNames.GivenName,
+                    LinkAuthorizationConstants.LinkSystemClaims.Email,
+                    LinkAuthorizationConstants.LinkSystemClaims.Subject,
+                    LinkAuthorizationConstants.LinkSystemClaims.Role,
+                    LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions
+                };
+
+            //Define all claims that should be removed
+            var claimsToRemove = claimsIdentity.Claims
+                .Where(claim => !allowedClaims.Contains(claim.Type))
+                .ToList();
+
+            //remove uneeeded claims
+            foreach (var claim in claimsToRemove)
+            {
+                claimsIdentity.RemoveClaim(claim);
+            }
+
+            return Results.Ok(claimsIdentity.Claims.Select(x => new { x.Type, x.Value }).ToList());                      
         }
 
         public IResult Logout(HttpContext context)
