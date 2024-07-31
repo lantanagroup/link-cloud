@@ -84,7 +84,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
-    // Add IOptions    
+    // Add IOptions
     builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));

@@ -6,13 +6,17 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Factories.ParameterFacto
 
 public class ResourceIdParameterFactory
 {
-    public static ParameterFactoryResult Build(ResourceIdsParameter parameter, GetPatientDataRequest request, Hl7.Fhir.Model.Bundle bundle)
+    public static ParameterFactoryResult Build(ResourceIdsParameter parameter, GetPatientDataRequest request, List<string> resourceIds)
     {
-        var entries = bundle.Entry.Where(x => x.TypeName == parameter.Resource).Select(x => x.Resource.Id).Distinct().ToList();
+        if (resourceIds == null || !resourceIds.Any())
+        {
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(parameter.Paged))
         {
             int pageSize = int.Parse(parameter.Paged);
-            var pagedEntries = entries.Chunk(pageSize).ToList();
+            var pagedEntries = resourceIds.Chunk(pageSize).ToList();
 
             if (!pagedEntries.Any())
                 return null;
@@ -20,7 +24,7 @@ public class ResourceIdParameterFactory
             return new ParameterFactoryResult(parameter.Name, null, true, pagedEntries);
         }
 
-        var joinedEntries = string.Join(",", entries);
+        var joinedEntries = string.Join(",", resourceIds);
         if (string.IsNullOrWhiteSpace(joinedEntries))
             return null;
 

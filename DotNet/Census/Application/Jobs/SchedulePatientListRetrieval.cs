@@ -10,23 +10,21 @@ namespace LantanaGroup.Link.Census.Application.Jobs;
 public class SchedulePatientListRetrieval : IJob
 {
     private readonly ILogger<SchedulePatientListRetrieval> _logger;
-    private readonly IKafkaProducerFactory<string, Null> _kafkaFactory;
+    private readonly IProducer<string, Null> _kafkaProducer;
 
-    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IKafkaProducerFactory<string, Null> kafkaFactory)
+    public SchedulePatientListRetrieval(ILogger<SchedulePatientListRetrieval> logger, IProducer<string, Null> kafkaProducer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _kafkaFactory = kafkaFactory ?? throw new ArgumentNullException(nameof(kafkaFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
     }
 
     public async Task Execute(IJobExecutionContext context)
     {
-        var producerConfig = new ProducerConfig();
-        using var producer = _kafkaFactory.CreateProducer(producerConfig);
         //get facility
         var facility = (CensusConfigEntity)context.JobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility);
         _logger.LogInformation($"Triggering {KafkaTopic.PatientCensusScheduled.ToString()} for facility: {facility.FacilityID} ");
 
-        await producer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
+        await _kafkaProducer.ProduceAsync(KafkaTopic.PatientCensusScheduled.ToString(), new Message<string, Null>
         {
             Key = facility.FacilityID
         });
