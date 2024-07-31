@@ -4,16 +4,14 @@ namespace LantanaGroup.Link.Shared.Application.Error.Exceptions
 {
     public class TransientException : Exception
     {
-        public AuditEventType AuditEventType { get; set; }
-
-        public TransientException(string message, AuditEventType auditEventType) : base(message)
+        public TransientException(string message) : base(message)
         {
-            AuditEventType = auditEventType;
+          
         }
 
-        public TransientException(string message, AuditEventType auditEventType, Exception? innerEx) : base(message, innerEx)
+        public TransientException(string message, Exception? innerEx) : base(message, innerEx)
         {
-            AuditEventType = auditEventType;
+            
         }
     }
 }

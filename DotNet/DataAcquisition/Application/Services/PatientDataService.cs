@@ -1,25 +1,16 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using Newtonsoft.Json;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -27,6 +18,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public interface IPatientDataService
 {
     Task Get(GetPatientDataRequest request, CancellationToken cancellationToken);
+    Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default);
 }
 
 public class PatientDataService : IPatientDataService
@@ -46,10 +38,8 @@ public class PatientDataService : IPatientDataService
         ILogger<PatientDataService> logger,
         IFhirQueryConfigurationManager fhirQueryManager,
         IQueryPlanManager queryPlanManager,
-        IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
-        IReferenceResourceService referenceResourceService,
         IQueryListProcessor queryListProcessor)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -66,6 +56,55 @@ public class PatientDataService : IPatientDataService
         _queryListProcessor = queryListProcessor ?? throw new ArgumentNullException(nameof(queryListProcessor));
     }
 
+    public async Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default)
+    {
+        var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+        var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+        var patient = await _fhirRepo.GetPatient(
+            queryConfig.FhirServerBaseUrl,
+            request.ConsumeResult.Value.PatientId,
+            Guid.NewGuid().ToString(),
+            request.FacilityId,
+            authenticationConfig,
+            cancellationToken) ?? throw new NotFoundException("Patient not found.");
+        var queryPlan = (
+            await _queryPlanManager.FindAsync(
+                q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
+            && q.PlanName.ToLower() == request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType.ToLower(), cancellationToken))
+            .FirstOrDefault();
+
+        if (queryPlan == null)
+            throw new MissingFacilityConfigurationException("Query Plan not found.");
+
+        var resources = new List<Resource>();
+
+        var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
+        var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+
+        var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
+        referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.InitialQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Initial.ToString()));
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.SupplementalQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Supplemental.ToString()));
+
+        return resources;
+    }
+
     public async Task Get(GetPatientDataRequest request, CancellationToken cancellationToken)
     {
         var dataAcqRequested = request.ConsumeResult.Message.Value;
@@ -76,8 +115,7 @@ public class PatientDataService : IPatientDataService
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans =
-                await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
+            queryPlans = await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
 
             if (fhirQueryConfiguration == null || queryPlans == null)
             {
@@ -100,41 +138,39 @@ public class PatientDataService : IPatientDataService
             throw;
         }
 
+        Patient patient = null;
+        var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
+
+        if (dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
+        {
+            patient = await _fhirRepo.GetPatient(
+                fhirQueryConfiguration.FhirServerBaseUrl,
+                patientId, request.CorrelationId,
+                request.FacilityId,
+                fhirQueryConfiguration.Authentication, cancellationToken);
+
+            await _kafkaProducer.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                new Message<string, ResourceAcquired>
+                {
+                    Key = request.FacilityId,
+                    Headers = new Headers
+                    {
+                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.CorrelationId))
+                    },
+                    Value = new ResourceAcquired
+                    {
+                        Resource = patient,
+                        ScheduledReports = request.ConsumeResult.Value.ScheduledReports,
+                        PatientId = patientId,
+                        QueryType = dataAcqRequested.QueryType
+                    }
+                }, cancellationToken);
+        }
+
         foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
         {
-            var patientId = TEMPORARYPatientIdPart(dataAcqRequested.PatientId);
-
-            Patient patient = null;
-
-            if (dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase))
-            {
-                patient = await _fhirRepo.GetPatient(
-                    fhirQueryConfiguration.FhirServerBaseUrl,
-                    patientId, request.CorrelationId,
-                    request.FacilityId,
-                    fhirQueryConfiguration.Authentication, cancellationToken);
-
-                await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(), 
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = request.FacilityId,
-                        Headers = new Headers
-                        {
-                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.CorrelationId))
-                        },
-                        Value = new ResourceAcquired
-                        {
-                            Resource = patient,
-                            ScheduledReports = new List<ScheduledReport> { scheduledReport },
-                            PatientId = patientId,
-                            QueryType = dataAcqRequested.QueryType
-                        }
-                    });
-            }
-
             var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
-            
 
             if (queryPlan != null)
             {
@@ -148,16 +184,16 @@ public class PatientDataService : IPatientDataService
                 try
                 {
                     await _queryListProcessor.Process(
-                            dataAcqRequested.QueryType == "Initial" ? initialQueries : supplementalQueries,
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
                             request,
                             fhirQueryConfiguration,
                             scheduledReport,
                             queryPlan,
                             referenceTypes,
-                            dataAcqRequested.QueryType == "Initial" ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString());
+                            dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
 
                 }
-                catch(ProduceException<string, ResourceAcquired>)
+                catch (ProduceException<string, ResourceAcquired>)
                 {
                     throw;
                 }

@@ -17,7 +17,7 @@ public class ParameterQueryFactory
     /// </summary>
     /// <param name="config"></param>
     /// <returns></returns>
-    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, Hl7.Fhir.Model.Bundle bundle = null)
+    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, List<string> resourceIds = null)
     {
         var isPaged = false;
         var searchParams = new SearchParams();
@@ -29,7 +29,7 @@ public class ParameterQueryFactory
             {
                 LiteralParameter => LiteralParameterFactory.Build((LiteralParameter)parameter),
                 VariableParameter => VariableParameterFactory.Build((VariableParameter)parameter, request, scheduledReport, lookback),
-                ResourceIdsParameter => ResourceIdParameterFactory.Build((ResourceIdsParameter)parameter, request, bundle),
+                ResourceIdsParameter => ResourceIdParameterFactory.Build((ResourceIdsParameter)parameter, request, resourceIds),
                 _ => throw new Exception("Unable to determine parameter type."),
             };
 

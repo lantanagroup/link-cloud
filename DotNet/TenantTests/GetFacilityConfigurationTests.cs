@@ -1,16 +1,15 @@
 
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 using Moq;
 using Moq.AutoMock;
-using System.Drawing.Printing;
-
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace TenantTests
 {
@@ -53,7 +52,7 @@ namespace TenantTests
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.GetAsyncById(Guid.Parse(id), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+                .Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
             _mocker.GetMock<IOptions<MeasureConfig>>()
               .Setup(p => p.Value)
@@ -63,9 +62,9 @@ namespace TenantTests
                 .Setup(p => p.Value)
                 .Returns(_serviceRegistry);
 
-            Task<FacilityConfigModel> facility = _service.GetFacilityById(Guid.Parse(id), CancellationToken.None);
+            Task<FacilityConfigModel> facility = _service.GetFacilityById(id, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsyncById(Guid.Parse(id), CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.GetAsync(id, CancellationToken.None), Times.Once);
 
             Assert.NotNull(facility.Result);
 
@@ -105,15 +104,16 @@ namespace TenantTests
 
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.SearchAsync("", "", "", SortOrder.Ascending, 10, 1, CancellationToken.None)).ReturnsAsync(output); 
+                .Setup(p => p.SearchAsync(null, "", SortOrder.Ascending, 10, 1, CancellationToken.None)).ReturnsAsync(output); 
 
             _mocker.GetMock<IOptions<ServiceRegistry>>()
              .Setup(p => p.Value)
              .Returns(_serviceRegistry);
 
-            Task<PagedFacilityConfigModel> facilitiesResponse = _service.GetFacilities("","","",SortOrder.Ascending,10,1, CancellationToken.None);
+            Task<PagedConfigModel<FacilityConfigModel>> facilitiesResponse = _service.GetFacilities("", "", "", SortOrder.Ascending, 10, 1, CancellationToken.None);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.SearchAsync("", "", "", SortOrder.Ascending, 10, 1, CancellationToken.None), Times.Once);
+            _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.SearchAsync(null, "", SortOrder.Ascending, 10, 1, CancellationToken.None), Times.Once);
+
 
             Assert.NotEmpty(facilitiesResponse.Result.Records);
 
