@@ -29,9 +29,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public void RegisterEndpoints(WebApplication app)
         {
             var integrationEndpoints = app.MapGroup("/api/integration")
-                .RequireAuthorization(
+                .RequireAuthorization([
                     LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName,
-                    PolicyNames.IsLinkAdmin)
+                    PolicyNames.IsLinkAdmin])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
