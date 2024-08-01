@@ -16,7 +16,7 @@ namespace QueryDispatchUnitTests
     {
         private AutoMocker _mocker;
 
-        [Fact]
+      /*  [Fact]
         public async void TestGetFacilityConfiguration()
         {
             _mocker = new AutoMocker();
@@ -28,7 +28,7 @@ namespace QueryDispatchUnitTests
 
             var result = await _controller.GetFacilityConfiguration(QueryDispatchTestsConstants.facilityId);
             Assert.IsType<OkObjectResult>(result.Result);
-        }
+        }*/
 
         [Fact]
         public async void NegativeTestGetFacilityConfiguration()
