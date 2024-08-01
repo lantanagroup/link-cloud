@@ -29,7 +29,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ILogger<ResourceAcquiredListener> _logger;
     private readonly IAuditService _auditService;
     private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
-    private readonly IKafkaProducerFactory<string, ResourceNormalizedMessage> _producerFactory;
+    private readonly IProducer<string, ResourceNormalizedMessage> _producer;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> _deadLetterExceptionHandler;
     private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
@@ -43,16 +43,15 @@ public class ResourceAcquiredListener : BackgroundService
         IServiceScopeFactory scopeFactory,
         IAuditService auditService,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
-        IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
         IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> deadLetterExceptionHandler,
         ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler,
-        INormalizationServiceMetrics metrics)
+        INormalizationServiceMetrics metrics,
+        IProducer<string, ResourceNormalizedMessage> producer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
-        _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
         _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
@@ -65,6 +64,7 @@ public class ResourceAcquiredListener : BackgroundService
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
 
         _scopeFactory = scopeFactory;
+        _producer = producer ?? throw new ArgumentNullException(nameof(producer));
     }
 
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
@@ -79,8 +79,6 @@ public class ResourceAcquiredListener : BackgroundService
             GroupId = NormalizationConstants.ServiceName,
             EnableAutoCommit = false
         });
-
-        using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd }, useOpenTelemetry: true);
 
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
 
@@ -289,7 +287,7 @@ public class ResourceAcquiredListener : BackgroundService
                                 Headers = headers,
                                 Value = resourceNormalizedMessage
                             };
-                            await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
 
                         }
                         catch (Exception ex)
