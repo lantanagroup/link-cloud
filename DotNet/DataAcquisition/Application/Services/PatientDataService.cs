@@ -18,6 +18,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 public interface IPatientDataService
 {
     Task Get(GetPatientDataRequest request, CancellationToken cancellationToken);
+    Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default);
 }
 
 public class PatientDataService : IPatientDataService
@@ -53,6 +54,55 @@ public class PatientDataService : IPatientDataService
         _producerConfig.CompressionType = CompressionType.Zstd;
 
         _queryListProcessor = queryListProcessor ?? throw new ArgumentNullException(nameof(queryListProcessor));
+    }
+
+    public async Task<List<Resource>> Get_NoKafka(GetPatientDataRequest request, CancellationToken cancellationToken = default)
+    {
+        var authenticationConfig = await _fhirQueryManager.GetAuthenticationConfigurationByFacilityId(request.FacilityId, cancellationToken);
+        var queryConfig = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+        var patient = await _fhirRepo.GetPatient(
+            queryConfig.FhirServerBaseUrl,
+            request.ConsumeResult.Value.PatientId,
+            Guid.NewGuid().ToString(),
+            request.FacilityId,
+            authenticationConfig,
+            cancellationToken) ?? throw new NotFoundException("Patient not found.");
+        var queryPlan = (
+            await _queryPlanManager.FindAsync(
+                q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
+            && q.PlanName.ToLower() == request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType.ToLower(), cancellationToken))
+            .FirstOrDefault();
+
+        if (queryPlan == null)
+            throw new MissingFacilityConfigurationException("Query Plan not found.");
+
+        var resources = new List<Resource>();
+
+        var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
+        var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
+
+        var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
+        referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.InitialQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Initial.ToString()));
+
+        resources.AddRange(await _queryListProcessor.Process_NoKafka(
+                queryPlan.SupplementalQueries.OrderBy(x => x.Key),
+                request,
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
+                queryPlan,
+                referenceTypes,
+                QueryPlanType.Supplemental.ToString()));
+
+        return resources;
     }
 
     public async Task Get(GetPatientDataRequest request, CancellationToken cancellationToken)
@@ -121,7 +171,7 @@ public class PatientDataService : IPatientDataService
         foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
         {
             var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
-            
+
             if (queryPlan != null)
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -143,7 +193,7 @@ public class PatientDataService : IPatientDataService
                             dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
 
                 }
-                catch(ProduceException<string, ResourceAcquired>)
+                catch (ProduceException<string, ResourceAcquired>)
                 {
                     throw;
                 }
