@@ -180,7 +180,14 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 //clear user cache              
                 var userKey = $"user:{user.Email}";
-                await _cache.RemoveAsync(userKey, cancellationToken);
+                try 
+                {
+                    await _cache.RemoveAsync(userKey, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCacheException(userKey, ex.Message);
+                }                
 
                 return true;
             }

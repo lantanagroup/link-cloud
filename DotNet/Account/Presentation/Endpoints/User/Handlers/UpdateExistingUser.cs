@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 if (existingUser is null)
                 {
 
-                    //verify that the emal is not already in use
+                    //verify that the emial is not already in use
                     var existingUserByEmail = await queryUser.Execute(model.Email, context.RequestAborted);
                     if (existingUserByEmail is not null)
                     {
