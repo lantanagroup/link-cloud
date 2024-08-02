@@ -61,6 +61,7 @@
 
             public const int AuditEventCreated = 1200;
             public const int AuditEventCreationException = 1201;
+            public const int CacheException = 1202;
         }
     }
 }
