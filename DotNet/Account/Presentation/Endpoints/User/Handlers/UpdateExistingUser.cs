@@ -31,6 +31,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 var existingUser = await queryUser.Execute(id, cancellationToken: context.RequestAborted);
                 if (existingUser is null)
                 {
+
+                    //verify that the emal is not already in use
+                    var existingUserByEmail = await queryUser.Execute(model.Email, context.RequestAborted);
+                    if (existingUserByEmail is not null)
+                    {
+                        return Results.Conflict("A user with the same email already exists.");
+                    }
+
                     //create new user
                     var createdUser = await createUserCommand.Execute(requestor, model, context.RequestAborted);
 
