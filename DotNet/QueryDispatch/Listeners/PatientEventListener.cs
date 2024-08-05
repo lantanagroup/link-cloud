@@ -3,7 +3,6 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -55,6 +54,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
             _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
+
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     using var scope = _serviceScopeFactory.CreateScope();
                                     var patientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
                                     var getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var queryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
+                                    var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IQueryDispatchConfigurationRepository>();
 
                                     if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
                                     {
@@ -114,13 +114,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (scheduledReport == null)
                                     {
-                                        throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                       throw new TransientException("PatientEventListener: scheduleReport is null.");
                                     }
 
                                     var now = DateTime.UtcNow;
                                     scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
-                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
+                                    // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
+                                    QueryDispatchConfigurationEntity dispatchSchedule= await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (dispatchSchedule == null)
                                     {

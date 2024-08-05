@@ -49,6 +49,8 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Model;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -147,6 +149,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new QueryPlanConverter());
+        options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
     });
 
     //Fhir Authentication Handlers
@@ -230,7 +233,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddTransient<RetryJob>();
-    builder.Services.AddScoped<IJobFactory, JobFactory>();
+    builder.Services.AddScoped<IJobFactory, JobFactory>(); 
 
     //Add Hosted Services
     if (!consumerSettings?.DisableConsumer ?? true)
@@ -242,7 +245,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (!consumerSettings?.DisableRetryConsumer ?? true)
     {
         
-        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, new []{ KafkaTopic.DataAcquisitionRequested.GetStringValue(), KafkaTopic.PatientCensusScheduled.GetStringValue() }));
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [ KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue() ]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

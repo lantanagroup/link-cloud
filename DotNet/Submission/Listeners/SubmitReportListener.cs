@@ -29,6 +29,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> _kafkaConsumerFactory;
         private readonly SubmissionServiceConfig _submissionConfig;
         private readonly IHttpClientFactory _httpClient;
+        private readonly ServiceRegistry _serviceRegistry;
 
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
@@ -43,8 +44,9 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<SubmissionServiceConfig> submissionConfig,
             IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, 
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, 
+            IOptions<ServiceRegistry> serviceRegistry)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -64,6 +66,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+            
+            _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -163,8 +167,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
                                 #region Census Admitted Patient List
-                                string censusRequestUrl = _submissionConfig.CensusUrl +
-                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
+                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
                                 //TODO: add method to get key that includes looking at redis for future use case
                                 if (_linkTokenServiceConfig.Value.SigningKey is null)
@@ -472,8 +475,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
-            string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
-                                $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
 
             try
             {

@@ -2,7 +2,6 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -13,55 +12,38 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     public class CreatePatientEvent : ICreatePatientEvent
     {
         private readonly ILogger<CreatePatientEvent> _logger;
-        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IProducer<string, object> _producer;
 
-        public CreatePatientEvent(ILogger<CreatePatientEvent> logger, IServiceScopeFactory scopeFactory)
+        public CreatePatientEvent(ILogger<CreatePatientEvent> logger, IProducer<string, object> producer)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));            
-            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task<string> Execute(PatientEvent model, string? userId = null)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");
-            using var scope = _scopeFactory.CreateScope();
-            var _kafkaProducerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, object>>();
-
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Event");                     
             string correlationId = Guid.NewGuid().ToString();
 
             try
             {
-                var producerConfig = new ProducerConfig();                
-
-                using (var producer = _kafkaProducerFactory.CreateProducer(producerConfig, useOpenTelemetry: true))
+                var headers = new Headers
                 {
-                    try
-                    {
-                        var headers = new Headers();
-                        headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(correlationId));
+                    { "X-Correlation-Id", Encoding.ASCII.GetBytes(correlationId) }
+                };
 
-                        var message = new Message<string, object>
-                        {
-                            Key = model.Key,
-                            Value = new PatientEventMessage { PatientId = model.PatientId, EventType = model.EventType },
-                            Headers = headers
-                        };
+                var message = new Message<string, object>
+                {
+                    Key = model.Key,
+                    Value = new PatientEventMessage { PatientId = model.PatientId, EventType = model.EventType },
+                    Headers = headers
+                };
 
-                        await producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);                     
-                        _logger.LogKafkaProducerPatientEvent(correlationId);
+                await _producer.ProduceAsync(nameof(KafkaTopic.PatientEvent), message);                     
+                _logger.LogKafkaProducerPatientEvent(correlationId);
 
-                        return correlationId;
+                return correlationId;
 
-                    }
-                    catch (Exception ex)
-                    {
-                        Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                        Activity.Current?.RecordException(ex);
-                        _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
-                        throw;
-                    }
-
-                }
             }
             catch (Exception ex)
             {
@@ -69,7 +51,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 Activity.Current?.RecordException(ex);
                 _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
                 throw;
-            }
+            }                
+
         }
     }
 }
