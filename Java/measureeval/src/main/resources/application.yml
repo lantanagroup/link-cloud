@@ -60,7 +60,7 @@ link:
           - queryType={queryType}
 
 secret-management:
-  key-vault-uri: https://link-vault.vault.azure.net/
+  key-vault-uri: ''
 
 authentication:
   anonymous: true

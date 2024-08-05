@@ -6,7 +6,6 @@ using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
-using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
 using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
@@ -49,6 +48,9 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.QueryDispatch.Listeners;
+using QueryDispatch.Domain.Managers;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -128,9 +130,6 @@ builder.Services.AddTransient<ICreateScheduledReportCommand, CreateScheduledRepo
 builder.Services.AddTransient<ICreatePatientDispatchCommand, CreatePatientDispatchCommand>();
 builder.Services.AddTransient<IDeletePatientDispatchCommand, DeletePatientDispatchCommand>();
 
-builder.Services.AddTransient<ICreateQueryDispatchConfigurationCommand, CreateQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IDeleteQueryDispatchConfigurationCommand, DeleteQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IUpdateQueryDispatchConfigurationCommand, UpdateQueryDispatchConfigurationCommand>();
 
 //Add factories
 builder.Services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
@@ -151,15 +150,15 @@ builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchC
 //Add repos
 builder.Services.AddScoped<IScheduledReportRepository, ScheduledReportRepo>();
 builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
-builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
+builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
 builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
+// Add Manager
+builder.Services.AddTransient<QueryDispatchConfigurationManager>();
 
 //Add Queries
 builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();
 builder.Services.AddScoped<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
-builder.Services.AddScoped<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
-builder.Services.AddScoped<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
 builder.Services.AddScoped<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
 
 //Excepation Handlers
