@@ -125,6 +125,24 @@ public class ResourceAcquiredListener : BackgroundService
                             throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", ex);
                         }
 
+                        NormalizationConfig? config = null;
+                        try
+                        {
+                            config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
+                        }
+                        catch(DbContextNullException ex)
+                        {
+                            throw new TransientException("Database context is null.", ex);
+                        }
+                        catch (NoEntityFoundException ex)
+                        {
+                            throw new TransientException("Config for facilityId does not exist.", ex);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", ex);
+                        }
+
                         if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
                         {
                             _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
@@ -147,24 +165,6 @@ public class ResourceAcquiredListener : BackgroundService
                             };
                             await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
                             return;
-                        }
-
-                        NormalizationConfig? config = null;
-                        try
-                        {
-                            config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
-                        }
-                        catch(DbContextNullException ex)
-                        {
-                            throw new TransientException("Database context is null.", ex);
-                        }
-                        catch (NoEntityFoundException ex)
-                        {
-                            throw new TransientException("Config for facilityId does not exist.", ex);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", ex);
                         }
 
                         if (config.OperationSequence == null || config.OperationSequence.Count == 0)
