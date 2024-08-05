@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Infrastructure.Extensions;
+using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authentication;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -29,10 +30,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 //create anonymous access
                 services.AddAuthorization(options =>
                 {
-                    options.AddPolicy("AuthenticatedUser", pb =>
+                    options.AddPolicy(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, pb =>
                     {
                         pb.RequireAssertion(context => true);
                     });
+
+                    options.AddPolicy(PolicyNames.IsLinkAdmin, pb => { pb.RequireAssertion(context => true); });                    
                 });
 
                 return services;
@@ -206,10 +209,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             // Add Authorization
             services.AddAuthorization(builder =>
             {
-                builder.AddPolicy("AuthenticatedUser", pb => {
+                builder.AddPolicy(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, pb => {
                     pb.RequireAuthenticatedUser()
                         .AddAuthenticationSchemes([.. authSchemas]);
                 });
+
+                builder.AddPolicy(PolicyNames.IsLinkAdmin, AuthorizationPolicies.IsLinkAdmin());
             });
 
             // Configure CORS
