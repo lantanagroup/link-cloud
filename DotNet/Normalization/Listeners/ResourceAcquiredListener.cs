@@ -104,7 +104,13 @@ public class ResourceAcquiredListener : BackgroundService
                             throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
 
-                        if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
+                        if (
+                        message.Message.Value == null 
+                            || ((message.Message.Value.Resource == null 
+                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType) 
+                                || message.Message.Value.ScheduledReports == null)
+                               && !message.Message.Value.AcquisitionComplete)
+                        )
                         {
                             throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.");
                         }
@@ -123,6 +129,11 @@ public class ResourceAcquiredListener : BackgroundService
                         try
                         {
                             config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
+
+                            if (config == null)
+                            {
+                                throw new NoEntityFoundException("Config for facilityId does not exist.");
+                            }
                         }
                         catch(DbContextNullException ex)
                         {
@@ -135,6 +146,30 @@ public class ResourceAcquiredListener : BackgroundService
                         catch (Exception ex)
                         {
                             throw new DeadLetterException("An error was encountered retrieving facility configuration.", ex);
+                        }
+
+                        if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
+                        {
+                            _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
+                            var headers = new Headers
+                            {
+                                new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
+                            };
+                            var resourceNormalizedMessage = new ResourceNormalizedMessage
+                            {
+                                AcquisitionComplete = message.Message.Value.AcquisitionComplete,
+                                PatientId = message.Message.Value.PatientId ?? "",
+                                QueryType = message.Message.Value.QueryType,
+                                ScheduledReports = message.Message.Value.ScheduledReports
+                            };
+                            Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
+                            {
+                                Key = messageMetaData.facilityId,
+                                Headers = headers,
+                                Value = resourceNormalizedMessage
+                            };
+                            await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                            return;
                         }
 
                         if (config.OperationSequence == null || config.OperationSequence.Count == 0)
@@ -277,10 +312,10 @@ public class ResourceAcquiredListener : BackgroundService
                             };
                             var resourceNormalizedMessage = new ResourceNormalizedMessage
                             {
-                                PatientId = message.Value.PatientId ?? "",
+                                AcquisitionComplete = message.Message.Value.AcquisitionComplete,
+                                PatientId = message.Message.Value.PatientId ?? "",
                                 Resource = serializedResource,
-
-                                QueryType = message.Value.QueryType,
+                                QueryType = message.Message.Value.QueryType,
                                 ScheduledReports = message.Message.Value.ScheduledReports
                             };
                             Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>

@@ -199,6 +199,9 @@ public class PatientDataService : IPatientDataService
                 }
                 catch (Exception ex)
                 {
+                    //produce tailing message
+                    await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
+
                     var message =
                         $"Error retrieving data from EHR for facility: {request.FacilityId}\n{ex.Message}\n{ex.InnerException}";
                     _logger.LogError(message);
@@ -206,6 +209,30 @@ public class PatientDataService : IPatientDataService
                 }
             }
         }
+
+        //produce tailing message to indicate acquisition is complete
+        await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
+    }
+
+    private async Task ProduceTailingMessage(string facilityId, string correlationId, string patientId, string queryType, List<ScheduledReport> scheduledReports, CancellationToken cancellationToken)
+    {
+        await _kafkaProducer.ProduceAsync(
+            KafkaTopic.ResourceAcquired.ToString(),
+            new Message<string, ResourceAcquired>
+            {
+                Key = facilityId,
+                Headers = new Headers
+                {
+                        new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
+                },
+                Value = new ResourceAcquired
+                {
+                    AcquisitionComplete = true,
+                    PatientId = patientId,
+                    QueryType = queryType,
+                    ScheduledReports = scheduledReports
+                }
+            }, cancellationToken);
     }
 
     private static string TEMPORARYPatientIdPart(string fullPatientUrl)
