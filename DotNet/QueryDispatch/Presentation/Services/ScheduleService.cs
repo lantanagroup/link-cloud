@@ -5,6 +5,8 @@ using Quartz.Spi;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
+using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
+using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 {
@@ -41,13 +43,16 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
+                // var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
+                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IQueryDispatchConfigurationRepository>();
+
                 var _getAllPatientDispatchQuery = scope.ServiceProvider.GetRequiredService<IGetAllPatientDispatchQuery>();
 
                 Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
                 Scheduler.JobFactory = _jobFactory;
 
-                List<QueryDispatchConfigurationEntity> configs = await _getAllQueryDispatchConfigurationQuery.Execute();
+                //List<QueryDispatchConfigurationEntity> configs = await _getAllQueryDispatchConfigurationQuery.Execute();
+                List<QueryDispatchConfigurationEntity> configs  = await queryDispatchConfigurationRepo.GetAllAsync(cancellationToken);
 
                 foreach (var config in configs)
                 {

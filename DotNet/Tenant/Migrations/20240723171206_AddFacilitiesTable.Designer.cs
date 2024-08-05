@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Tenant.Migrations
 {
     [DbContext(typeof(FacilityDbContext))]
-    [Migration("20240403135254_AddFacilitiesTable")]
+    [Migration("20240723171206_AddFacilitiesTable")]
     partial class AddFacilitiesTable
     {
         /// <inheritdoc />
@@ -28,11 +28,10 @@ namespace LantanaGroup.Link.Tenant.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.FacilityConfigModel", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
-                       .HasColumnType("datetime2");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("FacilityId")
                         .IsRequired()
@@ -41,13 +40,13 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<string>("FacilityName")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime?>("MRPCreatedDate")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("MRPModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
