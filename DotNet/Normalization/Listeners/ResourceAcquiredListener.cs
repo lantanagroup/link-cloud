@@ -129,6 +129,11 @@ public class ResourceAcquiredListener : BackgroundService
                         try
                         {
                             config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
+
+                            if (config == null)
+                            {
+                                throw new NoEntityFoundException("Config for facilityId does not exist.");
+                            }
                         }
                         catch(DbContextNullException ex)
                         {
