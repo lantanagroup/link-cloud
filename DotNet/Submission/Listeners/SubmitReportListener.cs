@@ -129,12 +129,11 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var value = consumeResult.Message.Value;
                                 facilityId = key.FacilityId;
 
-                               // if (string.IsNullOrWhiteSpace(key.FacilityId))
+                                if (string.IsNullOrWhiteSpace(key.FacilityId))
                                 {
                                     throw new TransientException(
                                         $"{Name}: FacilityId is null or empty.");
                                 }
-
 
                                 if (value.PatientIds == null || value.PatientIds.Count == 0)
                                 {
@@ -196,24 +195,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
                                     _logger.LogDebug("Census service response: " + censusContent);
                                     throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-                                }
-                                #endregion
-
-                                #region DataAcquisition Query Plan
-                                string queryPlans;
-                                try
-                                {
-                                    string dataAcqRequestUrl =
-                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlan";
-                                    var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
-                                    queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error retrieving Query Plans from Data Acquisition service.");
-                                    _logger.LogDebug("Data Acquisition service response: " + censusContent);
-                                    throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
                                 }
                                 #endregion
 
@@ -281,16 +262,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                     fileName = "patient-list.json";
                                     contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
-
-                                    #endregion
-
-                                    #region Query Plans
-
-                                    fileName = "query-plan.json";
-                                    contents = queryPlans;
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         cancellationToken);
