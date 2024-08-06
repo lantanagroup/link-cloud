@@ -446,6 +446,7 @@ services:
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
+      ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
@@ -572,6 +573,8 @@ services:
       spring.security.oauth2.resourceserver.jwt.issuer-uri: https://oauth.nhsnlink.org/realms/NHSNLink
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
+      spring.cloud.azure.appconfiguration.enabled: false
+      loki.url: http://loki:3100
     ports:
       - "8067:8067"
     build:

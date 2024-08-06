@@ -67,7 +67,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
