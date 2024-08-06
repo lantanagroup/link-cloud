@@ -156,7 +156,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             FacilityId = key.FacilityId,
                                             MeasureReportScheduleId = schedule.Id,
-                                            PatientId = value.PatientId
+                                            PatientId = value.PatientId,
+                                            CreateDate = DateTime.UtcNow
                                         };
                                     }
 
