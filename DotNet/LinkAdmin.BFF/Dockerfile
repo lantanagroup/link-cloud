@@ -3,7 +3,6 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
 USER app
 WORKDIR /app
-RUN chown app:app .
 EXPOSE 8080
 EXPOSE 8081
 
@@ -26,5 +25,6 @@ RUN dotnet publish "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/pub
 
 FROM base AS final
 WORKDIR /app
+RUN chown app:app .
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "LinkAdmin.BFF.dll"]
