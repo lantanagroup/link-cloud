@@ -6,23 +6,35 @@ using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
 namespace QueryDispatch.Domain.Managers
 {
-    public class QueryDispatchConfigurationManager
+
+    public interface IQueryDispatchConfigurationManager
+    {
+        public Task SaveConfigEntity(QueryDispatchConfigurationEntity config, List<DispatchSchedule> dispatchSchedules, CancellationToken cancellationToken);
+        public Task AddConfigEntity(QueryDispatchConfigurationEntity config, CancellationToken cancellationToken);
+        public Task DeleteConfigEntity(string facilityId, CancellationToken cancellationToken);
+        public Task<QueryDispatchConfigurationEntity> GetConfigEntity(string facilityId, CancellationToken cancellationToken);
+    }
+
+
+    public class QueryDispatchConfigurationManager : IQueryDispatchConfigurationManager
     {
 
-        private readonly IQueryDispatchConfigurationRepository _repository;
+        //private readonly IQueryDispatchConfigurationRepository _repository;
+        private readonly IEntityRepository<QueryDispatchConfigurationEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
         private readonly CompareLogic _compareLogic;
         private readonly ISchedulerFactory _schedulerFactory;
 
-        public QueryDispatchConfigurationManager(ILogger<QueryDispatchConfigurationManager> logger, IQueryDispatchConfigurationRepository queryDispatchConfigRepo, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
+        public QueryDispatchConfigurationManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
         {
-            _repository = queryDispatchConfigRepo;
+            _repository = database.QueryDispatchConfigurationRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _logger = logger;
             _compareLogic = new CompareLogic();
@@ -174,6 +186,12 @@ namespace QueryDispatch.Domain.Managers
             }
         }
 
+
+        public async Task<QueryDispatchConfigurationEntity> GetConfigEntity(string facilityId, CancellationToken cancellationToken)
+        {
+            return await _repository.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+
+        }
     }
 }
 
