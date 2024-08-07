@@ -15,7 +15,7 @@ RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 FROM eclipse-temurin:17-alpine AS run
 
 WORKDIR /app
-COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
+COPY --from=build /app/measureeval/target/measureeval-*.jar measureeval.jar
 RUN chmod -R 755 /app \
   && chown -R 1001 /app
 
