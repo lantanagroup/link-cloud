@@ -2,13 +2,13 @@
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
-using System.Threading;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
@@ -21,10 +21,10 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         private readonly IQueryDispatchConfigurationFactory _configurationFactory;
 
         private readonly ITenantApiService _tenantApiService;
-        private readonly IQueryDispatchConfigurationRepository _queryDispatchConfigRepo;
-        private readonly QueryDispatchConfigurationManager _queryDispatchConfigurationManager;
+        private readonly IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchConfigRepo;
+        private readonly IQueryDispatchConfigurationManager _queryDispatchConfigurationManager;
 
-        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ITenantApiService tenantApiService, IQueryDispatchConfigurationRepository queryDispatchConfigRepo, QueryDispatchConfigurationManager queryDispatchConfigurationManager)
+        public QueryDispatchController(ILogger<QueryDispatchController> logger, IQueryDispatchConfigurationFactory configurationFactory, ITenantApiService tenantApiService, IEntityRepository<QueryDispatchConfigurationEntity> queryDispatchConfigRepo, IQueryDispatchConfigurationManager queryDispatchConfigurationManager)
         {
             _logger = logger;
             _configurationFactory = configurationFactory;
@@ -48,7 +48,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("configuration/facility/{facilityid}")]
-        public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId) 
+        public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId, CancellationToken cancellationToken) 
         {
             if (string.IsNullOrEmpty(facilityId)) 
             { 
@@ -56,9 +56,8 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
 
             try
-            {
-                //var config = await _getQueryDispatchConfigurationQuery.Execute(facilityId);
-                var config = await _queryDispatchConfigRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId);              
+            {        
+                var config = await _queryDispatchConfigurationManager.GetConfigEntity(facilityId, cancellationToken);
 
                 if (config == null) 
                 {
@@ -111,7 +110,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                 }
             }
 
-            var existingConfig = await _queryDispatchConfigRepo.FirstOrDefaultAsync(x => x.FacilityId == model.FacilityId);
+            var existingConfig = await _queryDispatchConfigurationManager.GetConfigEntity(model.FacilityId, cancellationToken);
 
             if (existingConfig != null)
             {
@@ -221,12 +220,12 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
                     return BadRequest($"Facility {facilityId} does not exist.");
                 }
 
-                var existingConfig = await _queryDispatchConfigRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId);
+                var existingConfig = await _queryDispatchConfigurationManager.GetConfigEntity(facilityId, cancellationToken);
 
                 if (existingConfig == null)
                 {
-                    var config = _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
-                    await _queryDispatchConfigRepo.AddAsync(config);
+                    var config =  _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
+                    await _queryDispatchConfigurationManager.AddConfigEntity(config, cancellationToken);
 
                     return Created(config.Id, config);
                 }

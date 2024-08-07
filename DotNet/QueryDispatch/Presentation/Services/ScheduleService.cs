@@ -3,10 +3,8 @@ using LanatanGroup.Link.QueryDispatch.Jobs;
 using Quartz;
 using Quartz.Spi;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
 {
@@ -14,7 +12,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
     {
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IJobFactory _jobFactory;
-        private readonly ILogger<DeletePatientDispatchCommand> _logger;
+        private readonly ILogger<ScheduleService> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
@@ -27,7 +25,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
         public ScheduleService(
             ISchedulerFactory schedulerFactory, 
             IJobFactory jobFactory, 
-            ILogger<DeletePatientDispatchCommand> logger, 
+            ILogger<ScheduleService> logger, 
             IServiceScopeFactory serviceScopeFactory)
         {
             _schedulerFactory = schedulerFactory;
@@ -44,9 +42,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             {
                 using var scope = _serviceScopeFactory.CreateScope();
                 // var _getAllQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetAllQueryDispatchConfigurationQuery>();
-                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IQueryDispatchConfigurationRepository>();
+                var queryDispatchConfigurationRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<QueryDispatchConfigurationEntity>>();
 
-                var _getAllPatientDispatchQuery = scope.ServiceProvider.GetRequiredService<IGetAllPatientDispatchQuery>();
+                var queryPatientDispatchRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<PatientDispatchEntity>>();
 
                 Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
                 Scheduler.JobFactory = _jobFactory;
@@ -60,7 +58,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                     await Scheduler.AddJob(job, true);
                 }
 
-                List<PatientDispatchEntity> patientDispatches = await _getAllPatientDispatchQuery.Execute();
+               // List<PatientDispatchEntity> patientDispatches = await _getAllPatientDispatchQuery.Execute();
+
+                List<PatientDispatchEntity> patientDispatches = await queryPatientDispatchRepo.GetAllAsync(cancellationToken);
 
                 foreach (var patientDispatch in patientDispatches)
                 {
