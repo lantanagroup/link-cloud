@@ -8,12 +8,12 @@
 # ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"${ARTIFACTS_ENDPOINT}\", \"password\":\"${ACCESS_TOKEN}\"}]}"
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+USER app
 WORKDIR /app
 
-ENV \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    LC_ALL=en_US.UTF-8 \
-    LANG=en_US.UTF-8
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false 
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
 
 EXPOSE 80
 EXPOSE 443

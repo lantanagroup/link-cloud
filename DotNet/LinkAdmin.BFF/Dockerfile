@@ -25,6 +25,5 @@ RUN dotnet publish "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/pub
 
 FROM base AS final
 WORKDIR /app
-RUN chown app:app .
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "LinkAdmin.BFF.dll"]

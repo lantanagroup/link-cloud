@@ -1,6 +1,13 @@
 FROM maven:3-eclipse-temurin-17 AS build
 
-WORKDIR /root
+# Create a group and user
+RUN groupadd maven
+RUN useradd -m -s /bin/bash -g maven  mavenuser
+USER mavenuser
+
+WORKDIR /home/mavenuser
+
+RUN chown -R mavenuser:maven /home/mavenuser
 
 COPY pom.xml ./
 COPY shared/pom.xml shared/
@@ -8,12 +15,16 @@ COPY measureeval/pom.xml measureeval/
 COPY validation/pom.xml validation/
 RUN mvn -pl measureeval -am dependency:go-offline
 
-COPY ./ ./
+COPY --chown=mavenuser:maven ./ ./
+
 RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-alpine AS run
 
-WORKDIR /root
+RUN adduser -D mavenuser
+USER mavenuser
+
+WORKDIR  /home/mavenuser
 
 COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
 EXPOSE 5135

@@ -1,12 +1,12 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+USER app
 WORKDIR /app
 
-ENV \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    LC_ALL=en_US.UTF-8 \
-    LANG=en_US.UTF-8
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false 
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
