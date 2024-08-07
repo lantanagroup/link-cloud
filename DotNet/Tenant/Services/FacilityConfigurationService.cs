@@ -18,6 +18,7 @@ using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
+using Confluent.Kafka;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -28,7 +29,6 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly ILogger<FacilityConfigurationService> _logger;
         private readonly HttpClient _httpClient;
         private static List<KafkaTopic> _topics = new List<KafkaTopic>();
-        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
         private readonly CreateAuditEventCommand _createAuditEventCommand;
@@ -43,10 +43,9 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
             _logger = logger;
