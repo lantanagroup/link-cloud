@@ -16,14 +16,15 @@ namespace LantanaGroup.Link.Tenant.Jobs
     public class ReportScheduledJob : IJob
     {
         private readonly ILogger<ReportScheduledJob> _logger;
-        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        //private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        private readonly IProducer<string, object> _producer;
         private readonly ITenantServiceMetrics _metrics;
 
-        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, ITenantServiceMetrics metrics)
+        public ReportScheduledJob(ILogger<ReportScheduledJob> logger, ITenantServiceMetrics metrics, IProducer<string, object> producer)
         {
             _logger = logger;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -80,11 +81,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
                     },
                 };
 
-                var producerConfig = new ProducerConfig();
-
-                var producer = _kafkaProducerFactory.CreateProducer(producerConfig);
-
-                await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
+                await _producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message);
 
                 _metrics.IncrementReportScheduledCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),
