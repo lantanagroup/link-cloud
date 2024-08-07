@@ -1,29 +1,23 @@
 FROM maven:3-eclipse-temurin-17 AS build
 
-# Create a group and user
-RUN groupadd maven
-RUN useradd -m -s /bin/bash -g maven  mavenuser
-USER mavenuser
+WORKDIR /app
 
-WORKDIR /home/mavenuser
-
-COPY pom.xml ./
-COPY shared/pom.xml shared/
-COPY measureeval/pom.xml measureeval/
-COPY validation/pom.xml validation/
+COPY --chown=mvn:mvn pom.xml ./
+COPY --chown=mvn:mvn shared/pom.xml shared/
+COPY --chown=mvn:mvn measureeval/pom.xml measureeval/
+COPY --chown=mvn:mvn validation/pom.xml validation/
 RUN mvn -pl validation -am dependency:go-offline
 
-COPY --chown=mavenuser:maven ./ ./
+COPY --chown=mvn:mvn  ./ ./
 
 RUN mvn -pl validation -am -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-alpine AS run
+COPY --from=build /app/validation/target/validation-*.jar validation.jar
+WORKDIR /app
+RUN chmod -R 755 /app \
+  && chown -R 1001 /app
 
-RUN adduser -D mavenuser
-USER mavenuser
-
-WORKDIR  /home/mavenuser
-
-COPY --from=build /root/validation/target/validation-*.jar validation.jar
+USER 1001
 EXPOSE 31820
 CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "validation.jar"]
