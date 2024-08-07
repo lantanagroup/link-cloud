@@ -15,10 +15,10 @@ RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 FROM eclipse-temurin:17-alpine AS run
 
 WORKDIR /app
+COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
 RUN chmod -R 755 /app \
   && chown -R 1001 /app
 
 USER 1001
-COPY --from=build /root/measureeval/target/measureeval-*.jar measureeval.jar
 EXPOSE 5135
 CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "measureeval.jar"]
