@@ -4,10 +4,10 @@ FROM maven:3-eclipse-temurin-17 AS build
 #RUN groupadd maven
 #RUN useradd -m -s /bin/bash -g maven  mavenuser
 #USER mavenuser
-USER 1001
+#USER 1001
 
 WORKDIR /home/mavenuser
-
+RUN adduser maven -D
 #RUN chown -R mavenuser:maven /home/mavenuser
 
 COPY pom.xml ./
@@ -25,8 +25,8 @@ FROM eclipse-temurin:17-alpine AS run
 
 #RUN adduser -D mavenuser
 #USER mavenuser
-
-USER 1001
+RUN adduser maven -D
+USER maven
 
 WORKDIR  /home/mavenuser
 
