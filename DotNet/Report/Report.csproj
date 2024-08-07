@@ -16,6 +16,17 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Attributes\**" />
+	  <Compile Remove="Repositories\**" />
+	  <Content Remove="Attributes\**" />
+	  <Content Remove="Repositories\**" />
+	  <EmbeddedResource Remove="Attributes\**" />
+	  <EmbeddedResource Remove="Repositories\**" />
+	  <None Remove="Attributes\**" />
+	  <None Remove="Repositories\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <_ContentIncludedByDefault Remove="appsettings.local.json" />
 	</ItemGroup>
 
@@ -24,7 +35,6 @@
     <PackageReference Include="AutoMapper" Version="13.*" />
     <PackageReference Include="Azure.Identity" Version="1.12.0" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />

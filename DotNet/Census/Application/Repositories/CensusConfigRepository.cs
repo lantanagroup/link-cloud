@@ -7,7 +7,7 @@ using static LantanaGroup.Link.Census.Application.Settings.CensusConstants;
 
 namespace LantanaGroup.Link.Census.Application.Repositories;
 
-public class CensusConfigRepository : BaseSqlConfigurationRepo<CensusConfigEntity>, ICensusConfigRepository, IDisposable
+public class CensusConfigRepository : EntityRepository<CensusConfigEntity>, ICensusConfigRepository, IDisposable
 {
     private readonly ILogger<CensusConfigRepository> _logger;
     private readonly CensusContext _dbContext;

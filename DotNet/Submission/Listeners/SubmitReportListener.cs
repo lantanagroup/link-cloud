@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -13,13 +11,15 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
-using MediatR;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
-using System.Diagnostics;
 
 namespace LantanaGroup.Link.Submission.Listeners
 {
@@ -27,9 +27,7 @@ namespace LantanaGroup.Link.Submission.Listeners
     {
         private readonly ILogger<SubmitReportListener> _logger;
         private readonly IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> _kafkaConsumerFactory;
-        private readonly IMediator _mediator;
         private readonly SubmissionServiceConfig _submissionConfig;
-        private readonly FileSystemConfig _fileSystemConfig;
         private readonly IHttpClientFactory _httpClient;
 
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
@@ -42,16 +40,15 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
             IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> kafkaConsumerFactory,
-            IMediator mediator, IOptions<SubmissionServiceConfig> submissionConfig,
-            IOptions<FileSystemConfig> fileSystemConfig, IHttpClientFactory httpClient,
+            IOptions<SubmissionServiceConfig> submissionConfig,
+            IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
             _submissionConfig = submissionConfig.Value;
-            _fileSystemConfig = fileSystemConfig.Value;
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(HttpClient));
 
             _transientExceptionHandler = transientExceptionHandler ??
@@ -125,7 +122,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             {
                                 if (consumeResult == null)
                                 {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -134,33 +131,33 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId))
                                 {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
+                                    throw new TransientException(
+                                        $"{Name}: FacilityId is null or empty.");
                                 }
 
 
                                 if (value.PatientIds == null || value.PatientIds.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: PatientIds is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: PatientIds is null or contains no elements.");
                                 }
 
                                 if (value.MeasureIds == null || value.MeasureIds.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: MeasureIds is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: MeasureIds is null or contains no elements.");
                                 }
 
                                 if (value.Organization == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: Organization is null.", AuditEventType.Create);
+                                        $"{Name}: Organization is null.");
                                 }
 
                                 if (value.Aggregates == null || value.Aggregates.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: Aggregates is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
                                 var httpClient = _httpClient.CreateClient();
@@ -184,7 +181,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
 
                                 if (!censusResponse.IsSuccessStatusCode)
-                                    throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
+                                    throw new TransientException("Response from Census service is not successful: " + censusContent);
 
                                 List? admittedPatients;
                                 try
@@ -198,8 +195,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
                                     _logger.LogDebug("Census service response: " + censusContent);
-                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
-                                        AuditEventType.Query, ex.InnerException);
+                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
                                 }
                                 #endregion
 
@@ -208,7 +204,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 try
                                 {
                                     string dataAcqRequestUrl =
-                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlans";
+                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlan";
                                     var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
                                     queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
 
@@ -217,8 +213,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     _logger.LogError(ex, "Error retrieving Query Plans from Data Acquisition service.");
                                     _logger.LogDebug("Data Acquisition service response: " + censusContent);
-                                    throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
-                                        AuditEventType.Query, ex.InnerException);
+                                    throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
                                 }
                                 #endregion
 
@@ -318,7 +313,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
                                 catch (IOException ioException)
                                 {
-                                    throw new TransientException(ioException.Message, AuditEventType.Submit,
+                                    throw new TransientException(ioException.Message,
                                         ioException.InnerException);
                                 }
 
@@ -394,13 +389,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message,  ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
                             }
                             finally
                             {
@@ -416,12 +411,48 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
+                       /* var message = new Message<string, string>()
+                        {
+                            Headers = ex.ConsumerRecord.Message.Headers,
+                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                  ex.ConsumerRecord.Message.Key != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                                : string.Empty,
+                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                    ex.ConsumerRecord.Message.Value != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                                : string.Empty,
+                        };*/
+
+                        consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>()
+                        {
+                            Message = new Message<SubmitReportKey, SubmitReportValue>()
+                            {
+                                Key = new SubmitReportKey()
+                                {
+                                    FacilityId = facilityId
+                                },
+                                Value = new SubmitReportValue()
+                                {
+                                    PatientIds = new List<string>(),
+                                    MeasureIds = new List<string>(),
+                                    Organization = new Organization(),
+                                    Aggregates = new List<MeasureReport>()
+                                }
+                            }
+                        };  
+
+                       var transientException = new TransientException(ex.Message, ex.InnerException);
+
+                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+
+
+                      //  _transientExceptionHandler.HandleException(new TransientException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
                         consumer.Commit();
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
                     }
                 }
             }
@@ -507,7 +538,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (Exception ex)
             {
-                throw new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                throw new TransientException(ex.Message, ex.InnerException);
             }
         }
     }

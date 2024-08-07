@@ -1,12 +1,11 @@
-﻿using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.Config.QueryList;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using static LantanaGroup.Link.DataAcquisition.Application.Settings.DataAcquisitionConstants;
+using Quartz.Util;
+using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionConstants;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -16,15 +15,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class QueryListController : Controller
 {
     private readonly ILogger<QueryConfigController> _logger;
-    private readonly IMediator _mediator;
-    private readonly CompareLogic _compareLogic;
+    private readonly IFhirQueryListConfigurationManager _fhirQueryListConfigurationManager;
 
-    public QueryListController(ILogger<QueryConfigController> logger, IMediator mediator)
+    public QueryListController(ILogger<QueryConfigController> logger, IFhirQueryListConfigurationManager fhirQueryListConfigurationManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _compareLogic = new CompareLogic();
-        _compareLogic.Config.MaxDifferences = 25;
+        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
     }
 
     [HttpGet("{facilityId}/fhirQueryList")]
@@ -41,10 +37,7 @@ public class QueryListController : Controller
 
         try
         {
-            var result = await _mediator.Send(new GetFhirListConfigQuery
-            {
-                FacilityId = facilityId
-            });
+            var result = await _fhirQueryListConfigurationManager.SingleOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -68,26 +61,26 @@ public class QueryListController : Controller
     /// <param name="fhirListConfiguration"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    [HttpPost("{facilityId}/fhirQueryList")]
+    [HttpPost("fhirQueryList")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration(string facilityId, [FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration([FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(facilityId))
+        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
             return BadRequest();
         }
 
         try
         {
-            await _mediator.Send(new SaveFhirListCommand
-            {
-                FacilityId = facilityId,
-                FhirListConfiguration = fhirListConfiguration
-            });
+            var entity = await _fhirQueryListConfigurationManager.AddAsync(fhirListConfiguration, cancellationToken);
 
-            return Ok();
+            return Ok(entity);
+        }
+        catch (EntityAlreadyExistsException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (MissingFacilityConfigurationException ex)
         {
@@ -95,7 +88,7 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", facilityId);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", fhirListConfiguration.FacilityId);
             throw;
         }
     }

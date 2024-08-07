@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Submission.Persistence;
+﻿using LantanaGroup.Link.Submission.Domain;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Submission.Infrastructure
@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Submission.Infrastructure
         {
             try
             {
-                bool outcome = await _dataContext.Database.CanConnectAsync();
+                bool outcome = await _dataContext.Database.CanConnectAsync(cancellationToken);
 
                 if (outcome)
                 {

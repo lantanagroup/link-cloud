@@ -1,18 +1,18 @@
-﻿using LantanaGroup.Link.QueryDispatch.Application.Models;
+﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
-using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Application.Queries;
+using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using QueryDispatch.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using Confluent.Kafka.Extensions.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -87,13 +87,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                    var _createPatientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
-                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var _getQueryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
+                                    var patientDispatchCommand = scope.ServiceProvider.GetRequiredService<ICreatePatientDispatchCommand>();
+                                    var getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
+                                    var queryDispatchConfigurationQuery = scope.ServiceProvider.GetRequiredService<IGetQueryDispatchConfigurationQuery>();
 
                                     if (consumeResult == null || consumeResult.Key == null || !consumeResult.Value.IsValid())
                                     {
-                                        throw new DeadLetterException("Invalid Patient Event", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Patient Event");
                                     }
 
                                     PatientEventValue value = consumeResult.Message.Value;
@@ -105,35 +105,43 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
                                     else
                                     {
-                                        throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
+                                        throw new DeadLetterException("Correlation Id missing");
                                     }
 
                                     _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
 
-                                    ScheduledReportEntity scheduledReport = _getScheduledReportQuery.Execute(consumeResult.Message.Key);
+                                    ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
 
-                                    QueryDispatchConfigurationEntity dispatchSchedule = await _getQueryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
+                                    if (scheduledReport == null)
+                                    {
+                                       throw new TransientException("PatientEventListener: scheduleReport is null.");
+                                    }
+
+                                    var now = DateTime.UtcNow;
+                                    scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
+
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
 
                                     if (dispatchSchedule == null)
                                     {
-                                        throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                        throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}");
                                     }
 
                                     DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                                     if (dischargeDispatchSchedule == null)
                                     {
-                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}");
                                     }
 
                                     PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
 
                                     if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
                                     {
-                                        throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}", AuditEventType.Query);
+                                        throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}");
                                     }
 
-                                    await _createPatientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
+                                    await patientDispatchCommand.Execute(patientDispatch, dispatchSchedule);
 
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
@@ -162,7 +170,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key);
                                     _patientEventConsumer.Commit();
 
                                     //continue;
@@ -189,7 +197,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                             };
 
-                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
+                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
 
                             _patientEventConsumer.Commit();
                             continue;

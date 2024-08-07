@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Commands;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -16,7 +15,8 @@ public class OperationCommandTests
     [Fact]
     public async Task ApplyConceptMapCommand_Success() 
     {
-        var logger = new Mock<ILogger<ApplyConceptMapHandler>>();
+        var logger = new Mock<ILogger<NormalizationService>>();
+        var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
 
         var resource = LoadTestResource("TestResource.json");
         var conceptMapStr = LoadTestConceptMap("TestConceptMap.json");
@@ -27,8 +27,8 @@ public class OperationCommandTests
             FhirConceptMap = conceptMap
         };
 
-        var command = new ApplyConceptMapHandler(logger.Object);
-        var result = await command.Handle(new ApplyConceptMapCommand 
+        var service = new NormalizationService(logger.Object, conditionalTransformationEvaluationService.Object);
+        var result = await service.ApplyConceptMap(new ApplyConceptMapCommand 
         {
             Resource = resource,
             Operation = conceptMapOperation
@@ -40,7 +40,8 @@ public class OperationCommandTests
     [Fact]
     public async Task ConditionalTransformationCommand_Success() 
     {
-        var logger = new Mock<ILogger<ConditionalTransformationHandler>>();
+        var logger = new Mock<ILogger<NormalizationService>>();
+        var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
 
         var resource = LoadTestResource("TestResource.json");
         var conditionalTransformationOperation = new ConditionalTransformationOperation
@@ -52,8 +53,9 @@ public class OperationCommandTests
             Conditions = new List<ConditionElement>()
         };
 
-        var command = new ConditionalTransformationHandler(logger.Object, new ConditionalTransformationEvaluationService());
-        var result = await command.Handle(new ConditionalTransformationCommand
+        var service = new NormalizationService(logger.Object, conditionalTransformationEvaluationService.Object);
+        
+        var result = await service.ConditionalTransformation(new ConditionalTransformationCommand
         {
             Resource = resource,
             Operation = conditionalTransformationOperation,
@@ -72,7 +74,8 @@ public class OperationCommandTests
     [Fact]
     public async Task CopyLocationIdentifierToTypeCommand_Success() 
     {
-        var logger = new Mock<ILogger<CopyLocationIdentifierToTypeHandler>>();
+        var logger = new Mock<ILogger<NormalizationService>>();
+        var conditionalTransformationEvaluationService = new Mock<IConditionalTransformationEvaluationService>();
 
         var resource = LoadTestResource("TestResource.json");
         var copyLocationIdentifierToTypeOperation = new CopyLocationIdentifierToTypeOperation
@@ -80,8 +83,8 @@ public class OperationCommandTests
             Name = "CopyLocationIdentifierToType",
         };
 
-        var command = new CopyLocationIdentifierToTypeHandler();
-        var result = await command.Handle(new CopyLocationIdentifierToTypeCommand
+        var service = new NormalizationService(logger.Object, conditionalTransformationEvaluationService.Object);
+        var result = await service.CopyLocationIdentifierToType(new CopyLocationIdentifierToTypeCommand
         {
             Resource = resource,
             PropertyChanges = new List<PropertyChangeModel>()

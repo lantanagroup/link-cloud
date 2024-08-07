@@ -60,8 +60,8 @@ link:
           - queryType={queryType}
 
 secret-management:
-  key-vault-uri:
+  key-vault-uri: https://link-vault.vault.azure.net/
 
 authentication:
-  anonymous: false
+  anonymous: true
   authority: 'https://localhost:7004'

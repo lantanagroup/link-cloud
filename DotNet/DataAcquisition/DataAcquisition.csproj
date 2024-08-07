@@ -17,11 +17,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Protobuf Include="Protos\dataacquisition.proto" GrpcServices="Server" />
-		<Protobuf Include="Protos\tenantclient.proto" GrpcServices="Client" />
+	  <Compile Remove="Settings\**" />
+	  <Content Remove="Settings\**" />
+	  <EmbeddedResource Remove="Settings\**" />
+	  <None Remove="Settings\**" />
 	</ItemGroup>
 
 	<ItemGroup>
+    
 		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.0.2" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
 		<PackageReference Include="Azure.Identity" Version="1.12.0" />
@@ -33,7 +36,6 @@
 		<PackageReference Include="jose-jwt" Version="4.*" />
 		<PackageReference Include="JWT" Version="10.*" />
 		<!--<PackageReference Include="Hl7.Fhir.DSTU2" Version="1.*" />-->
-		<PackageReference Include="MediatR" Version="12.*" />
 		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.0.4" />
 		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
@@ -50,7 +52,6 @@
 		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.4" />
 		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-		<PackageReference Include="MongoDB.Driver" Version="2.*" />
 		<PackageReference Include="PemUtils" Version="3.*" />
 		<PackageReference Include="Portable.BouncyCastle" Version="1.*" />
 		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
@@ -59,10 +60,6 @@
 		<PackageReference Include="Serilog.Expressions" Version="4.0.0" />
 		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Settings\" />
 	</ItemGroup>
 
 	<ItemGroup>

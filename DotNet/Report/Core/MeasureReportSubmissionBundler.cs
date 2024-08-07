@@ -1,26 +1,19 @@
 ﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.MeasureReportConfig.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmission.Queries;
-using LantanaGroup.Link.Report.Application.MeasureReportSubmissionEntry.Queries;
-using LantanaGroup.Link.Report.Application.PatientResource.Queries;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
-using LantanaGroup.Link.Report.Application.SharedResource.Queries;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
-using MediatR;
-using Microsoft.Identity.Client;
 
 namespace LantanaGroup.Link.Report.Core
 {
     public class MeasureReportSubmissionBundler
     {
         private readonly ILogger<MeasureReportSubmissionBundler> _logger;
-        private readonly IMediator _mediator;
         private readonly IReportServiceMetrics _metrics;
+        private readonly IDatabase _database;
+
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -34,11 +27,11 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IMediator mediator, IReportServiceMetrics metrics)
+        public MeasureReportSubmissionBundler(ILogger<MeasureReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
+            _database = database ?? throw new ArgumentNullException(nameof(database));
         }
 
 
@@ -48,17 +41,21 @@ namespace LantanaGroup.Link.Report.Core
                 throw new Exception($"GenerateBundle: no measureReportScheduleId supplied");
 
             // find existing report scheduled for the supplied ID
-            MeasureReportScheduleModel schedule = await _mediator.Send(new GetMeasureReportScheduleQuery { Id = measureReportScheduleId });
+            MeasureReportScheduleModel schedule = await _database.ReportScheduledRepository.GetAsync(measureReportScheduleId);
+
             if (schedule == null)
                 throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
-            List<MeasureReportConfigModel> configs = (await _mediator.Send(new SearchMeasureReportConfigQuery { FacilityId = schedule.FacilityId })).ToList();
+            List<MeasureReportConfigModel> configs =
+                await _database.ReportConfigRepository.FindAsync(c => c.FacilityId == schedule.FacilityId);
+
             if (configs == null || configs.Count < 1)
                 throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
 
+            var submission =
+                (await _database.ReportSubmissionRepository.FindAsync(s =>
+                    s.MeasureReportScheduleId == measureReportScheduleId)).Single();
 
-            // need a bundle object to work with... either a newly created one or by parsing the existing bundle string
-            MeasureReportSubmissionModel submission = await _mediator.Send(new FindMeasureReportSubmissionByScheduleQuery { MeasureReportScheduleId = measureReportScheduleId });
             Bundle submissionBundle;
             if (submission is null)
             {
@@ -85,19 +82,13 @@ namespace LantanaGroup.Link.Report.Core
                     var pl = CreatePatientList(new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)), config.ReportType);
                     submissionBundle.AddResourceEntry(pl, GetFullUrl(pl));
                 }
-
-                // aggregate measure report
-                /*  if (GetAggregateMeasureReport(submissionBundle, config.ReportType) is null)
-                  {
-                      var measureAgg = CreateAggregateMeasureReport(config.ReportType, orgId, new FhirDateTime(new DateTimeOffset(schedule.ReportStartDate)), new FhirDateTime(new DateTimeOffset(schedule.ReportEndDate)));
-                      submissionBundle.AddResourceEntry(measureAgg, GetFullUrl(measureAgg));
-                  }*/
             }
 
-
             // add every fetched measure report entry to the submission bundle
-            var entries = await _mediator.Send(new GetMeasureReportSubmissionEntriesQuery { MeasureReportScheduleId = measureReportScheduleId });
-            var parser = new FhirJsonParser();
+            var entries =
+                await _database.SubmissionEntryRepository.FindAsync(e =>
+                    e.MeasureReportScheduleId == measureReportScheduleId);
+
             foreach (var entry in entries)
             {
                 if (entry.MeasureReport == null)
@@ -119,11 +110,11 @@ namespace LantanaGroup.Link.Report.Core
 
                         if (resourceTypeCategory == ResourceCategoryType.Patient)
                         {
-                            facilityResource = await _mediator.Send(new GetPatientResourceCommand(r.DocumentId));
+                            facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
                         }
                         else
                         {
-                            facilityResource = await _mediator.Send(new GetSharedResourceCommand(r.DocumentId));
+                            facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
                         }
 
                         Resource resource = facilityResource.GetResource();

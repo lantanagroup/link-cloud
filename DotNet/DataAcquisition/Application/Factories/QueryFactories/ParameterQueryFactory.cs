@@ -1,10 +1,8 @@
-﻿using Hl7.Fhir.Model;
-using Hl7.Fhir.Rest;
-using LantanaGroup.Link.DataAcquisition.Application.Commands.PatientResource;
+﻿using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.ParameterFactories;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
 
@@ -19,7 +17,7 @@ public class ParameterQueryFactory
     /// </summary>
     /// <param name="config"></param>
     /// <returns></returns>
-    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, Hl7.Fhir.Model.Bundle bundle)
+    public static ParameterQueryFactoryResult Build(ParameterQueryConfig config, GetPatientDataRequest request, ScheduledReport scheduledReport, string lookback, List<string> resourceIds = null)
     {
         var isPaged = false;
         var searchParams = new SearchParams();
@@ -31,7 +29,7 @@ public class ParameterQueryFactory
             {
                 LiteralParameter => LiteralParameterFactory.Build((LiteralParameter)parameter),
                 VariableParameter => VariableParameterFactory.Build((VariableParameter)parameter, request, scheduledReport, lookback),
-                ResourceIdsParameter => ResourceIdParameterFactory.Build((ResourceIdsParameter)parameter, request, bundle),
+                ResourceIdsParameter => ResourceIdParameterFactory.Build((ResourceIdsParameter)parameter, request, resourceIds),
                 _ => throw new Exception("Unable to determine parameter type."),
             };
 

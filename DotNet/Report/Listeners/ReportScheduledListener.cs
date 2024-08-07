@@ -1,8 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -10,9 +9,9 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
+using LantanaGroup.Link.Shared.Settings;
 using Quartz;
-using Quartz.Impl.Triggers;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -21,22 +20,23 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ReportScheduledListener> _logger;
         private readonly IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> _kafkaConsumerFactory;
-        private readonly IMediator _mediator;
         private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
         public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
-            IMediator mediator, ISchedulerFactory schedulerFactory,
+            ISchedulerFactory schedulerFactory,
             ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler)
+            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _serviceScopeFactory = serviceScopeFactory;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -83,10 +83,14 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager =
+                                    scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
+
                                 if (consumeResult == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: consumeResult is null", AuditEventType.Create);
+                                        $"{Name}: consumeResult is null");
                                 }
 
                                 var key = consumeResult.Message.Key;
@@ -97,8 +101,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     string.IsNullOrWhiteSpace(key.ReportType))
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null or empty.",
-                                        AuditEventType.Create);
+                                        $"{Name}: One or more required Key/Value properties are null or empty.");
                                 }
 
                                 DateTimeOffset startDateOffset;
@@ -106,8 +109,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
                                         out startDateOffset))
                                 {
-                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed",
-                                        AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed");
                                 }
 
                                 DateTimeOffset endDateOffset;
@@ -115,41 +117,34 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
                                         out endDateOffset))
                                 {
-                                    throw new DeadLetterException($"{Name}: End Date could not be parsed",
-                                        AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: End Date could not be parsed");
                                 }
 
                                 
                                 var startDate = startDateOffset.UtcDateTime;
                                 var endDate = endDateOffset.UtcDateTime;
 
-                                // create or update the consumed report schedule
-                                var existing = await _mediator.Send(
-                                    new FindMeasureReportScheduleForReportTypeQuery()
-                                    {
-                                        FacilityId = key.FacilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        ReportType = key.ReportType
-                                    }, cancellationToken);
+                                // Check if this already exists
+                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
+                                                                                                        && x.ReportStartDate == startDate 
+                                                                                                        && x.ReportEndDate == endDate 
+                                                                                                        && x.ReportType == key.ReportType, cancellationToken);
 
                                 if (existing != null)
                                 {
                                     throw new DeadLetterException(
-                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.",
-                                        AuditEventType.Create);
+                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.");
                                 }
 
-                                var reportSchedule = await _mediator.Send(new CreateMeasureReportScheduleCommand
+                                var ent = new MeasureReportScheduleModel
                                 {
-                                    ReportSchedule = new MeasureReportScheduleModel
-                                    {
-                                        FacilityId = key.FacilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        ReportType = key.ReportType
-                                    }
-                                }, cancellationToken);
+                                    FacilityId = key.FacilityId,
+                                    ReportStartDate = startDate,
+                                    ReportEndDate = endDate,
+                                    ReportType = key.ReportType
+                                };
+
+                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, cancellationToken);
 
                                 await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
                                     await _schedulerFactory.GetScheduler(cancellationToken));
@@ -165,13 +160,13 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
                             }
                             finally
                             {
@@ -187,12 +182,37 @@ namespace LantanaGroup.Link.Report.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        var message = new Message<string, string>()
+                        {
+                            Headers = ex.ConsumerRecord.Message.Headers,
+                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                  ex.ConsumerRecord.Message.Key != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
+                                : string.Empty,
+                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
+                                    ex.ConsumerRecord.Message.Value != null
+                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                                : string.Empty,
+                        };
+                        
+                        var dlEx = new DeadLetterException(ex.Message);
+                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
+                        {
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
                     }
                 }
             }
@@ -205,5 +225,16 @@ namespace LantanaGroup.Link.Report.Listeners
 
         }
 
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
+        }
     }
 }

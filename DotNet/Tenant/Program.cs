@@ -92,13 +92,11 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddGrpc();
-            builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
+            builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
@@ -262,11 +260,6 @@ namespace Tenant
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
-
-            if (app.Configuration.GetValue<bool>("AllowReflection"))
-            {
-                app.MapGrpcReflectionService();
-            }
 
             // Ensure database created
             using (var scope = app.Services.CreateScope())

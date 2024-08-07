@@ -1,7 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using System.Diagnostics;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services
 {
