@@ -7,7 +7,7 @@ FROM maven:3-eclipse-temurin-17 AS build
 #USER 1001
 
 WORKDIR /home/mavenuser
-RUN adduser maven -D
+RUN useradd maven -D
 #RUN chown -R mavenuser:maven /home/mavenuser
 
 COPY pom.xml ./
@@ -25,7 +25,7 @@ FROM eclipse-temurin:17-alpine AS run
 
 #RUN adduser -D mavenuser
 #USER mavenuser
-RUN adduser maven -D
+RUN useradd maven -D
 USER maven
 
 WORKDIR  /home/mavenuser
