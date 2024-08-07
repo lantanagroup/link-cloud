@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<ReportScheduledEventListener> _logger;
         private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _auditProducer;
         private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory, 
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducer, 
+            IProducer<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory) 
@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _auditProducerFactory = auditProducer;
+            _auditProducer = auditProducer;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
             _serviceScopeFactory = serviceScopeFactory;
@@ -209,14 +209,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
         private void ProduceAuditEvent(AuditEventMessage auditEvent, Headers headers)
         {
-            using (var producer = _auditProducerFactory.CreateAuditEventProducer())
-            {
-                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditEvent,
                     Headers = headers
                 });
-            }
+            
         }
     }
 }
