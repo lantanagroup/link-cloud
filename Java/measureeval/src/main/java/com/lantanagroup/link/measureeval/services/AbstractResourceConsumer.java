@@ -38,7 +38,7 @@ import static io.opentelemetry.api.common.AttributeKey.stringKey;
 public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private final AbstractResourceRepository resourceRepository;
-    protected final PatientReportingEvaluationStatusRepository patientStatusRepository;
+    private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final MeasureEvaluatorCache measureEvaluatorCache;
     private final MeasureReportNormalizer measureReportNormalizer;
     private final Predicate<MeasureReport> reportabilityPredicate;
