@@ -9,7 +9,7 @@ COPY --chown=mvn:mvn validation/pom.xml validation/
 RUN mvn -pl measureeval -am dependency:go-offline
 
 COPY --chown=mvn:mvn ./ ./
-RUN chmod +x ./mvn
+#RUN chmod +x ./mvn
 RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-alpine AS run
