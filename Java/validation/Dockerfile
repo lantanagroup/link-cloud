@@ -13,8 +13,8 @@ COPY --chown=mvn:mvn  ./ ./
 RUN mvn -pl validation -am -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-alpine AS run
-COPY --from=build /app/validation/target/validation-*.jar validation.jar
 WORKDIR /app
+COPY --from=build /app/validation/target/validation-*.jar validation.jar
 RUN chmod -R 755 /app \
   && chown -R 1001 /app
 
