@@ -89,6 +89,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             logger.error("Record Resource is null and AcquisitionComplete is false. Exiting.");
             throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
         }
+        if (value.getQueryType() == null){
+            logger.error("Query Type is null. Exiting.");
+            throw new ValidationException("Query Type is null.");
+        }
+        if (value.getScheduledReports() == null || value.getScheduledReports().isEmpty()){
+            logger.error("Scheduled Reports is null or empty. Exiting.");
+            throw new ValidationException("Scheduled Reports is null or empty.");
+        }
 
         if (value.isAcquisitionComplete()){
             logger.info("Consuming record: RECORD=[{}] FACILITY=[{}] CORRELATION=[{}] ACQUISITION COMPLETE=[{}]", KafkaUtils.format(record), facilityId, correlationId, value.isAcquisitionComplete());
@@ -116,7 +124,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
         Set<String> existingResources = patientStatus.getResources().stream().map(res -> res.getResourceId() + "-" + res.getResourceType() + "-" + res.getQueryType()).collect(Collectors.toSet());
 
-        // Create a unique key based on resourceId, resourceType and queryType
         String resourceKey = value.getResourceId() + "-" + value.getResourceType() + "-" + value.getQueryType();
         logger.info("Resource Key: {}", resourceKey);
         if (existingResources.add(resourceKey)) {
