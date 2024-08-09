@@ -4,17 +4,15 @@ export class UserProfile implements IUserProfile {
   email: string;
   firstName: string;
   lastName: string;
-  facilities: string[];
-  groups: string[];
   roles: string[];  
+  permissions: string[];
 
-  constructor(email: string, firstname: string, lastname: string, facilities: string[], groups: string[], roles: string[] ) {
+  constructor(email: string, firstname: string, lastname: string, roles: string[], permissions: string[] ) {
     this.email = email;
     this.firstName = firstname;
     this.lastName = lastname;
-    this.facilities = facilities;
-    this.groups = groups;
     this.roles = roles;
+    this.permissions = permissions;
   }
 }
 
