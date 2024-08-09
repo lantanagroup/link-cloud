@@ -23,7 +23,6 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
     public ResourceAcquiredErrorConsumer(
             AbstractResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
-            DataAcquisitionClient dataAcquisitionClient,
             MeasureEvaluatorCache measureEvaluatorCache,
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
@@ -34,7 +33,6 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
         super(
                 resourceRepository,
                 patientStatusRepository,
-                dataAcquisitionClient,
                 measureEvaluatorCache,
                 measureReportNormalizer,
                 reportabilityPredicate,
