@@ -1,8 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -10,6 +7,8 @@ using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Text;
 using QueryDispatch.Application.Settings;
+using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+using QueryDispatch.Domain.Managers;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -24,13 +23,14 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
         public QueryDispatchJob(
             ILogger<QueryDispatchJob> logger, 
             IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory,
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, 
+            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _acquisitionProducerFactory = acquisitionProducerFactory ?? throw new ArgumentNullException(nameof(acquisitionProducerFactory));
             _auditProducerFactory = auditProducerFactory ?? throw new ArgumentNullException(nameof(auditProducerFactory));
             _serviceScopeFactory = serviceScopeFactory;
+
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -47,9 +47,9 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             {
                 try
                 {
-                    using var scope = _serviceScopeFactory.CreateScope();
-                    var _deletePatientDispatchCommand = scope.ServiceProvider.GetRequiredService<IDeletePatientDispatchCommand>();
-
+                      using var scope = _serviceScopeFactory.CreateScope();
+                      var patientDispatchMgr = scope.ServiceProvider.GetRequiredService<IPatientDispatchManager>();
+  
                     DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                     {
                         PatientId = patientDispatchEntity.PatientId,
@@ -81,9 +81,12 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                     producer.Flush();
 
-                    _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: { patientDispatchEntity.FacilityId }");
+                    _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {patientDispatchEntity.FacilityId}");
 
-                    await _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+                    //await _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+
+                    await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+
                 }
                 catch (Exception ex)
                 {

@@ -141,7 +141,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     FacilityId = key.FacilityId,
                                     ReportStartDate = startDate,
                                     ReportEndDate = endDate,
-                                    ReportType = key.ReportType
+                                    ReportType = key.ReportType,
+                                    CreateDate = DateTime.UtcNow
                                 };
 
                                 var reportSchedule = await measureReportScheduledManager.AddAsync(ent, cancellationToken);

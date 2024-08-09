@@ -1,13 +1,14 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Controllers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
+using QueryDispatch.Domain.Managers;
 
 namespace QueryDispatchUnitTests
 {
@@ -15,7 +16,7 @@ namespace QueryDispatchUnitTests
     {
         private AutoMocker _mocker;
 
-       /* [Fact]
+        [Fact]
         public async Task TestUpdateQueryDispatchConfigurationAsync()
         {
             _mocker = new AutoMocker();
@@ -32,19 +33,25 @@ namespace QueryDispatchUnitTests
                 .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(true));
 
-            _mocker.GetMock<IGetQueryDispatchConfigurationQuery>()
-                .Setup(query => query.Execute(validModel.FacilityId))
-                .ReturnsAsync(new QueryDispatchConfigurationEntity());
+            _mocker.GetMock<IQueryDispatchConfigurationManager>().Setup(x => x.GetConfigEntity(It.IsAny<string>(), CancellationToken.None))
+            .Returns(Task.FromResult(new QueryDispatchConfigurationEntity()));
 
-            _mocker.GetMock<IUpdateQueryDispatchConfigurationCommand>()
-                .Setup(factory => factory.Execute(It.IsAny<QueryDispatchConfigurationEntity>(), validModel.DispatchSchedules))
-                .Returns(Task.CompletedTask);
+            _mocker.GetMock<IQueryDispatchConfigurationFactory>()
+               .Setup(factory => factory.CreateQueryDispatchConfiguration(It.IsAny<string>(), It.IsAny<List<DispatchSchedule>>()))
+               .Returns(new QueryDispatchConfigurationEntity());
 
-            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, validModel);
+            _mocker.GetMock<IQueryDispatchConfigurationManager>().Setup(x => x.SaveConfigEntity(It.IsAny<QueryDispatchConfigurationEntity>(), validModel.DispatchSchedules, CancellationToken.None))
+             .Returns(Task.FromResult(true));
+
+            _mocker.GetMock<IQueryDispatchConfigurationManager>().Setup(x => x.AddConfigEntity(It.IsAny<QueryDispatchConfigurationEntity>(), CancellationToken.None))
+              .Returns(Task.FromResult(true));
+
+
+            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, validModel, CancellationToken.None);
             Assert.IsType<NoContentResult>(result.Result);
-        }*/
+        }
 
-     /*   [Fact]
+        [Fact]
         public async Task NegativeTestUpdateQueryDispatchConfigurationAsync()
         {
             _mocker = new AutoMocker();
@@ -56,8 +63,8 @@ namespace QueryDispatchUnitTests
                 DispatchSchedules = new List<DispatchSchedule>()
             };
 
-            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, invalidModel);
+            var result = await _controller.UpdateQueryDispatchConfiguration(QueryDispatchTestsConstants.facilityId, invalidModel, CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result.Result);
-        }*/
+        }
     }
 }

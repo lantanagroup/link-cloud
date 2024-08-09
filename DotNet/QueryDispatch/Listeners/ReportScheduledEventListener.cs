@@ -2,15 +2,15 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
 using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
@@ -80,9 +80,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                    var scheduledReportCommand = scope.ServiceProvider.GetRequiredService<ICreateScheduledReportCommand>();
-                                    var scheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var updateScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IUpdateScheduledReportCommand>();
+                                
+                                    var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
+
+                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
 
                                     if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
                                     {
@@ -123,18 +124,18 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key.FacilityId, key.ReportType, startDate, endDate);
 
-                                    var existingRecord = scheduledReportQuery.Execute(key.FacilityId);
+                                    var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key.FacilityId);
 
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key.FacilityId);
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await updateScheduledReportQuery.Execute(existingRecord, scheduledReport);
+                                        await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await scheduledReportCommand.Execute(scheduledReport);
+                                       await scheduledReportMgr.createScheduledReport(scheduledReport);
                                     }
 
                                     _reportScheduledConsumer.Commit(consumeResult);
