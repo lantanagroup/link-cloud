@@ -32,6 +32,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -183,10 +184,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
-    }    
+    }
 
     // Add health checks
-    builder.Services.AddHealthChecks();    
+    builder.Services.AddHealthChecks()
+        .AddCheck<CacheHealthCheck>("Cache");
 
     // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();    
