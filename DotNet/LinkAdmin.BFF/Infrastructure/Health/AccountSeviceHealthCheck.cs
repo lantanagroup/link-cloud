@@ -1,11 +1,9 @@
-﻿using Hl7.Fhir.Language.Debugging;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
 {
@@ -39,33 +37,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/health", cancellationToken);
+                var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/health", cancellationToken);   
+                
+                dynamic data = JObject.Parse(await response.Content.ReadAsStringAsync(cancellationToken: cancellationToken));                             
 
-                if (response.IsSuccessStatusCode)
+                if (((string)data.status).Equals("Healthy", StringComparison.OrdinalIgnoreCase))
                 {
-
-                    try
-                    {
-                        dynamic data = JObject.Parse(await response.Content.ReadAsStringAsync(cancellationToken: cancellationToken));
-
-                        if (((string)data.status).Equals("Healthy", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return HealthCheckResult.Healthy();
-                        }
-                        else
-                        {
-                            return new HealthCheckResult(HealthStatus.Unhealthy, description: "Account service is not healthy");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogGatewayServiceUriException("Account", ex.Message);
-                        return new HealthCheckResult(HealthStatus.Unhealthy, description: "Failed to determine health status of the Account service.");
-                    }
+                    return HealthCheckResult.Healthy();
                 }
-
-                return new HealthCheckResult(HealthStatus.Unhealthy, description: "Failed to connect to account service");
-
+                else
+                {
+                    return new HealthCheckResult(HealthStatus.Unhealthy, description: "Account service is not healthy");
+                }
+                   
             }
             catch (Exception ex)
             {
