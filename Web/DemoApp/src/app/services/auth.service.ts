@@ -33,7 +33,6 @@ export class AuthService {
               claims['email'],
               claims['given_name'],
               claims['family_name'],
-              ["TestFacility01", "TestFacility02"],
               [],
               ["Admin"]
             );
