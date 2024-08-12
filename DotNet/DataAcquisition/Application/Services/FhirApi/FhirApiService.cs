@@ -270,18 +270,19 @@ public class FhirApiService : IFhirApiService
             ]);
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+            Bundle? newResultBundle = resultBundle;
 
             while(resultBundle.Link.Exists(x => x.Relation == "next"))
             {
-                var newResultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+                resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
 
-                if(newResultBundle != null && newResultBundle.Entry.Any())
-                    resultBundle.Entry.AddRange(newResultBundle.Entry);
+                if(resultBundle != null && resultBundle.Entry.Any())
+                    newResultBundle.Entry.AddRange(resultBundle.Entry);
             }
 
-            if (resultBundle != null && resultBundle.Entry.Count > 0)
+            if (newResultBundle != null && newResultBundle.Entry.Count > 0)
             {
-                foreach (var entry in resultBundle.Entry)
+                foreach (var entry in newResultBundle.Entry)
                 {
                     await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
                     {
@@ -291,7 +292,7 @@ public class FhirApiService : IFhirApiService
                         PatientId = patientId,
                         FacilityId = facilityId,
                         QueryType = queryType,
-                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                        IsSuccessful = newResultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow
                     }, cancellationToken);
@@ -300,7 +301,7 @@ public class FhirApiService : IFhirApiService
                 }
             }
 
-            return resultBundle;
+            return newResultBundle;
         }
         catch (FhirOperationException ex)
         {
