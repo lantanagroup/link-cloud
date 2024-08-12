@@ -188,7 +188,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add health checks
     builder.Services.AddHealthChecks()
-        .AddCheck<CacheHealthCheck>("Cache");
+        .AddCheck<CacheHealthCheck>("Cache")
+        .AddCheck<AccountSeviceHealthCheck>("Account Service");
 
     // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();    
