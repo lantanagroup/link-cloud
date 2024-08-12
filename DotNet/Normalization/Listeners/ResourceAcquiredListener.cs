@@ -166,7 +166,7 @@ public class ResourceAcquiredListener : BackgroundService
                                 Headers = headers,
                                 Value = resourceNormalizedMessage
                             };
-                            await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
                             return;
                         }
 
