@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using LantanaGroup.Link.Shared.Domain.Entities;
 
 namespace LantanaGroup.Link.Census.Domain.Entities;
 

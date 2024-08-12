@@ -1,12 +1,12 @@
-﻿namespace LantanaGroup.Link.Census.Application.Services;
-
-using global::Census.Domain.Entities;
+﻿using global::Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
-using System.Threading;
+
+namespace LantanaGroup.Link.Census.Application.Services;
 
 public class ScheduleService : BackgroundService
 {
@@ -43,7 +43,7 @@ public class ScheduleService : BackgroundService
 
         Scheduler.JobFactory = _jobFactory;
 
-        using var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigRepository>();
+        var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
 
         List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
 
