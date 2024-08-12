@@ -14,19 +14,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
     public class CreateAuditEvent : ICreateAuditEvent
     {
         private readonly ILogger<CreateAuditEvent> _logger;
-        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        private readonly IProducer<string, object> _producer;
 
-        public CreateAuditEvent(ILogger<CreateAuditEvent> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory)
+        public CreateAuditEvent(ILogger<CreateAuditEvent> logger, IProducer<string, object> producer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task<bool> Execute(AuditEventMessage model, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("CreateAuditEvent:Execute");
-
-            using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
 
             try
             {
@@ -40,7 +38,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
 
-                await producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, object>
                 {
                     Key = model.FacilityId ?? string.Empty,
                     Value = model,
