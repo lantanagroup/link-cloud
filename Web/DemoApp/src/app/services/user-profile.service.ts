@@ -31,7 +31,7 @@ export class UserProfileService {
       return JSON.parse(profile) as IUserProfile;
     }
     else {
-      return new UserProfile('', '', '', [''], [''], ['']);
+      return new UserProfile('', '', '', [''], ['']);
     }
   }
 
@@ -40,7 +40,7 @@ export class UserProfileService {
     this.sessionStorageSrv.removeItem(this.profileKey);
     console.log("profile is " + this.sessionStorageSrv.getItem(this.profileKey));
     this.sessionStorageSrv.clearSession();
-    let profile = new UserProfile('', '', '', [''], [''], [''])
+    let profile = new UserProfile('', '', '', [''], [''])
     this._userProfileUpdatedSubject.next(profile);
   }
 

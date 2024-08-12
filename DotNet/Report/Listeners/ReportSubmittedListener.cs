@@ -31,8 +31,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private string Name => this.GetType().Name;
 
-        public ReportSubmittedListener(ILogger<ReportSubmittedListener> logger, IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, IServiceScopeFactory serviceScopeFactory,
+        public ReportSubmittedListener(
+            ILogger<ReportSubmittedListener> logger, 
+            IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, 
+            IServiceScopeFactory serviceScopeFactory,
             ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {

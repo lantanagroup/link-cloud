@@ -4,14 +4,6 @@ using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
-using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
-using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
-using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -49,6 +41,10 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.QueryDispatch.Listeners;
+using QueryDispatch.Domain.Managers;
+using QueryDispatch.Domain;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,15 +118,6 @@ var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters().AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHttpClient();
 
-//Add commands
-builder.Services.AddTransient<ICreateScheduledReportCommand, CreateScheduledReportCommand>();
-
-builder.Services.AddTransient<ICreatePatientDispatchCommand, CreatePatientDispatchCommand>();
-builder.Services.AddTransient<IDeletePatientDispatchCommand, DeletePatientDispatchCommand>();
-
-builder.Services.AddTransient<ICreateQueryDispatchConfigurationCommand, CreateQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IDeleteQueryDispatchConfigurationCommand, DeleteQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IUpdateQueryDispatchConfigurationCommand, UpdateQueryDispatchConfigurationCommand>();
 
 //Add factories
 builder.Services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
@@ -149,18 +136,21 @@ builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
 
 //Add repos
-builder.Services.AddScoped<IScheduledReportRepository, ScheduledReportRepo>();
-builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
-builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
+builder.Services.AddTransient<IEntityRepository<ScheduledReportEntity>, DataEntityRepository<ScheduledReportEntity>>();
+builder.Services.AddTransient<IEntityRepository<PatientDispatchEntity>, DataEntityRepository<PatientDispatchEntity>>();
+builder.Services.AddTransient<IEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
+builder.Services.AddTransient<IDatabase, Database>();
+
+//builder.Services.AddTransient<IPatientDispatchRepository, PatientDispatchRepo>();
+//builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
 builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
 
-//Add Queries
-builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();
-builder.Services.AddScoped<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
-builder.Services.AddScoped<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
-builder.Services.AddScoped<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
-builder.Services.AddScoped<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
+// Add Managers
+builder.Services.AddTransient<IQueryDispatchConfigurationManager, QueryDispatchConfigurationManager>();
+builder.Services.AddTransient<IPatientDispatchManager, PatientDispatchManager>();
+builder.Services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
+
 
 //Excepation Handlers
 builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
@@ -177,7 +167,6 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
     builder.Services.AddHostedService<PatientEventListener>();
     builder.Services.AddHostedService<ReportScheduledEventListener>();
     builder.Services.AddHostedService<ScheduleService>();
-    builder.Services.AddSingleton<QueryDispatchJob>();
 
 }
 
@@ -190,10 +179,9 @@ if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     builder.Services.AddSingleton<RetryJob>();
 }
 
-
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-
+builder.Services.AddSingleton<QueryDispatchJob>();
 
 
 //Add problem details

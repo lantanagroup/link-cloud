@@ -1,31 +1,23 @@
 FROM maven:3-eclipse-temurin-17 AS build
 
-# Create a group and user
-RUN groupadd maven
-RUN useradd -m -s /bin/bash -g maven  mavenuser
-USER mavenuser
+WORKDIR /app
 
-WORKDIR /home/mavenuser
-
-RUN chown -R mavenuser:maven /home/mavenuser
-
-COPY pom.xml ./
-COPY shared/pom.xml shared/
-COPY measureeval/pom.xml measureeval/
-COPY validation/pom.xml validation/
+COPY --chown=mvn:mvn pom.xml ./
+COPY --chown=mvn:mvn shared/pom.xml shared/
+COPY --chown=mvn:mvn measureeval/pom.xml measureeval/
+COPY --chown=mvn:mvn validation/pom.xml validation/
 RUN mvn -pl measureeval -am dependency:go-offline
 
-COPY --chown=mavenuser:maven ./ ./
-
+COPY --chown=mvn:mvn ./ ./
+#RUN chmod +x ./mvn
 RUN mvn -pl measureeval -am -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-alpine AS run
+WORKDIR /app
+COPY --from=build /app/measureeval/target/measureeval-*.jar measureeval.jar
+RUN chmod -R 755 /app \
+  && chown -R 1001 /app
 
-RUN adduser -D mavenuser
-USER mavenuser
-
-WORKDIR  /home/mavenuser
-
-COPY --from=build /home/mavenuser/measureeval/target/measureeval-*.jar measureeval.jar
+USER 1001
 EXPOSE 5135
 CMD ["java", "--add-opens", "java.base/java.util=ALL-UNNAMED", "-jar", "measureeval.jar"]
