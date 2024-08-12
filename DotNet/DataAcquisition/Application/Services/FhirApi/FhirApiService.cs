@@ -270,37 +270,41 @@ public class FhirApiService : IFhirApiService
             ]);
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+            Bundle? newResultBundle = resultBundle;
 
-            while(resultBundle.Link.Exists(x => x.Relation == "next"))
+            if (newResultBundle != null)
             {
-                var newResultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
-
-                if(newResultBundle != null && newResultBundle.Entry.Any())
-                    resultBundle.Entry.AddRange(newResultBundle.Entry);
-            }
-
-            if (resultBundle != null && resultBundle.Entry.Count > 0)
-            {
-                foreach (var entry in resultBundle.Entry)
+                while (resultBundle.Link.Exists(x => x.Relation == "next"))
                 {
-                    await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
-                    {
-                        ResourceId = entry.Resource.Id,
-                        ResourceType = entry.Resource.TypeName,
-                        CorrelationId = correlationId,
-                        PatientId = patientId,
-                        FacilityId = facilityId,
-                        QueryType = queryType,
-                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
-                        CreateDate = DateTime.UtcNow,
-                        ModifyDate = DateTime.UtcNow
-                    }, cancellationToken);
+                    resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
 
-                    IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
+                    if (resultBundle != null && resultBundle.Entry.Any())
+                        newResultBundle.Entry.AddRange(resultBundle.Entry);
                 }
+
+                if (newResultBundle.Entry.Count > 0)
+                {
+                    foreach (var entry in newResultBundle.Entry)
+                    {
+                        await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+                        {
+                            ResourceId = entry.Resource.Id,
+                            ResourceType = entry.Resource.TypeName,
+                            CorrelationId = correlationId,
+                            PatientId = patientId,
+                            FacilityId = facilityId,
+                            QueryType = queryType,
+                            IsSuccessful = newResultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow
+                        }, cancellationToken);
+
+                        IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
+                    }
+                } 
             }
 
-            return resultBundle;
+            return newResultBundle;
         }
         catch (FhirOperationException ex)
         {
