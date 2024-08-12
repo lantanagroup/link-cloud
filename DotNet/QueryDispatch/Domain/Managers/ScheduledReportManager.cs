@@ -1,31 +1,93 @@
 ﻿using Confluent.Kafka;
 using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using Quartz;
 using QueryDispatch.Application.Settings;
 
-namespace LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands
+namespace QueryDispatch.Domain.Managers
 {
-    public class UpdateScheduledReportCommand : IUpdateScheduledReportCommand
+
+    public interface IScheduledReportManager
     {
-        private readonly ILogger<UpdateScheduledReportCommand> _logger;
-        private readonly IScheduledReportRepository _dataStore;
+        public Task<string> createScheduledReport(ScheduledReportEntity scheduledReport);
+        public Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport);
+    }
+
+    public class ScheduledReportManager : IScheduledReportManager
+    {
+        // private readonly IPatientDispatchRepository _queryDispatchRepository;
+        //private readonly IScheduledReportRepository _scheduledReportRepository;
+
+        IEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
+        IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
+
+        private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
         private readonly CompareLogic _compareLogic;
+        private readonly ISchedulerFactory _schedulerFactory;
 
-        public UpdateScheduledReportCommand(ILogger<UpdateScheduledReportCommand> logger, IScheduledReportRepository dataStore, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory)   
+        public ScheduledReportManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _dataStore = dataStore ?? throw new ArgumentNullException(nameof(dataStore));
+            _queryDispatchRepository = database.QueryDispatchConfigurationRepo;
+            _scheduledReportRepository = database.ScheduledReportRepo;
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _logger = logger;
             _compareLogic = new CompareLogic();
             _compareLogic.Config.MaxDifferences = 25;
+            _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         }
 
-        public async Task Execute(ScheduledReportEntity existingReport, ScheduledReportEntity newReport)
+        public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport)
+        {
+            try
+            {
+                // await _datastore.AddAsync(scheduledReport);
+
+                await _scheduledReportRepository.AddAsync(scheduledReport);
+
+                _logger.LogInformation($"Created schedule report for faciltiy {scheduledReport.FacilityId}");
+
+                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
+                {
+                    var headers = new Headers
+                        {
+                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
+                        };
+
+                    var auditMessage = new AuditEventMessage
+                    {
+                        FacilityId = scheduledReport.FacilityId,
+                        ServiceName = QueryDispatchConstants.ServiceName,
+                        Action = AuditEventType.Create,
+                        EventDate = DateTime.UtcNow,
+                        Resource = typeof(ScheduledReportEntity).Name,
+                        Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
+                    };
+
+                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    {
+                        Value = auditMessage,
+                        Headers = headers
+                    });
+
+                    producer.Flush();
+                }
+
+
+                return scheduledReport.FacilityId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to create scheduled report for facility {scheduledReport.FacilityId}.", ex);
+                throw new ApplicationException($"Failed to create scheduled report for facility {scheduledReport.FacilityId}.");
+            }
+        }
+
+        public async Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport)
         {
             try
             {
@@ -38,8 +100,8 @@ namespace LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands
                 {
                     var resultChanges = _compareLogic.Compare(existingReport.ReportPeriods, newReport.ReportPeriods);
                     List<Difference> list = resultChanges.Differences;
-                   
-                    list.Where(d => !d.PropertyName.ToLower().Contains("createdate") &&! d.PropertyName.ToLower().Contains("modifydate")).ToList().ForEach(d =>
+
+                    list.Where(d => !d.PropertyName.ToLower().Contains("createdate") && !d.PropertyName.ToLower().Contains("modifydate")).ToList().ForEach(d =>
                     {
                         propertyChanges.Add(new PropertyChangeModel
                         {
@@ -67,7 +129,9 @@ namespace LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands
 
                 }
 
-                await _dataStore.Update(existingReport);
+                //await _dataStore.Update(existingReport);
+
+                await _scheduledReportRepository.UpdateAsync(existingReport);
 
                 _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportType} for facility id {existingReport.FacilityId}");
 
