@@ -25,7 +25,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
-        private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
+       //private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
+        private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
         private readonly IResourceManager _resourceManager;
         private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
         private readonly ISubmissionEntryManager _submissionEntryManager;
@@ -40,18 +41,21 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private string Name => this.GetType().Name;
 
-        public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory,
+        public ResourceEvaluatedListener(
+            ILogger<ResourceEvaluatedListener> logger, 
+            IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
+            //IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             MeasureReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
-            IServiceScopeFactory serviceScopeFactory)
+            IServiceScopeFactory serviceScopeFactory, 
+            IProducer<SubmissionReportKey, SubmissionReportValue> submissionReportProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
+            //_kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _bundler = bundler;
             _aggregator = aggregator;
 
@@ -65,6 +69,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
+            _submissionReportProducer = submissionReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -231,10 +236,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                             .Select(e => e.MeasureReport)
                                             .ToList();
 
-                                        using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
-
+                                        
                                         var organization = _bundler.CreateOrganization(schedule.FacilityId);
-                                        prod.Produce(nameof(KafkaTopic.SubmitReport),
+                                        _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
                                             new Message<SubmissionReportKey, SubmissionReportValue>
                                             {
                                                 Key = new SubmissionReportKey()
@@ -259,7 +263,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 }
                                             });
 
-                                        prod.Flush(cancellationToken);
+                                        _submissionReportProducer.Flush(cancellationToken);
 
                                         
                                         schedule.SubmitReportDateTime = DateTime.UtcNow;
