@@ -51,14 +51,6 @@ spring:
 link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
 
-  data-acquisition:
-    base-url: http://localhost:5194
-    routes:
-      query-result:
-        path: /api/data/{facilityId}/QueryResult/{correlationId}
-        query:
-          - queryType={queryType}
-
 secret-management:
   key-vault-uri: ''
 
