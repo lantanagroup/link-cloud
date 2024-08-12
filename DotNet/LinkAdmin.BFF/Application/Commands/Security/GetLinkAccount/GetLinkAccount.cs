@@ -37,6 +37,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
             if (accountId == null) { return null; }
 
+            //TODO: Refactor to use the account service http typed client
+
             //check if the account service uri is set
             if(string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl)) 
             {

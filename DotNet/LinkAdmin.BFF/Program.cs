@@ -5,8 +5,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Validation;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using FluentValidation;
@@ -91,6 +89,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
+    // Determine if anonymous access is allowed
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+
     // Add kafka connection singleton
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
     if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
@@ -102,8 +103,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
-    // Add HttpClientFactory
+    // Add HttpClientFactory and Clients
     builder.Services.AddHttpClient();
+    builder.Services.AddLinkClients();
 
     // Add data protection
     builder.Services.AddDataProtection().SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
@@ -143,8 +145,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         });
     }
 
-    // Add Link Security
-    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    // Add Link Security    
     if (!allowAnonymousAccess)
     {
         Log.Logger.Information("Registering Link Gateway Security for the Link Admin API.");

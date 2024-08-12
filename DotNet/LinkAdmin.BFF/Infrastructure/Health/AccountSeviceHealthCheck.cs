@@ -1,43 +1,27 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
-using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
 {
     public class AccountSeviceHealthCheck : IHealthCheck
     {
         private readonly ILogger<AccountSeviceHealthCheck> _logger;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IOptions<ServiceRegistry> _serviceRegistry;
+        private readonly AccountService _accountService;
 
-        public AccountSeviceHealthCheck(ILogger<AccountSeviceHealthCheck> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry)
+        public AccountSeviceHealthCheck(ILogger<AccountSeviceHealthCheck> logger, AccountService accountService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-            _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));            
+            _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
-        {
-            //check if the account service uri is set
-            if (string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl))
-            {
-                _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
-                return new HealthCheckResult(HealthStatus.Unhealthy, description: "Account service uri is not set");
-            }
-
+        {           
             try
-            {
-                //create a http client
-                var client = _httpClientFactory.CreateClient();
-                client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/health", cancellationToken);   
+            {             
+                // make a request to the account service health check
+                var response = await _accountService.ServiceHealthCheck(cancellationToken);
                 
                 dynamic data = JObject.Parse(await response.Content.ReadAsStringAsync(cancellationToken: cancellationToken));                             
 
