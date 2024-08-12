@@ -7,6 +7,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServ
         public static IServiceCollection AddLinkClients(this IServiceCollection services)
         {
             services.AddHttpClient<AccountService>();
+            services.AddHttpClient<AuditService>();
+            services.AddHttpClient<CensusService>();
+            services.AddHttpClient<DataAcquisitionService>();
+            services.AddHttpClient<MeasureEvalService>();
+            services.AddHttpClient<NormalizationService>();
+            services.AddHttpClient<NotificationService>();           
+            services.AddHttpClient<QueryDispatchService>();
+            services.AddHttpClient<ReportService>();
+            services.AddHttpClient<SubmissionService>();            
 
             return services;
         }
