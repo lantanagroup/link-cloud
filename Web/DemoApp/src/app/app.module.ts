@@ -36,12 +36,6 @@ export function initConfig(appConfig: AppConfigService) {
     AppComponent
   ],
   imports: [
-    //OAuthModule.forRoot({
-    //  resourceServer: {
-    //    // allowedUrls: [`${environment.baseApiUrl}/api`], TODO: Not sure how to get this from a run-time config
-    //    sendAccessToken: true
-    //  }
-    //}),
     BrowserModule,
     HttpClientModule,
     BrowserAnimationsModule,

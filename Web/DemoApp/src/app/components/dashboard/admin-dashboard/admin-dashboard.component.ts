@@ -20,23 +20,10 @@ export class AdminDashboardComponent {
 
   async ngOnInit(): Promise<void> {
 
-    let result: Array<any> = await firstValueFrom(this.http.get<Array<any>>('/api/user'));
+    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>('/api/user'));
     console.log('got result:', result);
-    let firstName: string = "";
-    let lastName: string = "";
-    let email: string = "";
-    result.forEach((entry: any) => {
-      if (entry?.type == "given_name") {
-        firstName = entry.value;
-      }
-      if (entry?.type == "family_name") {
-        lastName= entry.value;
-      }
-      if (entry?.type == "email") {
-        email = entry.value;
-      }
-    });
-    let profile = new UserProfile(email, firstName, lastName, [''], [''], ['']);
+
+    let profile = new UserProfile(result.email, result.firstName, result.lastName, result.roles, result.permissions);
     this.name = profile.firstName + ' ' + profile.lastName;
     this.userProfileService.setProfile(profile);
   }

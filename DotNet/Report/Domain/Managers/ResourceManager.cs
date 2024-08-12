@@ -95,7 +95,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     PatientId = patientId,
                     Resource = resource,
                     ResourceId = resource.Id,
-                    ResourceType = resource.TypeName
+                    ResourceType = resource.TypeName,
+                    CreateDate = DateTime.UtcNow
                 };
 
                 patientResource = await _database.PatientResourceRepository.AddAsync(patientResource, cancellationToken);
@@ -110,7 +111,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     FacilityId = facilityId,
                     Resource = resource,
                     ResourceId = resource.Id,
-                    ResourceType = resource.TypeName
+                    ResourceType = resource.TypeName,
+                    CreateDate = DateTime.UtcNow
                 };
 
                 sharedResource = await _database.SharedResourceRepository.AddAsync(sharedResource, cancellationToken);
