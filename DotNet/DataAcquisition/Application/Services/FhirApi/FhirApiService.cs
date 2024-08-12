@@ -269,7 +269,15 @@ public class FhirApiService : IFhirApiService
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType);
+            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+
+            while(resultBundle.Link.Exists(x => x.Relation == "next"))
+            {
+                var newResultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+
+                if(newResultBundle != null && newResultBundle.Entry.Any())
+                    resultBundle.Entry.AddRange(newResultBundle.Entry);
+            }
 
             if (resultBundle != null && resultBundle.Entry.Count > 0)
             {
