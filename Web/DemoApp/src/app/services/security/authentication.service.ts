@@ -18,15 +18,14 @@ export class AuthenticationService {
   constructor(private http: HttpClient, private profileService: UserProfileService, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
   loadUser() {
-    this.http.get<UserClaims[]>(`${this.appConfigService.config?.baseApiUrl}/user`, { withCredentials: true })
-      .subscribe((response: UserClaims[]) => {
+    this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`, { withCredentials: true })
+      .subscribe((response: UserProfile) => {
         this.userProfile = new UserProfile(
-          response.find(x => x.type === 'email')?.value || '',
-          response.find(x => x.type === 'given_name')?.value || '',
-          response.find(x => x.type === 'family_name')?.value || '',
-          response.filter(x => x.type === 'facilities').map(y => y.value),
-          [],
-          response.filter(x => x.type === 'roles').map(y => y.value)
+          response.email,
+          response.firstName,
+          response.lastName,
+          response.roles,
+          response.permissions
         );
         this.profileService.setProfile(this.userProfile);
       });
