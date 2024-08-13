@@ -8,7 +8,7 @@ using System.Text;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public record ResourceRequiredMessageRequest(string faciltyId, string patientId, string queryType, string correlationId, List<ScheduledReport> scheduledReports);
+public record ResourceRequiredMessageRequest(string facilityId, string patientId, string queryType, string correlationId, List<ScheduledReport> scheduledReports);
 
 public interface IBundleEventService<EventKey, EventValue, EventRequest>
 {
@@ -36,7 +36,7 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
                     KafkaTopic.ResourceAcquired.ToString(),
                     new Message<string, ResourceAcquired>
                     {
-                        Key = request.faciltyId,
+                        Key = request.facilityId,
                         Headers = new Headers
                         {
                             new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.correlationId))
