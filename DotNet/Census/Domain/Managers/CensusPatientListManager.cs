@@ -17,6 +17,9 @@ public interface ICensusPatientListManager
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
         CancellationToken cancellationToken = default);
+
+    Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
+        CancellationToken cancellationToken = default);
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
@@ -30,12 +33,32 @@ public class CensusPatientListManager : ICensusPatientListManager
         _patientListRepository = patientListRepository;
     }
 
+    public async Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
+    {
+        if (entity.Id != null)
+        {
+            return await UpdateAsync(entity, cancellationToken);
+        }
+        else
+        {
+            return await AddAsync(entity, cancellationToken);
+        }
+    }
+
     public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
     {
+        if (entity.Id == null)
+        {
+            entity.Id = Guid.NewGuid().ToString();
+            entity.CreateDate = DateTime.UtcNow;
+        }
+
         return await _patientListRepository.AddAsync(entity, cancellationToken);
     }
     public async Task<CensusPatientListEntity> UpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
     {
+        entity.ModifyDate = DateTime.UtcNow;
+
         return await _patientListRepository.UpdateAsync(entity, cancellationToken);
     }
     public async Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate)
