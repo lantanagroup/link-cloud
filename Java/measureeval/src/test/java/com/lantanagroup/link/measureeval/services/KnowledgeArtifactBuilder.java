@@ -85,19 +85,10 @@ public class KnowledgeArtifactBuilder {
         }
     }
 
-    static class CohortMeasure {
-        private static final String MEASURE_ID = "CohortMeasure";
-        private static final String LIBRARY_ID = "CohortLibrary";
+    static class SimpleCohortMeasureTrue {
+        private static final String MEASURE_ID = "CohortMeasureTrue";
+        private static final String LIBRARY_ID = "CohortLibraryTrue";
         private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
-        public static final String cql = """
-                library CohortLibrary version '1.0.0'
-                
-                using FHIR version '4.0.1'
-                
-                context Patient
-
-                define "Initial Population":
-                  true""";
         public static Measure measure() {
             Measure measure = new Measure();
             measure.addLibrary(LIBRARY_URL);
@@ -109,7 +100,7 @@ public class KnowledgeArtifactBuilder {
 
         public static Library library() {
             Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(cql.getBytes(StandardCharsets.UTF_8));
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_COHORT_IP_TRUE.getBytes(StandardCharsets.UTF_8));
             library.setId(LIBRARY_ID);
             return library;
         }
@@ -122,31 +113,108 @@ public class KnowledgeArtifactBuilder {
         }
     }
 
-    static class ProportionMeasure {
-        private static final String MEASURE_ID = "ProportionMeasure";
-        private static final String LIBRARY_ID = "ProportionLibrary";
+    static class SimpleCohortMeasureFalse {
+        private static final String MEASURE_ID = "CohortMeasureFalse";
+        private static final String LIBRARY_ID = "CohortLibraryFalse";
         private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
-        public static final String cql = """
-                library ProportionLibrary version '1.0.0'
-                
-                using FHIR version '4.0.1'
-                
-                context Patient
+        public static Measure measure() {
+            Measure measure = new Measure();
+            measure.addLibrary(LIBRARY_URL);
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
+            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
+            measure.setId(MEASURE_ID);
+            return measure;
+        }
 
-                define "Initial Population":
-                  true
-                  
-                define "Numerator":
-                  true
-                  
-                define "Numerator Exclusion":
-                  false
-                
-                define "Denominator":
-                  true
-                  
-                define "Denominator Exclusion"
-                  false""";
+        public static Library library() {
+            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_COHORT_IP_FALSE.getBytes(StandardCharsets.UTF_8));
+            library.setId(LIBRARY_ID);
+            return library;
+        }
+
+        public static Bundle bundle() {
+            Bundle bundle = new Bundle();
+            bundle.addEntry().setResource(library());
+            bundle.addEntry().setResource(measure());
+            return bundle;
+        }
+    }
+
+    static class CohortMeasureWithValueSet {
+        private static final String MEASURE_ID = "CohortMeasureWithValueSet";
+        private static final String LIBRARY_ID = "CohortLibraryWithValueSet";
+        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        public static Measure measure() {
+            Measure measure = new Measure();
+            measure.addLibrary(LIBRARY_URL);
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
+            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
+            measure.setId(MEASURE_ID);
+            return measure;
+        }
+
+        public static Library library() {
+            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.COHORT_IP_TRUE_WITH_VALUESET.getBytes(StandardCharsets.UTF_8));
+            library.setId(LIBRARY_ID);
+            return library;
+        }
+
+        public static Bundle bundle() {
+            Bundle bundle = new Bundle();
+            bundle.addEntry().setResource(library());
+            bundle.addEntry().setResource(measure());
+            bundle.addEntry().setResource(ValueSetBuilder.inpatientEncounter());
+            return bundle;
+        }
+    }
+
+    static class CohortMeasureWithSDE {
+        private static final String MEASURE_ID = "CohortMeasureWithSDE";
+        private static final String LIBRARY_ID = "CohortLibraryWithSDE";
+        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        public static Measure measure() {
+            Measure measure = new Measure();
+            measure.setId(MEASURE_ID);
+            measure.setMeta(new Meta().addProfile(
+                    "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cohort-measure-cqfm").addProfile(
+                            "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-measure-cqfm"));
+            measure.addExtension().setValue(new StringType("Encounter"))
+                    .setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis");
+            measure.addLibrary(LIBRARY_URL);
+            measure.addType().addCoding().setSystem("http://terminology.hl7.org/CodeSystem/measure-type").setCode("outcome");
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
+            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
+            var sde = new Measure.MeasureSupplementalDataComponent();
+            sde.setId("sde-condition");
+            sde.setDescription("SDE Condition");
+            sde.setCriteria(new Expression().setLanguage("text/cql-identifier").setExpression("SDE Condition"));
+            sde.addUsage().addCoding().setCode("supplemental-data").setSystem("http://terminology.hl7.org/CodeSystem/measure-data-usage");
+            measure.addSupplementalData(sde);
+            return measure;
+        }
+
+        public static Library library() {
+            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.COHORT_IP_TRUE_WITH_SDE.getBytes(StandardCharsets.UTF_8));
+            library.setId(LIBRARY_ID);
+            return library;
+        }
+
+        public static Bundle bundle() {
+            Bundle bundle = new Bundle();
+            bundle.addEntry().setResource(library());
+            bundle.addEntry().setResource(measure());
+            bundle.addEntry().setResource(ValueSetBuilder.inpatientEncounter());
+            return bundle;
+        }
+    }
+
+    static class SimpleProportionMeasureAllTrueNoExclusion {
+        private static final String MEASURE_ID = "ProportionMeasureAllTrueNoExclusion";
+        private static final String LIBRARY_ID = "ProportionLibraryAllTrueNoExclusion";
+        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
         public static Measure measure() {
             Measure measure = new Measure();
             measure.addLibrary(LIBRARY_URL);
@@ -163,7 +231,7 @@ public class KnowledgeArtifactBuilder {
 
         public static Library library() {
             Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(cql.getBytes(StandardCharsets.UTF_8));
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_PROPORTION_ALL_TRUE_NO_EXCLUSION.getBytes(StandardCharsets.UTF_8));
             library.setId(LIBRARY_ID);
             return library;
         }
@@ -176,31 +244,43 @@ public class KnowledgeArtifactBuilder {
         }
     }
 
-    static class RatioMeasure {
+    static class SimpleProportionMeasureAllFalse {
+        private static final String MEASURE_ID = "ProportionMeasureAllFalse";
+        private static final String LIBRARY_ID = "ProportionLibraryAllFalse";
+        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        public static Measure measure() {
+            Measure measure = new Measure();
+            measure.addLibrary(LIBRARY_URL);
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("proportion")));
+            measure.addGroup()
+                    .addPopulation(MeasurePopulationGroup.initialPopulation())
+                    .addPopulation(MeasurePopulationGroup.numerator())
+                    .addPopulation(MeasurePopulationGroup.numeratorExclusion())
+                    .addPopulation(MeasurePopulationGroup.denominator())
+                    .addPopulation(MeasurePopulationGroup.denominatorExclusion());
+            measure.setId(MEASURE_ID);
+            return measure;
+        }
+
+        public static Library library() {
+            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_PROPORTION_ALL_FALSE.getBytes(StandardCharsets.UTF_8));
+            library.setId(LIBRARY_ID);
+            return library;
+        }
+
+        public static Bundle bundle() {
+            Bundle bundle = new Bundle();
+            bundle.addEntry().setResource(library());
+            bundle.addEntry().setResource(measure());
+            return bundle;
+        }
+    }
+
+    static class SimpleRatioMeasure {
         private static final String MEASURE_ID = "RatioMeasure";
         private static final String LIBRARY_ID = "RatioLibrary";
         private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
-        public static final String cql = """
-                library RatioLibrary version '1.0.0'
-                
-                using FHIR version '4.0.1'
-                
-                context Patient
-
-                define "Initial Population":
-                  ["Encounter"]
-                  
-                define "Numerator":
-                  "Initial Population"
-                
-                define "Denominator":
-                  "Initial Population"
-                
-                define function "Denominator Observation"(Encounter "Encounter"):
-                  24
-                  
-                define function "Numerator Observation"(Encounter "Encounter"):
-                  1""";
 
         public static Measure measure() {
             Measure measure = new Measure();
@@ -218,7 +298,7 @@ public class KnowledgeArtifactBuilder {
 
         public static Library library() {
             Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(cql.getBytes(StandardCharsets.UTF_8));
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_RATIO.getBytes(StandardCharsets.UTF_8));
             library.setId(LIBRARY_ID);
             return library;
         }
@@ -231,28 +311,10 @@ public class KnowledgeArtifactBuilder {
         }
     }
 
-    static class ContinuousVariableMeasure {
+    static class SimpleContinuousVariableMeasure {
         private static final String MEASURE_ID = "ContinuousVariableMeasure";
         private static final String LIBRARY_ID = "ContinuousVariableLibrary";
         private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
-        public static final String cql = """
-                library ContinuousVariableLibrary version '1.0.0'
-                
-                using FHIR version '4.0.1'
-                
-                context Patient
-
-                define "Initial Population":
-                  ["Encounter"]
-                  
-                define "Measure Population":
-                  "Initial Population"
-                
-                define "Measure Population Exclusion":
-                  false
-                
-                define function "Measure Observation"(Encounter "Encounter"):
-                  24""";
 
         public static Measure measure() {
             Measure measure = new Measure();
@@ -268,7 +330,7 @@ public class KnowledgeArtifactBuilder {
 
         public static Library library() {
             Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(cql.getBytes(StandardCharsets.UTF_8));
+            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_CONTINUOUS_VARIABLE.getBytes(StandardCharsets.UTF_8));
             library.setId(LIBRARY_ID);
             return library;
         }
