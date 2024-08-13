@@ -20,6 +20,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
             services.AddLinkAuthorizationHandlers();
 
+            logger.Information("Initializing authentication schemas.");
+            List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];
+
+            var defaultChallengeScheme = configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
+            services.Configure<AuthenticationSchemaConfig>(options =>
+            {
+                options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+
+                if (string.IsNullOrEmpty(defaultChallengeScheme))
+                    throw new NullReferenceException("DefaultChallengeScheme is required.");
+
+                options.DefaultChallengeScheme = defaultChallengeScheme;
+
+                options.EnableAnonymousAccess = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+
+            });
+
             if (securityServiceOptions.Environment.IsDevelopment() && configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
             {
                 services.AddAuthentication(options =>
@@ -40,22 +57,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 return services;
             
-            }                
-
-            logger.Information("Initializing authentication schemas.");
-            List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];            
-
-            var defaultChallengeScheme = configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
-            services.Configure<AuthenticationSchemaConfig>(options =>
-            {
-                options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;                
-
-                if (string.IsNullOrEmpty(defaultChallengeScheme))
-                    throw new NullReferenceException("DefaultChallengeScheme is required.");
-
-                options.DefaultChallengeScheme = defaultChallengeScheme;
-                
-            });
+            }              
 
             var authBuilder = services.AddAuthentication(options => {
                 options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;

@@ -85,6 +85,13 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         _collection.DeleteOne(filter);
     }
 
+    public virtual async System.Threading.Tasks.Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested) return;
+        var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
+        await _collection.DeleteOneAsync(filter, cancellationToken);
+    }
+
     public virtual async System.Threading.Tasks.Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;

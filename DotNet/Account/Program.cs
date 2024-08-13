@@ -95,14 +95,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add IOptions
     builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
-    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
 
     //add factories
-    builder.Services.AddFactories();
+    builder.Services.AddFactories(kafkaConnection);
 
     //add command and queries
     builder.Services.AddCommandAndQueries();
