@@ -5,12 +5,12 @@ using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
 {
-    public class AccountSeviceHealthCheck : IHealthCheck
+    public class AccountServiceHealthCheck : IHealthCheck
     {
-        private readonly ILogger<AccountSeviceHealthCheck> _logger;
+        private readonly ILogger<AccountServiceHealthCheck> _logger;
         private readonly AccountService _accountService;
 
-        public AccountSeviceHealthCheck(ILogger<AccountSeviceHealthCheck> logger, AccountService accountService)
+        public AccountServiceHealthCheck(ILogger<AccountServiceHealthCheck> logger, AccountService accountService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
