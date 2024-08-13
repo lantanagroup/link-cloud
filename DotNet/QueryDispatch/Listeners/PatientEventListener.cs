@@ -20,28 +20,27 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<PatientEventListener> _logger;
         private readonly IKafkaConsumerFactory<string, PatientEventValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
         private readonly ITransientExceptionHandler<string, PatientEventValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientEventValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly IProducer<string, AuditEventMessage> _producer;
 
         public PatientEventListener(
-            ILogger<PatientEventListener> logger, 
-            IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory, 
-            IQueryDispatchFactory queryDispatchFactory, 
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, 
-            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler, 
-            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler, 
+            ILogger<PatientEventListener> logger,
+            IKafkaConsumerFactory<string, PatientEventValue> kafkaConsumerFactory,
+            IQueryDispatchFactory queryDispatchFactory,
+            IDeadLetterExceptionHandler<string, PatientEventValue> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
             ITransientExceptionHandler<string, PatientEventValue> transientExceptionHandler,
             IServiceScopeFactory serviceScopeFactory
-            ) 
+,
+            IProducer<string, AuditEventMessage> producer)
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
             _serviceScopeFactory = serviceScopeFactory;
-            _auditProducerFactory = auditProducerFactory;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _transientExceptionHandler = transientExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
@@ -54,7 +53,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
             _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.PatientEvent) + "-Error";
-
+            _producer = producer ?? throw new ArgumentException(nameof(producer));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -219,14 +218,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
         private void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
         {
-            using (var producer = _auditProducerFactory.CreateAuditEventProducer())
-            {
-                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditValue,
                     Headers = headers
                 });
-            }
+            
         }
     }
 }
