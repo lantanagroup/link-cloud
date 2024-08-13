@@ -22,7 +22,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
         entity.Id = Guid.NewGuid().ToString();
 
@@ -33,7 +33,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return result;
     }
 
-    public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
         entity = _dbContext.Set<T>().Update(entity).Entity;
 
@@ -43,7 +43,17 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     }
 
-    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken)
+    public virtual async Task DeleteAsync(T? entity, CancellationToken cancellationToken = default)
+    {
+        if (entity is null) return;
+
+        _dbContext.Set<T>().Remove(entity);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+    }
+
+    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
