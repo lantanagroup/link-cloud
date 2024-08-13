@@ -25,21 +25,18 @@ namespace LantanaGroup.Link.Normalization.Application.Services
     public class AuditService : IAuditService
     {
         private readonly ILogger<AuditService> _logger;
-        //private readonly IKafkaWrapper<Ignore, Ignore, string, Models.Messages.AuditEvent> _auditKafkaWrapper;
-        private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _producerFactory;
+        private readonly IProducer<string, Shared.Application.Models.Kafka.AuditEventMessage> _producer;
 
-        public AuditService(ILogger<AuditService> logger, IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> producerFactory)
+        public AuditService(ILogger<AuditService> logger,IProducer<string, Shared.Application.Models.Kafka.AuditEventMessage> producer)
         {
-            _logger = logger;
-            _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
 
         public async System.Threading.Tasks.Task TriggerAuditEvent(TriggerAuditEventCommand request, CancellationToken cancellationToken)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
-
-            using var producer = _producerFactory.CreateAuditEventProducer();
 
             var headers = new Headers
             {
@@ -48,7 +45,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services
 
             try
             {
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(),
+                await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(),
                     new Message<string, Shared.Application.Models.Kafka.AuditEventMessage>
                     {
                         Key = request.FacilityId,
