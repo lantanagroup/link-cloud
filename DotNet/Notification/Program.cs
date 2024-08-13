@@ -112,7 +112,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
@@ -148,7 +149,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddTransient<INotificationConfigurationFactory, NotificationConfigurationFactory>();
     builder.Services.AddTransient<INotificationFactory, NotificationFactory>();
+    
     builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
+    builder.Services.AddSingleton(new KafkaProducerFactory(kafkaConnection).CreateAuditEventProducer());
+
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
