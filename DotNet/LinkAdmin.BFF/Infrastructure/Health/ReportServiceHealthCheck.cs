@@ -32,9 +32,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
                 }
 
             }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogLinkServiceRequestException("Report", ex.Message);
+                return new HealthCheckResult(HealthStatus.Unhealthy, description: "HTTP request error.");
+            }
             catch (Exception ex)
             {
-                _logger.LogGatewayServiceUriException("Report", ex.Message);
+                _logger.LogLinkServiceRequestException("Report", ex.Message);
                 return new HealthCheckResult(HealthStatus.Unhealthy, description: "Failed to determine health status of the Report service.");
             }
         }
