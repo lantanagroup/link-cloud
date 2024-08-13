@@ -66,9 +66,9 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = await _patientListManager.GetPatientList(facilityId, startDate, endDate);
+            var patients = (await _patientListManager.GetPatientList(facilityId, startDate, endDate)).ToList();
 
-            if(patients.Any())
+            if(!patients.Any())
             {
                 return NotFound($"No patients found for facilityId {facilityId}");
             }
