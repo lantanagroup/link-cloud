@@ -19,26 +19,23 @@ namespace QueryDispatch.Domain.Managers
 
     public class ScheduledReportManager : IScheduledReportManager
     {
-        // private readonly IPatientDispatchRepository _queryDispatchRepository;
-        //private readonly IScheduledReportRepository _scheduledReportRepository;
-
         IEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
         IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
 
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
         private readonly ISchedulerFactory _schedulerFactory;
 
-        public ScheduledReportManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
+        public ScheduledReportManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, ISchedulerFactory schedulerFactory, IProducer<string, AuditEventMessage> producer)
         {
             _queryDispatchRepository = database.QueryDispatchConfigurationRepo;
             _scheduledReportRepository = database.ScheduledReportRepo;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _logger = logger;
             _compareLogic = new CompareLogic();
             _compareLogic.Config.MaxDifferences = 25;
             _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport)
@@ -51,8 +48,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Created schedule report for faciltiy {scheduledReport.FacilityId}");
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
                     var headers = new Headers
                         {
                             { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
@@ -68,14 +63,14 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage,
                         Headers = headers
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
 
 
                 return scheduledReport.FacilityId;
@@ -135,8 +130,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportType} for facility id {existingReport.FacilityId}");
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
                     var headers = new Headers
                     {
                         { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.CorrelationId) }
@@ -153,14 +146,14 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Updated schedule report {existingReport.Id} for facility {existingReport.FacilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage,
                         Headers = headers
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
 
             }
             catch (Exception ex)
