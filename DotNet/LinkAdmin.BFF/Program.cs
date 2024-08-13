@@ -132,6 +132,13 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         options.ConnectionString = redisConnection;
         options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+
+        if (builder.Configuration.GetValue<int>("Redis:Timeout") > 0)
+        {
+            options.Timeout = builder.Configuration.GetValue<int>("Redis:Timeout");
+        }
+
+        
     });
 
     // Add Secret Manager
