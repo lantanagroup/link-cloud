@@ -1,6 +1,4 @@
 ﻿using Confluent.Kafka;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
@@ -8,9 +6,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Quartz;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -21,25 +17,30 @@ namespace LantanaGroup.Link.Report.Jobs
     public class GenerateDataAcquisitionRequestsForPatientsToQuery : IJob
     {
         private readonly ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> _logger;
-        private readonly IKafkaProducerFactory<string, DataAcquisitionRequestedValue> _dataAcquisitionProducerFactory;
-        private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _submissionProducerFactory;
+        private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
+        private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
         private readonly ISchedulerFactory _schedulerFactory;
 
         private readonly MeasureReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
         private readonly IDatabase _database;
 
-        public GenerateDataAcquisitionRequestsForPatientsToQuery(ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger, 
-            IKafkaProducerFactory<string, DataAcquisitionRequestedValue> dataAcquisitionProducerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> submissionProducerFactory, ISchedulerFactory schedulerFactory, MeasureReportSubmissionBundler bundler, MeasureReportAggregator aggregator, IDatabase database)
+        public GenerateDataAcquisitionRequestsForPatientsToQuery(
+            ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger,
+            ISchedulerFactory schedulerFactory,
+            MeasureReportSubmissionBundler bundler,
+            MeasureReportAggregator aggregator,
+            IDatabase database,
+            IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
+            IProducer<SubmissionReportKey, SubmissionReportValue> submissionReportProducer)
         {
             _logger = logger;
-            _dataAcquisitionProducerFactory = dataAcquisitionProducerFactory;
-            _submissionProducerFactory = submissionProducerFactory;
             _schedulerFactory = schedulerFactory;
             _bundler = bundler;
             _aggregator = aggregator;
             _database = database;
+            _dataAcqProducer = dataAcqProducer;
+            _submissionReportProducer = submissionReportProducer;
         }
 
 
@@ -66,16 +67,15 @@ namespace LantanaGroup.Link.Report.Jobs
                         ClientId = "Report_DataAcquisitionScheduled"
                     };
 
-                    using (var prod = _dataAcquisitionProducerFactory.CreateProducer(config))
-                    {
-                        foreach (string patientId in schedule.PatientsToQuery ?? new List<string>())
-                        {
-                            var darKey = schedule.FacilityId;
 
-                            var darValue = new DataAcquisitionRequestedValue()
-                            {
-                                PatientId = patientId,
-                                ScheduledReports = new List<ScheduledReport>()
+                    foreach (string patientId in schedule.PatientsToQuery ?? new List<string>())
+                    {
+                        var darKey = schedule.FacilityId;
+
+                        var darValue = new DataAcquisitionRequestedValue()
+                        {
+                            PatientId = patientId,
+                            ScheduledReports = new List<ScheduledReport>()
                                 {
                                     new ScheduledReport()
                                     {
@@ -84,20 +84,20 @@ namespace LantanaGroup.Link.Report.Jobs
                                         ReportType = schedule.ReportType
                                     }
                                 },
-                                QueryType = QueryType.Initial.ToString(),
-                            };
+                            QueryType = QueryType.Initial.ToString(),
+                        };
 
-                            var headers = new Headers
+                        var headers = new Headers
                             {
                                 { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                             };
 
-                            prod.Produce(nameof(KafkaTopic.DataAcquisitionRequested),
-                                new Message<string, DataAcquisitionRequestedValue>
-                                    { Key = darKey, Value = darValue, Headers = headers });
-                            prod.Flush();
-                        }
+                        _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested),
+                            new Message<string, DataAcquisitionRequestedValue>
+                            { Key = darKey, Value = darValue, Headers = headers });
+                        _dataAcqProducer.Flush();
                     }
+
 
                     _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Type: {schedule.ReportType} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
@@ -122,9 +122,8 @@ namespace LantanaGroup.Link.Report.Jobs
                             ClientId = "Report_SubmissionReportScheduled"
                         };
 
-                        using var prod = _submissionProducerFactory.CreateProducer(producerConfig);
                         var organization = _bundler.CreateOrganization(schedule.FacilityId);
-                        prod.Produce(nameof(KafkaTopic.SubmitReport),
+                        _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
                             new Message<SubmissionReportKey, SubmissionReportValue>
                             {
                                 Key = new SubmissionReportKey()
@@ -146,7 +145,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 }
                             });
 
-                        prod.Flush();
+                        _submissionReportProducer.Flush();
                     }
                 }
 

@@ -1,15 +1,11 @@
 package com.lantanagroup.link.measureeval.configs;
 
-import com.azure.security.keyvault.secrets.SecretClient;
-import com.lantanagroup.link.shared.auth.JwtService;
-import com.lantanagroup.link.measureeval.services.DataAcquisitionClient;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestClient;
 
 import java.util.function.Predicate;
 
@@ -26,9 +22,4 @@ public class LinkConfig {
         return (Predicate<MeasureReport>) Class.forName(reportabilityPredicate).getConstructor().newInstance();
     }
 
-    @Bean
-    @ConfigurationProperties("link.data-acquisition")
-    public DataAcquisitionClient dataAcquisitionClient(RestClient restClient, JwtService jwtService, SecretClient... secretClient) {
-        return new DataAcquisitionClient(restClient, jwtService, secretClient);
-    }
 }

@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.records;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -18,6 +19,9 @@ import java.util.List;
 @Getter
 @Setter
 public abstract class AbstractResourceRecord {
+
+    private boolean AcquisitionComplete;
+
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
@@ -27,16 +31,19 @@ public abstract class AbstractResourceRecord {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
+    @JsonIgnore
     public boolean isPatientResource() {
         return StringUtils.isNotEmpty(patientId);
     }
 
+    @JsonIgnore
     public ResourceType getResourceType() {
-        return ResourceType.fromCode(resource.fhirType());
+        return ResourceType.fromCode(resource!= null?resource.fhirType():"");
     }
 
+    @JsonIgnore
     public String getResourceId() {
-        return resource.getIdElement().getIdPart();
+        return resource!=null?resource.getIdElement().getIdPart():"";
     }
 
     @Getter
