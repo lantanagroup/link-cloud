@@ -33,12 +33,15 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Diagnostics;
 using System.Reflection;
+using Census.Domain.Entities;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using LantanaGroup.Link.Census.Application.Models.Messages;
+using LantanaGroup.Link.Census.Domain.Entities;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Listeners;
 
@@ -145,10 +148,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Repositories
-    builder.Services.AddScoped<ICensusConfigRepository, CensusConfigRepository>();
-    builder.Services.AddScoped<ICensusHistoryRepository, CensusHistoryRepository>();
-    builder.Services.AddScoped<ICensusPatientListRepository, CensusPatientListRepository>();
+    builder.Services.AddTransient<IEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
+    builder.Services.AddTransient<IEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
+    builder.Services.AddTransient<IEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
     builder.Services.AddScoped<IEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+
+    //Managers
+    builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
+    builder.Services.AddTransient<ICensusPatientListManager, CensusPatientListManager>();
+    builder.Services.AddTransient<IPatientCensusHistoryManager, PatientCensusHistoryManager>();
+
+    //Services
+    builder.Services.AddScoped<IPatientIdsAcquiredService, PatientIdsAcquiredService>();
 
     //Handlers
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();

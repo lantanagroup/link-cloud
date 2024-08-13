@@ -3,52 +3,51 @@ using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Domain.Entities;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using MediatR;
 using Microsoft.Data.SqlClient;
 
-namespace LantanaGroup.Link.Census.Application.Commands;
+namespace LantanaGroup.Link.Census.Application.Services;
 
-public class ConsumePatientIdsAcquiredEventCommand : IRequest<IEnumerable<BaseResponse>>
+public interface IPatientIdsAcquiredService
 {
-    public string FacilityId { get; set; }
-    public PatientIDsAcquired Message { get; set; }
+    Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken);
 }
 
-public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePatientIdsAcquiredEventCommand, IEnumerable<BaseResponse>>
+public class PatientIdsAcquiredService : IPatientIdsAcquiredService
 {
-    private readonly ILogger<ConsumePaitentIdsAcquiredEventHandler> _logger;
-    private readonly ICensusPatientListRepository _patientListRepository;
-    private readonly ICensusHistoryRepository _historyRepository;
+    private readonly ILogger<PatientIdsAcquiredService> _logger;
+    private readonly ICensusPatientListManager _patientListManager;
+    private readonly IPatientCensusHistoryManager _historyManager;
     private readonly ICensusServiceMetrics _metrics;
 
-    public ConsumePaitentIdsAcquiredEventHandler(
-        ILogger<ConsumePaitentIdsAcquiredEventHandler> logger,
-        ICensusPatientListRepository patientListRepository,
-        ICensusHistoryRepository historyRepository,
+    public PatientIdsAcquiredService(
+        ILogger<PatientIdsAcquiredService> logger,
+        ICensusPatientListManager patientListRepository,
+        IPatientCensusHistoryManager historyRepository,
         ICensusServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _patientListRepository = patientListRepository ?? throw new ArgumentNullException(nameof(patientListRepository));
-        _historyRepository = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
+        _patientListManager = patientListRepository ?? throw new ArgumentNullException(nameof(patientListRepository));
+        _historyManager = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
-    public async Task<IEnumerable<BaseResponse>> Handle(ConsumePatientIdsAcquiredEventCommand request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken)
     {
-        /// 1. convert Fhir List to patient entities
-        /// 2. get existing census from database
-        /// 3. compare:
-        ///    - new patients need admitted date updated to DateTime.UtcNow
-        ///    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow
-        /// 4. save updated/new patients   
+        // 1. convert Fhir List to patient entities
+        // 2. get existing census from database
+        // 3. compare:
+        //    - new patients need admitted date updated to DateTime.UtcNow
+        //    - patients that are on existing list and not in new list need to have discharged date set to DateTime.UtcNow
+        // 4. save updated/new patients   
         var convertedList = ConvertFhirListToEntityList(request.Message.PatientIds, request.FacilityId);
 
         List<CensusPatientListEntity>? activePatients = null;
         try
         {
-            activePatients = await _patientListRepository.GetActivePatientsForFacility(request.FacilityId, cancellationToken);
+            activePatients = await _patientListManager.GetPatientListForFacility(request.FacilityId, activeOnly: true, cancellationToken);
         }
         catch(SqlException ex)
         {
@@ -68,7 +67,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
         {
             if (!activePatients.Any(x => x.PatientId == patient.PatientId))
             {
-                var existingPatient = await _patientListRepository.GetPatientByPatientId(request.FacilityId, patient.PatientId, cancellationToken);
+                var existingPatient = await _patientListManager.GetPatientByPatientId(request.FacilityId, patient.PatientId, cancellationToken);
                 if (existingPatient != null)
                 {
                     existingPatient.AdmitDate = DateTime.UtcNow;
@@ -109,7 +108,7 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
 
         foreach (var patient in patientUpdates)
         {
-            await _patientListRepository.UpdateAsync(patient, cancellationToken);
+            await _patientListManager.AddOrUpdateAsync(patient, cancellationToken);
             if (patient.IsDischarged)
             {
                 var correlationId = Guid.NewGuid().ToString();
@@ -134,9 +133,10 @@ public class ConsumePaitentIdsAcquiredEventHandler : IRequestHandler<ConsumePati
             }
         }
 
-        await _historyRepository.AddAsync(new PatientCensusHistoricEntity
+        await _historyManager.AddAsync(new PatientCensusHistoricEntity
         {
             CensusDateTime = DateTime.UtcNow,
+            CreateDate = DateTime.UtcNow,
             FacilityId = request.FacilityId
         }, cancellationToken);
 
