@@ -116,7 +116,7 @@ public class CensusListener : BackgroundService
                                 try
                                 {
                                     var patientIdsAcuiredService = scope.ServiceProvider.GetRequiredService<IPatientIdsAcquiredService>();
-                                    var responseMessages = await patientIdsAcuiredService.ProcesEvent(new ConsumePatientIdsAcquiredEventModel()
+                                    var responseMessages = await patientIdsAcuiredService.ProcessEvent(new ConsumePatientIdsAcquiredEventModel()
                                     {
                                         FacilityId = messageMetaData.facilityId,
                                         Message = msgValue,

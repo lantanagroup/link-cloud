@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Census.Application.Services;
 
 public interface IPatientIdsAcquiredService
 {
-    Task<IEnumerable<BaseResponse>> ProcesEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken);
+    Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken);
 }
 
 public class PatientIdsAcquiredService : IPatientIdsAcquiredService
@@ -34,7 +34,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
-    public async Task<IEnumerable<BaseResponse>> ProcesEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<BaseResponse>> ProcessEvent(ConsumePatientIdsAcquiredEventModel request, CancellationToken cancellationToken)
     {
         // 1. convert Fhir List to patient entities
         // 2. get existing census from database
