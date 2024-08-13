@@ -411,3 +411,4 @@ FodyWeavers.xsd
 **/target/
 /DotNet/Submission/appsettings.Development.json
 /DotNet/Submission/submissions
+/DotNet/Census/appsettings.Local.json
