@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
     public static class UpdateExistingUser
     {
         public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, 
-            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, 
+            [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IGetUserByEmail queryUserByEmail,
             [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
         {
             try
@@ -31,6 +31,14 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 var existingUser = await queryUser.Execute(id, cancellationToken: context.RequestAborted);
                 if (existingUser is null)
                 {
+
+                    //verify that the emial is not already in use
+                    var existingUserByEmail = await queryUserByEmail.Execute(model.Email, context.RequestAborted);
+                    if (existingUserByEmail is not null)
+                    {
+                        return Results.Conflict("A user with the same email already exists.");
+                    }
+
                     //create new user
                     var createdUser = await createUserCommand.Execute(requestor, model, context.RequestAborted);
 
