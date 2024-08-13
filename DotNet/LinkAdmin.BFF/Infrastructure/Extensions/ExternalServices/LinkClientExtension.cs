@@ -15,7 +15,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServ
             services.AddHttpClient<NotificationService>();           
             services.AddHttpClient<QueryDispatchService>();
             services.AddHttpClient<ReportService>();
-            services.AddHttpClient<SubmissionService>();            
+            services.AddHttpClient<SubmissionService>();   
+            services.AddHttpClient<TenantService>();
 
             return services;
         }

@@ -190,7 +190,17 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<CacheHealthCheck>("Cache")
-        .AddCheck<AccountSeviceHealthCheck>("Account Service");
+        .AddCheck<AccountSeviceHealthCheck>("Account Service")
+        .AddCheck<AuditServiceHealthCheck>("Audit Service")
+        .AddCheck<CensusServiceHealthCheck>("Census Service")
+        .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
+        .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
+        .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
+        .AddCheck<NotificationServiceHealthCheck>("Notification Service")
+        .AddCheck<ReportServiceHealthCheck>("Report Service")
+        .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
+        .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+
 
     // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();    
