@@ -50,6 +50,7 @@
             public const int LinkServiceRequestException = 1016;
             public const int LinkServiceRequestWarning = 1017;
             public const int LinkServiceRequestSuccess = 1018;
+            public const int CacheException = 1019;
 
         }
     }

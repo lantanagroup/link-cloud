@@ -2,15 +2,14 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
+using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
 using Microsoft.Data.SqlClient;
 using System.Text;
 
@@ -21,27 +20,28 @@ public class CensusListener : BackgroundService
     private readonly IKafkaConsumerFactory<string, PatientIDsAcquired> _kafkaConsumerFactory;
     private readonly IProducer<string, object> _kafkaProducer;
     private readonly ILogger<CensusListener> _logger;
-    private readonly IMediator _mediator;
     private readonly IDeadLetterExceptionHandler<string, PatientIDsAcquired> _nonTransientExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeErrorHandler;
     private readonly ITransientExceptionHandler<string, PatientIDsAcquired> _transientExceptionHandler;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public CensusListener(
-        ILogger<CensusListener> logger, 
-        IMediator mediator, 
+        ILogger<CensusListener> logger,
         IKafkaConsumerFactory<string, PatientIDsAcquired> kafkaConsumerFactory, 
         IProducer<string, object> kafkaProducer, 
         IDeadLetterExceptionHandler<string, PatientIDsAcquired> nonTransientExceptionHandler, 
         ITransientExceptionHandler<string, PatientIDsAcquired> transientExceptionHandler, 
-        IDeadLetterExceptionHandler<string, string> consumeErrorHandler)
+        IDeadLetterExceptionHandler<string, string> consumeErrorHandler,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _nonTransientExceptionHandler = nonTransientExceptionHandler ?? throw new ArgumentNullException(nameof(nonTransientExceptionHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         _consumeErrorHandler = consumeErrorHandler ?? throw new ArgumentNullException(nameof(consumeErrorHandler));
+        _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+
 
         _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
@@ -49,7 +49,6 @@ public class CensusListener : BackgroundService
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
         _consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
         _consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
@@ -76,13 +75,15 @@ public class CensusListener : BackgroundService
         kafkaConsumer.Subscribe(KafkaTopic.PatientIDsAcquired.ToString());
         ConsumeResult<string, PatientIDsAcquired>? rawmessage = null;
 
+        using var scope = _scopeFactory.CreateScope();
+
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientIDsAcquired>?, CancellationToken, System.Threading.Tasks.Task>)(async (result, CancellationToken) =>
                     {
                         rawmessage = result;
 
@@ -114,15 +115,12 @@ public class CensusListener : BackgroundService
 
                                 try
                                 {
-                                    responseMessages = msgValue switch
+                                    var patientIdsAcuiredService = scope.ServiceProvider.GetRequiredService<IPatientIdsAcquiredService>();
+                                    var responseMessages = await patientIdsAcuiredService.ProcessEvent(new ConsumePatientIdsAcquiredEventModel()
                                     {
-                                        PatientIDsAcquired => await _mediator.Send(new ConsumePatientIdsAcquiredEventCommand
-                                        {
-                                            FacilityId = messageMetaData.facilityId,
-                                            Message = msgValue,
-                                        }, cancellationToken),
-                                        _ => null
-                                    };
+                                        FacilityId = messageMetaData.facilityId,
+                                        Message = msgValue,
+                                    }, cancellationToken);
 
                                     await ProduceEvents(responseMessages, cancellationToken);
                                 }
@@ -160,7 +158,7 @@ public class CensusListener : BackgroundService
                             kafkaConsumer.Commit(rawmessage);
                         }
 
-                    }, cancellationToken);
+                    }), cancellationToken);
                 }
                 catch (ConsumeException e)
                 {
