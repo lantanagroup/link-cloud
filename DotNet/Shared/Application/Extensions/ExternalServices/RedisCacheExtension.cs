@@ -28,6 +28,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
                     options.ConfigurationOptions.Password = redisCacheOptions.Password;
                 }
 
+                if (redisCacheOptions.Timeout > 0)
+                {
+                    options.ConfigurationOptions.ConnectTimeout = (int)redisCacheOptions.Timeout;
+                }
+                
+
             });
 
             return services;
@@ -39,6 +45,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
             public string? InstanceName { get; set; }
             public string ConnectionString { get; set; } = null!;
             public string? Password { get; set; }
+            public int Timeout { get; set; }
         }
     }
 }
