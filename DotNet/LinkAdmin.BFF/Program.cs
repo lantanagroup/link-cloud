@@ -190,7 +190,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add health checks
     builder.Services.AddHealthChecks()
         .AddCheck<CacheHealthCheck>("Cache")
-        .AddCheck<AccountSeviceHealthCheck>("Account Service")
+        .AddCheck<AccountServiceHealthCheck>("Account Service")
         .AddCheck<AuditServiceHealthCheck>("Audit Service")
         .AddCheck<CensusServiceHealthCheck>("Census Service")
         .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
