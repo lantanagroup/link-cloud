@@ -32,9 +32,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health
                 }
 
             }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogLinkServiceRequestException("Data Acquisition", ex.Message);
+                return new HealthCheckResult(HealthStatus.Unhealthy, description: "HTTP request error.");
+            }
             catch (Exception ex)
             {
-                _logger.LogGatewayServiceUriException("Data Acquisition", ex.Message);
+                _logger.LogLinkServiceRequestException("Data Acquisition", ex.Message);
                 return new HealthCheckResult(HealthStatus.Unhealthy, description: "Failed to determine health status of the Data Acquisition service.");
             }
         }
