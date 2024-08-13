@@ -7,12 +7,15 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
+using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
@@ -89,6 +92,18 @@ public interface IFhirApiService
         ResourceReference referenceId,
         ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig);
+
+    Task GetReferenceResourceAndGenerateMessage(
+        string baseUrl,
+        string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
+        ScheduledReport report,
+        ResourceReference referenceId,
+        ReferenceQueryConfig config,
+        AuthenticationConfiguration authConfig);
 }
 
 public class FhirApiService : IFhirApiService
@@ -99,8 +114,16 @@ public class FhirApiService : IFhirApiService
     private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly BundleResourceAcquiredEventService _bundleResourceAcquiredEventService;
+    private readonly IReferenceResourcesManager _referenceResourceManager;
 
-    public FhirApiService(ILogger<FhirApiService> logger, HttpClient httpClient, IAuthenticationRetrievalService authenticationRetrievalService, IQueriedFhirResourceManager queriedFhirResourceManager, IDataAcquisitionServiceMetrics metrics, BundleResourceAcquiredEventService bundleResourceAcquiredEventService)
+    public FhirApiService(
+        ILogger<FhirApiService> logger, 
+        HttpClient httpClient, 
+        IAuthenticationRetrievalService authenticationRetrievalService, 
+        IQueriedFhirResourceManager queriedFhirResourceManager, 
+        IDataAcquisitionServiceMetrics metrics, 
+        BundleResourceAcquiredEventService bundleResourceAcquiredEventService, 
+        IReferenceResourcesManager referenceResourceManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -108,6 +131,7 @@ public class FhirApiService : IFhirApiService
         _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _bundleResourceAcquiredEventService = bundleResourceAcquiredEventService ?? throw new ArgumentNullException(nameof(bundleResourceAcquiredEventService));
+        _referenceResourceManager = referenceResourceManager;
     }
 
     public async Task<Bundle> GetPagedBundledResultsAsync(
@@ -278,6 +302,7 @@ public class FhirApiService : IFhirApiService
         List<string>? referenceTypes = default,
         bool generateMessages = false,
         bool returnBundle = true,
+        bool saveReferenceResource = false,
         CancellationToken cancellationToken = default)
     {
         try
@@ -313,6 +338,40 @@ public class FhirApiService : IFhirApiService
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow
                     }, cancellationToken);
+
+                    if (saveReferenceResource) 
+                    {
+                        var resource = entry.Resource;
+                        if (resource.TypeName == nameof(OperationOutcome))
+                        {
+                            var opOutcome = (OperationOutcome)resource;
+                            _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
+                            continue;
+                        }
+
+                        var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+                        var currentDateTime = DateTime.UtcNow;
+                        var fhirDateTime = new FhirDateTime(
+                            currentDateTime.Year,
+                            currentDateTime.Month,
+                            currentDateTime.Day,
+                            currentDateTime.Hour,
+                            currentDateTime.Minute,
+                            currentDateTime.Second,
+                            TimeSpan.Zero);
+
+                        var refResource = new ReferenceResources
+                        {
+                            FacilityId = facilityId,
+                            ResourceId = resource.Id,
+                            ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
+                            ResourceType = resourceType,
+                            CreateDate = currentDateTime,
+                            ModifyDate = currentDateTime,
+                        };
+
+                        await _referenceResourceManager.AddAsync(refResource);
+                    }
 
                     IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
                 }
@@ -351,6 +410,40 @@ public class FhirApiService : IFhirApiService
                                 CreateDate = DateTime.UtcNow,
                                 ModifyDate = DateTime.UtcNow
                             }, cancellationToken);
+
+                            if (saveReferenceResource)
+                            {
+                                var resource = entry.Resource;
+                                if (resource.TypeName == nameof(OperationOutcome))
+                                {
+                                    var opOutcome = (OperationOutcome)resource;
+                                    _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
+                                    continue;
+                                }
+
+                                var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+                                var currentDateTime = DateTime.UtcNow;
+                                var fhirDateTime = new FhirDateTime(
+                                    currentDateTime.Year,
+                                    currentDateTime.Month,
+                                    currentDateTime.Day,
+                                    currentDateTime.Hour,
+                                    currentDateTime.Minute,
+                                    currentDateTime.Second,
+                                    TimeSpan.Zero);
+
+                                var refResource = new ReferenceResources
+                                {
+                                    FacilityId = facilityId,
+                                    ResourceId = resource.Id,
+                                    ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
+                                    ResourceType = resourceType,
+                                    CreateDate = currentDateTime,
+                                    ModifyDate = currentDateTime,
+                                };
+
+                                await _referenceResourceManager.AddAsync(refResource);
+                            }
 
                             IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
                         }
@@ -652,5 +745,108 @@ public class FhirApiService : IFhirApiService
         }
 
         return references;
+    }
+
+    public async Task GetReferenceResourceAndGenerateMessage(
+        string baseUrl,
+        string resourceType,
+        string patientIdReference,
+        string facilityIdReference,
+        string correlationId,
+        string queryPlanType,
+        ScheduledReport report,
+        ResourceReference referenceId, 
+        ReferenceQueryConfig config,
+        AuthenticationConfiguration authConfig)
+    {
+        var fhirClient = GenerateFhirClient(baseUrl);
+
+        var authBuilderResults = await AuthMessageHandlerFactory.Build(_authenticationRetrievalService, authConfig);
+        if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
+        {
+            fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+        }
+
+        if (config.OperationType == OperationType.Read)
+        {
+            var refIdResult = GetRefId(referenceId, resourceType);
+
+            if (!refIdResult.success)
+                return;
+
+            var refId = refIdResult.refId;
+
+            if (authBuilderResults.isQueryParam)
+            {
+                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
+                if (refId.Contains("?"))
+                {
+                    refId = $"{refId}&{kvPair.Key}={kvPair.Value}";
+                }
+                else
+                {
+                    refId = $"{refId}?{kvPair.Key}={kvPair.Value}";
+                }
+            }
+
+            var result = await ReadFhirEndpointAsync(fhirClient, resourceType, refId, patientIdReference, correlationId, facilityIdReference, queryPlanType);
+
+            if (result.TypeName == nameof(OperationOutcome))
+            {
+                var opOutcome = (OperationOutcome)result;
+                _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
+                return;
+            }
+
+            var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
+            var currentDateTime = DateTime.UtcNow;
+            var fhirDateTime = new FhirDateTime(
+                currentDateTime.Year,
+                currentDateTime.Month,
+                currentDateTime.Day,
+                currentDateTime.Hour,
+                currentDateTime.Minute,
+                currentDateTime.Second,
+                TimeSpan.Zero);
+
+            var refResource = new ReferenceResources
+            {
+                FacilityId = facilityIdReference,
+                ResourceId = result.Id,
+                ReferenceResource = System.Text.Json.JsonSerializer.Serialize(result, jsonOptions),
+                ResourceType = resourceType,
+                CreateDate = currentDateTime,
+                ModifyDate = currentDateTime,
+            };
+            await _referenceResourceManager.AddAsync(refResource);
+
+            await _bundleResourceAcquiredEventService.GenerateEventAsync(
+                new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = result } } }, 
+                new ResourceRequiredMessageRequest(facilityIdReference, patientIdReference, queryPlanType, correlationId, new List<ScheduledReport> { report }));
+        }
+        else
+        {
+            SearchParams searchParams = new SearchParams();
+            try
+            {
+                var id = (string.IsNullOrWhiteSpace(referenceId.ElementId) ? referenceId.Url.ToString() : referenceId.ElementId).Split("/").LastOrDefault();
+                if (string.IsNullOrWhiteSpace(id))
+                    return;
+                searchParams.Add("_id", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"No appropriate ID found for reference.\n{referenceId.ToJson()}");
+                return;
+            }
+
+            if (authBuilderResults.isQueryParam)
+            {
+                var kvPair = (AuthQueryKeyValuePair)authBuilderResults.authHeader;
+                searchParams.Add(kvPair.Key, kvPair.Value);
+            }
+
+            await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, patientIdReference, correlationId, facilityIdReference, queryPlanType, report, null, true, false, true);
+        }
     }
 }

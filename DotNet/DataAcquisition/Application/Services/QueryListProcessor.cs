@@ -228,6 +228,7 @@ public class QueryListProcessor : IQueryListProcessor
                     request,
                     fhirQueryConfiguration,
                     queryInfo,
+                    scheduledReport,
                     queryPlanType);
             }
 
