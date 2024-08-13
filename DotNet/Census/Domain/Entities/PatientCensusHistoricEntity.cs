@@ -4,7 +4,7 @@ using LantanaGroup.Link.Shared.Domain.Entities;
 namespace LantanaGroup.Link.Census.Domain.Entities;
 
 [Table("PatientCensusHistory")]
-public class PatientCensusHistoricEntity : BaseEntity
+public class PatientCensusHistoricEntity : BaseEntityExtended
 {
     public string FacilityId { get; set; }
     public DateTime CensusDateTime { get; set; }

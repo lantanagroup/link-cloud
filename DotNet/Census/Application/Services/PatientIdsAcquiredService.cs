@@ -108,7 +108,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
 
         foreach (var patient in patientUpdates)
         {
-            await _patientListManager.UpdateAsync(patient, cancellationToken);
+            await _patientListManager.AddOrUpdateAsync(patient, cancellationToken);
             if (patient.IsDischarged)
             {
                 var correlationId = Guid.NewGuid().ToString();
@@ -136,6 +136,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
         await _historyManager.AddAsync(new PatientCensusHistoricEntity
         {
             CensusDateTime = DateTime.UtcNow,
+            CreateDate = DateTime.UtcNow,
             FacilityId = request.FacilityId
         }, cancellationToken);
 
