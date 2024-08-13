@@ -290,9 +290,38 @@ public class FhirApiService : IFhirApiService
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resourceType)
             ]);
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
-            Bundle? newResultBundle = resultBundle;
             List<ResourceReference> references = new List<ResourceReference>();
+
+            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+
+            if (resultBundle != null)
+            {
+                if (generateMessages)
+                    await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
+
+                foreach (var entry in resultBundle.Entry)
+                {
+                    await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
+                    {
+                        ResourceId = entry.Resource.Id,
+                        ResourceType = entry.Resource.TypeName,
+                        CorrelationId = correlationId,
+                        PatientId = patientId,
+                        FacilityId = facilityId,
+                        QueryType = queryType,
+                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                        CreateDate = DateTime.UtcNow,
+                        ModifyDate = DateTime.UtcNow
+                    }, cancellationToken);
+
+                    IncrementResourceAcquiredMetric(correlationId, patientId, facilityId, queryType, resourceType, entry.Resource.Id);
+                }
+
+                if (referenceTypes != default)
+                    references.AddRange(ReferenceResourceBundleExtractor.Extract(resultBundle, referenceTypes));
+            }
+
+            Bundle? newResultBundle = resultBundle;
 
             if (newResultBundle != null)
             {
@@ -306,7 +335,7 @@ public class FhirApiService : IFhirApiService
                             newResultBundle.Entry.AddRange(resultBundle.Entry);
                         
                         if(generateMessages)
-                            _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
+                            await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
 
                         foreach (var entry in resultBundle.Entry)
                         {
@@ -318,7 +347,7 @@ public class FhirApiService : IFhirApiService
                                 PatientId = patientId,
                                 FacilityId = facilityId,
                                 QueryType = queryType,
-                                IsSuccessful = newResultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
+                                IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
                                 CreateDate = DateTime.UtcNow,
                                 ModifyDate = DateTime.UtcNow
                             }, cancellationToken);
