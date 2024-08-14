@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/health", cancellationToken);
+            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
 
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/user/email/{email}", cancellationToken);
+            HttpResponseMessage response = await _client.GetAsync($"api/account/user/email/{email}", cancellationToken);
             
             return response;
         }
@@ -81,11 +81,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
         private void InitHttpClient()
         {
-            //check if the account service uri is set
+            //check if the service uri is set
             if (string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl))
             {
                 _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
-                throw new ArgumentNullException("Tenant Service URL is missing.");
+                throw new ArgumentNullException("Account Service URL is missing.");
             }
 
             _client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);

@@ -197,8 +197,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<CacheHealthCheck>("Cache")
+    var healthCheckBuilder = builder.Services.AddHealthChecks()
         .AddCheck<AccountServiceHealthCheck>("Account Service")
         .AddCheck<AuditServiceHealthCheck>("Audit Service")
         .AddCheck<CensusServiceHealthCheck>("Census Service")
@@ -209,6 +208,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<ReportServiceHealthCheck>("Report Service")
         .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
         .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    {
+        healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
+    }
 
 
     // Add swagger generation
