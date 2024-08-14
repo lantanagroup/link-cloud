@@ -118,19 +118,22 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    //Add Redis     
-    builder.Services.AddRedisCache(options =>
+    //Add Redis
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
     {
-        options.Environment = builder.Environment;
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
 
-        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+            var redisConnection = builder.Configuration.GetConnectionString("Redis");
 
-        if (string.IsNullOrEmpty(redisConnection))
-            throw new NullReferenceException("Redis Connection String is required.");
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new NullReferenceException("Redis Connection String is required.");
 
-        options.ConnectionString = redisConnection;
-        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
-    });
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+        });
+    }    
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
