@@ -20,22 +20,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
     public class CreateLinkBearerToken : ICreateLinkBearerToken
     {
         private readonly ILogger<CreateLinkBearerToken> _logger;
-        private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ILinkAdminMetrics _metrics;
+        private readonly IOptions<CacheSettings> _cacheSettings;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _linkTokenServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         }
 
         public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
@@ -44,69 +46,78 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             if(string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
             {
-                   throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
+                throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
             }
             
             try
             {
                 string bearerKey = string.Empty;
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                byte[] encodedKey = [];
+                byte[] encodedKey = [];                
 
                 if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
-                    //attempt to get signing key from cache
-                    try
-                    {
-                        bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
-                    }
-
-                    //if key is not in cache, get it from the secret manager
-                    if (string.IsNullOrEmpty(bearerKey))
+                    //if no cache providers have been registered, get the signing key from the secret manager
+                    if (!_cacheSettings.Value.Enabled)
                     {
                         bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                        encodedKey = Encoding.UTF8.GetBytes(bearerKey);
+                    }
+                    else
+                    {
+                        using var scope = _serviceScopeFactory.CreateScope();
+                        var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
-                        //store signing key in cache
+                        //attempt to get signing key from cache
                         try
                         {
-                            if (_dataProtectionSettings.Value.Enabled)
-                            {
-                                _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
-                            }
-                            else
-                            {
-                                _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
-                            }
+                            bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
                         }
                         catch (Exception ex)
                         {
                             _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
-                        }                        
-                    }
-                    
-                    if (_dataProtectionSettings.Value.Enabled)
-                    {
-                        encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
-                    }
-                    else
-                    {
-                        encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                    }
+                        }
+
+                        //if key is not in cache, get it from the secret manager
+                        if (string.IsNullOrEmpty(bearerKey))
+                        {
+                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+
+                            //store signing key in cache
+                            try
+                            {
+                                if (_dataProtectionSettings.Value.Enabled)
+                                {
+                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                                }
+                                else
+                                {
+                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
+                            }
+                        }
+
+                        if (_dataProtectionSettings.Value.Enabled)
+                        {
+                            encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
+                        }
+                        else
+                        {
+                            encodedKey = Encoding.UTF8.GetBytes(bearerKey);
+                        }
+                    }                   
                 }
                 else
                 { 
                     bearerKey = _linkTokenServiceConfig.Value.SigningKey;
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                }                
+                }          
 
-                
-
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
-                
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);                
 
                 var token = new JwtSecurityToken(                                    
                     issuer: _linkTokenServiceConfig.Value.Authority,

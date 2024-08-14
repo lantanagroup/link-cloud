@@ -334,6 +334,7 @@ services:
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
       Telemetry__EnableTelemetry: true
@@ -401,6 +402,7 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__1__Args__uri: http://loki:3100
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
       LinkTokenService__EnableTokenGenerationEndpoint: true
