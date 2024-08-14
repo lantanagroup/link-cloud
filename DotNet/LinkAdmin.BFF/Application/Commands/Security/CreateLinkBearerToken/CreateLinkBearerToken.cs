@@ -49,44 +49,72 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             
             try
             {
+                string bearerKey = string.Empty;
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                string? bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
+                byte[] encodedKey = [];
 
-                if (bearerKey == null)
+                if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
+                    //attempt to get signing key from cache
+                    try
+                    {
+                        bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
+                    }
 
-                    bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                    //if key is not in cache, get it from the secret manager
+                    if (string.IsNullOrEmpty(bearerKey))
+                    {
+                        bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
 
+                        //store signing key in cache
+                        try
+                        {
+                            if (_dataProtectionSettings.Value.Enabled)
+                            {
+                                _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                            }
+                            else
+                            {
+                                _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
+                        }                        
+                    }
+                    
                     if (_dataProtectionSettings.Value.Enabled)
                     {
-                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                        encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
                     }
                     else
                     {
-                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
-                    }                             
-                }
-
-                byte[] encodedKey = [];
-                if (_dataProtectionSettings.Value.Enabled)
-                {
-                    encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
+                        encodedKey = Encoding.UTF8.GetBytes(bearerKey);
+                    }
                 }
                 else
-                {
+                { 
+                    bearerKey = _linkTokenServiceConfig.Value.SigningKey;
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                }
+                }                
+
+                
 
                 var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
                 
 
                 var token = new JwtSecurityToken(                                    
-                                    issuer: _linkTokenServiceConfig.Value.Authority,
-                                    audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
-                                    claims: user.Claims,
-                                    expires: DateTime.Now.AddMinutes(timespan),
-                                    signingCredentials: credentials
-                                );
+                    issuer: _linkTokenServiceConfig.Value.Authority,
+                    audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
+                    claims: user.Claims,
+                    expires: DateTime.Now.AddMinutes(timespan),
+                    signingCredentials: credentials
+                );
 
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
 
