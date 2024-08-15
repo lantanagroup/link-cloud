@@ -73,13 +73,16 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<MeasureReportScheduledKey, MeasureReportScheduledValue>? consumeResult = null;
                     string facilityId = string.Empty;
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            consumeResult = result;
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
 
                             try
                             {
@@ -87,14 +90,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var measureReportScheduledManager =
                                     scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
 
-                                if (consumeResult == null)
+                                if (result == null)
                                 {
                                     throw new DeadLetterException(
                                         $"{Name}: consumeResult is null");
                                 }
 
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) ||
@@ -128,7 +131,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
                                                                                                         && x.ReportEndDate == endDate 
-                                                                                                        && x.ReportType == key.ReportType, cancellationToken);
+                                                                                                        && x.ReportType == key.ReportType, consumeCancellationToken);
 
                                 if (existing != null)
                                 {
@@ -145,33 +148,33 @@ namespace LantanaGroup.Link.Report.Listeners
                                     CreateDate = DateTime.UtcNow
                                 };
 
-                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, cancellationToken);
+                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, consumeCancellationToken);
 
                                 await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                    await _schedulerFactory.GetScheduler(cancellationToken));
+                                    await _schedulerFactory.GetScheduler(consumeCancellationToken));
                                 
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TimeoutException ex)
                             {
                                 var transientException = new TransientException(ex.Message, ex.InnerException);
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
                         }, cancellationToken);
 
@@ -213,7 +216,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                        _logger.LogError(ex, "Error encountered in ReportScheduledListener");
+                        consumer.Commit();
                     }
                 }
             }

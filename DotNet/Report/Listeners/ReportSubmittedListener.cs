@@ -79,27 +79,30 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<ReportSubmittedKey, ReportSubmittedValue>();
                     string facilityId = string.Empty;
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            consumeResult = result;
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
 
                             try
                             {
                                 var scope = _serviceScopeFactory.CreateScope();
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-                                if (consumeResult == null)
+                                if (result == null)
                                 {
                                     throw new DeadLetterException(
                                         $"{Name}: consumeResult is null");
                                 }
 
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
                                 if (string.IsNullOrWhiteSpace(key?.FacilityId))
@@ -114,10 +117,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // find existing report schedule
                                 var subEntry = await database.ReportSubmissionRepository.SingleAsync(e =>
-                                        e.SubmissionBundle.Id == value.ReportBundleId, cancellationToken);
+                                        e.SubmissionBundle.Id == value.ReportBundleId, consumeCancellationToken);
 
                                 var schedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s =>
-                                    s.Id == subEntry.MeasureReportScheduleId, cancellationToken);
+                                    s.Id == subEntry.MeasureReportScheduleId, consumeCancellationToken);
 
                                 if (schedule is null)
                                 {
@@ -127,7 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 // update report schedule with submitted date
                                 schedule.SubmittedDate = DateTime.UtcNow;
-                                await database.ReportScheduledRepository.UpdateAsync(schedule, cancellationToken);
+                                await database.ReportScheduledRepository.UpdateAsync(schedule, consumeCancellationToken);
 
                                 // produce audit message signalling the report service acknowledged the report has been submitted
                                 using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
@@ -160,25 +163,25 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TimeoutException ex)
                             {
                                 var transientException = new TransientException(ex.Message, ex.InnerException);
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
 
                         }, cancellationToken);
@@ -221,7 +224,8 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                        _logger.LogError(ex, "Error encountered in ReportSubmittedListener");
+                        consumer.Commit();
                     }
                 }
             }
