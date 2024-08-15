@@ -31,14 +31,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
-                message = message ?? "";
-                if (consumeResult == null)
-                {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null" + message);
-                    HandleException(message, facilityId);
-                    return;
-                }
-
                 Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: new Exception(message));
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
@@ -46,7 +38,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             catch (Exception e)
             {
                 Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                HandleException(e, facilityId ?? string.Empty);
             }
         }
 
@@ -60,13 +51,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         {
             try
             {
-                if (consumeResult == null)
-                {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null", exception: ex);
-                    HandleException(ex, facilityId);
-                    return;
-                }
-
                 Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
 
                 ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
@@ -74,7 +58,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             catch (Exception e)
             {
                 Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                HandleException(e, facilityId ?? string.Empty);
             }
         }
 
@@ -97,80 +80,9 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             catch (Exception e)
             {
                 Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                HandleException(e, facilityId ?? string.Empty);
             }
         }
 
-        public virtual void HandleException(DeadLetterException ex, string facilityId)
-        {
-            try
-            {
-                var consumeResult = new ConsumeResult<string, string>();
-
-                consumeResult.Message = new Message<string, string>();
-
-                consumeResult.Message.Key = ex.Message;
-                consumeResult.Message.Value = ex.StackTrace;
-                consumeResult.Message.Headers = new Headers();
-
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
-
-                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                HandleException(e, facilityId ?? string.Empty);
-            }
-        }
-
-        public virtual void HandleException(Exception ex, string facilityId)
-        {
-            try
-            {
-                var consumeResult = new ConsumeResult<string, string>();
-
-                consumeResult.Message = new Message<string, string>();
-                
-                consumeResult.Message.Key = ex.Message;
-                consumeResult.Message.Value = ex.StackTrace;
-                consumeResult.Message.Headers = new Headers();
-
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
-
-                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                throw;
-            }
-        }
-
-        public virtual void HandleException(string message, string facilityId)
-        {
-            try
-            {
-                var consumeResult = new ConsumeResult<string, string>();
-
-                consumeResult.Message = new Message<string, string>();
-
-                consumeResult.Message.Key = message;
-                consumeResult.Message.Value = message;
-                consumeResult.Message.Headers = new Headers();
-
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: new Exception(message));
-
-                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                throw;
-            }
-        }
-
-       
         public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))

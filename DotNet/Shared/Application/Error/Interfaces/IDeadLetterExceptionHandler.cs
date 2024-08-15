@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
 {
@@ -14,14 +15,10 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         /// The name of the service that is consuming the IDeadLetterExceptionHandler.
         /// </summary>
         public string ServiceName { get; set; }
-
         void HandleException(ConsumeResult<K, V> consumeResult, string facilityId,string message = "");
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId);
         void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId);
-        void HandleException(DeadLetterException ex, string facilityId);
-        void HandleException(Exception ex, string facilityId);
-        void HandleException(string message, string facilityId);
         void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage);
         void ProduceNullConsumeResultDeadLetter(string key, string value, Headers headers, string exceptionMessage);
     }

@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
@@ -369,7 +370,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
                             finally
                             {
@@ -380,12 +381,21 @@ namespace LantanaGroup.Link.Submission.Listeners
                     }
                     catch (ConsumeException ex)
                     {
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        if (ex.ConsumerRecord?.Message?.Headers == null)
+                        {
+                            consumer.Commit();
+                            continue;
+                        }
+
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                       /* var message = new Message<string, string>()
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        var message = new Message<string, string>()
                         {
                             Headers = ex.ConsumerRecord.Message.Headers,
                             Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
@@ -396,37 +406,25 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     ex.ConsumerRecord.Message.Value != null
                                 ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
                                 : string.Empty,
-                        };*/
+                        };
 
-                        consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>()
+                        var dlEx = new DeadLetterException(ex.Message);
+                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
+
+                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        if (offset == null)
                         {
-                            Message = new Message<SubmitReportKey, SubmitReportValue>()
-                            {
-                                Key = new SubmitReportKey()
-                                {
-                                    FacilityId = facilityId
-                                },
-                                Value = new SubmitReportValue()
-                                {
-                                    PatientIds = new List<string>(),
-                                    MeasureIds = new List<string>(),
-                                    Organization = new Organization(),
-                                    Aggregates = new List<MeasureReport>()
-                                }
-                            }
-                        };  
-
-                       var transientException = new TransientException(ex.Message, ex.InnerException);
-
-                        _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
-
-
-                      //  _transientExceptionHandler.HandleException(new TransientException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+                            consumer.Commit();
+                        }
+                        else
+                        {
+                            consumer.Commit(new List<TopicPartitionOffset> { offset });
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId);
+                        _logger.LogError(ex, "Error encountered in SubmitReportListener");
+                        consumer.Commit();
                     }
                 }
             }
@@ -436,6 +434,18 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
         }
 
         protected string GetRelativeReference(Resource resource)
@@ -497,8 +507,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.PatientResources: {patientSubmissionBundle?.PatientResources == null}
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
-
-                var patientBundle = patientSubmissionBundle.PatientResources;
 
                 var otherResources = patientSubmissionBundle.OtherResources;
 
