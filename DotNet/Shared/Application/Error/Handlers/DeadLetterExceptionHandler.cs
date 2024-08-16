@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -61,28 +62,6 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId)
-        {
-            try
-            {
-                var consumeResult = new ConsumeResult<string, string>();
-
-                consumeResult.Message = new Message<string, string>();
-
-                consumeResult.Message.Key = key;
-                consumeResult.Message.Value = value;
-                consumeResult.Message.Headers = headers;
-
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
-
-                ProduceNullConsumeResultDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-            }
-        }
-
         public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))
@@ -109,7 +88,38 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             producer.Flush();
         }
 
-        public virtual void ProduceNullConsumeResultDeadLetter(string key, string value, Headers headers, string exceptionMessage)
+        public virtual void HandleConsumeException(ConsumeException ex, string facilityId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    throw new ArgumentException("Error in HandleConsumeException: parameter facilityId is null or white space.");
+                }
+
+                if (ex?.ConsumerRecord?.Message == null)
+                {
+                    throw new Exception("Error in HandleConsumeException: ex.ConsumeRecord.Message contains null properties");
+                }
+
+                var message = new Message<string, string>()
+                {
+                    Headers = ex.ConsumerRecord.Message.Headers,
+                    Key = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key),
+                    Value = Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
+                };
+
+                Logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", Topic, DateTime.UtcNow);
+
+                ProduceConsumeExceptionDeadLetter(message.Key, message.Value, message.Headers, ex.Message);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+            }
+        }
+
+        protected void ProduceConsumeExceptionDeadLetter(string key, string value, Headers headers, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {

@@ -20,6 +20,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using static Confluent.Kafka.ConfigPropertyNames;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -381,43 +382,17 @@ namespace LantanaGroup.Link.Submission.Listeners
                     {
                         _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
-                        if (ex.ConsumerRecord?.Message?.Headers == null)
-                        {
-                            consumer.Commit();
-                            continue;
-                        }
-
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
                         facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-                        var message = new Message<string, string>()
-                        {
-                            Headers = ex.ConsumerRecord.Message.Headers,
-                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                  ex.ConsumerRecord.Message.Key != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                                : string.Empty,
-                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                    ex.ConsumerRecord.Message.Value != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
-                                : string.Empty,
-                        };
 
-                        var dlEx = new DeadLetterException(ex.Message);
-                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        if (offset == null)
-                        {
-                            consumer.Commit();
-                        }
-                        else
-                        {
-                            consumer.Commit(new List<TopicPartitionOffset> { offset });
-                        }
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (Exception ex)
                     {
