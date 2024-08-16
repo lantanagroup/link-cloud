@@ -115,23 +115,21 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>();
                     string facilityId = string.Empty;
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            consumeResult = result;
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
 
                             try
                             {
-                                if (consumeResult == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null");
-                                }
-
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId))
@@ -180,8 +178,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
-                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
-                                var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
+                                var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
 
                                 if (!censusResponse.IsSuccessStatusCode)
                                     throw new TransientException("Response from Census service is not successful: " + censusContent);
@@ -248,7 +246,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -258,7 +256,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -268,7 +266,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -281,7 +279,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         contents = await fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                            cancellationToken);
+                                            consumeCancellationToken);
                                     }
 
                                     #endregion
@@ -321,7 +319,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate, key.EndDate, cancellationToken);
+                                                key.StartDate, key.EndDate, consumeCancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
@@ -350,31 +348,31 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
+                                    consumeCancellationToken);
 
                                 #endregion
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TimeoutException ex)
                             {
                                 var transientException = new TransientException(ex.Message,  ex.InnerException);
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
                         }, cancellationToken);
 

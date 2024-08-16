@@ -15,7 +15,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
-using System.Transactions;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -27,9 +26,6 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
        //private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
-        private readonly IResourceManager _resourceManager;
-        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
@@ -44,7 +40,6 @@ namespace LantanaGroup.Link.Report.Listeners
         public ResourceEvaluatedListener(
             ILogger<ResourceEvaluatedListener> logger, 
             IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
-            //IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
             MeasureReportSubmissionBundler bundler,
@@ -55,7 +50,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            //_kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _bundler = bundler;
             _aggregator = aggregator;
 
@@ -116,11 +110,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                if (result == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null");
-                                }
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;

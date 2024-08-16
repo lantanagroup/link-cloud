@@ -90,12 +90,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var measureReportScheduledManager =
                                     scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
 
-                                if (result == null)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: consumeResult is null");
-                                }
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;
