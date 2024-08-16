@@ -82,12 +82,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var scope = _serviceScopeFactory.CreateScope();
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-
-                                if (result == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null");
-                                }
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key;

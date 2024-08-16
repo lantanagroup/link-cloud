@@ -1,5 +1,4 @@
-﻿using System.Reflection.Metadata.Ecma335;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
@@ -11,9 +10,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
-using Microsoft.Extensions.DependencyInjection;
 using System.Text;
-using Hl7.Fhir.Language.Debugging;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
