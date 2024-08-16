@@ -18,8 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Interfaces
         void HandleException(ConsumeResult<K, V> consumeResult, string facilityId,string message = "");
         void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId);
         void HandleException(ConsumeResult<K, V> consumeResult, DeadLetterException ex, string facilityId);
-        void HandleException(Headers headers, string key, string value, DeadLetterException ex, string facilityId);
+        void HandleConsumeException(ConsumeException ex, string facilityId);
         void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage);
-        void ProduceNullConsumeResultDeadLetter(string key, string value, Headers headers, string exceptionMessage);
     }
 }

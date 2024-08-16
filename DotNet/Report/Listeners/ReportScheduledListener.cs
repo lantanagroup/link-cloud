@@ -175,38 +175,19 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (ConsumeException ex)
                     {
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
                         facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-                        var message = new Message<string, string>()
-                        {
-                            Headers = ex.ConsumerRecord.Message.Headers,
-                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                  ex.ConsumerRecord.Message.Key != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                                : string.Empty,
-                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                    ex.ConsumerRecord.Message.Value != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
-                                : string.Empty,
-                        };
-                        
-                        var dlEx = new DeadLetterException(ex.Message);
-                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
 
-                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        if (offset == null)
-                        {
-                            consumer.Commit();
-                        }
-                        else
-                        {
-                            consumer.Commit(new List<TopicPartitionOffset> { offset });
-                        }
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (Exception ex)
                     {
