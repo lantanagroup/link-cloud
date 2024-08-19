@@ -42,7 +42,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             //check if account is in cache, if not get it from the account service
             var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkUser);
-            var cacheAccount = _cache.GetString(userKey);
+            string? cacheAccount = null;
+
+            try
+            { 
+                cacheAccount = _cache.GetString(userKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCacheException(userKey, ex.Message);
+            }
 
             Account? account;
 
@@ -73,14 +82,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             // Cache the account for 5 minutes if it is not already in the cache
             if(cacheAccount is null)
             {
-                if (_dataProtectionOptions.Value.Enabled)
+                try
                 {
-                    _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                    if (_dataProtectionOptions.Value.Enabled)
+                    {
+                        _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                    }
+                    else
+                    {
+                        _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
-                }                
+                    _logger.LogCacheException(userKey, ex.Message);
+                }                                
             }                  
 
             // Remove the existing 'sub' claim and replace with link account id
