@@ -44,6 +44,7 @@ using LantanaGroup.Link.QueryDispatch.Listeners;
 using QueryDispatch.Domain.Managers;
 using QueryDispatch.Domain;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using QueryDispatch.Application.Extensions;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,8 +90,8 @@ else
 // Additional configuration is required to successfully run gRPC on macOS.
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
-
-builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
+var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
@@ -119,16 +120,9 @@ builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = t
 builder.Services.AddHttpClient();
 
 
-//Add factories
-builder.Services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
-builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
-builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
+//Register Kafka
+builder.Services.RegisterKafka(kafkaConnection);
 
-builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
-builder.Services.AddTransient<IKafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>>();
 
 builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
