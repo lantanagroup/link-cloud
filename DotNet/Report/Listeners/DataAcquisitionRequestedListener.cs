@@ -10,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
-using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -69,30 +68,30 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<string, DataAcquisitionRequestedValue>? consumeResult = null;
                     string facilityId = string.Empty;
 
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
+
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
+
                             try
                             {
                                 var scope = _serviceScopeFactory.CreateScope();
                                 var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
-                                consumeResult = result;
-
-                                if (consumeResult == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null");
-                                }
-
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key;
 
-                                if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null || !value.ScheduledReports.Any() || string.IsNullOrWhiteSpace(value.PatientId))
+                                if (string.IsNullOrWhiteSpace(key) || value == null || value.ScheduledReports == null ||
+                                    !value.ScheduledReports.Any() || string.IsNullOrWhiteSpace(value.PatientId))
                                 {
                                     throw new DeadLetterException("Invalid Data Acquisition Requested Event");
                                 }
@@ -104,7 +103,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var scheduledReports =
                                     await database.ReportScheduledRepository.FindAsync(x =>
-                                        x.FacilityId == key, cancellationToken);
+                                        x.FacilityId == key, consumeCancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -112,7 +111,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                         $"{Name}: No Scheduled Reports found for facilityId: {key}");
                                 }
 
-                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested))
+                                foreach (var scheduledReport in scheduledReports.Where(sr =>
+                                             !sr.PatientsToQueryDataRequested))
                                 {
                                     if (scheduledReport.PatientsToQuery == null)
                                     {
@@ -124,8 +124,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     try
                                     {
                                         await database.ReportScheduledRepository.UpdateAsync(
-                                            scheduledReport, cancellationToken);
-                                    } 
+                                            scheduledReport, consumeCancellationToken);
+                                    }
                                     catch (Exception)
                                     {
                                         throw new TransientException("Failed to update ReportSchedule");
@@ -134,56 +134,44 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " + ex.Message), facilityId);
+                                _deadLetterExceptionHandler.HandleException(result,
+                                    new DeadLetterException("Report - PatientIdsAcquired Exception thrown: " +
+                                                            ex.Message), facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
                         facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-                        var message = new Message<string, string>()
-                        {
-                            Headers = ex.ConsumerRecord.Message.Headers,
-                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                  ex.ConsumerRecord.Message.Key != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                                : string.Empty,
-                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                    ex.ConsumerRecord.Message.Value != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
-                                : string.Empty,
-                        };
 
-                        var dlEx = new DeadLetterException(ex.Message);
-                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        if (offset == null)
-                        {
-                            consumer.Commit();
-                        }
-                        else
-                        {
-                            consumer.Commit(new List<TopicPartitionOffset> { offset });
-                        }
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error encountered in DataAcquisitionRequestedListener");
+                        consumer.Commit();
                     }
                 }
             }

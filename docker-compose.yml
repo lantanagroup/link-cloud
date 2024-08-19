@@ -399,7 +399,7 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       ConnectionStrings__Redis: redis_cache:6379
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
@@ -656,7 +656,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
       IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317

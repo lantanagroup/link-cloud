@@ -111,5 +111,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging
             LogLevel.Information,
             "Request to service {service} was successful.")]
         public static partial void LogLinkServiceRequestSuccess(this ILogger logger, string service);
+
+        [LoggerMessage(
+            LinkAdminLoggingIds.CacheException,
+            LogLevel.Error,
+            "An exception occured while attempting to access cache {cacheKey}: {message}.")]
+        public static partial void LogCacheException(this ILogger logger, string cacheKey, string message);
+
     }
 }
