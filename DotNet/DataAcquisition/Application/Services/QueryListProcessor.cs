@@ -181,20 +181,19 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetSingularBundledResultsAsync(
+                var references = await _fhirRepo.GetSingularBundledResultsAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.ConsumeResult.Message.Value.PatientId,
                     request.CorrelationId,
                     request.FacilityId,
                     queryPlanType,
+                    referenceTypes,
                     (SingularParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
 
-                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
-
-                await GenerateMessagesFromBundle(bundle, request.FacilityId, request.ConsumeResult.Message.Value.PatientId, queryPlanType, request.CorrelationId, new List<ScheduledReport> { scheduledReport }, CancellationToken.None);
+                referenceResources.AddRange(references);
             }
 
             if (builtQuery.GetType() == typeof(PagedParameterQueryFactoryResult))
@@ -202,20 +201,19 @@ public class QueryListProcessor : IQueryListProcessor
                 var queryInfo = (ParameterQueryConfig)queryConfig;
                 _logger.LogInformation("Resource: {1}", queryInfo.ResourceType);
 
-                var bundle = await _fhirRepo.GetPagedBundledResultsAsync(
+                var references = await _fhirRepo.GetPagedBundledResultAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
                     request.ConsumeResult.Message.Value.PatientId,
                     request.CorrelationId,
                     request.FacilityId,
                     queryPlanType,
+                    referenceTypes,
                     (PagedParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
                     scheduledReport,
                     fhirQueryConfiguration.Authentication);
 
-                referenceResources.AddRange(ReferenceResourceBundleExtractor.Extract(bundle, referenceTypes));
-
-                await GenerateMessagesFromBundle(bundle, request.FacilityId, request.ConsumeResult.Message.Value.PatientId, queryPlanType, request.CorrelationId, new List<ScheduledReport> { scheduledReport }, CancellationToken.None);
+                referenceResources.AddRange(references);
             }
 
             if (builtQuery.GetType() == typeof(ReferenceQueryFactoryResult))
@@ -230,43 +228,10 @@ public class QueryListProcessor : IQueryListProcessor
                     request,
                     fhirQueryConfiguration,
                     queryInfo,
+                    scheduledReport,
                     queryPlanType);
             }
 
-        }
-    }
-
-    private async Task GenerateMessagesFromBundle(
-        Bundle bundle,
-        string facilityId,
-        string patientId,
-        string queryType,
-        string correlationId,
-        List<ScheduledReport> scheduledReports,
-        CancellationToken cancellationToken)
-    {
-        foreach(var e in bundle.Entry)
-        {
-            if (e.Resource is Resource resource)
-            {
-                await _kafkaProducer.ProduceAsync(
-                    KafkaTopic.ResourceAcquired.ToString(),
-                    new Message<string, ResourceAcquired>
-                    {
-                        Key = facilityId,
-                        Headers = new Headers
-                        {
-                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
-                        },
-                        Value = new ResourceAcquired
-                        {
-                            Resource = resource,
-                            ScheduledReports = scheduledReports,
-                            PatientId = RemovePatientId(e.Resource) ? string.Empty : patientId,
-                            QueryType = queryType
-                        }
-                    });
-            }
         }
     }
 
