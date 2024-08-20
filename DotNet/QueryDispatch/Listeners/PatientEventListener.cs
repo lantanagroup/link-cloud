@@ -188,20 +188,9 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                             var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
 
-                            var converted_record = new ConsumeResult<string, string>()
-                            {
-                                Message = new Message<string, string>()
-                                {
-                                    Key = facilityId,
-                                    Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
-                                    Headers = e.ConsumerRecord.Message.Headers
-                                }
-                            };
-
-                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
+                            _consumeResultDeadLetterExceptionHandler.HandleConsumeException(e, facilityId);
 
                             _patientEventConsumer.Commit();
-                            continue;
                         }                        
                     }
                     _patientEventConsumer.Close();
