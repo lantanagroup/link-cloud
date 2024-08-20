@@ -20,19 +20,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
     {
         private readonly ILogger<RefreshSigningKey> _logger;
         private readonly ISecretManager _secretManager;
+        private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly ILinkAdminMetrics _metrics;
         private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
+        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, ISecretManager secretManager, IOptions<DataProtectionSettings> dataProtectionSettings, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
+            _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));            
         }
 
         //TODO: Add back data protection once key persience is implemented
@@ -62,9 +64,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                 using var scope = _serviceScopeFactory.CreateScope();
                 var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
-                var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                //_cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
-                _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key);
+                if (_dataProtectionSettings.Value.Enabled)
+                {
+                    var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
+                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
+                }
+                else
+                {
+                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key);
+                }              
+                
             }            
 
             return true;
