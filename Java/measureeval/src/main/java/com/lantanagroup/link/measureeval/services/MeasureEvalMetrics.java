@@ -14,6 +14,7 @@ public class MeasureEvalMetrics {
   private final LongCounter patientReportableCounter;
   private final LongCounter patientNonReportableCounter;
   private final LongCounter patientEvaluatedCounter;
+  private final LongCounter recordsReceivedCounter;
   private final LongHistogram evaluationDuration;
 
   public MeasureEvalMetrics(OpenTelemetry openTelemetry)
@@ -31,6 +32,10 @@ public class MeasureEvalMetrics {
             .counterBuilder("Patient_Evaluated_Resource_Counter")
             .build();
 
+    recordsReceivedCounter = meter.
+                    counterBuilder("Records_Consumed")
+                    .build();
+
     evaluationDuration = meter.histogramBuilder("MeasureEval.evaluation.duration")
           .ofLongs()
           .setDescription("The duration of the evaluation of a measure").setUnit("ms").build();
@@ -38,7 +43,7 @@ public class MeasureEvalMetrics {
 
   public void IncrementPatientReportableCounter(Attributes attributes)
   {
-     patientReportableCounter.add(1, attributes);
+    patientReportableCounter.add(1, attributes);
   }
 
   public void IncrementPatientNonReportableCounter(Attributes attributes)
@@ -49,6 +54,11 @@ public class MeasureEvalMetrics {
   public void IncrementPatientEvaluatedCounter(Attributes attributes)
   {
     patientEvaluatedCounter.add(1, attributes);
+  }
+
+  public void IncrementRecordsReceivedCounter(Attributes attributes)
+  {
+    recordsReceivedCounter.add(1, attributes);
   }
 
   void MeasureEvalDuration(long elapsedTime, Attributes attributes) {
