@@ -16,25 +16,30 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+
+            InitHttpClient();
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
+        {         
+            // HTTP GET
+            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
+
+            return response;
+        }
+
+        private void InitHttpClient()
         {
-            //check if the measure evaluation service uri is set
+            //check if the service uri is set
             if (string.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
             {
-                _logger.LogGatewayServiceUriException("MeasureEvaluation", "Measure evaluation service uri is not set");
-                return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
+                _logger.LogGatewayServiceUriException("MeasureEvaluation", "Measure Evaluation service uri is not set");
+                throw new ArgumentNullException("Measure Evaluation Service URL is missing.");
             }
 
             _client.BaseAddress = new Uri(_serviceRegistry.Value.MeasureServiceUrl);
             _client.DefaultRequestHeaders.Accept.Clear();
             _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"{_serviceRegistry.Value.MeasureServiceUrl}/health", cancellationToken);
-
-            return response;
         }
     }
 }
