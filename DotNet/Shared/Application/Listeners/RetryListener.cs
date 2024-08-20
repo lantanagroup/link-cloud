@@ -138,18 +138,8 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                     {
                         var facilityId = GetStringValueFromHeader(ex.ConsumerRecord.Message.Headers, KafkaConstants.HeaderConstants.ExceptionFacilityId);
 
-                        var exceptionConsumerResult = new ConsumeResult<string, string>()
-                        {
-                            Message = new Message<string, string>()
-                            {
-                                Headers = ex.ConsumerRecord.Message.Headers,
-                                Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null && ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : string.Empty,
-                                Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null && ex.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value) : string.Empty,
-                            },
-                        };
-
                         _deadLetterExceptionHandler.Topic = ex.ConsumerRecord.Topic.Replace("-Retry", "-Error");
-                        _deadLetterExceptionHandler.HandleException(exceptionConsumerResult, ex, facilityId);
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
                         _logger.LogError(ex, $"Error consuming message for topics: [{string.Join(", ", consumer.Subscription)}] at {DateTime.UtcNow}");
                         continue;
                     }                    

@@ -31,10 +31,11 @@ public interface IReferenceResourceService
         CancellationToken cancellationToken = default);
 
     Task Execute(
-        ReferenceQueryFactoryResult referenceQueryFactoryResult, 
+        ReferenceQueryFactoryResult referenceQueryFactoryResult,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
+        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default);
 }
@@ -112,6 +113,7 @@ public class ReferenceResourceService : IReferenceResourceService
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
+        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default)
     {
@@ -164,57 +166,17 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach(var x in missingReferences)
         {
-            var fullMissingResources = await _fhirRepo.GetReferenceResource(
+            await _fhirRepo.GetReferenceResourceAndGenerateMessage(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
             request.ConsumeResult.Message.Value.PatientId.SplitReference(),
             request.FacilityId,
             request.CorrelationId,
             queryPlanType,
+            report,
             x,
             referenceQueryConfig,
             fhirQueryConfiguration.Authentication);
-
-            foreach (var resource in fullMissingResources)
-            {
-                if (resource.TypeName == nameof(OperationOutcome))
-                {
-                    var opOutcome = (OperationOutcome)resource;
-                    _logger.LogWarning("Operation Outcome encountered:\n {opOutcome}", opOutcome.Text);
-                    continue;
-                }
-
-                var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-                var currentDateTime = DateTime.UtcNow;
-                var fhirDateTime = new FhirDateTime(
-                    currentDateTime.Year,
-                    currentDateTime.Month,
-                    currentDateTime.Day,
-                    currentDateTime.Hour,
-                    currentDateTime.Minute,
-                    currentDateTime.Second,
-                    TimeSpan.Zero);
-
-                var refResource = new ReferenceResources
-                {
-                    FacilityId = request.FacilityId,
-                    ResourceId = resource.Id,
-                    ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
-                    ResourceType = referenceQueryFactoryResult.ResourceType,
-                    CreateDate = currentDateTime,
-                    ModifyDate = currentDateTime,
-                };
-
-                await GenerateMessage(
-                resource,
-                request.FacilityId,
-                request.ConsumeResult.Message.Value.PatientId,
-                queryPlanType,
-                request.CorrelationId,
-                request.ConsumeResult.Message.Value.ScheduledReports);
-
-                await _referenceResourcesManager.AddAsync(refResource);
-            }
         }
     }
 
