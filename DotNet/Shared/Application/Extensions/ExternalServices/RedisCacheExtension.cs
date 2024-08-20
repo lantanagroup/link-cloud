@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 
@@ -28,17 +29,20 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
                     options.ConfigurationOptions.Password = redisCacheOptions.Password;
                 }
 
+                if (redisCacheOptions.Timeout > 0)
+                {
+                    options.ConfigurationOptions.ConnectTimeout = (int)redisCacheOptions.Timeout;
+                }
+                
+
             });
 
             return services;
         }
 
-        public class RedisCacheOptions
+        public class RedisCacheOptions : CacheSettings
         {
             public IWebHostEnvironment Environment { get; set; } = null!;
-            public string? InstanceName { get; set; }
-            public string ConnectionString { get; set; } = null!;
-            public string? Password { get; set; }
         }
     }
 }

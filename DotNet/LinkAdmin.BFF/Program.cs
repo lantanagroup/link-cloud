@@ -88,6 +88,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
 
     // Determine if anonymous access is allowed
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -119,20 +120,28 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
-    //Add Redis
-    Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
-    builder.Services.AddRedisCache(options =>
+    //Add Redis   
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
     {
-        options.Environment = builder.Environment;
+        Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
 
-        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+            var redisConnection = builder.Configuration.GetConnectionString("Redis");
 
-        if (string.IsNullOrEmpty(redisConnection))
-            throw new NullReferenceException("Redis Connection String is required.");
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new NullReferenceException("Redis Connection String is required.");
 
-        options.ConnectionString = redisConnection;
-        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
-    });
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+
+            if (builder.Configuration.GetValue<int>("Cache:Timeout") > 0)
+            {
+                options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
+            }
+        });
+    }    
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
@@ -188,8 +197,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<CacheHealthCheck>("Cache")
+    var healthCheckBuilder = builder.Services.AddHealthChecks()
         .AddCheck<AccountServiceHealthCheck>("Account Service")
         .AddCheck<AuditServiceHealthCheck>("Audit Service")
         .AddCheck<CensusServiceHealthCheck>("Census Service")
@@ -200,6 +208,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         .AddCheck<ReportServiceHealthCheck>("Report Service")
         .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
         .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    {
+        healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
+    }
 
 
     // Add swagger generation
