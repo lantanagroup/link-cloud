@@ -16,7 +16,6 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     protected readonly ILogger<BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>> Logger;
     protected readonly IKafkaConsumerFactory<ConsumeKeyType, ConsumeValueType> KafkaConsumerFactory;
     protected readonly IDeadLetterExceptionHandler<ConsumeKeyType, ConsumeValueType> DeadLetterConsumerHandler;
-    protected readonly IDeadLetterExceptionHandler<string, string> DeadLetterConsumerErrorHandler;
     protected readonly ITransientExceptionHandler<ConsumeKeyType, ConsumeValueType> TransientExceptionHandler;
     protected readonly IOptions<ServiceInformation> ServiceInformation;
     protected readonly string TopicName;
@@ -32,18 +31,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         KafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
         DeadLetterConsumerHandler = deadLetterConsumerHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerHandler));
-        DeadLetterConsumerErrorHandler = deadLetterConsumerErrorHandler ?? throw new ArgumentNullException(nameof(deadLetterConsumerErrorHandler));
         TransientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
         ServiceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
         this.TopicName = typeof(MessageType).Name;
 
         //configure error handlers topic names
-        DeadLetterConsumerErrorHandler.Topic = $"{this.TopicName}-Error";
         DeadLetterConsumerHandler.Topic = $"{this.TopicName}-Error";
         TransientExceptionHandler.Topic = $"{this.TopicName}-Retry";
 
         //configure error handlers service names
-        DeadLetterConsumerErrorHandler.ServiceName = ServiceInformation.Value.ServiceName;
         DeadLetterConsumerHandler.ServiceName = ServiceInformation.Value.ServiceName;
         TransientExceptionHandler.ServiceName = ServiceInformation.Value.ServiceName;
         
@@ -112,19 +108,9 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         throw new OperationCanceledException(e.Error.Reason, e);
                     }
 
-                    var facilityId = e.ConsumerRecord.Message.Key != null ? ExtractFacilityId(consumeResult) : "";
+                    var facilityId = ExtractFacilityId(consumeResult);
 
-                    var converted_record = new ConsumeResult<string, string>()
-                    {
-                        Message = new Message<string, string>()
-                        {
-                            Key = facilityId,
-                            Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
-                            Headers = e.ConsumerRecord.Message.Headers
-                        }
-                    };
-
-                    DeadLetterConsumerErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
+                    DeadLetterConsumerHandler.HandleConsumeException(e, facilityId);
 
                     var offset = e.ConsumerRecord?.TopicPartitionOffset;
                     consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });

@@ -20,22 +20,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
     public class CreateLinkBearerToken : ICreateLinkBearerToken
     {
         private readonly ILogger<CreateLinkBearerToken> _logger;
-        private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ILinkAdminMetrics _metrics;
+        private readonly IOptions<CacheSettings> _cacheSettings;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics)
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _linkTokenServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
-            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));            
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         }
 
         public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
@@ -44,49 +46,86 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             if(string.IsNullOrEmpty(_linkTokenServiceConfig.Value.Authority))
             {
-                   throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
+                throw new ArgumentNullException(nameof(_linkTokenServiceConfig.Value.Authority));
             }
             
             try
             {
+                string bearerKey = string.Empty;
                 var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-                string? bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName);
+                byte[] encodedKey = [];                
 
-                if (bearerKey == null)
+                if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
-
-                    bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
-
-                    if (_dataProtectionSettings.Value.Enabled)
+                    //if no cache providers have been registered, get the signing key from the secret manager
+                    if (!_cacheSettings.Value.Enabled)
                     {
-                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                        bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+                        encodedKey = Encoding.UTF8.GetBytes(bearerKey);
                     }
                     else
                     {
-                        _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
-                    }                             
-                }
+                        using var scope = _serviceScopeFactory.CreateScope();
+                        var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
-                byte[] encodedKey = [];
-                if (_dataProtectionSettings.Value.Enabled)
-                {
-                    encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
+                        //attempt to get signing key from cache
+                        try
+                        {
+                            bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
+                        }
+
+                        //if key is not in cache, get it from the secret manager
+                        if (string.IsNullOrEmpty(bearerKey))
+                        {
+                            bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
+
+                            //store signing key in cache
+                            try
+                            {
+                                if (_dataProtectionSettings.Value.Enabled)
+                                {
+                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                                }
+                                else
+                                {
+                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogCacheException(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, ex.Message);
+                            }
+                        }
+
+                        if (_dataProtectionSettings.Value.Enabled)
+                        {
+                            encodedKey = Encoding.UTF8.GetBytes(protector.Unprotect(bearerKey));
+                        }
+                        else
+                        {
+                            encodedKey = Encoding.UTF8.GetBytes(bearerKey);
+                        }
+                    }                   
                 }
                 else
-                {
+                { 
+                    bearerKey = _linkTokenServiceConfig.Value.SigningKey;
                     encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                }
+                }          
 
-                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);
-                
+                var credentials = new SigningCredentials(new SymmetricSecurityKey(encodedKey), SecurityAlgorithms.HmacSha512);                
 
                 var token = new JwtSecurityToken(                                    
-                                    issuer: _linkTokenServiceConfig.Value.Authority,
-                                    audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
-                                    claims: user.Claims,
-                                    expires: DateTime.Now.AddMinutes(timespan),
-                                    signingCredentials: credentials
-                                );
+                    issuer: _linkTokenServiceConfig.Value.Authority,
+                    audience: LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
+                    claims: user.Claims,
+                    expires: DateTime.Now.AddMinutes(timespan),
+                    signingCredentials: credentials
+                );
 
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);                
 

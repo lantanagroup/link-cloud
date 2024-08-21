@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Shared.Settings
             public const string DataProtection = "DataProtection";
             public const string LinkTokenService = "LinkTokenService";
             public const string SecretManagement = "SecretManagement";
+            public const string Cache = "Cache";
         }
 
         public static class DatabaseConnections
