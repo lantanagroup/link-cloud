@@ -277,8 +277,13 @@ pool:
     #       secretType: 'dockerRegistry'
     #       containerRegistryType: 'Azure Container Registry'
 
-    - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactName: 'scripts'
-      publishLocation: 'database'
+    - job: Publish
+      displayName: "Publish"
+      steps:
+      - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'scripts'
+        publishLocation: 'database'
+        displayName: Generate Tenant SQL Script
+    
