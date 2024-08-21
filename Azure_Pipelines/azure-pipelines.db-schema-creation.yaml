@@ -246,7 +246,17 @@ pool:
            -p $(build.sourcesdirectory)/Dotnet/Tenant/Tenant.csproj\
            -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
         displayName: Generate Tenant SQL Script
-      
+    ###
+    # Publish
+    - job: Publish
+      displayName: "Publish"
+      steps:
+      - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'scripts'
+        publishLocation: 'database'
+        displayName: Generate Tenant SQL Script  
     # ###
     # # Validation
     # - job: Validation
@@ -277,13 +287,5 @@ pool:
     #       secretType: 'dockerRegistry'
     #       containerRegistryType: 'Azure Container Registry'
 
-    - job: Publish
-      displayName: "Publish"
-      steps:
-      - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-        ArtifactName: 'scripts'
-        publishLocation: 'database'
-        displayName: Generate Tenant SQL Script
+    
     
