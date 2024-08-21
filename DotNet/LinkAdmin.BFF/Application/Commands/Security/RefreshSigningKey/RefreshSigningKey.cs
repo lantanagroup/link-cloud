@@ -4,10 +4,12 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -17,18 +19,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
     public class RefreshSigningKey : IRefreshSigningKey
     {
         private readonly ILogger<RefreshSigningKey> _logger;
-        private readonly IDistributedCache _cache;
         private readonly ISecretManager _secretManager;
+        private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly ILinkAdminMetrics _metrics;
+        private readonly IOptions<CacheSettings> _cacheSettings;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, IDistributedCache cache, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics)
+        public RefreshSigningKey(ILogger<RefreshSigningKey> logger, ISecretManager secretManager, IOptions<DataProtectionSettings> dataProtectionSettings, IDataProtectionProvider dataProtectionProvider, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
+            _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));            
         }
 
         //TODO: Add back data protection once key persience is implemented
@@ -53,9 +59,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _logger.LogLinkAdminTokenKeyRefreshed(DateTime.UtcNow);
             _metrics.IncrementTokenKeyRefreshCounter([]);
 
-            var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
-            //_cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
-            _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key);
+            if(_cacheSettings.Value.Enabled)
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
+
+                if (_dataProtectionSettings.Value.Enabled)
+                {
+                    var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkSigningKey);
+                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(key));
+                }
+                else
+                {
+                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, key);
+                }              
+                
+            }            
 
             return true;
         }
