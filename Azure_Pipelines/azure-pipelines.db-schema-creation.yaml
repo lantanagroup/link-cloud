@@ -20,6 +20,16 @@ pool:
   stages:
   - stage: Build
     jobs:
+
+    - job: install EF
+      steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
+
     - job: getChangedFiles
       displayName: Get Changes
       steps: 
