@@ -179,8 +179,8 @@ pool:
     - job: Notification
       displayName: "Generate Notification Schema Script"
       #dependsOn: getChangedFiles
-      variables: 
-        changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
+      # variables: 
+      #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
       #condition: eq(variables.changed, 'True')
       steps:
       - script: |
