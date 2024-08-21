@@ -115,7 +115,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps: 
         - script: |
            dotnet ef migrations script \
@@ -151,7 +151,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps: 
         - script: |
            dotnet ef migrations script \
@@ -170,7 +170,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
         - script: |
            dotnet ef migrations script \
@@ -188,7 +188,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
       - script: |
            dotnet ef migrations script \
@@ -206,7 +206,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
       - script: |
            dotnet ef migrations script \
@@ -224,7 +224,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
       - script: |
            dotnet ef migrations script \
@@ -242,7 +242,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
       - script: |
            dotnet ef migrations script \
@@ -260,7 +260,7 @@ variables:
       dependsOn: getChangedFiles
       variables: 
         changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-      condition: eq(variables.changed, 'True')
+      #condition: eq(variables.changed, 'True')
       steps:
       - script: |
            dotnet ef migrations script \
