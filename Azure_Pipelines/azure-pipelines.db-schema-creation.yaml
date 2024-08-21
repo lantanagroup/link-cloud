@@ -1,7 +1,8 @@
 trigger:
   branches:
     include:
-    - dev
+    - LNK-2855-auto-db-schema-script
+    #- dev
   paths:
     include:
     - DotNet/*/Migrations
@@ -13,17 +14,7 @@ pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
-  
-  # - script: |
-  #    dotnet ef migrations script \
-  #    --idempotent \
-  #    --verbose \
-  #    -c CensusContext \
-  #    -s $(build.sourcesdirectory)/$(project) \
-  #    -p $(build.sourcesdirectory)/$(project) \
-  #    -o $(build.artifactstagingdirectory)/DotNet/Census/Scripts/censusDb.sql
-  #   displayName: Generate SQL Script
-  
+
   #####################
 
   stages:
