@@ -237,7 +237,17 @@ stages:
   # Publish
   - job: Publish
     displayName: "Publish"
-    dependsOn: getchangedFiles | Account | Audit | Census | DataAcquisition | Normalization | Notification | QueryDispatch | Submission
+    dependsOn: 
+    - getchangedFiles
+    - Account 
+    - Audit 
+    - Census 
+    - DataAcquisition 
+    - Normalization 
+    - Notification 
+    - QueryDispatch 
+    - Submission 
+    - Tenant
     steps:
     - task: PublishBuildArtifacts@1
       inputs:
