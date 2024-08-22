@@ -92,12 +92,12 @@ stages:
     #condition: eq(variables.changed, 'True')
     steps: 
       - script: |
-         dotnet-ef migrations script 
-         --idempotent 
-         --verbose 
-         -c AccountDbContext 
-         -s $(build.sourcesdirectory)/Dotnet/Account/Account.csproj 
-         -p $(build.sourcesdirectory)/Dotnet/Account/Account.csproj 
+         dotnet ef migrations script \
+         --idempotent \
+         --verbose \
+         -c AccountDbContext \
+         -s $(build.sourcesdirectory)/Dotnet/Account/Account.csproj \
+         -p $(build.sourcesdirectory)/Dotnet/Account/Account.csproj \
          -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
   ###
