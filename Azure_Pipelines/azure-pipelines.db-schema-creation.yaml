@@ -146,7 +146,7 @@ stages:
   ###
   # Normalization
   - job: Normalization
-    displayName: "Generate Data Acquisition Schema Script"
+    displayName: "Generate Normalization Schema Script"
     #dependsOn: getChangedFiles
     # variables: 
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
