@@ -6,6 +6,7 @@ using System.Text.Json;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 
 namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
@@ -57,4 +58,15 @@ public partial class NormalizationDbContext : DbContext
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    public class NormalizationDbContextFactory : IDesignTimeDbContextFactory<NormalizationDbContext>
+    {
+        public NormalizationDbContext CreateDbContext(string[] args)
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<NormalizationDbContext>();
+            optionsBuilder.UseSqlServer();
+
+            return new NormalizationDbContext(optionsBuilder.Options);
+        }
+    }
 }
