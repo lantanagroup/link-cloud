@@ -30,7 +30,7 @@ public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbCont
     public AccountDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
-        optionsBuilder.UseSqlServer();
+        optionsBuilder.UseSqlServer("\"DefaultConnection\": \"Data Source;Initial;Integrated Security=True;");
 
         return new AccountDbContext(optionsBuilder.Options);
     }
