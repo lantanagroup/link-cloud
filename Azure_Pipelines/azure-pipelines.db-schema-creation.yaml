@@ -219,7 +219,7 @@ stages:
   # Tenant
   - job: Tenant
     displayName: "Build Tenant"
-    #dependsOn: getChangedFiles
+    #dependsOn: getChangedFiles 
     # variables: 
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
     #condition: eq(variables.changed, 'True')
@@ -237,6 +237,7 @@ stages:
   # Publish
   - job: Publish
     displayName: "Publish"
+    dependsOn: getchangedFiles | Account | Audit | Census | DataAcquisition | Normalization | Notification | QueryDispatch | Submission
     steps:
     - task: PublishBuildArtifacts@1
       inputs:
