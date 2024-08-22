@@ -27,31 +27,37 @@ public class AccountDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AccountDbContext).Assembly);
         base.OnModelCreating(modelBuilder);                       
     }
-}
 
-public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbContext>
-{
-    public AccountDbContext CreateDbContext(string[] args)
+    public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbContext>
     {
-        //var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
-        //optionsBuilder.UseSqlServer("Data Source;Initial;Integrated Security=True;");
+        public AccountDbContext CreateDbContext(string[] args)
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
+            optionsBuilder.UseSqlServer();
 
-        //return new AccountDbContext(optionsBuilder.Options);
-
-        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
-
-        IConfiguration config = new ConfigurationBuilder()
-            .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "DataAcquisition"))
-            .AddJsonFile("appsettings.json")
-            .AddJsonFile($"appsettings.{env}.json", optional: true)
-            //.AddEnvironmentVariables()
-            .Build();
-
-        var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
-        var connectionString = config.GetConnectionString("SqlServer");
-        connectionString = string.IsNullOrWhiteSpace(connectionString) ? "Data Source;Initial;Integrated Security=True;" : connectionString;
-        optionsBuilder.UseSqlServer(connectionString);
-
-        return new AccountDbContext(optionsBuilder.Options);
+            return new AccountDbContext(optionsBuilder.Options);
+        }
     }
 }
+
+//public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbContext>
+//{
+//    public AccountDbContext CreateDbContext(string[] args)
+//    {
+//        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+//        IConfiguration config = new ConfigurationBuilder()
+//            .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "Account"))
+//            .AddJsonFile("appsettings.json")
+//            .AddJsonFile($"appsettings.{env}.json", optional: true)
+//            //.AddEnvironmentVariables()
+//            .Build();
+
+//        var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
+//        var connectionString = config.GetConnectionString("SqlServer");
+//        connectionString = string.IsNullOrWhiteSpace(connectionString) ? "Data Source;Initial;Integrated Security=True;" : connectionString;
+//        optionsBuilder.UseSqlServer(connectionString);
+
+//        return new AccountDbContext(optionsBuilder.Options);
+//    }
+//}
