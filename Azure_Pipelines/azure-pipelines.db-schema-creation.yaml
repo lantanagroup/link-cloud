@@ -20,14 +20,6 @@ pool:
 stages:
 - stage: Build
   jobs:
-  # - job: Install_EF
-  #   steps:
-  #   - task: DotNetCoreCLI@2
-  #     displayName: Install dotnet-ef
-  #     inputs:
-  #      command: 'custom'
-  #      custom: 'tool'
-  #      arguments: 'install --global dotnet-ef'
   - job: getChangedFiles
     displayName: Get Changes
     steps: 
@@ -56,10 +48,6 @@ stages:
             # DataAcquisition - Return $true if path has changed files
             $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) 
             Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
-
-            # MeasureEval - Return $true if path has changed files ##TODO
-            # $measureBool = ((Select-String -InputObject $changedFiles -Pattern "MeasureEval/" -AllMatches).Matches.Count -gt 0)
-            # Write-Host "##vso[task.setvariable variable=measureChanged;isOutput=true;]$measureBool"
 
             # Normalization - Return $true if path has changed files
             $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) 
@@ -102,8 +90,8 @@ stages:
          --idempotent \
          --verbose \
          -c AccountDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Account/Account.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/Account/Account.csproj \
+         -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj \
          -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
   ###
