@@ -20,14 +20,14 @@ pool:
 stages:
 - stage: Build
   jobs:
-  - job: Install_EF
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
+  # - job: Install_EF
+  #   steps:
+  #   - task: DotNetCoreCLI@2
+  #     displayName: Install dotnet-ef
+  #     inputs:
+  #      command: 'custom'
+  #      custom: 'tool'
+  #      arguments: 'install --global dotnet-ef'
   - job: getChangedFiles
     displayName: Get Changes
     steps: 
@@ -90,7 +90,13 @@ stages:
     # variables: 
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
     #condition: eq(variables.changed, 'True')
-    steps: 
+    steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
       - script: |
          dotnet ef migrations script \
          --idempotent \
