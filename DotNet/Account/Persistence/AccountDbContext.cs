@@ -11,6 +11,10 @@ namespace LantanaGroup.Link.Account.Persistence;
 public class AccountDbContext : DbContext
 { 
     
+    public AccountDbContext() : base()
+    {
+    }
+
     public AccountDbContext(DbContextOptions<AccountDbContext> options) : base(options)
     {
     }       
@@ -29,8 +33,24 @@ public class AccountDbContextFactory : IDesignTimeDbContextFactory<AccountDbCont
 {
     public AccountDbContext CreateDbContext(string[] args)
     {
+        //var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
+        //optionsBuilder.UseSqlServer("Data Source;Initial;Integrated Security=True;");
+
+        //return new AccountDbContext(optionsBuilder.Options);
+
+        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+        IConfiguration config = new ConfigurationBuilder()
+            .SetBasePath(Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "DataAcquisition"))
+            .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.{env}.json", optional: true)
+            //.AddEnvironmentVariables()
+            .Build();
+
         var optionsBuilder = new DbContextOptionsBuilder<AccountDbContext>();
-        optionsBuilder.UseSqlServer("\"DefaultConnection\": \"Data Source;Initial;Integrated Security=True;");
+        var connectionString = config.GetConnectionString("SqlServer");
+        connectionString = string.IsNullOrWhiteSpace(connectionString) ? "Data Source;Initial;Integrated Security=True;" : connectionString;
+        optionsBuilder.UseSqlServer(connectionString);
 
         return new AccountDbContext(optionsBuilder.Options);
     }
