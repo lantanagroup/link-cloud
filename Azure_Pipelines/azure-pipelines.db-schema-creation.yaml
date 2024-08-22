@@ -89,9 +89,6 @@ stages:
          dotnet ef migrations script \
          --idempotent \
          --verbose \
-         -c AccountDbContext \
-         -s $(build.sourcesdirectory)/DotNet/Account/Account.csproj \
-         -p $(build.sourcesdirectory)/DotNet/Account/Account.csproj \
          -o $(build.artifactstagingdirectory)/DatabaseScripts/accountDb.sql
         displayName: Generate Account SQL Script
   ###
