@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Permissions;
 using Microsoft.Extensions.Options;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 
@@ -30,40 +31,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _tokenServiceConfig = tokenServiceConfig ?? throw new ArgumentNullException(nameof(tokenServiceConfig));
             _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
 
-            _systemPrincipal = CreateSystemAccountPrincipal();            
+            _systemPrincipal = CreateSystemAccountPrincipal();
+            InitHttpClient();
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {
-            //check if the account service uri is set
-            if (string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl))
-            {
-                _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
-                return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
-            }
-
-            _client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);
-            _client.DefaultRequestHeaders.Accept.Clear();
-            _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));            
-
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/health", cancellationToken);
+            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
 
         public async Task<HttpResponseMessage> GetAccountByEmail(string email, CancellationToken cancellationToken)
-        {
-            //check if the account service uri is set
-            if (string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl))
-            {
-                _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
-                return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
-            }
-
-            _client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);
-            _client.DefaultRequestHeaders.Accept.Clear();
-            _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        {        
 
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
@@ -80,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
 
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"{_serviceRegistry.Value.AccountServiceUrl}/api/account/user/email/{email}", cancellationToken);
+            HttpResponseMessage response = await _client.GetAsync($"api/account/user/email/{email}", cancellationToken);
             
             return response;
         }
@@ -96,6 +77,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             };
            
             return new ClaimsPrincipal(new ClaimsIdentity(claims));
+        }
+
+        private void InitHttpClient()
+        {
+            //check if the service uri is set
+            if (string.IsNullOrEmpty(_serviceRegistry.Value.AccountServiceUrl))
+            {
+                _logger.LogGatewayServiceUriException("Account", "Account service uri is not set");
+                throw new ArgumentNullException("Account Service URL is missing.");
+            }
+
+            _client.BaseAddress = new Uri(_serviceRegistry.Value.AccountServiceUrl);
+            _client.DefaultRequestHeaders.Accept.Clear();
+            _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
     }
 }

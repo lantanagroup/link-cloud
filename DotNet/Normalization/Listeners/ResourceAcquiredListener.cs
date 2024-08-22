@@ -371,17 +371,8 @@ public class ResourceAcquiredListener : BackgroundService
                 }
 
                 string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
-                
-                ConsumeResult<string, string> result = new ConsumeResult<string, string>
-                {
-                    Message = new Message<string, string>
-                    {
-                        Headers = ex.ConsumerRecord?.Message?.Headers,
-                        Key = facilityId,
-                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? Array.Empty<byte>())
-                    }
-                };
-                _consumeExceptionHandler.HandleException(result, ex, facilityId);
+
+                _consumeExceptionHandler.HandleConsumeException(ex, facilityId);
                 TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
                 if (offset == null)
                 {

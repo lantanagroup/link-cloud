@@ -201,11 +201,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             if (!LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken.Equals(defaultChallengeScheme))
                 authSchemas.Add(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken);
 
-            services.AddLinkBearerServiceAuthentication(options =>
+            services.AddLinkBearerServiceAuthentication(logger, options =>
             {
                 options.Environment = securityServiceOptions.Environment;
                 options.Authority = configuration.GetValue<string>("LinkTokenService:Authority") ?? LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
-                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;              
+                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;   
+                
+                var linkTokenSigningKey = configuration.GetValue<string>("LinkTokenService:SigningKey");
+                if (!string.IsNullOrEmpty(linkTokenSigningKey))
+                {
+                    options.SigningKey = linkTokenSigningKey;
+                }
             });
 
             // Add Authorization
@@ -246,7 +252,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
         public class SecurityServiceOptions
         {
-            public IWebHostEnvironment Environment { get; set; } = null!;
+            public IWebHostEnvironment Environment { get; set; } = null!;        
         }
     }
 }

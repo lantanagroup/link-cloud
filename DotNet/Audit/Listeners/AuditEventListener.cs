@@ -11,6 +11,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Text;
 using LantanaGroup.Link.Audit.Application.Interfaces;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
@@ -20,27 +21,21 @@ namespace LantanaGroup.Link.Audit.Listeners
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
         private readonly IDeadLetterExceptionHandler<string, AuditEventMessage> _deadLetterExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<string, string> _consumerExceptionDeadLetterHandler;
         private readonly ITransientExceptionHandler<string, AuditEventMessage> _transientExceptionHandler;
 
         public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IKafkaConsumerFactory<string, 
             AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, 
-            IDeadLetterExceptionHandler<string, string> consumerExceptionDeadLetterHandler, ITransientExceptionHandler<string, 
-            AuditEventMessage> transientExceptionHandler)
+            ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-            _consumerExceptionDeadLetterHandler = consumerExceptionDeadLetterHandler ?? throw new ArgumentNullException(nameof(consumerExceptionDeadLetterHandler));
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
 
             //configure deadletter exception handlers
             _deadLetterExceptionHandler.ServiceName = AuditConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
-
-            _consumerExceptionDeadLetterHandler.ServiceName = AuditConstants.ServiceName;
-            _consumerExceptionDeadLetterHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
 
             //configure transient exception handler
             _transientExceptionHandler.ServiceName = AuditConstants.ServiceName;
@@ -115,21 +110,10 @@ namespace LantanaGroup.Link.Audit.Listeners
 
                             var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
 
-                            var converted_record = new ConsumeResult<string, string>()
-                            {
-                                Message = new Message<string, string>()
-                                {
-                                    Key = facilityId,
-                                    Value = ex.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value) : "",
-                                    Headers = ex.ConsumerRecord.Message.Headers
-                                }
-                            };
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                            var deadLetterException = new DeadLetterException($"Consume Result exception: {ex.InnerException?.Message}");
-                            _consumerExceptionDeadLetterHandler.HandleException(converted_record, deadLetterException, facilityId);
-
-                            _consumer.Commit();
-                            continue;
+                            var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                            _consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                         }                        
                     }
 
