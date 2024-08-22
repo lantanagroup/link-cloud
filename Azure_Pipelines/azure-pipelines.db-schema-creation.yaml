@@ -108,8 +108,8 @@ stages:
          --idempotent \
          --verbose \
          -c AuditDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Audit/Audit.csproj \
-         -p $(build.sourcesdirectory)/Audit/Audit.csproj\
+         -s $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Audit/Audit.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/auditDb.sql
         displayName: Generate Audit SQL Script
   ###
@@ -132,8 +132,8 @@ stages:
          --idempotent \
          --verbose \
          -c AuditDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Census/Census.csproj \
-         -p $(build.sourcesdirectory)/Census/Census.csproj\
+         -s $(build.sourcesdirectory)/DotNet/Census/Census.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Census/Census.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/censusDb.sql
         displayName: Generate Census SQL Script
 
@@ -157,8 +157,8 @@ stages:
          --idempotent \
          --verbose \
          -c DataAcquisitionDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/DataAcquisition/DataAcquisition.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/DataAcquisition.Domain/DataAcquisition.Domain.csproj\
+         -s $(build.sourcesdirectory)/DotNet/DataAcquisition/DataAcquisition.csproj \
+         -p $(build.sourcesdirectory)/DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/dataDb.sql
         displayName: Generate DataAcquisition SQL Script
   ###
@@ -181,8 +181,8 @@ stages:
            --idempotent \
            --verbose \
            -c NormalizationDbContext \
-           -s $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj \
-           -p $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj\
+           -s $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj \
+           -p $(build.sourcesdirectory)/DotNet/Normalization/Normalization.csproj\
            -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
         displayName: Generate Normalization SQL Script
   ###
@@ -205,8 +205,8 @@ stages:
          --idempotent \
          --verbose \
          -c NotificationDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Notification/Notification.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/Notification/Notification.csproj\
+         -s $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/notificationDb.sql
       displayName: Generate Notification SQL Script
   ###
@@ -229,8 +229,8 @@ stages:
          --idempotent \
          --verbose \
          -c QueryDispatchDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/QueryDispatch/QueryDispatch.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/QueryDispatch/QueryDispatch.csproj\
+         -s $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj \
+         -p $(build.sourcesdirectory)/DotNet/QueryDispatch/QueryDispatch.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/queryDispatchDb.sql
       displayName: Generate QueryDispatch SQL Script
   ###
@@ -253,8 +253,8 @@ stages:
          --idempotent \
          --verbose \
          -c TenantSubmissionDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Submission/Submission.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/Submission/Submission.csproj\
+         -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
       displayName: Generate Submission SQL Script
   ###
@@ -277,8 +277,8 @@ stages:
          --idempotent \
          --verbose \
          -c FacilityDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Tenant/Tenant.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/Tenant/Tenant.csproj\
+         -s $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj \
+         -p $(build.sourcesdirectory)/DotNet/Tenant/Tenant.csproj\
          -o $(build.artifactstagingdirectory)/DatabaseScripts/tenantDb.sql
       displayName: Generate Tenant SQL Script
   ###
