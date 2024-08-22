@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Data.SqlClient;
 using System.Text;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Census.Listeners;
 
@@ -21,7 +22,6 @@ public class CensusListener : BackgroundService
     private readonly IProducer<string, object> _kafkaProducer;
     private readonly ILogger<CensusListener> _logger;
     private readonly IDeadLetterExceptionHandler<string, PatientIDsAcquired> _nonTransientExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<string, string> _consumeErrorHandler;
     private readonly ITransientExceptionHandler<string, PatientIDsAcquired> _transientExceptionHandler;
     private readonly IServiceScopeFactory _scopeFactory;
 
@@ -30,8 +30,7 @@ public class CensusListener : BackgroundService
         IKafkaConsumerFactory<string, PatientIDsAcquired> kafkaConsumerFactory, 
         IProducer<string, object> kafkaProducer, 
         IDeadLetterExceptionHandler<string, PatientIDsAcquired> nonTransientExceptionHandler, 
-        ITransientExceptionHandler<string, PatientIDsAcquired> transientExceptionHandler, 
-        IDeadLetterExceptionHandler<string, string> consumeErrorHandler,
+        ITransientExceptionHandler<string, PatientIDsAcquired> transientExceptionHandler,
         IServiceScopeFactory scopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -39,7 +38,6 @@ public class CensusListener : BackgroundService
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
         _nonTransientExceptionHandler = nonTransientExceptionHandler ?? throw new ArgumentNullException(nameof(nonTransientExceptionHandler));
         _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
-        _consumeErrorHandler = consumeErrorHandler ?? throw new ArgumentNullException(nameof(consumeErrorHandler));
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
 
@@ -47,8 +45,6 @@ public class CensusListener : BackgroundService
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
         _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-        _consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
-        _consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
@@ -160,35 +156,26 @@ public class CensusListener : BackgroundService
 
                     }), cancellationToken);
                 }
-                catch (ConsumeException e)
+                catch (ConsumeException ex)
                 {
-                    if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+
+                    if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
-                        throw new OperationCanceledException(e.Error.Reason, e);
+                        throw new OperationCanceledException(ex.Error.Reason, ex);
                     }
 
-                    var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
+                    var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
 
-                    var converted_record = new ConsumeResult<string, string>()
-                    {
-                        Message = new Message<string, string>()
-                        {
-                            Key = facilityId,
-                            Value = e.ConsumerRecord.Message.Value != null ? System.Text.Json.JsonSerializer.Serialize(e.ConsumerRecord.Message.Value) : "",
-                            Headers = e.ConsumerRecord.Message.Headers
-                        }
-                    };
+                    _nonTransientExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                    _consumeErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message), facilityId);
-
-                    kafkaConsumer.Commit();
-                    continue;
+                    var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                    kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                 }
                 catch (Exception ex)
                 {
-                    _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
-                    _nonTransientExceptionHandler.HandleException(rawmessage, ex, "");
-                    continue;
+                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    kafkaConsumer.Commit();
                 }
             }
         }
