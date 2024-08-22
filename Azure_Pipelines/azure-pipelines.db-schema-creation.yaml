@@ -92,7 +92,7 @@ stages:
     #condition: eq(variables.changed, 'True')
     steps: 
       - script: |
-         dotnet ef migrations script 
+         dotnet-ef migrations script 
          --idempotent 
          --verbose 
          -c AccountDbContext 
