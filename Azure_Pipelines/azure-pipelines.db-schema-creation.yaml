@@ -39,47 +39,47 @@ stages:
           targetType: 'inline'
           script: |
             #Get any changed files
-            $changedFiles = git diff --name-status HEAD HEAD^ \
+            $changedFiles = git diff --name-status HEAD HEAD^ 
             
             # Account - Return $true if path has changed files
-            $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" \
+            $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" 
 
             # Audit - Return $true if path has changed files
-            $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" \
+            $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" 
 
             # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" \
+            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" 
 
             # DataAcquisition - Return $true if path has changed files
-            $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" \
+            $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
 
             # MeasureEval - Return $true if path has changed files ##TODO
             # $measureBool = ((Select-String -InputObject $changedFiles -Pattern "MeasureEval/" -AllMatches).Matches.Count -gt 0)
             # Write-Host "##vso[task.setvariable variable=measureChanged;isOutput=true;]$measureBool"
 
             # Normalization - Return $true if path has changed files
-            $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" \
+            $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" 
 
             # QueryDispatch - Return $true if path has changed files
-            $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" \
+            $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" 
 
             # Report - Return $true if path has changed files
-            $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" \
+            $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" 
 
             # Submission - Return $true if path has changed files
-            $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" \
+            $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" 
 
             # Tenant - Return $true if path has changed files
-            $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) \
-            Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool" \
+            $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool" 
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
   ###
