@@ -191,6 +191,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IPatientCensusService, PatientCensusService>();
     builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
     builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
+    builder.Services.AddTransient<BundleResourceAcquiredEventService, BundleResourceAcquiredEventService>();
 
     //Factories - Consumer
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
