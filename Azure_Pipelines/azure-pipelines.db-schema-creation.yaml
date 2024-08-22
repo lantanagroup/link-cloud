@@ -96,7 +96,13 @@ stages:
     #variables: 
       #changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
     #condition: eq(variables.changed, 'True')
-    steps: 
+    steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
       - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -114,7 +120,13 @@ stages:
     # variables: 
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
     #condition: eq(variables.changed, 'True')
-    steps: 
+    steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
       - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -134,6 +146,12 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
       - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -152,15 +170,21 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
-    - script: |
-         dotnet ef migrations script \
-         --idempotent \
-         --verbose \
-         -c NormalizationDbContext \
-         -s $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj \
-         -p $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj\
-         -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
-      displayName: Generate Normalization SQL Script
+      - task: DotNetCoreCLI@2
+        displayName: Install dotnet-ef
+        inputs:
+         command: 'custom'
+         custom: 'tool'
+         arguments: 'install --global dotnet-ef'
+      - script: |
+           dotnet ef migrations script \
+           --idempotent \
+           --verbose \
+           -c NormalizationDbContext \
+           -s $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj \
+           -p $(build.sourcesdirectory)/Dotnet/Normalization/Normalization.csproj\
+           -o $(build.artifactstagingdirectory)/DatabaseScripts/normalizationDb.sql
+        displayName: Generate Normalization SQL Script
   ###
   # Notification
   - job: Notification
@@ -170,6 +194,12 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
+    - task: DotNetCoreCLI@2
+      displayName: Install dotnet-ef
+      inputs:
+       command: 'custom'
+       custom: 'tool'
+       arguments: 'install --global dotnet-ef'
     - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -188,6 +218,12 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
+    - task: DotNetCoreCLI@2
+      displayName: Install dotnet-ef
+      inputs:
+       command: 'custom'
+       custom: 'tool'
+       arguments: 'install --global dotnet-ef'
     - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -206,6 +242,12 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
+    - task: DotNetCoreCLI@2
+      displayName: Install dotnet-ef
+      inputs:
+       command: 'custom'
+       custom: 'tool'
+       arguments: 'install --global dotnet-ef'
     - script: |
          dotnet ef migrations script \
          --idempotent \
@@ -224,6 +266,12 @@ stages:
     #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
     #condition: eq(variables.changed, 'True')
     steps:
+    - task: DotNetCoreCLI@2
+      displayName: Install dotnet-ef
+      inputs:
+       command: 'custom'
+       custom: 'tool'
+       arguments: 'install --global dotnet-ef'
     - script: |
          dotnet ef migrations script \
          --idempotent \
