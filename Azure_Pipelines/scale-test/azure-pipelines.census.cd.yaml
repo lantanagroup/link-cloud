@@ -1,0 +1,92 @@
+trigger:
+  branches:
+    include:
+    - release/0.1.1
+  paths:
+    include:
+    - DotNet/Census/*
+    - DotNet/Shared/*
+    exclude:
+    - '*'
+    
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/Census/Census.csproj'
+- name: testProject
+  value: 'DotNet/CensusUnitTests/CensusUnitTests.csproj'
+- name: registry-repo-Name
+  value: 'link-census'
+- name: dockerPath
+  value: '**/DotNet/Census/Dockerfile'
+- name: serviceName
+  value: 'Census'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+  
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)'
+    displayName: 'Run Tests'
+  
+
+  - task: Docker@2
+    displayName: "Build & Push Census Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(Build.BuildId)
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: DotNetCoreCLI@2
+    displayName: Install dotnet-ef
+    inputs:
+      command: 'custom'
+      custom: 'tool'
+      arguments: 'install --global dotnet-ef'
+
+  # - script: |
+  #    dotnet ef migrations script \
+  #    --idempotent \
+  #    --verbose \
+  #    -c CensusContext \
+  #    -s $(build.sourcesdirectory)/$(project) \
+  #    -p $(build.sourcesdirectory)/$(project) \
+  #    -o $(build.artifactstagingdirectory)/DotNet/Census/Scripts/censusDb.sql
+  #   displayName: Generate SQL Script
+
+  # - task: PublishPipelineArtifact@1
+  #   inputs:
+  #     targetPath: '$(Build.ArtifactStagingDirectory)'
+  #     artifact: 'manifest'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
+  
