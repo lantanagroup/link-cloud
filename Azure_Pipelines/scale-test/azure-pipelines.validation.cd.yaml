@@ -1,0 +1,58 @@
+trigger:
+  branches:
+    include:
+    - release/0.1.1
+  paths:
+    include:
+    - Java/validation/*
+    - Java/shared/*
+    exclude:
+    - '*'
+    
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: repositoryName
+  value: 'link-validation'
+- name: dockerPath
+  value: 'Java/validation/Dockerfile'
+- name: serviceName
+  value: 'Validation'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+
+steps:
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - task: Maven@2
+    displayName: Maven Install
+    inputs:
+      mavenPomFile: 'Java/pom.xml'
+      goals: install
+      options: '-pl validation -am'
+  
+  - task: Docker@2
+    displayName: "Build & Push Audit Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(repositoryName)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(Build.BuildId)
+      buildContext: 'Java/'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

@@ -1,0 +1,94 @@
+trigger:
+  branches:
+    include:
+    - release/0.1.1
+  paths:
+    include:
+    - DotNet/DataAcquisition/*
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/DataAcquisition/DataAcquisition.csproj'
+- name: domainProject
+  value: 'DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj'
+- name: testProject
+  value: 'DotNet/DataAcquisitionTests/DataAcquisitionTests.csproj'
+- name: nugetPath
+  value: 'DotNet/DataAcquisition/nuget.config'
+- name: tags1
+  value: 'latest'
+- name: tags2
+  value: '$(Build.BuildId)'
+- name: registry-repo-Name
+  value: 'link-dataacquisition'
+- name: dockerPath
+  value: '**/DotNet/DataAcquisition/Dockerfile'
+- name: serviceName
+  value: 'DataAcquisition'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)'
+    displayName: 'Run Tests'
+  
+
+  - task: Docker@2
+    displayName: "Build & Push DataAcquisition Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        $(tags1)
+        $(tags2)
+      buildContext: '$(Build.Repository.LocalPath)'
+  - task: DotNetCoreCLI@2
+    displayName: Install dotnet-ef
+    inputs:
+      command: 'custom'
+      custom: 'tool'
+      arguments: 'install --global dotnet-ef'
+
+  - script: |
+     dotnet ef migrations script \
+     --idempotent \
+     --verbose \
+     -c DataAcquisitionDbContext \
+     -s $(build.sourcesdirectory)/$(project) \
+     -p $(build.sourcesdirectory)/$(domainProject) \
+     -o $(build.artifactstagingdirectory)/sqlMigrations/Scripts/dataAcqDb.sql
+    displayName: Generate SQL Script
+
+  # - task: PublishPipelineArtifact@1
+  #   inputs:
+  #     targetPath: '$(Build.ArtifactStagingDirectory)'
+  #     artifact: 'manifest'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
