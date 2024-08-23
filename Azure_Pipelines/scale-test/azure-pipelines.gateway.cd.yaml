@@ -1,0 +1,56 @@
+trigger:
+  branches:
+    include:
+    - release/0.1.1
+  paths:
+    include:
+    - DotNet/DemoApiGateway/*
+    exclude:
+    - '*'
+    
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/DemoApiGateway/DemoApiGateway.csproj'
+- name: registry-repo-Name
+  value: 'link-api-gw'
+- name: dockerPath
+  value: '**/DotNet/DemoApiGateway/Dockerfile'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+  
+  - task: Docker@2
+    displayName: "Build & Push DemoApiGateway Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(Build.BuildId)
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'
