@@ -13,7 +13,7 @@
 		<Company>Lantana Consulting Group</Company>
 		<Description>Shared library for Lantana Link</Description>
 		<Product>NHSN Link Shared Library</Product>
-		<VersionPrefix>2.3.3</VersionPrefix>
+		<VersionPrefix>0.1.1</VersionPrefix>
 		<PackageId>com.lantanagroup.link.Shared</PackageId>
 	</PropertyGroup>
 
