@@ -26,3 +26,5 @@ COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Audit.dll"]
 #
 #
+# test 8 squash multiple signed commits
+
