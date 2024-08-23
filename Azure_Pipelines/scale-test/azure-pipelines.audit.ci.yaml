@@ -1,0 +1,40 @@
+trigger:
+  paths:
+    include:
+    - DotNet/Audit/*
+    - DotNet/Shared/*
+    
+pr:
+  paths:
+    include:
+    - DotNet/Audit/*
+    - DotNet/Shared/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  project: 'DotNet/Audit/Audit.csproj'
+  testProject: 'DotNet/AuditTests/AuditTests.csproj'
+  serviceName: 'Audit'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      verbosityRestore: Diagnostic
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: $(testProject)
+      arguments: --collect "Code coverage"
+    displayName: 'Run Tests'

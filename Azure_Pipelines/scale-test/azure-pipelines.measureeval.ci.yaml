@@ -1,0 +1,32 @@
+trigger:
+  paths:
+    include:
+    - Java/shared/*
+    - Java/measureeval/*
+    
+pr:
+  paths:
+    include:
+    - Java/shared/*
+    - Java/measureeval/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+  
+variables:
+- group: link-cloud-variables
+
+steps:
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  - task: Maven@2
+    displayName: Maven Install
+    inputs:
+      mavenPomFile: 'Java/pom.xml'
+      goals: test
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      options: '-pl measureeval -am'
