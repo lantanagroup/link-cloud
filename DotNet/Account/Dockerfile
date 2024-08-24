@@ -39,3 +39,4 @@ ENTRYPOINT ["dotnet", "Account.dll"]
 
 # test 3 - cherry pick a signed commit
 # test 9 multiple signed and unsigned commits
+# test 7 multiple signed and unsigned merge --no-ff
