@@ -38,3 +38,4 @@ COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Account.dll"]
 
 # test 3 - cherry pick a signed commit
+# test 9 multiple signed and unsigned commits
