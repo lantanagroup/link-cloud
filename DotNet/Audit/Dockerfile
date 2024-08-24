@@ -28,3 +28,4 @@ ENTRYPOINT ["dotnet", "Audit.dll"]
 #
 # test 8 squash multiple signed commits
 # test 9 multiple signed and unsigned commits
+# test 7 multiple signed and unsigned merge --no-ff
