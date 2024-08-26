@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QueryDispatch.Domain.Context;
 
@@ -11,9 +12,11 @@ using QueryDispatch.Domain.Context;
 namespace QueryDispatch.Migrations
 {
     [DbContext(typeof(QueryDispatchDbContext))]
-    partial class QueryDispatchDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240822210307_20240822_RenameRetryEntityTable")]
+    partial class _20240822_RenameRetryEntityTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
