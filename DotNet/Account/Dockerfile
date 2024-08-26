@@ -41,3 +41,4 @@ ENTRYPOINT ["dotnet", "Account.dll"]
 # test 9 multiple signed and unsigned commits
 # test 7 multiple signed and unsigned merge --no-ff
 # test 11 unsigned commit in protected branch
+# test 11 unsigned commit in protected branch part 2
