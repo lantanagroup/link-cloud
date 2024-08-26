@@ -5,9 +5,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.Shared.Application.Models
 {
-    [BsonCollection("retryEntity")]
+    [BsonCollection("eventRetries")]
     [BsonIgnoreExtraElements]
-    [Table("kafkaRetryTbl")]
+    [Table("EventRetries")]
     public class RetryEntity : BaseEntity
     {
         public string ServiceName { get; set; }
