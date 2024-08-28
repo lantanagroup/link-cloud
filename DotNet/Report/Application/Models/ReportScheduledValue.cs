@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.Report.Application.Models
 {
-    public class MeasureReportScheduledValue
+    public class ReportScheduledValue
     {
         public List<KeyValuePair<string, string>>? Parameters { get; set; }
     }
