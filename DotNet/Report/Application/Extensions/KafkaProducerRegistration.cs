@@ -11,7 +11,7 @@ public static class KafkaProducerRegistration
     public static void RegisterKafkaProducers(this IServiceCollection services, KafkaConnection kafkaConnection)
     {
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
-        services.AddTransient<IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>, KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>>();
+        services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
         services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
 
         var dataAcqProducerConfig = new ProducerConfig()
@@ -26,7 +26,7 @@ public static class KafkaProducerRegistration
         {
             ClientId = "Report_SubmissionReportScheduled"
         };
-        var submissionProducer = new KafkaProducerFactory<SubmissionReportKey, SubmissionReportValue>(kafkaConnection).CreateProducer(submissionProducerConfig);
+        var submissionProducer = new KafkaProducerFactory<SubmitReportKey, SubmitReportValue>(kafkaConnection).CreateProducer(submissionProducerConfig);
         services.AddSingleton(submissionProducer);
 
 
