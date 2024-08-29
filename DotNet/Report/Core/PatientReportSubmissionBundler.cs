@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Report.Core
         private readonly ILogger<PatientReportSubmissionBundler> _logger;
         private readonly IReportServiceMetrics _metrics;
         private readonly IDatabase _database;
-        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
+        private readonly IReportScheduledManager _reportScheduledManager;
 
         private readonly List<string> REMOVE_EXTENSIONS = new List<string> {
         "http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.population.description",
@@ -32,12 +32,12 @@ namespace LantanaGroup.Link.Report.Core
         "http://open.epic.com/FHIR/StructureDefinition/extension/team-name",
         "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant"};
 
-        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IMeasureReportScheduledManager measureReportScheduledManager)
+        public PatientReportSubmissionBundler(ILogger<PatientReportSubmissionBundler> logger, IDatabase database, IReportServiceMetrics metrics, IReportScheduledManager reportScheduledManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
             _database = database ?? throw new ArgumentNullException(nameof(database));
-            _measureReportScheduledManager = measureReportScheduledManager ?? throw new ArgumentNullException(nameof(measureReportScheduledManager));
+            _reportScheduledManager = reportScheduledManager ?? throw new ArgumentNullException(nameof(reportScheduledManager));
         }
 
 
@@ -49,18 +49,18 @@ namespace LantanaGroup.Link.Report.Core
             if (string.IsNullOrEmpty(patientId))
                 throw new Exception($"GenerateBundle: no patientId supplied");
 
-            var schedules = await _measureReportScheduledManager.GetMeasureReportSchedules(facilityId, startDate, endDate) ?? throw new Exception($"No Measure Reports Scheduled for facility {facilityId} and date range of {startDate} - {endDate}");
+            var schedules = await _reportScheduledManager.GetReportSchedules(facilityId, startDate, endDate) ?? throw new Exception($"No Measure Reports Scheduled for facility {facilityId} and date range of {startDate} - {endDate}");
 
             var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
                 e.FacilityId == facilityId && e.PatientId == patientId &&
-                schedules.Any(s => s.Id == e.MeasureReportScheduleId));
+                schedules.Any(s => s.Id == e.ReportScheduleId));
 
             Bundle patientResources = CreateNewBundle();
             Bundle otherResources = CreateNewBundle();  
             foreach (var entry in entries)
             {
-                var measureReportScheduleId = entry.MeasureReportScheduleId;
-                var schedule = schedules.Single(s => s.Id == entry.MeasureReportScheduleId);
+                var measureReportScheduleId = entry.ReportScheduleId;
+                var schedule = schedules.Single(s => s.Id == entry.ReportScheduleId);
                 if (schedule == null)
                     throw new Exception($"No report schedule found for measureReportScheduleId {measureReportScheduleId}");
 
@@ -70,14 +70,6 @@ namespace LantanaGroup.Link.Report.Core
                 }
 
                 MeasureReport mr = entry.MeasureReport;
-
-                var config =
-                    (await _database.ReportConfigRepository.FindAsync(x =>
-                        x.FacilityId == facilityId && x.ReportType == schedule.ReportType)).FirstOrDefault();
-
-                if (config == null)
-                    throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
-
 
                 foreach(var r in entry.ContainedResources)
                 {
@@ -134,8 +126,7 @@ namespace LantanaGroup.Link.Report.Core
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", measureReportScheduleId),
-                    new KeyValuePair<string, object?>("measure", mr.Measure),
-                    new KeyValuePair<string, object?>("bundling.type", config?.BundlingType)
+                    new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
             }
 
