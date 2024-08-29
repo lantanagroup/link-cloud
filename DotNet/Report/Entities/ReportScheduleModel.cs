@@ -5,9 +5,9 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace LantanaGroup.Link.Report.Entities
 {
 
-    [BsonCollection("measureReportSchedule")]
+    [BsonCollection("reportSchedule")]
     [BsonIgnoreExtraElements]
-    public class MeasureReportScheduleModel : BaseEntityExtended
+    public class ReportScheduleModel : BaseEntityExtended
     {
         public string FacilityId { get; set; } = string.Empty;
         public DateTime ReportStartDate { get; set; }
