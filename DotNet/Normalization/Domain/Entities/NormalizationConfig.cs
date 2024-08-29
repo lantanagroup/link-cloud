@@ -7,7 +7,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
 [Table("NormalizationConfig")]
-public partial class NormalizationConfig : BaseEntityExtended
+public class NormalizationConfig : BaseEntityExtended
 {
     [Unicode(false)]
     public string FacilityId { get; set; }
