@@ -21,7 +21,7 @@ public class QueryDispatchDbContext : DbContext
     public DbSet<QueryDispatchConfigurationEntity> QueryDispatchConfigurations { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
     public DbSet<PatientDispatchEntity> PatientDispatches { get; set; }
-    public DbSet<RetryEntity> EventRetries { get; set; }
+    public DbSet<RetryEntity> RetryEntities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

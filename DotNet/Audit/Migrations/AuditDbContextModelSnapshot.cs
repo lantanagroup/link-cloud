@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Audit.Migrations
 
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"), false);
 
-                    b.ToTable("EventRetries");
+                    b.ToTable("kafkaRetryTbl");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Audit.Domain.Entities.AuditLog", b =>

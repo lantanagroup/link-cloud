@@ -1,54 +1,59 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
-using Quartz;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
-    public class ReportScheduledListener : BackgroundService
+    public class ReportSubmittedListener : BackgroundService
     {
 
-        private readonly ILogger<ReportScheduledListener> _logger;
-        private readonly IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
-        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly ILogger<ReportSubmittedListener> _logger;
+        private readonly IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> _kafkaConsumerFactory;
+        //Doesn't actually generate a SubmissionReport but prevents us from having to declare a new factory type in the initialization
+        //for a ProducerFactory that's only used for an AuditEvent
+        private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
+
         private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private readonly ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> _deadLetterExceptionHandler;
 
         private string Name => this.GetType().Name;
 
-        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
-            ISchedulerFactory schedulerFactory,
-            ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory)
+        public ReportSubmittedListener(
+            ILogger<ReportSubmittedListener> logger, 
+            IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
+            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory, 
+            IServiceScopeFactory serviceScopeFactory,
+            ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
+            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _serviceScopeFactory = serviceScopeFactory;
 
             _transientExceptionHandler = transientExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
+                                               throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
-                                               throw new ArgumentException(nameof(_deadLetterExceptionHandler));
+                                      throw new ArgumentException(nameof(deadLetterExceptionHandler));
 
             _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Retry";
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportSubmitted) + "-Error";
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -68,8 +73,8 @@ namespace LantanaGroup.Link.Report.Listeners
             using var consumer = _kafkaConsumerFactory.CreateConsumer(config);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.ReportScheduled)}' at {DateTime.UtcNow}");
+                consumer.Subscribe(nameof(KafkaTopic.ReportSubmitted));
+                _logger.LogInformation($"Started report submitted consumer for topic '{nameof(KafkaTopic.ReportSubmitted)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -87,66 +92,67 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
+                                var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
-                                if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                    string.IsNullOrWhiteSpace(key.ReportType))
+                                if (string.IsNullOrWhiteSpace(key?.FacilityId))
                                 {
-                                    throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null or empty.");
+                                    throw new DeadLetterException("FacilityId is null or empty");
                                 }
 
-                                DateTimeOffset startDateOffset;
-                                if (!DateTimeOffset.TryParse(
-                                        value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
-                                        out startDateOffset))
+                                if (string.IsNullOrWhiteSpace(value?.ReportBundleId))
                                 {
-                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed");
+                                    throw new DeadLetterException("ReportBundleId is null or empty");
                                 }
 
-                                DateTimeOffset endDateOffset;
-                                if (!DateTimeOffset.TryParse(
-                                        value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
-                                        out endDateOffset))
+                                // find existing report schedule
+                                var subEntry = await database.ReportSubmissionRepository.SingleAsync(e =>
+                                        e.SubmissionBundle.Id == value.ReportBundleId, consumeCancellationToken);
+
+                                var schedule = await database.ReportScheduledRepository.SingleOrDefaultAsync(s =>
+                                    s.Id == subEntry.MeasureReportScheduleId, consumeCancellationToken);
+
+                                if (schedule is null)
                                 {
-                                    throw new DeadLetterException($"{Name}: End Date could not be parsed");
+                                    throw new TransientException(
+                                        $"{Name}: No report schedule found for submission bundle with ID {value.ReportBundleId}");
                                 }
 
-                                
-                                var startDate = startDateOffset.UtcDateTime;
-                                var endDate = endDateOffset.UtcDateTime;
+                                // update report schedule with submitted date
+                                schedule.SubmittedDate = DateTime.UtcNow;
+                                await database.ReportScheduledRepository.UpdateAsync(schedule, consumeCancellationToken);
 
-                                // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
-                                                                                                        && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate 
-                                                                                                        && x.ReportType == key.ReportType, consumeCancellationToken);
+                                // produce audit message signalling the report service acknowledged the report has been submitted
+                                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
 
-                                if (existing != null)
+                                string notes =
+                                    $"{ReportConstants.ServiceName} has processed the {nameof(KafkaTopic.ReportSubmitted)} event for report bundle with ID {value.ReportBundleId} with report schedule ID {schedule.Id}";
+                                var val = new AuditEventMessage
                                 {
-                                    throw new DeadLetterException(
-                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.");
-                                }
-
-                                var ent = new MeasureReportScheduleModel
+                                    FacilityId = schedule.FacilityId,
+                                    ServiceName = ReportConstants.ServiceName,
+                                    Action = AuditEventType.Submit,
+                                    EventDate = DateTime.UtcNow,
+                                    Resource = typeof(MeasureReportScheduleModel).Name,
+                                    Notes = notes
+                                };
+                                var headers = new Headers
                                 {
-                                    FacilityId = key.FacilityId,
-                                    ReportStartDate = startDate,
-                                    ReportEndDate = endDate,
-                                    ReportType = key.ReportType,
-                                    CreateDate = DateTime.UtcNow
+                                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                                 };
 
-                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, consumeCancellationToken);
+                                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred),
+                                    new Message<string, AuditEventMessage>
+                                    {
+                                        Value = val,
+                                        Headers = headers
+                                    });
+                                producer.Flush();
 
-                                await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                    await _schedulerFactory.GetScheduler(consumeCancellationToken));
-                                
+                                _logger.LogInformation(notes);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -170,8 +176,9 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 consumer.Commit(result);
                             }
-                        }, cancellationToken);
 
+                        }, cancellationToken);
+                        
                     }
                     catch (ConsumeException ex)
                     {
@@ -191,7 +198,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error encountered in ReportScheduledListener");
+                        _logger.LogError(ex, "Error encountered in ReportSubmittedListener");
                         consumer.Commit();
                     }
                 }
@@ -202,7 +209,6 @@ namespace LantanaGroup.Link.Report.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
-
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)

@@ -149,7 +149,7 @@ namespace QueryDispatch.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("EventRetries");
+                    b.ToTable("kafkaRetryTbl");
                 });
 #pragma warning restore 612, 618
         }

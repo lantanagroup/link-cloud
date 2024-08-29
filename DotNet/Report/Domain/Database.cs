@@ -10,8 +10,10 @@ namespace LantanaGroup.Link.Report.Domain
     {
         IEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         IEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
-        IEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
+        IEntityRepository<MeasureReportScheduleModel> ReportScheduledRepository { get; set; }
         IEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
+        IEntityRepository<MeasureReportConfigModel> ReportConfigRepository { get; set; }
+        IEntityRepository<MeasureReportSubmissionModel> ReportSubmissionRepository { get; set; }
     }
 
     public class Database : IDatabase
@@ -20,14 +22,18 @@ namespace LantanaGroup.Link.Report.Domain
 
         public IEntityRepository<PatientResourceModel> PatientResourceRepository { get; set; }
         public IEntityRepository<SharedResourceModel> SharedResourceRepository { get; set; }
-        public IEntityRepository<ReportScheduleModel> ReportScheduledRepository { get; set; }
+        public IEntityRepository<MeasureReportScheduleModel> ReportScheduledRepository { get; set; }
         public IEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
+        public IEntityRepository<MeasureReportConfigModel> ReportConfigRepository { get; set; }
+        public IEntityRepository<MeasureReportSubmissionModel> ReportSubmissionRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IEntityRepository<PatientResourceModel> patientResourceRepository,
             IEntityRepository<SharedResourceModel> sharedResourceRepository,
-            IEntityRepository<ReportScheduleModel> reportScheduledRepository,
-            IEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository)
+            IEntityRepository<MeasureReportScheduleModel> reportScheduledRepository,
+            IEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository,
+            IEntityRepository<MeasureReportConfigModel> reportConfigRepository,
+            IEntityRepository<MeasureReportSubmissionModel> reportSubmissionRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
@@ -36,6 +42,8 @@ namespace LantanaGroup.Link.Report.Domain
             SharedResourceRepository = sharedResourceRepository;
             ReportScheduledRepository = reportScheduledRepository;
             SubmissionEntryRepository = submissionEntryRepository;
+            ReportConfigRepository = reportConfigRepository;
+            ReportSubmissionRepository = reportSubmissionRepository;
         }
     }
 }

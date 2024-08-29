@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.Report.Application.Models
 {
-    public class SubmitReportKey
+    public class SubmissionReportKey
     {
         public string FacilityId { get; set; } = string.Empty;
         public DateTime? StartDate { get; internal set; }

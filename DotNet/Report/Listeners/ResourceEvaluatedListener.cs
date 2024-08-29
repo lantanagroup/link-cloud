@@ -15,7 +15,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -26,14 +25,14 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
        //private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
-        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
-        private readonly PatientReportSubmissionBundler _bundler;
+        private readonly MeasureReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
 
         private string Name => this.GetType().Name;
@@ -43,10 +42,10 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
-            PatientReportSubmissionBundler bundler,
+            MeasureReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
             IServiceScopeFactory serviceScopeFactory, 
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IProducer<SubmissionReportKey, SubmissionReportValue> submissionReportProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -106,7 +105,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             var scope = _serviceScopeFactory.CreateScope();
                             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
-                            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
                             var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
 
                             try
@@ -136,7 +135,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
-                                var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, consumeCancellationToken) ??
+                                var schedule = await measureReportScheduledManager.GetMeasureReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, consumeCancellationToken) ??
                                             throw new TransientException(
                                                 $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
                                 
@@ -145,7 +144,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (value.IsReportable)
                                 {
                                     var entry = (await submissionEntryManager.SingleOrDefaultAsync(e =>
-                                        e.ReportScheduleId == schedule.Id
+                                        e.MeasureReportScheduleId == schedule.Id
                                         && e.PatientId == value.PatientId, consumeCancellationToken));
 
                                     if (entry == null)
@@ -153,7 +152,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         entry = new MeasureReportSubmissionEntryModel
                                         {
                                             FacilityId = key.FacilityId,
-                                            ReportScheduleId = schedule.Id,
+                                            MeasureReportScheduleId = schedule.Id,
                                             PatientId = value.PatientId,
                                             CreateDate = DateTime.UtcNow
                                         };
@@ -217,7 +216,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     var submissionEntries =
                                         await submissionEntryManager.FindAsync(
-                                            e => e.ReportScheduleId == schedule.Id, consumeCancellationToken);
+                                            e => e.MeasureReportScheduleId == schedule.Id, consumeCancellationToken);
 
                                     var allReady = submissionEntries.All(x => x.ReadyForSubmission);
 
@@ -230,19 +229,17 @@ namespace LantanaGroup.Link.Report.Listeners
                                             .ToList();
 
                                         
-                                        var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
-                                        
+                                        var organization = _bundler.CreateOrganization(schedule.FacilityId);
                                         _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
-                                            new Message<SubmitReportKey, SubmitReportValue>
+                                            new Message<SubmissionReportKey, SubmissionReportValue>
                                             {
-                                                Key = new SubmitReportKey()
+                                                Key = new SubmissionReportKey()
                                                 {
                                                     FacilityId = schedule.FacilityId,
                                                     StartDate = schedule.ReportStartDate,
                                                     EndDate = schedule.ReportEndDate
                                                 },
-                                                Value = new SubmitReportValue()
+                                                Value = new SubmissionReportValue()
                                                 {
                                                     PatientIds = patientIds,
                                                     MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),

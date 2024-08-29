@@ -13,12 +13,45 @@ namespace LantanaGroup.Link.Report.Controllers
     public class ReportController : ControllerBase
     {
         private readonly ILogger<ReportController> _logger;
+        private readonly MeasureReportSubmissionBundler _bundler;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler)
+        public ReportController(ILogger<ReportController> logger, MeasureReportSubmissionBundler bundler, PatientReportSubmissionBundler patientReportSubmissionBundler)
         {
             _logger = logger;
+            _bundler = bundler;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
+        }
+
+        /// <summary>
+        /// Generates the bundle for the report indicated by the provided parameters.
+        /// </summary>
+        /// <param name="reportId"></param>
+        /// <returns></returns>
+        [HttpGet("Bundle/MeasureReport")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<MeasureReportSubmissionModel>> GetSubmissionBundle(string reportId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(reportId))
+                {
+                    BadRequest("Paramater reportId is null or whitespace");
+                }
+
+                _logger.LogInformation($"Executing GenerateSubmissionBundleJob for MeasureReportScheduleModel {reportId}");
+
+                MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
+
+                return Ok(submission);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundle for ReportId {reportId}: {ex.Message}");
+                return Problem(ex.Message, statusCode: 500);
+            }
         }
 
         /// <summary>

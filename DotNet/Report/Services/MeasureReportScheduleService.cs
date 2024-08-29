@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Report.Services
         }
 
 
-        public static async Task CreateJobAndTrigger(ReportScheduleModel reportSchedule, IScheduler scheduler)
+        public static async Task CreateJobAndTrigger(MeasureReportScheduleModel reportSchedule, IScheduler scheduler)
         {
             IJobDetail job = CreateJob(reportSchedule);
             
@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.Report.Services
         }
 
 
-        public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
+        public static IJobDetail CreateJob(MeasureReportScheduleModel reportSchedule)
         {
             JobDataMap jobDataMap = new JobDataMap();
 
@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.Report.Services
                 .Build();
         }
 
-        private static ITrigger CreateTrigger(ReportScheduleModel reportSchedule, JobKey jobKey)
+        private static ITrigger CreateTrigger(MeasureReportScheduleModel reportSchedule, JobKey jobKey)
         {
             JobDataMap jobDataMap = new JobDataMap();
 
@@ -102,13 +102,13 @@ namespace LantanaGroup.Link.Report.Services
         }
 
 
-        public static async Task DeleteJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+        public static async Task DeleteJob(MeasureReportScheduleModel reportSchedule, IScheduler scheduler)
         {
             JobKey jobKey = new JobKey(reportSchedule.Id, ReportConstants.MeasureReportSubmissionScheduler.Group);
             await scheduler.DeleteJob(jobKey);
         }
 
-        public static async Task RescheduleJob(ReportScheduleModel reportSchedule, IScheduler scheduler)
+        public static async Task RescheduleJob(MeasureReportScheduleModel reportSchedule, IScheduler scheduler)
         {
             await DeleteJob(reportSchedule, scheduler);
             await CreateJobAndTrigger(reportSchedule, scheduler);

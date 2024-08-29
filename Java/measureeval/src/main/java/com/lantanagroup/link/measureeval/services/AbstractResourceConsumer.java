@@ -216,11 +216,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         Set<Map.Entry<String, String>> singles = new HashSet<>();
 
         return patientStatus.getResources().stream()
-                .filter(resource -> resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED)
-                .filter(resource -> singles.add(new AbstractMap.SimpleEntry<>(resource.getResourceType().toString(), resource.getResourceId())))
+                .filter(resource ->
+                        resource.getNormalizationStatus() == NormalizationStatus.NORMALIZED ||
+                                resource.getNormalizationStatus() == NormalizationStatus.ERROR)
                 .map(resource -> retrieveResource(patientStatus.getFacilityId(), resource))
+                .filter(resource -> singles.add(new AbstractMap.SimpleEntry<>(resource.getResourceType().toString(), resource.getResourceId())))
                 .toList();
-
     }
 
     private AbstractResourceEntity retrieveResource(

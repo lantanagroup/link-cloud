@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.Census.Migrations
             modelBuilder.Entity("Census.Domain.Entities.CensusConfigEntity", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
@@ -49,6 +50,7 @@ namespace LantanaGroup.Link.Census.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.CensusPatientListEntity", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("AdmitDate")
@@ -85,6 +87,7 @@ namespace LantanaGroup.Link.Census.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Census.Domain.Entities.PatientCensusHistoricEntity", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CensusDateTime")
@@ -155,7 +158,7 @@ namespace LantanaGroup.Link.Census.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("EventRetries");
+                    b.ToTable("kafkaRetryTbl");
                 });
 #pragma warning restore 612, 618
         }

@@ -25,6 +25,7 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.FhirListConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Authentication")
@@ -56,6 +57,7 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.FhirQueryConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Authentication")
@@ -86,6 +88,7 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.QueriedFhirResourceRecord", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CorrelationId")
@@ -123,6 +126,7 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.QueryPlan", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
@@ -167,6 +171,7 @@ namespace DataAcquisition.Domain.Migrations
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.ReferenceResources", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
@@ -240,7 +245,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("EventRetries");
+                    b.ToTable("kafkaRetryTbl");
                 });
 #pragma warning restore 612, 618
         }

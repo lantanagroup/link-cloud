@@ -28,6 +28,8 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<Guid>("Id"));
+
                     b.Property<DateTime>("CreateDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -92,7 +94,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("EventRetries");
+                    b.ToTable("kafkaRetryTbl");
                 });
 #pragma warning restore 612, 618
         }

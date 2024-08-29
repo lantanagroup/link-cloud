@@ -9,7 +9,6 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Jobs
@@ -19,22 +18,25 @@ namespace LantanaGroup.Link.Report.Jobs
     {
         private readonly ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> _logger;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
-        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
         private readonly ISchedulerFactory _schedulerFactory;
 
+        private readonly MeasureReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
         private readonly IDatabase _database;
 
         public GenerateDataAcquisitionRequestsForPatientsToQuery(
             ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger,
             ISchedulerFactory schedulerFactory,
+            MeasureReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
             IDatabase database,
             IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IProducer<SubmissionReportKey, SubmissionReportValue> submissionReportProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
+            _bundler = bundler;
             _aggregator = aggregator;
             _database = database;
             _dataAcqProducer = dataAcqProducer;
@@ -49,7 +51,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
                 var schedule =
-                    (ReportScheduleModel)triggerMap[
+                    (MeasureReportScheduleModel)triggerMap[
                         ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
 
                 //Make sure we get a fresh object from the DB
@@ -103,7 +105,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 {
                     var submissionEntries =
                         await _database.SubmissionEntryRepository.FindAsync(x =>
-                            x.ReportScheduleId == schedule.Id);
+                            x.MeasureReportScheduleId == schedule.Id);
 
                     var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
@@ -120,18 +122,17 @@ namespace LantanaGroup.Link.Report.Jobs
                             ClientId = "Report_SubmissionReportScheduled"
                         };
 
-                        var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                                                                ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                        var organization = _bundler.CreateOrganization(schedule.FacilityId);
                         _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
-                            new Message<SubmitReportKey, SubmitReportValue>
+                            new Message<SubmissionReportKey, SubmissionReportValue>
                             {
-                                Key = new SubmitReportKey()
+                                Key = new SubmissionReportKey()
                                 {
                                     FacilityId = schedule.FacilityId,
                                     StartDate = schedule.ReportStartDate,
                                     EndDate = schedule.ReportEndDate
                                 },
-                                Value = new SubmitReportValue()
+                                Value = new SubmissionReportValue()
                                 {
                                     PatientIds = patientIds,
                                     Organization = organization,
