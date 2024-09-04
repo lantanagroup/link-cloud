@@ -91,10 +91,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     if (consumeResult == null 
                                     || string.IsNullOrWhiteSpace(consumeResult.Message.Key) 
                                     || !value.IsValid())
-                                    //|| (value.ReportType == null 
-                                    //|| value.ReportType.Count <= 0)
-                                    //|| value.EndDate == default
-                                    //|| value.StartDate == default)
                                     {
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
