@@ -1,10 +1,10 @@
 ## Proposed changes
 
-Describe the big picture of your changes here to communicate to the team members reviewing them.
+Describe the big picture of your changes here to the team members reviewing them.
 
 ## Types of changes
 
-What types of changes does your code introduce to Appium?
+What types of changes does your code introduce?
 _Put an `x` in the boxes that apply_
 
 - [ ] Bug-fix 
@@ -14,4 +14,4 @@ _Put an `x` in the boxes that apply_
 
 ## Unit testing performed
 
-Describe the testing performed and whether new unit tests 
+Describe the testing performed and whether any new unit tests need to be added to CI.
