@@ -42,8 +42,6 @@ namespace QueryDispatch.Domain.Managers
         {
             try
             {
-                // await _datastore.AddAsync(scheduledReport);
-
                 await _scheduledReportRepository.AddAsync(scheduledReport);
 
                 _logger.LogInformation($"Created schedule report for faciltiy {scheduledReport.FacilityId}");
