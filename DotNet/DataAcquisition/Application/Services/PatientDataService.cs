@@ -170,7 +170,7 @@ public class PatientDataService : IPatientDataService
 
         foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
         {
-            var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
+            var queryPlan = queryPlans.FirstOrDefault(x => x.Type.ToString() == scheduledReport.ReportType);
 
             if (queryPlan != null)
             {
