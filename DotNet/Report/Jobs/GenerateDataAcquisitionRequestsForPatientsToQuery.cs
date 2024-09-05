@@ -48,9 +48,7 @@ namespace LantanaGroup.Link.Report.Jobs
             {
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                var schedule =
-                    (ReportScheduleModel)triggerMap[
-                        ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
+                var schedule = (ReportScheduleModel)triggerMap[ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
 
                 //Make sure we get a fresh object from the DB
                 schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id);
@@ -70,16 +68,33 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         var darKey = schedule.FacilityId;
 
+                        string reportableEvent = string.Empty;
+
+                        switch (schedule.Frequency.ToLower())
+                        {
+                            case "monthly":
+                                reportableEvent = "EOM";
+                                break;
+                            case "weekly":
+                                reportableEvent = "EOW";
+                                break;
+                            case "daily":
+                                reportableEvent = "EOD";
+                                break;
+                        }
+
                         var darValue = new DataAcquisitionRequestedValue()
                         {
                             PatientId = patientId,
+                            ReportableEvent = reportableEvent,
                             ScheduledReports = new List<ScheduledReport>()
                                 {
-                                    new ScheduledReport()
+                                    new ()
                                     {
                                         StartDate = schedule.ReportStartDate,
                                         EndDate = schedule.ReportEndDate,
-                                        ReportType = schedule.ReportFrequency
+                                        Frequency = schedule.Frequency,
+                                        ReportTypes = schedule.ReportTypes
                                     }
                                 },
                             QueryType = QueryType.Initial.ToString(),
@@ -97,7 +112,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     }
 
 
-                    _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Type: {schedule.ReportFrequency} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
+                    _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Types: {string.Join(", ", schedule.ReportTypes)} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
                 else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {

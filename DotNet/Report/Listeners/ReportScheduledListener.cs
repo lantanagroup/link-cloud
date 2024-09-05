@@ -105,13 +105,19 @@ namespace LantanaGroup.Link.Report.Listeners
                                         $"{Name}: FacilityId is null or empty.");
                                 }
 
+                                if (reportTypes == null || reportTypes.Length == 0)
+                                {
+                                    throw new DeadLetterException(
+                                        $"{Name}: ReportTypes is null or empty.");
+                                }
+
                                 // Check if this already exists
                                 var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
                                                                                                         && x.ReportEndDate == endDate
                                                                                                         && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
 
-                                ReportScheduleModel? reportSchedule = null;
+                                ReportScheduleModel? reportSchedule;
                                 if(existing != null) 
                                 {
                                     reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
