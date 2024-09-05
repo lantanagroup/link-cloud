@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                     {
                                         StartDate = schedule.ReportStartDate,
                                         EndDate = schedule.ReportEndDate,
-                                        ReportType = schedule.ReportType
+                                        ReportType = schedule.ReportFrequency
                                     }
                                 },
                             QueryType = QueryType.Initial.ToString(),
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     }
 
 
-                    _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Type: {schedule.ReportType} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
+                    _logger.LogInformation($"DataAcquisitionRequested topics published for {schedule?.PatientsToQuery?.Count ?? 0} patients for {schedule.FacilityId} for Report Type: {schedule.ReportFrequency} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
                 else if ((schedule.PatientsToQuery?.Count ?? 0) == 0)
                 {
