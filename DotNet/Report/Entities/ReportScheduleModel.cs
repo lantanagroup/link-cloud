@@ -16,6 +16,7 @@ namespace LantanaGroup.Link.Report.Entities
         public DateTime? SubmitReportDateTime { get; set; }
         public DateTime? SubmittedDate { get; set; }
         public bool PatientsToQueryDataRequested { get; set; } = false;
-        public string ReportType { get; internal set; } = string.Empty;
+        public string[] ReportTypes { get; set; } = Array.Empty<string>();
+        public string Frequency { get; internal set; } = string.Empty;
     }
 }

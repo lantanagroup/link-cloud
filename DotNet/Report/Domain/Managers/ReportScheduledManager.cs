@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             // find existing report scheduled for this facility, report type, and date range
             return (await _database.ReportScheduledRepository.FindAsync(
                 r => r.FacilityId == facilityId && r.ReportStartDate == startDate && r.ReportEndDate == endDate &&
-                     r.ReportType == reportType, cancellationToken))?.SingleOrDefault();
+                     r.ReportTypes.Contains(reportType), cancellationToken))?.SingleOrDefault();
         }
 
         public async Task<List<ReportScheduleModel>?> GetReportSchedules(string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
