@@ -239,6 +239,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 Key = new SubmitReportKey()
                                                 {
                                                     FacilityId = schedule.FacilityId,
+                                                    ReportScheduleId = schedule.Id,
                                                     StartDate = schedule.ReportStartDate,
                                                     EndDate = schedule.ReportEndDate
                                                 },
