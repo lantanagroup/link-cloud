@@ -1,13 +1,11 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Factory
 {
     public class QueryDispatchFactory : IQueryDispatchFactory
     {
-        public ScheduledReportEntity CreateScheduledReport(string facilityId, string reportType, DateTime startDate, DateTime endDate, string correlationId)
+        public ScheduledReportEntity CreateScheduledReport(string facilityId, string reportType, string frequency, DateTime startDate, DateTime endDate, string correlationId)
         {
             return new ScheduledReportEntity()
             {
@@ -18,6 +16,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Factory
                     new ReportPeriodEntity()
                     {
                         ReportType = reportType,
+                        Frequency = frequency,
                         StartDate = startDate,
                         EndDate = endDate,
                         CreateDate = DateTime.UtcNow,

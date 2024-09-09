@@ -42,35 +42,33 @@ namespace QueryDispatch.Domain.Managers
         {
             try
             {
-                // await _datastore.AddAsync(scheduledReport);
-
                 await _scheduledReportRepository.AddAsync(scheduledReport);
 
                 _logger.LogInformation($"Created schedule report for faciltiy {scheduledReport.FacilityId}");
 
-                    var headers = new Headers
+                var headers = new Headers
                         {
                             { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
                         };
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = scheduledReport.FacilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Create,
-                        EventDate = DateTime.UtcNow,
-                        Resource = typeof(ScheduledReportEntity).Name,
-                        Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = scheduledReport.FacilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Create,
+                    EventDate = DateTime.UtcNow,
+                    Resource = typeof(ScheduledReportEntity).Name,
+                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage,
-                        Headers = headers
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage,
+                    Headers = headers
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
 
 
                 return scheduledReport.FacilityId;
@@ -130,30 +128,30 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportType} for facility id {existingReport.FacilityId}");
 
-                    var headers = new Headers
+                var headers = new Headers
                     {
                         { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.CorrelationId) }
                     };
 
-                    var auditMessage = new AuditEventMessage
-                    {
-                        FacilityId = existingReport.FacilityId,
-                        ServiceName = QueryDispatchConstants.ServiceName,
-                        Action = AuditEventType.Update,
-                        EventDate = DateTime.UtcNow,
-                        PropertyChanges = propertyChanges,
-                        Resource = typeof(ScheduledReportEntity).Name,
-                        Notes = $"Updated schedule report {existingReport.Id} for facility {existingReport.FacilityId}"
-                    };
+                var auditMessage = new AuditEventMessage
+                {
+                    FacilityId = existingReport.FacilityId,
+                    ServiceName = QueryDispatchConstants.ServiceName,
+                    Action = AuditEventType.Update,
+                    EventDate = DateTime.UtcNow,
+                    PropertyChanges = propertyChanges,
+                    Resource = typeof(ScheduledReportEntity).Name,
+                    Notes = $"Updated schedule report {existingReport.Id} for facility {existingReport.FacilityId}"
+                };
 
-                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                    {
-                        Value = auditMessage,
-                        Headers = headers
-                    });
+                _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                {
+                    Value = auditMessage,
+                    Headers = headers
+                });
 
-                    _producer.Flush();
-                
+                _producer.Flush();
+
 
             }
             catch (Exception ex)
