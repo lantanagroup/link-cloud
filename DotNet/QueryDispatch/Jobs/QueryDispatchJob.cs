@@ -9,6 +9,7 @@ using System.Text;
 using QueryDispatch.Application.Settings;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using QueryDispatch.Domain.Managers;
+using QueryDispatch.Application.Models;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
