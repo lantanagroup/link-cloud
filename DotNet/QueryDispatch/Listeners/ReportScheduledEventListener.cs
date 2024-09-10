@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             IProducer<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
-            IServiceScopeFactory serviceScopeFactory) 
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -55,9 +55,11 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken) {
+        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        {
 
-            var config = new ConsumerConfig() { 
+            var config = new ConsumerConfig()
+            {
                 GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
@@ -72,7 +74,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         ConsumeResult<string, ReportScheduledValue>? consumeResult;
-                        try 
+
+                        try
                         {
                             await _reportScheduledConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                             {
@@ -81,15 +84,15 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                
+
                                     var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
 
                                     var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
 
                                     ReportScheduledValue value = consumeResult.Message.Value;
 
-                                    if (consumeResult == null 
-                                    || string.IsNullOrWhiteSpace(consumeResult.Message.Key) 
+                                    if (consumeResult == null
+                                    || string.IsNullOrWhiteSpace(consumeResult.Message.Key)
                                     || !value.IsValid())
                                     {
                                         throw new DeadLetterException("Invalid Report Scheduled event");
@@ -107,7 +110,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
 
                                     string key = consumeResult.Message.Key;
-                                    
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
@@ -120,7 +122,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
-                                        foreach(var reportType in value.ReportType)
+                                        
+                                        foreach (var reportType in value.ReportType)
                                         {
                                             ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, reportType, frequency, startDate, endDate, correlationId);
                                             await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
@@ -209,12 +212,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
         private void ProduceAuditEvent(AuditEventMessage auditEvent, Headers headers)
         {
-                _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                {
-                    Value = auditEvent,
-                    Headers = headers
-                });
-            
+            _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+            {
+                Value = auditEvent,
+                Headers = headers
+            });
+
         }
     }
 }
