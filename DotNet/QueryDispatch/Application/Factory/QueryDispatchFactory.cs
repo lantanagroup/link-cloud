@@ -1,7 +1,5 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using QueryDispatch.Application.Settings;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Factory
 {
