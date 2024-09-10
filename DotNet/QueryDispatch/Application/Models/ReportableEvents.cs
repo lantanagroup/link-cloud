@@ -4,6 +4,6 @@ namespace QueryDispatch.Application.Models;
 
 public enum ReportableEvents
 {
-    [StringValue("Disharge")]
+    [StringValue("Discharge")]
     Disharge
 }
