@@ -11,7 +11,7 @@
 
 ## Introduction
 
-Link is an open source reference implementation for CDC’s National Healthcare Safety Network (NHSN) reporting. It is an application that aggregates, calculates, and shares line-level clinical data for patients matching NHSN surveillance requirements. It is based on C#/.NET Core and Java using Micro Services, Kafka, and other technologies. It is intended for large loads. It uses streaming technologies so that as soon as a patient can be queried, it does, rather than waiting until the end of the reporting cycle to initiate query/evaluate. So, it works throughout the entire month, distributing the workload through the entire month, and then aggregates it at the end of the reporting cycle for a submission.
+NHSNLink is an open-source reference implementation for CDC’s National Healthcare Safety Network (NHSN) reporting. It is an application that aggregates, transforms, evaluates, validates and submits patient-level clinical data for patients matching NHSN surveillance requirements. It is based on a event driven micro service architecture using C#, Java, Kafka and other technologies. NHSNLink is designed to handle large-scale data processing efficiently. It leverages streaming technologies that can be configured to continuously query and evaluate patient data throughout the reporting cycle, rather than waiting until the end to initiate this process.
 
 ## Link Cloud Services
 
