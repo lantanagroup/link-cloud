@@ -1,17 +1,7 @@
-## Proposed changes
+### 🛠 Description of Changes
 
-Describe the big picture of your changes here to the team members reviewing them.
+Provide a high-level overview of the changes included in this PR.
 
-## Types of changes
+### 🧪 Testing Performed
 
-What types of changes does your code introduce?
-_Put an `x` in the boxes that apply_
-
-- [ ] Bug-fix 
-- [ ] New feature work
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation Update (if none of the other choices apply)
-
-## Unit testing performed
-
-Describe the testing performed and whether any new unit tests need to be added to CI.
+Describe the testing that was performed to test the change or bug-fix.
