@@ -8,5 +8,6 @@ public class ResourceAcquiredMessage
     public string PatientId { get; set; }
     public string QueryType { get; set; }
     public object Resource { get; set; }
+    public string ReportableEvent { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }
 }
