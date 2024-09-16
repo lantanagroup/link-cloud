@@ -2,7 +2,8 @@
 
 public class ScheduledReport
 {
-    public string ReportType { get; set; }
+    public string[] ReportTypes { get; set; }
     public string StartDate { get; set; }
     public string EndDate { get; set; }
+    public string Frequency { get; set; } = string.Empty;
 }
