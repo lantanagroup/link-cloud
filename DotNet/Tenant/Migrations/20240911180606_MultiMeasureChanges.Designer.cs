@@ -4,6 +4,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Tenant.Migrations
 {
     [DbContext(typeof(FacilityDbContext))]
-    partial class FacilityDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240911180606_MultiMeasureChanges")]
+    partial class MultiMeasureChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

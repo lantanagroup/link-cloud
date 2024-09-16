@@ -103,7 +103,7 @@ namespace Tenant
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
-            builder.Services.AddScoped<FacilityConfigurationService>();
+            builder.Services.AddScoped<IFacilityConfigurationService, FacilityConfigurationService>();
             builder.Services.AddScoped<IFacilityConfigurationRepo, FacilityConfigurationRepo>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
