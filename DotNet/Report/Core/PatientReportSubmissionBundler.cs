@@ -143,6 +143,92 @@ namespace LantanaGroup.Link.Report.Core
             return patientSubmissionModel;
         }
 
+        public async Task<Bundle> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
+        {
+            if (string.IsNullOrEmpty(facilityId))
+                throw new Exception($"GenerateBundle: no facilityId supplied");
+
+            if (string.IsNullOrEmpty(patientId))
+                throw new Exception($"GenerateBundle: no patientId supplied");
+
+            var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportScheduleId) ?? throw new Exception($"No Measure Reports Scheduled for reportScheduleId of {reportScheduleId}");
+
+            var entries = await _database.SubmissionEntryRepository.FindAsync(e => e.FacilityId == facilityId && e.PatientId == patientId && schedule.Id == e.ReportScheduleId);
+
+            Bundle bundle = CreateNewBundle();
+
+            foreach (var entry in entries)
+            {
+                if (entry.MeasureReport == null)
+                {
+                    continue;
+                }
+
+                MeasureReport mr = entry.MeasureReport;
+
+                foreach (var r in entry.ContainedResources)
+                {
+                    if (r.DocumentId == null)
+                        continue;
+
+                    IFacilityResource facilityResource = null!;
+
+                    var resourceTypeCategory = ResourceCategory.GetResourceCategoryByType(r.ResourceType);
+
+                    Resource resource = null;
+
+                    try
+                    {
+                        if (resourceTypeCategory == ResourceCategoryType.Patient)
+                        {
+                            facilityResource = await _database.PatientResourceRepository.GetAsync(r.DocumentId);
+                            resource = facilityResource.GetResource();
+                            AddResourceToBundle(bundle, resource);
+                        }
+                        else
+                        {
+                            facilityResource = await _database.SharedResourceRepository.GetAsync(r.DocumentId);
+                            resource = facilityResource.GetResource();
+                            AddResourceToBundle(bundle, resource);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        var message =
+                            $"{resource.TypeName} with ID {resource?.Id} contained resource could not be parsed into a valid Resource.";
+                        _logger.LogError(message, ex);
+
+                        throw new Exception(message, ex);
+                    }
+                }
+
+
+                // ensure we have an id to reference
+                if (string.IsNullOrEmpty(mr.Id))
+                    mr.Id = Guid.NewGuid().ToString();
+                // ensure we have a meta object
+                // set individual measure report profile
+                mr.Meta = new Meta
+                {
+                    Profile = new List<string> { ReportConstants.BundleSettings.IndividualMeasureReportProfileUrl }
+                };
+
+                // clean up resource
+                cleanupResource(mr);
+
+                AddResourceToBundle(bundle, mr);
+
+                _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() 
+                {
+                    new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
+                    new KeyValuePair<string, object?>("measure.schedule.id", reportScheduleId),
+                    new KeyValuePair<string, object?>("measure", mr.Measure)
+                });
+            }
+
+            return bundle;
+        }
+
         #region Bundling Options
 
         private void cleanupResource(Resource resource)

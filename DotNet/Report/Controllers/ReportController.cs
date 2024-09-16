@@ -1,3 +1,4 @@
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Entities;
 using Link.Authorization.Policies;
@@ -50,6 +51,48 @@ namespace LantanaGroup.Link.Report.Controllers
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
 
                 return Ok(submission);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
+                return Problem(ex.Message, statusCode: 500);
+            }
+        }
+
+        /// <summary>
+        /// Returns a serialized PatientSubmissionModel containing all of the Patient level resources and Other resources
+        /// for all measure reports for the provided FacilityId, PatientId, and Reporting Period.
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="patientId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        [HttpGet("Bundle/Validation/Patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Bundle))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<Bundle>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(facilityId))
+                {
+                    BadRequest("Paramater facilityId is null or whitespace");
+                }
+
+                if (string.IsNullOrWhiteSpace(patientId))
+                {
+                    BadRequest("Paramater patientId is null or whitespace");
+                }
+
+                if (string.IsNullOrWhiteSpace(reportScheduleId))
+                {
+                    BadRequest("Paramater reportScheduleId is null or whitespace");
+                }
+
+                var bundle = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
+
+                return Ok(bundle);
             }
             catch (Exception ex)
             {
