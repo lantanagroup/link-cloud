@@ -48,7 +48,7 @@ public class TenantApiService : ITenantApiService
         _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
-        if (_linkTokenServiceConfig.Value.SigningKey is null && !_linkTokenServiceConfig.)
+        if (_linkTokenServiceConfig.Value.SigningKey is null)
             throw new Exception("Link Token Service Signing Key is missing.");
 
         //get link token
