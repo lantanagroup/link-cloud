@@ -2,7 +2,9 @@ package com.lantanagroup.link.measureeval;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
+import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -38,9 +41,9 @@ public class FileSystemInvocation {
             if (measureBundleFile.isFile()) {
                 String measureBundleContent = FileUtils.readFileToString(measureBundleFile, "UTF-8");
                 if (measureBundlePath.toLowerCase().endsWith(".json")) {
-                    return (Bundle) fhirContext.newJsonParser().parseResource(measureBundleContent);
+                    return fhirContext.newJsonParser().parseResource(Bundle.class, measureBundleContent);
                 } else if (measureBundlePath.toLowerCase().endsWith(".xml")) {
-                    return (Bundle) fhirContext.newXmlParser().parseResource(measureBundleContent);
+                    return fhirContext.newXmlParser().parseResource(Bundle.class, measureBundleContent);
                 } else {
                     throw new IllegalArgumentException("Unsupported measure bundle file format: " + measureBundlePath);
                 }
@@ -52,12 +55,14 @@ public class FileSystemInvocation {
                 File[] files = measureBundleFile.listFiles();
 
                 if (files != null) {
-                    List<String> loaded = new ArrayList<>();
+                    HashSet<String> loaded = new HashSet<>();
 
                     for (File file : files) {
                         String filePath = file.getAbsolutePath();
-                        if (file.isFile() && (filePath.endsWith(".json") || filePath.endsWith(".xml"))) {
-                            String fileName = file.getName().substring(0, file.getName().lastIndexOf('.'));
+                        String fileExtension = file.isFile() ? FilenameUtils.getExtension(filePath) : null;
+
+                        if (file.isFile() && (fileExtension.equalsIgnoreCase("json") || fileExtension.equalsIgnoreCase("xml"))) {
+                            String fileName = FilenameUtils.getBaseName(filePath);
 
                             if (loaded.contains(fileName)) {
                                 logger.warn("Skipping duplicate file: {}", filePath);
@@ -129,7 +134,7 @@ public class FileSystemInvocation {
         return bundle.getEntry().stream()
                 .filter(e -> e.getResource() instanceof Patient)
                 .map(e -> (Patient) e.getResource())
-                .findFirst()
+                .reduce(StreamUtils::toOnlyElement)
                 .orElseThrow(() -> new IllegalArgumentException("Patient resource not found in bundle"));
     }
 
