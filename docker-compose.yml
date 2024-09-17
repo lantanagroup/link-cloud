@@ -822,6 +822,7 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      LinkTokenService__EnableTokenGenerationEndpoint: false
       ServiceRegistry__MeasureServiceUrl: http://measureeval:8067
     ports:
       - "8074:8074"
