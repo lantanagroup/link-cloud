@@ -96,7 +96,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
+                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId.Replace("\n", "")}: {ex.Message}");
                 return Problem(ex.Message, statusCode: 500);
             }
         }
