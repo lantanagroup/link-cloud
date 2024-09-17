@@ -1,41 +1,46 @@
 trigger:
   branches:
     include:
-    - dev
-    - release/*
+    - main
   paths:
     include:
-    - DotNet/Account/*
-    - DotNet/Shared/*
-    exclude:
-    - '*'
-    
+    - DotNet/PatientList/*
 pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: link-cloud-variables
+- group: Link_BOTW_Build_Package_Variables
 - name: project
-  value: 'DotNet/Account/Account.csproj'
+  value: 'DotNet/PatientList/PatientList.csproj'
 - name: testProject
-  value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
-- name: serviceName
-  value: 'Account'
+  value: 'DotNet/PatientListUnitTests/PatientListUnitTests.csproj'
+- name: nugetPath
+  value: 'DotNet/PatientList/nuget.config'
+- name: tags1
+  value: 'latest'
+- name: tags2
+  value: '$(Build.BuildId)_$(Build.SourceBranchName)'
 - name: registry-repo-Name
-  value: 'link-account'
+  value: 'link-patientlist'
 - name: dockerPath
-  value: '**/DotNet/Account/Dockerfile'
+  value: '**/DotNet/PatientList/Dockerfile'
+- name: serviceName
+  value: 'PatientList'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
-  
+
 steps:
+  - template: ../azure-nuget-package-source.yml
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
+      nugetConfigPath: '$(nugetPath)'
+      feedsToUse: config
   
   - task: DotNetCoreCLI@2
     displayName: Build
@@ -51,7 +56,7 @@ steps:
   
 
   - task: Docker@2
-    displayName: "Build & Push Account Docker Image"
+    displayName: "Build & Push PatientList Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
@@ -59,8 +64,8 @@ steps:
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
-        latest
-        $(Build.BuildId)_$(Build.SourceBranchName)
+        $(tags1)
+        $(tags2)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
