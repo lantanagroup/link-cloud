@@ -334,6 +334,7 @@ services:
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
       Telemetry__EnableTelemetry: true
@@ -399,8 +400,9 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
       LinkTokenService__EnableTokenGenerationEndpoint: true
@@ -656,7 +658,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
       IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317

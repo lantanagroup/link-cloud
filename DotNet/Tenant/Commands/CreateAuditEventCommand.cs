@@ -13,12 +13,13 @@ namespace LantanaGroup.Link.Tenant.Commands
         private readonly ILogger<CreateAuditEventCommand> _logger;
 
 
-        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        //private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+        private readonly IProducer<string, object> _producer;
 
-        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory)
+        public CreateAuditEventCommand(ILogger<CreateAuditEventCommand> logger, IProducer<string, object> producer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
 
@@ -27,15 +28,14 @@ namespace LantanaGroup.Link.Tenant.Commands
 
             using (ServiceActivitySource.Instance.StartActivity("Produce Audit Event"))
             {
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-
+                
                 try
                 {
                     // send the Audit Event
                     Headers headers = new Headers();
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId ?? Guid.NewGuid().ToString()));
 
-                    await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, AuditEventMessage>
+                    await _producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, object>
                     {
                         Key = facilityId,
                         Value = auditEvent,

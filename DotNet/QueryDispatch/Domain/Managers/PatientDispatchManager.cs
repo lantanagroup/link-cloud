@@ -1,9 +1,7 @@
 ﻿using Confluent.Kafka;
 using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
@@ -23,21 +21,21 @@ namespace QueryDispatch.Domain.Managers
     {
         private readonly IEntityRepository<PatientDispatchEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
         private readonly ISchedulerFactory _schedulerFactory;
 
-        public PatientDispatchManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
+        public PatientDispatchManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, ISchedulerFactory schedulerFactory, IProducer<string, AuditEventMessage> producer)
         {
             _repository = database.PatientDispatchRepo;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _logger = logger;
             _compareLogic = new CompareLogic();
             _compareLogic.Config.MaxDifferences = 25;
             _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
-       
+
 
         public async Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch)
         {
@@ -50,9 +48,6 @@ namespace QueryDispatch.Domain.Managers
 
                 await ScheduleService.CreateJobAndTrigger(patientDispatch, await _schedulerFactory.GetScheduler());
 
-
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
                     var headers = new Headers
                     {
                         { "X-Correlation-Id", Guid.NewGuid().ToByteArray() }
@@ -68,14 +63,14 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Created patient dispatch for patient id {patientDispatch.PatientId} in facility {patientDispatch.FacilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage,
                         Headers = headers
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
                 return patientDispatch.FacilityId;
             }
             catch (Exception ex)
@@ -96,8 +91,7 @@ namespace QueryDispatch.Domain.Managers
                 }
                 _logger.LogInformation($"Deleted Patient Dispatch record for patient id {patientId} in facility {facilityId}");
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
+
                     var headers = new Headers
                         {
                             { "X-Correlation-Id", Guid.NewGuid().ToByteArray() }
@@ -113,14 +107,14 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Deleted Patient Dispatch record for patient id {patientId} in facility {facilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage,
                         Headers = headers
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
 
                 return true;
 

@@ -20,6 +20,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             services.AddTransient<IClaimsTransformation, LinkClaimsTransformer>();
             services.AddLinkAuthorizationHandlers();
 
+            logger.Information("Initializing authentication schemas.");
+            List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];
+
+            var defaultChallengeScheme = configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
+            services.Configure<AuthenticationSchemaConfig>(options =>
+            {
+                options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
+
+                if (string.IsNullOrEmpty(defaultChallengeScheme))
+                    throw new NullReferenceException("DefaultChallengeScheme is required.");
+
+                options.DefaultChallengeScheme = defaultChallengeScheme;
+
+                options.EnableAnonymousAccess = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+
+            });
+
             if (securityServiceOptions.Environment.IsDevelopment() && configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
             {
                 services.AddAuthentication(options =>
@@ -40,22 +57,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 return services;
             
-            }                
-
-            logger.Information("Initializing authentication schemas.");
-            List<string> authSchemas = [LinkAdminConstants.AuthenticationSchemes.Cookie];            
-
-            var defaultChallengeScheme = configuration.GetValue<string>("Authentication:DefaultChallengeScheme");
-            services.Configure<AuthenticationSchemaConfig>(options =>
-            {
-                options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;                
-
-                if (string.IsNullOrEmpty(defaultChallengeScheme))
-                    throw new NullReferenceException("DefaultChallengeScheme is required.");
-
-                options.DefaultChallengeScheme = defaultChallengeScheme;
-                
-            });
+            }              
 
             var authBuilder = services.AddAuthentication(options => {
                 options.DefaultScheme = LinkAdminConstants.AuthenticationSchemes.Cookie;
@@ -199,11 +201,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
             if (!LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken.Equals(defaultChallengeScheme))
                 authSchemas.Add(LinkAuthorizationConstants.AuthenticationSchemas.LinkBearerToken);
 
-            services.AddLinkBearerServiceAuthentication(options =>
+            services.AddLinkBearerServiceAuthentication(logger, options =>
             {
                 options.Environment = securityServiceOptions.Environment;
                 options.Authority = configuration.GetValue<string>("LinkTokenService:Authority") ?? LinkAuthorizationConstants.LinkBearerService.LinkBearerIssuer;
-                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;              
+                options.Audience = LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience;   
+                
+                var linkTokenSigningKey = configuration.GetValue<string>("LinkTokenService:SigningKey");
+                if (!string.IsNullOrEmpty(linkTokenSigningKey))
+                {
+                    options.SigningKey = linkTokenSigningKey;
+                }
             });
 
             // Add Authorization
@@ -244,7 +252,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
         public class SecurityServiceOptions
         {
-            public IWebHostEnvironment Environment { get; set; } = null!;
+            public IWebHostEnvironment Environment { get; set; } = null!;        
         }
     }
 }

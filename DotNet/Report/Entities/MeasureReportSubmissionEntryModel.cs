@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Report.Entities
     public class MeasureReportSubmissionEntryModel : BaseEntityExtended
     {
         public string FacilityId { get; set; } = string.Empty;
-        public string MeasureReportScheduleId { get; set; } = string.Empty;
+        public string ReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
         [BsonIgnoreIfNull]
