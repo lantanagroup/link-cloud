@@ -246,6 +246,8 @@ namespace Tenant
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
 
+            app.AutoMigrateEF<FacilityDbContext>();
+
             app.UseRouting();            
             app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
