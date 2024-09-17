@@ -36,7 +36,7 @@ public class FileSystemInvocation {
             }
 
             if (measureBundleFile.isFile()) {
-                String measureBundleContent = FileUtils.readFileToString(measureBundleFile);
+                String measureBundleContent = FileUtils.readFileToString(measureBundleFile, "UTF-8");
                 if (measureBundlePath.toLowerCase().endsWith(".json")) {
                     return (Bundle) fhirContext.newJsonParser().parseResource(measureBundleContent);
                 } else if (measureBundlePath.toLowerCase().endsWith(".xml")) {
@@ -66,9 +66,9 @@ public class FileSystemInvocation {
                             Resource resource;
 
                             if (filePath.endsWith(".json")) {
-                                resource = (Resource) fhirContext.newJsonParser().parseResource(FileUtils.readFileToString(file));
+                                resource = (Resource) fhirContext.newJsonParser().parseResource(FileUtils.readFileToString(file, "UTF-8"));
                             } else {
-                                resource = (Resource) fhirContext.newXmlParser().parseResource(FileUtils.readFileToString(file));
+                                resource = (Resource) fhirContext.newXmlParser().parseResource(FileUtils.readFileToString(file, "UTF-8"));
                             }
 
                             bundle.addEntry(new Bundle.BundleEntryComponent().setResource(resource));
