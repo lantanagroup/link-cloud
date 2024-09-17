@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
@@ -10,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -110,14 +112,18 @@ public class PatientDataService : IPatientDataService
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
         FhirQueryConfiguration fhirQueryConfiguration = null;
-        List<QueryPlan> queryPlans = null;
+        QueryPlan? queryPlan = null;
 
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans = await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
+            queryPlan = (await _queryPlanManager.FindAsync(
+                q => q.FacilityId == request.FacilityId 
+                    && q.Type.GetStringValue() == ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent)
+                , cancellationToken))
+                ?.FirstOrDefault();
 
-            if (fhirQueryConfiguration == null || queryPlans == null)
+            if (fhirQueryConfiguration == null || queryPlan == null)
             {
                 throw new MissingFacilityConfigurationException(
                     $"No configuration for {request.FacilityId} exists.");
@@ -170,14 +176,11 @@ public class PatientDataService : IPatientDataService
 
         foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
         {
-            var queryPlan = queryPlans.FirstOrDefault(x => x.Type.ToString() == scheduledReport.ReportType);
-
             if (queryPlan != null)
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
                 var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
 
-                //var referenceTypes = queryPlan.InitialQueries.Where(x => x.GetType() == typeof(ReferenceQueryConfig)).Select(x => ((ReferenceQueryConfig)x.Value).ResourceType).ToList();
                 var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
                 referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
 
