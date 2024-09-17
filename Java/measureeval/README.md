@@ -28,11 +28,11 @@ To bypass the JAR manifest's main() class that runs it as a service, run the JAR
 Format:
 
 ```bash
-java -cp measureeval.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
+java -cp measureeval-<version>.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
 ```
 
 Example:
 
 ```bash
-java -cp measureeval.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
+java -cp measureeval-<version>.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
 ```
