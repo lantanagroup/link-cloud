@@ -4,6 +4,8 @@ import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.r4.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,8 +14,7 @@ import java.util.List;
 
 /**
  * This class is used to invoke measure evaluation using arbitrary artifacts on the file system for ease of testing and debugging new measures.
- * Format: `java -jar measureeval.jar -cp com.lantanagroup.link.measureeval.FileSystemInvocation "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"`
- * Example: `java -jar measureeval.jar -cp com.lantanagroup.link.measureeval.FileSystemInvocation "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"`
+ * See the main measureeval project's README for more details about how to execute the JAR from the command line.
  * Careful when specifying file paths to use forward-slash instead of windows' backslash, as that will cause java to interpret the backslash as an escape character and not as a path separator, leading to potentially incorrect parameter interpretation.
  * The `start` and `end` parameters must be in a valid DateTime format from the FHIR specification.
  * The `measure-bundle-path` can be a path to a single measure bundle file or a directory containing each of the resources needed for the measure.
@@ -22,67 +23,133 @@ import java.util.List;
  */
 public class FileSystemInvocation {
     private static final FhirContext fhirContext = FhirContext.forR4Cached();
+    private static final Logger logger = LoggerFactory.getLogger(FileSystemInvocation.class);
 
     private static Bundle getBundle(String measureBundlePath) throws IOException {
-        System.out.println("Loading measure bundle from: " + measureBundlePath);
+        logger.info("Loading measure bundle from: {}", measureBundlePath);
 
-        File measureBundleFile = new File(measureBundlePath);
+        try {
+            File measureBundleFile = new File(measureBundlePath);
 
-        if (!measureBundleFile.exists()) {
-            throw new IllegalArgumentException("Measure bundle file does not exist: " + measureBundlePath);
-        }
-
-        if (measureBundleFile.isFile()) {
-            String measureBundleContent = FileUtils.readFileToString(measureBundleFile);
-            if (measureBundlePath.toLowerCase().endsWith(".json")) {
-                return (Bundle) fhirContext.newJsonParser().parseResource(measureBundleContent);
-            } else if (measureBundlePath.toLowerCase().endsWith(".xml")) {
-                return (Bundle) fhirContext.newXmlParser().parseResource(measureBundleContent);
-            } else {
-                throw new IllegalArgumentException("Unsupported measure bundle file format: " + measureBundlePath);
+            if (!measureBundleFile.exists()) {
+                throw new IllegalArgumentException("Measure bundle file does not exist: " + measureBundlePath);
             }
-        } else {
-            // Parse and load each file in the directory
-            Bundle bundle = new Bundle();
-            bundle.setType(Bundle.BundleType.COLLECTION);
 
-            File[] files = measureBundleFile.listFiles();
+            if (measureBundleFile.isFile()) {
+                String measureBundleContent = FileUtils.readFileToString(measureBundleFile);
+                if (measureBundlePath.toLowerCase().endsWith(".json")) {
+                    return (Bundle) fhirContext.newJsonParser().parseResource(measureBundleContent);
+                } else if (measureBundlePath.toLowerCase().endsWith(".xml")) {
+                    return (Bundle) fhirContext.newXmlParser().parseResource(measureBundleContent);
+                } else {
+                    throw new IllegalArgumentException("Unsupported measure bundle file format: " + measureBundlePath);
+                }
+            } else {
+                // Parse and load each file in the directory
+                Bundle bundle = new Bundle();
+                bundle.setType(Bundle.BundleType.COLLECTION);
 
-            if (files != null) {
-                List<String> loaded = new ArrayList<>();
+                File[] files = measureBundleFile.listFiles();
 
-                for (File file : files) {
-                    String filePath = file.getAbsolutePath();
-                    if (file.isFile() && (filePath.endsWith(".json") || filePath.endsWith(".xml"))) {
-                        String fileName = file.getName().substring(0, file.getName().lastIndexOf('.'));
+                if (files != null) {
+                    List<String> loaded = new ArrayList<>();
 
-                        if (loaded.contains(fileName)) {
-                            System.out.println("Skipping duplicate file: " + filePath);
-                        }
+                    for (File file : files) {
+                        String filePath = file.getAbsolutePath();
+                        if (file.isFile() && (filePath.endsWith(".json") || filePath.endsWith(".xml"))) {
+                            String fileName = file.getName().substring(0, file.getName().lastIndexOf('.'));
 
-                        Resource resource;
+                            if (loaded.contains(fileName)) {
+                                logger.warn("Skipping duplicate file: {}", filePath);
+                            }
 
-                        if (filePath.endsWith(".json")) {
-                            resource = (Resource) fhirContext.newJsonParser().parseResource(FileUtils.readFileToString(file));
+                            Resource resource;
+
+                            if (filePath.endsWith(".json")) {
+                                resource = (Resource) fhirContext.newJsonParser().parseResource(FileUtils.readFileToString(file));
+                            } else {
+                                resource = (Resource) fhirContext.newXmlParser().parseResource(FileUtils.readFileToString(file));
+                            }
+
+                            bundle.addEntry(new Bundle.BundleEntryComponent().setResource(resource));
+                            loaded.add(fileName);
                         } else {
-                            resource = (Resource) fhirContext.newXmlParser().parseResource(FileUtils.readFileToString(file));
+                            logger.warn("Skipping file: {}", filePath);
                         }
-
-                        bundle.addEntry(new Bundle.BundleEntryComponent().setResource(resource));
-                        loaded.add(fileName);
-                    } else {
-                        System.out.println("Skipping file: " + filePath);
                     }
                 }
+
+                logger.info("Loaded " + bundle.getEntry().size() + " resources from directory: " + measureBundlePath);
+
+                return bundle;
             }
-
-            System.out.println("Loaded " + bundle.getEntry().size() + " resources from directory: " + measureBundlePath);
-
-            return bundle;
+        } catch (IOException ex) {
+            logger.error("Error occurred while loading measure bundle: {}", ex.getMessage());
+            throw ex;
         }
     }
 
+
+    public static List<Bundle> getBundlesFromDirectoryAndSubDirectories(String directory) {
+        List<Bundle> bundles = new ArrayList<>();
+        File[] files = new File(directory).listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    bundles.addAll(getBundlesFromDirectoryAndSubDirectories(file.getAbsolutePath()));
+                } else {
+                    try {
+                        if (!file.getAbsolutePath().toLowerCase().endsWith(".json") && !file.getAbsolutePath().toLowerCase().endsWith(".xml")) {
+                            continue;
+                        }
+                        Bundle bundle = getBundle(file.getAbsolutePath());
+                        bundles.add(bundle);
+                    } catch (IOException e) {
+                        System.err.println("Error occurred while loading bundle: " + e.getMessage());
+                        continue;
+                    }
+                }
+            }
+        }
+        return bundles;
+    }
+
+    public static String getGroupPopulations(MeasureReport measureReport) {
+        StringBuilder populations = new StringBuilder();
+        for (MeasureReport.MeasureReportGroupComponent group : measureReport.getGroup()) {
+            populations.append("Group: ").append(group.getId()).append("\n");
+            for (MeasureReport.MeasureReportGroupPopulationComponent population : group.getPopulation()) {
+                populations.append("Population: ").append(population.getCode().getCodingFirstRep().getDisplay()).append(" - ").append(population.getCount()).append("\n");
+            }
+        }
+        return populations.toString();
+    }
+
+    private static Patient findPatient(Bundle bundle) {
+        return bundle.getEntry().stream()
+                .filter(e -> e.getResource() instanceof Patient)
+                .map(e -> (Patient) e.getResource())
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Patient resource not found in bundle"));
+    }
+
+    private static void evaluatePatientBundle(String patientBundlePath, Bundle patientBundle, String start, String end, MeasureEvaluator evaluator) {
+        Patient patient = findPatient(patientBundle);
+        var report = evaluator.evaluate(
+                new DateTimeType(start),
+                new DateTimeType(end),
+                new StringType("Patient/" + patient.getIdElement().getIdPart()),
+                patientBundle);
+        String json = fhirContext.newJsonParser().encodeResourceToString(report);
+        logger.info("Summary of evaluate for patient/groups/populations:\nPatient: {}\n{}\nJSON: {}", patient.getIdElement().getIdPart(), getGroupPopulations(report), json);
+    }
+
     public static void main(String[] args) {
+        if (args.length != 4) {
+            System.err.println("Invalid number of arguments. Expected 4 arguments: <measure-bundle-path> <patient-bundle-path> <start> <end>");
+            System.exit(1);
+        }
+
         String measureBundlePath = args[0];
         String patientBundlePath = args[1];
         String start = args[2];
@@ -90,17 +157,21 @@ public class FileSystemInvocation {
 
         try {
             Bundle measureBundle = getBundle(measureBundlePath);
-            Bundle patientBundle = getBundle(patientBundlePath);
-            MeasureEvaluator evaluator = MeasureEvaluator.compile(fhirContext, measureBundle);
-            Patient patient = patientBundle.getEntry().stream()
-                    .filter(e -> e.getResource() instanceof Patient)
-                    .map(e -> (Patient) e.getResource())
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Patient resource not found in bundle"));
-            var report = evaluator.evaluate(new DateTimeType(start), new DateTimeType(end),
-                    new StringType("Patient/" + patient.getIdElement().getIdPart()), patientBundle);
-            String json = fhirContext.newJsonParser().encodeResourceToString(report);
-            System.out.println(json);
+            MeasureEvaluator evaluator = MeasureEvaluator.compile(fhirContext, measureBundle, true);
+
+            File patientBundleFile = new File(patientBundlePath);
+
+            if (patientBundleFile.isDirectory()) {
+                List<Bundle> patientBundles = getBundlesFromDirectoryAndSubDirectories(patientBundlePath);
+
+                for (Bundle patientBundle : patientBundles) {
+                    logger.info("\n===================================================");
+                    evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+                }
+            } else {
+                Bundle patientBundle = getBundle(patientBundlePath);
+                evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+            }
         } catch (Exception e) {
             System.err.println("Error occurred while evaluating measure: " + e.getMessage());
             e.printStackTrace();
