@@ -24,6 +24,7 @@ public interface IEntityRepository<T>
     T Update(T entity);
     Task<T> UpdateAsync(T entity, CancellationToken cancellationToken = default);
     void Delete(string id);
+    Task DeleteAsync(T? entity, CancellationToken cancellationToken);
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     Task<HealthCheckResult> HealthCheck(int eventId);

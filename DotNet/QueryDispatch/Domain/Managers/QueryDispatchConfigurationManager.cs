@@ -24,22 +24,20 @@ namespace QueryDispatch.Domain.Managers
 
     public class QueryDispatchConfigurationManager : IQueryDispatchConfigurationManager
     {
-
-        //private readonly IQueryDispatchConfigurationRepository _repository;
         private readonly IEntityRepository<QueryDispatchConfigurationEntity> _repository;
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _kafkaProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _producer;
         private readonly CompareLogic _compareLogic;
         private readonly ISchedulerFactory _schedulerFactory;
 
-        public QueryDispatchConfigurationManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, IKafkaProducerFactory<string, AuditEventMessage> kafkaProducerFactory, ISchedulerFactory schedulerFactory)
+        public QueryDispatchConfigurationManager(ILogger<QueryDispatchConfigurationManager> logger, IDatabase database, ISchedulerFactory schedulerFactory, IProducer<string, AuditEventMessage> producer)
         {
             _repository = database.QueryDispatchConfigurationRepo;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _logger = logger;
             _compareLogic = new CompareLogic();
             _compareLogic.Config.MaxDifferences = 25;
             _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
+            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
         public async Task SaveConfigEntity(QueryDispatchConfigurationEntity config, List<DispatchSchedule> dispatchSchedules, CancellationToken cancellationToken)
@@ -67,8 +65,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Updated query dispatch configuration for facility {config.FacilityId}");
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
+
 
                     var auditMessage = new AuditEventMessage
                     {
@@ -81,13 +78,13 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Updated query dispatch configuration {config.Id} for facility {config.FacilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
             }
             catch (Exception ex)
             {
@@ -106,8 +103,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Created query dispatch configuration for facility {config.FacilityId}");
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
 
                     var auditMessage = new AuditEventMessage
                     {
@@ -119,13 +114,13 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Created query dispatch configuration {config.Id} for facility {config.FacilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
 
             }
             catch (Exception ex)
@@ -155,8 +150,6 @@ namespace QueryDispatch.Domain.Managers
                 _logger.LogInformation($"Deleted query dispatch configuration for facility {facilityId}");
 
 
-                using (var producer = _kafkaProducerFactory.CreateAuditEventProducer())
-                {
                     var auditMessage = new AuditEventMessage
                     {
                         FacilityId = facilityId,
@@ -167,13 +160,13 @@ namespace QueryDispatch.Domain.Managers
                         Notes = $"Deleted query dispatch configuration for facility {facilityId}"
                     };
 
-                    producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                    _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                     {
                         Value = auditMessage
                     });
 
-                    producer.Flush();
-                }
+                    _producer.Flush();
+                
 
                 await ScheduleService.DeleteJob(facilityId, await _schedulerFactory.GetScheduler());
                 

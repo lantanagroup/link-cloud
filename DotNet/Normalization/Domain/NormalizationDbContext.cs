@@ -11,18 +11,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Entities;
 
 public partial class NormalizationDbContext : DbContext
 {
-    //public NormalizationDbContext()
-    //{
-
-    //}
-
     public NormalizationDbContext(DbContextOptions<NormalizationDbContext> options)
         : base(options)
     {
     }
 
     public virtual DbSet<NormalizationConfig> NormalizationConfigs { get; set; }
-    public virtual DbSet<RetryEntity> RetryEntities { get; set; }
+    public virtual DbSet<RetryEntity> EventRetries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,8 +32,6 @@ public partial class NormalizationDbContext : DbContext
                 v => new Guid(v),
                 v => v.ToString()
             );
-
-        OnModelCreatingPartial(modelBuilder);
 
         modelBuilder.Entity<NormalizationConfig>()
             .Property(b => b.OperationSequence)
@@ -55,6 +48,4 @@ public partial class NormalizationDbContext : DbContext
                                           v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
                                                  );
     }
-
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
