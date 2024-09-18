@@ -7,11 +7,11 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
 public enum Frequency
 {
     [StringValue("Discharge")]
-    Discharge,
+    Discharge = 0,
     [StringValue("Daily")]
-    Daily,
+    Daily = 1,
     [StringValue("Weekly")]
-    Weekly,
+    Weekly = 2,
     [StringValue("Monthly")]
-    Monthly
+    Monthly = 3
 }

@@ -7,9 +7,9 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
@@ -35,14 +35,11 @@ public interface IFhirApiService
 
     Task<List<ResourceReference>> GetPagedBundledResultAndGenerateMessagesAsync(
         string baseUrl, 
-        string patientIdReference, 
-        string correlationId, 
-        string facilityId, 
+        GetPatientDataRequest request, 
         string queryType, 
         List<string> referenceTypes, 
         PagedParameterQueryFactoryResult pagedQuery, 
         ParameterQueryConfig config, 
-        ScheduledReport report, 
         AuthenticationConfiguration authConfig);
 
     Task<Bundle> GetSingularBundledResultsAsync(
@@ -58,14 +55,11 @@ public interface IFhirApiService
 
     Task<List<ResourceReference>> GetSingularBundledResultsAndGenerateMessagesAsync(
         string baseUrl, 
-        string patientIdReference, 
-        string correlationId, 
-        string facilityId, 
+        GetPatientDataRequest request,
         string queryType, 
         List<string> resourceTypes, 
         SingularParameterQueryFactoryResult query, 
         ParameterQueryConfig config, 
-        ScheduledReport report, 
         AuthenticationConfiguration authConfig);
 
     Task<Patient> GetPatient(
@@ -96,11 +90,8 @@ public interface IFhirApiService
     Task GetReferenceResourceAndGenerateMessage(
         string baseUrl,
         string resourceType,
-        string patientIdReference,
-        string facilityIdReference,
-        string correlationId,
+        GetPatientDataRequest request,
         string queryPlanType,
-        ScheduledReport report,
         ResourceReference referenceId,
         ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig);
@@ -298,8 +289,9 @@ public class FhirApiService : IFhirApiService
         string? correlationId = default,
         string? facilityId = default,
         string? queryType = default,
-        ScheduledReport? report = default,
+        List<ScheduledReport>? reports = default,
         List<string>? referenceTypes = default,
+        ReportableEvent reportableEvent = default,
         bool generateMessages = false,
         bool returnBundle = true,
         bool saveReferenceResource = false,
@@ -322,7 +314,7 @@ public class FhirApiService : IFhirApiService
             if (resultBundle != null)
             {
                 if (generateMessages)
-                    await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
+                    await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
 
                 foreach (var entry in resultBundle.Entry)
                 {
@@ -394,7 +386,7 @@ public class FhirApiService : IFhirApiService
                             newResultBundle.Entry.AddRange(resultBundle.Entry);
                         
                         if(generateMessages)
-                            await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
+                            await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
 
                         foreach (var entry in resultBundle.Entry)
                         {
@@ -471,6 +463,7 @@ public class FhirApiService : IFhirApiService
         string? correlationId = default,
         string? facilityId = default,
         string? queryType = default,
+        ReportableEvent reportableEvent = default,
         ScheduledReport? report = default,
         bool generateMessages = false,
         CancellationToken cancellationToken = default)
@@ -515,7 +508,7 @@ public class FhirApiService : IFhirApiService
         if (readResource != null)
         {
             if (generateMessages)
-                await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = readResource } } }, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, new List<ScheduledReport> { report }), cancellationToken);
+                await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = readResource } } }, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, new List<ScheduledReport> { report }), cancellationToken);
 
             await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
             {
@@ -654,7 +647,14 @@ public class FhirApiService : IFhirApiService
         ]);
     }
 
-    public async Task<List<ResourceReference>> GetPagedBundledResultAndGenerateMessagesAsync(string baseUrl, string patientIdReference, string correlationId, string facilityId, string queryType, List<string> referenceTypes, PagedParameterQueryFactoryResult pagedQuery, ParameterQueryConfig config, ScheduledReport report, AuthenticationConfiguration authConfig)
+    public async Task<List<ResourceReference>> GetPagedBundledResultAndGenerateMessagesAsync(
+        string baseUrl, 
+        GetPatientDataRequest request,
+        string queryType, 
+        List<string> referenceTypes, 
+        PagedParameterQueryFactoryResult pagedQuery, 
+        ParameterQueryConfig config, 
+        AuthenticationConfiguration authConfig)
     {
         List<ResourceReference> references = new List<ResourceReference>();
 
@@ -679,14 +679,21 @@ public class FhirApiService : IFhirApiService
                 parameters.Add(kvPair.Key, kvPair.Value);
             }
 
-            var results = await SearchFhirEndpointAsync(parameters, fhirClient, config.ResourceType, patientIdReference, correlationId, facilityId, queryType, report, referenceTypes, true, false);
+            var results = await SearchFhirEndpointAsync(parameters, fhirClient, config.ResourceType, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ScheduledReports, referenceTypes, request.ConsumeResult.Value.ReportableEvent, true, false);
             references.AddRange(results.ResourceReference);
         }
 
         return references;
     }
 
-    public async Task<List<ResourceReference>> GetSingularBundledResultsAndGenerateMessagesAsync(string baseUrl, string patientIdReference, string correlationId, string facilityId, string queryType, List<string> resourceTypes, SingularParameterQueryFactoryResult query, ParameterQueryConfig config, ScheduledReport report, AuthenticationConfiguration authConfig)
+    public async Task<List<ResourceReference>> GetSingularBundledResultsAndGenerateMessagesAsync(
+        string baseUrl, 
+        GetPatientDataRequest request,
+        string queryType, 
+        List<string> resourceTypes, 
+        SingularParameterQueryFactoryResult query, 
+        ParameterQueryConfig config,
+        AuthenticationConfiguration authConfig)
     {
         List<ResourceReference> references = new List<ResourceReference>();
 
@@ -720,9 +727,9 @@ public class FhirApiService : IFhirApiService
                 }
             }
 
-            var resource = await ReadFhirEndpointAsync(fhirClient, config.ResourceType, resourceId, patientIdReference, correlationId, facilityId, queryType);
+            var resource = await ReadFhirEndpointAsync(fhirClient, config.ResourceType, resourceId, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ReportableEvent);
             
-            await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, new ResourceRequiredMessageRequest(facilityId, patientIdReference, queryType, correlationId, new List<ScheduledReport> { report }));
+            await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, new ResourceRequiredMessageRequest(request.FacilityId, request.ConsumeResult.Value.PatientId, queryType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
 
             references.AddRange(ReferenceResourceBundleExtractor.Extract(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, resourceTypes));
         }
@@ -739,7 +746,7 @@ public class FhirApiService : IFhirApiService
                 query.SearchParams.Add(kvPair.Key, kvPair.Value);
             }
 
-            var result = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, patientIdReference, correlationId, facilityId, queryType, report, resourceTypes, true, false);
+            var result = await SearchFhirEndpointAsync(query.SearchParams, fhirClient, config.ResourceType, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ScheduledReports, resourceTypes, request.ConsumeResult.Value.ReportableEvent, true, false);
 
             references.AddRange(result.ResourceReference);
         }
@@ -750,11 +757,8 @@ public class FhirApiService : IFhirApiService
     public async Task GetReferenceResourceAndGenerateMessage(
         string baseUrl,
         string resourceType,
-        string patientIdReference,
-        string facilityIdReference,
-        string correlationId,
+        GetPatientDataRequest request,
         string queryPlanType,
-        ScheduledReport report,
         ResourceReference referenceId, 
         ReferenceQueryConfig config,
         AuthenticationConfiguration authConfig)
@@ -789,7 +793,7 @@ public class FhirApiService : IFhirApiService
                 }
             }
 
-            var result = await ReadFhirEndpointAsync(fhirClient, resourceType, refId, patientIdReference, correlationId, facilityIdReference, queryPlanType);
+            var result = await ReadFhirEndpointAsync(fhirClient, resourceType, refId, request.ConsumeResult.Value.PatientId.SplitReference(), request.CorrelationId, request.FacilityId, queryPlanType);
 
             if (result.TypeName == nameof(OperationOutcome))
             {
@@ -811,7 +815,7 @@ public class FhirApiService : IFhirApiService
 
             var refResource = new ReferenceResources
             {
-                FacilityId = facilityIdReference,
+                FacilityId = request.FacilityId,
                 ResourceId = result.Id,
                 ReferenceResource = System.Text.Json.JsonSerializer.Serialize(result, jsonOptions),
                 ResourceType = resourceType,
@@ -822,7 +826,7 @@ public class FhirApiService : IFhirApiService
 
             await _bundleResourceAcquiredEventService.GenerateEventAsync(
                 new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = result } } }, 
-                new ResourceRequiredMessageRequest(facilityIdReference, patientIdReference, queryPlanType, correlationId, new List<ScheduledReport> { report }));
+                new ResourceRequiredMessageRequest(request.FacilityId, request.ConsumeResult.Value.PatientId?.SplitReference(), queryPlanType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
         }
         else
         {
@@ -846,7 +850,7 @@ public class FhirApiService : IFhirApiService
                 searchParams.Add(kvPair.Key, kvPair.Value);
             }
 
-            await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, patientIdReference, correlationId, facilityIdReference, queryPlanType, report, null, true, false, true);
+            await SearchFhirEndpointAsync(searchParams, fhirClient, resourceType, request.ConsumeResult.Value.PatientId?.SplitReference(), request.CorrelationId, request.FacilityId, queryPlanType, request.ConsumeResult.Value.ScheduledReports, null, request.ConsumeResult.Value.ReportableEvent, true, false, true);
         }
     }
 }

@@ -35,7 +35,6 @@ public interface IReferenceResourceService
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
-        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default);
 }
@@ -113,7 +112,6 @@ public class ReferenceResourceService : IReferenceResourceService
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
-        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default)
     {
@@ -169,11 +167,8 @@ public class ReferenceResourceService : IReferenceResourceService
             await _fhirRepo.GetReferenceResourceAndGenerateMessage(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
-            request.ConsumeResult.Message.Value.PatientId.SplitReference(),
-            request.FacilityId,
-            request.CorrelationId,
+            request,
             queryPlanType,
-            report,
             x,
             referenceQueryConfig,
             fhirQueryConfiguration.Authentication);
