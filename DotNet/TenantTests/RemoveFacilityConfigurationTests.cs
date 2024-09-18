@@ -39,10 +39,11 @@ namespace TenantTests
                 Id = id,
                 FacilityId = facilityId,
                 FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
+                ScheduledReports = new ScheduledReportModel()
             };
+            _model.ScheduledReports.Daily = new string[] { "NHSNdQMAcuteCareHospitalInitialPopulation" };
+            _model.ScheduledReports.Weekly = new string[] { "NHSNRespiratoryPathogenSurveillanceInitialPopulation" };
+            _model.ScheduledReports.Monthly = new string[] { "NHSNGlycemicControlHypoglycemicInitialPopulation" };
 
             _serviceRegistry = new ServiceRegistry()
             {
