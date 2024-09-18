@@ -123,6 +123,11 @@ public class ResourceAcquiredListener : BackgroundService
                             throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", ex);
                         }
 
+                        if (string.IsNullOrWhiteSpace(message.Message.Value.ReportableEvent))
+                        {
+                            throw new DeadLetterException("Message.Value.ReportableEvent) is null or empty");
+                        }
+
                         NormalizationConfig? config = null;
                         try
                         {
@@ -314,7 +319,8 @@ public class ResourceAcquiredListener : BackgroundService
                                 PatientId = message.Message.Value.PatientId ?? "",
                                 Resource = serializedResource,
                                 QueryType = message.Message.Value.QueryType,
-                                ScheduledReports = message.Message.Value.ScheduledReports
+                                ScheduledReports = message.Message.Value.ScheduledReports,
+                                ReportableEvent = message.Message.Value.ReportableEvent
                             };
                             Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
                             {
