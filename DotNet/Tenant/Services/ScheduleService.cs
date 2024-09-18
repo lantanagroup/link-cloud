@@ -19,10 +19,12 @@ namespace LantanaGroup.Link.Tenant.Services
         public const string DAILY = "daily";
 
         private readonly ISchedulerFactory _schedulerFactory;
-        private readonly IJobFactory _jobFactory;
+        private readonly Quartz.Spi.IJobFactory _jobFactory;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ILogger<ScheduleService> _logger;
 
         public ScheduleService(
+           ILogger<ScheduleService> logger,
            ISchedulerFactory schedulerFactory,
            IServiceScopeFactory serviceScopeFactory,
            IJobFactory jobFactory)
@@ -30,6 +32,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
             _scopeFactory = serviceScopeFactory;
+            _logger = logger;
         }
 
         public IScheduler Scheduler { get; set; }
@@ -46,7 +49,12 @@ namespace LantanaGroup.Link.Tenant.Services
                 var facilities = await _context.Facilities.ToListAsync();
                 foreach (FacilityConfigModel facility in facilities)
                 {
-                   await AddJobsForFacility(facility, Scheduler);
+                    if(String.IsNullOrEmpty(facility.TimeZone))
+                    {
+                        _logger.LogError($"Facility {facility.Id} does not have a timezone set. Skipping scheduled jobs for this facility.");
+                        continue;
+                    }
+                    await AddJobsForFacility(facility, Scheduler);
                 }
             }
 
@@ -59,12 +67,12 @@ namespace LantanaGroup.Link.Tenant.Services
             await Scheduler?.Shutdown(cancellationToken);
         }
 
-        public static Task AddJobsForFacility(FacilityConfigModel facility, IScheduler scheduler)
+        public static async Task AddJobsForFacility(FacilityConfigModel facility, IScheduler scheduler)
         {
             // create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
-               createJobAndTrigger(facility, MONTHLY, scheduler);
+                createJobAndTrigger(facility, MONTHLY, scheduler);
             }
 
             //create a job and trigger for weekly reports
@@ -79,7 +87,6 @@ namespace LantanaGroup.Link.Tenant.Services
                 createJobAndTrigger(facility, DAILY, scheduler);
             }
 
-            return Task.CompletedTask;
         }
 
         public static async Task DeleteJobsForFacility(String facilityId, IScheduler scheduler, List<string>? frequencies = null)
@@ -99,7 +106,7 @@ namespace LantanaGroup.Link.Tenant.Services
                         Group = nameof(KafkaTopic.ReportScheduled)
                     };
 
-                    IJobDetail? job = await scheduler.GetJobDetail(jobKey);
+                    IJobDetail job = await scheduler.GetJobDetail(jobKey);
 
                     if (job != null)
                     {
@@ -128,7 +135,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public static async Task UpdateJobsForFacility(FacilityConfigModel updatedFacility, FacilityConfigModel existingFacility, IScheduler scheduler)
         {
-           
+            // delete jobs that are in existing facility but not in the new one
             List<string> frequencies = [];
 
             if (!updatedFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x).SequenceEqual(existingFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x)))
@@ -177,7 +184,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
             await scheduler.AddJob(job, true);
 
-            ITrigger trigger = CreateTrigger(frequency, job.Key);
+            ITrigger trigger = CreateTrigger(facility, frequency, job.Key);
 
             await scheduler.ScheduleJob(trigger);
 
@@ -202,7 +209,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 .Build();
         }
 
-        public static ITrigger CreateTrigger(string frequency, JobKey jobKey)
+        public static ITrigger CreateTrigger(FacilityConfigModel facility, string frequency, JobKey jobKey)
         {
             JobDataMap jobDataMap = new JobDataMap();
             string ScheduledTrigger = "";
@@ -212,29 +219,35 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 case MONTHLY:
                     ScheduledTrigger = "0 0 0 1 * ? *";
+                    //ScheduledTrigger = "0 40 15 * * ? *";
                     break;
                 case WEEKLY:
                     ScheduledTrigger = "0 0 0 ? * 1 *";
-                     break;
+                    //ScheduledTrigger = "0 40 15 * * ? *";
+                    break;
                 case DAILY:
-                    ScheduledTrigger = "0 0 0 * * ? *";
+                     ScheduledTrigger = "0 0 0 * * ? *";
+                    //ScheduledTrigger = "0 40 15 * * ? *";
                     break;
             }       
 
+            var timeZones = TimeZoneInfo.GetSystemTimeZones();
+
+            // set the chron trigger based on timezone
+            TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
 
             jobDataMap.Put(TenantConstants.Scheduler.JobTrigger, ScheduledTrigger);
-
-
+ 
             return TriggerBuilder
                 .Create()
                 .ForJob(jobKey)
                 .WithIdentity(Guid.NewGuid().ToString(), jobKey.Group)
-                .WithCronSchedule(ScheduledTrigger, x => x.InTimeZone(TimeZoneInfo.Utc))
+                .WithCronSchedule(ScheduledTrigger, x => x.InTimeZone(timeZone))
                 .WithDescription(ScheduledTrigger)
                 .UsingJobData(jobDataMap)
                 .Build();
         }
-
+     
         public static void GetAllJobs(IScheduler scheduler)
         {
             var jobGroups = scheduler.GetJobGroupNames().Result;
