@@ -28,11 +28,12 @@ namespace LantanaGroup.Link.Tenant.Config
 
             public const string Facility = "Facility";
 
-            public const string ReportType = "ReportType";
+            public const string Frequency = "Frequency";
 
             public const string StartDate = "StartDate";
 
             public const string EndDate = "EndDate";
+
         }
 
     }
