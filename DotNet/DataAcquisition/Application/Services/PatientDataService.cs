@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -71,8 +72,7 @@ public class PatientDataService : IPatientDataService
             cancellationToken) ?? throw new NotFoundException("Patient not found.");
         var queryPlan = (
             await _queryPlanManager.FindAsync(
-                q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
-            && q.PlanName.ToLower() == request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType.ToLower(), cancellationToken))
+                q => q.FacilityId.ToLower() == request.FacilityId.ToLower(), cancellationToken))
             .FirstOrDefault();
 
         if (queryPlan == null)
@@ -117,9 +117,10 @@ public class PatientDataService : IPatientDataService
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
+            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
             queryPlan = (await _queryPlanManager.FindAsync(
                 q => q.FacilityId == request.FacilityId 
-                    && q.Type.GetStringValue() == ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent)
+                    && q.Type == reportableEventTranslation
                 , cancellationToken))
                 ?.FirstOrDefault();
 
