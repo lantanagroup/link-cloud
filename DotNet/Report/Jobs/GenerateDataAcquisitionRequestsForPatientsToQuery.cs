@@ -58,11 +58,11 @@ namespace LantanaGroup.Link.Report.Jobs
                     $"Executing GenerateDataAcquisitionRequestsForPatientsToQuery for MeasureReportScheduleModel {schedule.Id}");
 
                 var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(e => e.ReportScheduleId == schedule.Id);
-                var itemsToEvaluate = submissionEntries.Where(x => x.Status == PatientSubmissionStatus.NotEvaluated).Select(x => x.PatientId).ToList();
+                var patientsToEvaluate = submissionEntries.Where(x => x.Status == PatientSubmissionStatus.NotEvaluated).Select(x => x.PatientId).Distinct().ToList();
 
-                if (itemsToEvaluate.Any())
+                if (patientsToEvaluate.Any())
                 {
-                    foreach (string patientId in itemsToEvaluate)
+                    foreach (string patientId in patientsToEvaluate)
                     {
                         var darKey = schedule.FacilityId;
 
@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         _dataAcqProducer.Flush();
                     }
 
-                    _logger.LogInformation($"DataAcquisitionRequested topics published for {itemsToEvaluate} patients for {schedule.FacilityId} for Report Types: {string.Join(", ", schedule.ReportTypes)} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
+                    _logger.LogInformation($"DataAcquisitionRequested topics published for {patientsToEvaluate} patients for {schedule.FacilityId} for Report Types: {string.Join(", ", schedule.ReportTypes)} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
                 else
                 {
