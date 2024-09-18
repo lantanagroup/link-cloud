@@ -174,8 +174,8 @@ public class PatientDataService : IPatientDataService
                 }, cancellationToken);
         }
 
-        foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
-        {
+        //foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
+        //{
             if (queryPlan != null)
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
@@ -190,7 +190,6 @@ public class PatientDataService : IPatientDataService
                             dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
                             request,
                             fhirQueryConfiguration,
-                            scheduledReport,
                             queryPlan,
                             referenceTypes,
                             dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
@@ -211,7 +210,7 @@ public class PatientDataService : IPatientDataService
                     throw;
                 }
             }
-        }
+        //}
 
         //produce tailing message to indicate acquisition is complete
         await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);
