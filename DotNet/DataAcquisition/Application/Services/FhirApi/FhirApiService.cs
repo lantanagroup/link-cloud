@@ -3,6 +3,7 @@ using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
@@ -102,7 +103,7 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
-    private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
+    private readonly IFhirQueryManager _fhirQueryManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly BundleResourceAcquiredEventService _bundleResourceAcquiredEventService;
     private readonly IReferenceResourcesManager _referenceResourceManager;
@@ -110,8 +111,8 @@ public class FhirApiService : IFhirApiService
     public FhirApiService(
         ILogger<FhirApiService> logger, 
         HttpClient httpClient, 
-        IAuthenticationRetrievalService authenticationRetrievalService, 
-        IQueriedFhirResourceManager queriedFhirResourceManager, 
+        IAuthenticationRetrievalService authenticationRetrievalService,
+        IFhirQueryManager fhirQueryManager, 
         IDataAcquisitionServiceMetrics metrics, 
         BundleResourceAcquiredEventService bundleResourceAcquiredEventService, 
         IReferenceResourcesManager referenceResourceManager)
@@ -119,7 +120,7 @@ public class FhirApiService : IFhirApiService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
-        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
+        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _bundleResourceAcquiredEventService = bundleResourceAcquiredEventService ?? throw new ArgumentNullException(nameof(bundleResourceAcquiredEventService));
         _referenceResourceManager = referenceResourceManager;
@@ -311,6 +312,15 @@ public class FhirApiService : IFhirApiService
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
 
+            await _fhirQueryManager.AddAsync(new Domain.Entities.FhirQuery
+            {
+                ResourceType = resourceType,
+                CorrelationId = correlationId,
+                PatientId = patientId,
+                FacilityId = facilityId,
+                SearchParams = JsonSerializer.Serialize(searchParams),
+            }, cancellationToken);
+
             if (resultBundle != null)
             {
                 if (generateMessages)
@@ -318,19 +328,6 @@ public class FhirApiService : IFhirApiService
 
                 foreach (var entry in resultBundle.Entry)
                 {
-                    await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
-                    {
-                        ResourceId = entry.Resource.Id,
-                        ResourceType = entry.Resource.TypeName,
-                        CorrelationId = correlationId,
-                        PatientId = patientId,
-                        FacilityId = facilityId,
-                        QueryType = queryType,
-                        IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
-                        CreateDate = DateTime.UtcNow,
-                        ModifyDate = DateTime.UtcNow
-                    }, cancellationToken);
-
                     if (saveReferenceResource) 
                     {
                         var resource = entry.Resource;
@@ -390,19 +387,6 @@ public class FhirApiService : IFhirApiService
 
                         foreach (var entry in resultBundle.Entry)
                         {
-                            await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
-                            {
-                                ResourceId = entry.Resource.Id,
-                                ResourceType = entry.Resource.TypeName,
-                                CorrelationId = correlationId,
-                                PatientId = patientId,
-                                FacilityId = facilityId,
-                                QueryType = queryType,
-                                IsSuccessful = resultBundle.Entry.All(x => x.Resource.TypeName != nameof(OperationOutcome)),
-                                CreateDate = DateTime.UtcNow,
-                                ModifyDate = DateTime.UtcNow
-                            }, cancellationToken);
-
                             if (saveReferenceResource)
                             {
                                 var resource = entry.Resource;
@@ -504,24 +488,18 @@ public class FhirApiService : IFhirApiService
             throw;
         }
 
+        await _fhirQueryManager.AddAsync(new Domain.Entities.FhirQuery
+        {
+            ResourceType = resourceType,
+            CorrelationId = correlationId,
+            PatientId = patientId,
+            FacilityId = facilityId,
+        }, cancellationToken);
 
         if (readResource != null)
         {
             if (generateMessages)
                 await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = readResource } } }, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, new List<ScheduledReport> { report }), cancellationToken);
-
-            await _queriedFhirResourceManager.AddAsync(new Domain.Entities.QueriedFhirResourceRecord
-            {
-                ResourceId = id,
-                ResourceType = resourceType,
-                CorrelationId = correlationId,
-                PatientId = patientId,
-                FacilityId = facilityId,
-                QueryType = queryType,
-                IsSuccessful = readResource is not OperationOutcome,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = DateTime.UtcNow
-            }, cancellationToken);
 
             if (readResource is not OperationOutcome)
             {
