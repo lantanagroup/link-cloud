@@ -8,8 +8,8 @@ public class FhirQuery : BaseEntityExtended
 {
     public string FacilityId { get; set; }
     public string CorrelationId { get; set; }
-    public string PatientId { get; set; }
+    public string? PatientId { get; set; }
     public string ResourceType { get; set; }
-    public string SearchParams { get; set; }
-    public string RequestBody { get; set; }
+    public string? SearchParams { get; set; }
+    public string? RequestBody { get; set; }
 }

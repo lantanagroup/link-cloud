@@ -13,10 +13,14 @@ public interface IFhirQueryManager
 }
 public class FhirQueryManager : IFhirQueryManager
 {
-    private ILogger<FhirQueryManager> _logger;
-    private IDatabase _database;
+    private readonly ILogger<FhirQueryManager> _logger;
+    private readonly IDatabase _database;
 
-
+    public FhirQueryManager(ILogger<FhirQueryManager> logger, IDatabase database)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+    }
 
     public async Task<FhirQuery> AddAsync(FhirQuery entity, CancellationToken cancellationToken = default)
     {

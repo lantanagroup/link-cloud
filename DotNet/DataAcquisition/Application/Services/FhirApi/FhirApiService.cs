@@ -316,7 +316,7 @@ public class FhirApiService : IFhirApiService
             {
                 ResourceType = resourceType,
                 CorrelationId = correlationId,
-                PatientId = patientId,
+                PatientId = patientId.SplitReference(),
                 FacilityId = facilityId,
                 SearchParams = JsonSerializer.Serialize(searchParams),
             }, cancellationToken);
@@ -492,7 +492,7 @@ public class FhirApiService : IFhirApiService
         {
             ResourceType = resourceType,
             CorrelationId = correlationId,
-            PatientId = patientId,
+            PatientId = patientId.SplitReference(),
             FacilityId = facilityId,
         }, cancellationToken);
 
