@@ -65,7 +65,8 @@ public class FhirQueriesController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get FHIR Query Results"), ex, "An exception occurred while attempting to retrieve FHIR Query Results for correlationId {correlationId}", correlationId.Trim());
+            var sanitizedCorrelationId = correlationId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "").Trim();
+            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get FHIR Query Results"), ex, "An exception occurred while attempting to retrieve FHIR Query Results for correlationId {correlationId}", sanitizedCorrelationId);
             throw;
         }
     }
