@@ -11,12 +11,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [Route("api/data/{facilityId}/[controller]")]
-public class QueriesController : ControllerBase
+public class FhirQueriesController : ControllerBase
 {
-    private readonly ILogger<QueriesController> _logger;
+    private readonly ILogger<FhirQueriesController> _logger;
     private IFhirQueryManager _fhirQueryManager;
 
-    public QueriesController(ILogger<QueriesController> logger, IFhirQueryManager fhirQueryManager)
+    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
