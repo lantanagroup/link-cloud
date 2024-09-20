@@ -91,19 +91,5 @@ namespace LantanaGroup.Link.Tenant.Utils
             return valid && Regex.IsMatch(schedule, regex);
         }
 
-
-        // Function to return correct Time Zone Id based on the platform
-        // Linux is using IANA time zone and Windows is using Windows time zone
-        static string GetTimeZoneId(string windowsTimeZoneId, string ianaTimeZoneId)
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return windowsTimeZoneId; // Use Windows time zone
-            }
-            else
-            {
-                return ianaTimeZoneId; // Use IANA time zone for Linux/Unix/macOS
-            }
-        }
     }
 }

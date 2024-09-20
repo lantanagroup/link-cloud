@@ -831,6 +831,11 @@ services:
       dockerfile: DotNet/Tenant/Dockerfile
     networks:
       - link-nw
+    depends_on:
+      - kafka_init
+      - otel-collector
+      - loki
+      - mssql_init
 
   validation:
     image: link-validation
