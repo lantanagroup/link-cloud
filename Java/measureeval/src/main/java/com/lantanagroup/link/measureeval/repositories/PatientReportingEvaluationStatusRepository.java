@@ -16,7 +16,7 @@ public interface PatientReportingEvaluationStatusRepository
         probe.setCorrelationId(correlationId);
         probe.setReports(null);
         probe.setResources(null);
-       // ExampleMatcher matcher = ExampleMatcher.matching().withIgnorePaths("patientId", "reports", "resources");
+
         return findOne(Example.of(probe));
     }
 }
