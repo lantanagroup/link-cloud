@@ -6,13 +6,10 @@ Perform the following from the `/Java` directory, which builds the measureeval J
 module:
 
 ```bash
-mvn clean install -pl measureeval -am
+mvn -P cli -pl measureeval -am clean package
 ```
 
-## Running the CLI
-
-To bypass the JAR manifest's main() class that runs it as a service, run the JAR with the following parameters:
-`-Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher`
+We use the `cli` Maven profile to ensure that `FileSystemInvocation` is used as the main class.
 
 ### Parameters
 
@@ -28,11 +25,11 @@ To bypass the JAR manifest's main() class that runs it as a service, run the JAR
 Format:
 
 ```bash
-java -cp measureeval-<version>.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
+java -jar measureeval-<version>.jar "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
 ```
 
 Example:
 
 ```bash
-java -cp measureeval-<version>.jar -Dloader.main=com.lantanagroup.link.measureeval.FileSystemInvocation org.springframework.boot.loader.launch.PropertiesLauncher "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
+java -jar measureeval-<version>.jar "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
 ```
