@@ -5,7 +5,6 @@ using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 
 using Quartz;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Tenant.Utils
