@@ -26,7 +26,6 @@ import org.springframework.kafka.retrytopic.RetryTopicConfiguration;
 import org.springframework.kafka.retrytopic.RetryTopicConfigurationBuilder;
 import org.springframework.kafka.support.serializer.*;
 
-
 import java.text.SimpleDateFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
