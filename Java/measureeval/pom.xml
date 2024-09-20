@@ -146,7 +146,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>com.lantanagroup.link.measureeval.MeasureEvalApplication</mainClass>
+                    <mainClass>${mainClass}</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -157,4 +157,23 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>api</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <mainClass>com.lantanagroup.link.measureeval.MeasureEvalApplication</mainClass>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>cli</id>
+            <properties>
+                <mainClass>com.lantanagroup.link.measureeval.FileSystemInvocation</mainClass>
+            </properties>
+        </profile>
+    </profiles>
 </project>
