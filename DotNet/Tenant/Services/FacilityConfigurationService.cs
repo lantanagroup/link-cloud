@@ -324,14 +324,12 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportType}";
 
-                //TODO: add method to get key that includes looking at redis for future use case
-                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                    throw new Exception("Link Token Service Signing Key is missing.");
-
-
                 //get link token
                 if (_linkTokenServiceConfig.Value.EnableTokenGenerationEndpoint)
                 {
+                    //TODO: add method to get key that includes looking at redis for future use case
+                    if (_linkTokenServiceConfig.Value.SigningKey is null) throw new Exception("Link Token Service Signing Key is missing.");
+
                     var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 }
