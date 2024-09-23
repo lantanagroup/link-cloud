@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
                 table: "Facilities",
                 type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: "Eastern Standard Time");
+                defaultValue: "America/New_York");
                 
         }
 
