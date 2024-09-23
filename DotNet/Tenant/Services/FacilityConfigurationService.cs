@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
 using Confluent.Kafka;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -35,6 +36,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly IOptions<MeasureConfig> _measureConfig;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
+        private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
 
         static FacilityConfigurationService()
         {
@@ -43,7 +45,7 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -53,6 +55,7 @@ namespace LantanaGroup.Link.Tenant.Services
             _createAuditEventCommand = createAuditEventCommand;
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+            _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
         }
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
@@ -414,14 +417,17 @@ namespace LantanaGroup.Link.Tenant.Services
                 string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportTypeSchedule.ReportType}";
 
                 //TODO: add method to get key that includes looking at redis for future use case
-                if (_linkTokenServiceConfig.Value.SigningKey is null)
+                if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
                     throw new Exception("Link Token Service Signing Key is missing.");
 
 
                 //get link token
-                var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
-
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+                {
+                    var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+                
                 var response = _httpClient.GetAsync(requestUrl).Result;
 
                 // check respone status code
