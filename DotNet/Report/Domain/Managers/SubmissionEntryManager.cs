@@ -13,6 +13,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
             CancellationToken cancellationToken = default);
 
+        Task<MeasureReportSubmissionEntryModel?> SingleAsync(
+            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
+            CancellationToken cancellationToken = default);
+
         Task<MeasureReportSubmissionEntryModel?> FirstOrDefaultAsync(
             Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate,
             CancellationToken cancellationToken = default);
@@ -48,6 +52,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<MeasureReportSubmissionEntryModel?> SingleOrDefaultAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.SingleOrDefaultAsync(predicate, cancellationToken);
+        }
+
+        public async Task<MeasureReportSubmissionEntryModel?> SingleAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await _database.SubmissionEntryRepository.SingleAsync(predicate, cancellationToken);
         }
 
         public async Task<MeasureReportSubmissionEntryModel> AddAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
