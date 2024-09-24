@@ -16,6 +16,7 @@ using Moq.AutoMock;
 using Moq.Protected;
 using System.Linq.Expressions;
 using System.Net;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 namespace TenantTests
 {
@@ -25,6 +26,7 @@ namespace TenantTests
         private ServiceRegistry? _serviceRegistry;
         private LinkTokenServiceSettings? _linkTokenService;
         private MeasureConfig? _linkMeasureConfig;
+        private LinkBearerServiceOptions _linkBearerServiceOptions;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
@@ -63,6 +65,11 @@ namespace TenantTests
             _linkMeasureConfig = new MeasureConfig()
             {
                 CheckIfMeasureExists = true,
+            };
+
+            _linkBearerServiceOptions = new LinkBearerServiceOptions()
+            {
+                AllowAnonymous = true
             };
 
             List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
@@ -127,6 +134,9 @@ namespace TenantTests
                 _producerMock.Object // Inject the mocked producer
             );
 
+            Mock<IOptions<LinkBearerServiceOptions>> _mockLinkBearerServiceOptions = _mocker.GetMock<IOptions<LinkBearerServiceOptions>>();
+            _mockLinkBearerServiceOptions.Setup(p => p.Value).Returns(_linkBearerServiceOptions);
+
             // Create FacilityConfigurationService
             var _service = new FacilityConfigurationService(
              _mockFacilityRepo.Object,
@@ -136,7 +146,8 @@ namespace TenantTests
              _mockMeasureConfig.Object,
              httpClient,
              _mockLinkTokenServiceSettings.Object,
-             Mock.Of<ICreateSystemToken>()
+             Mock.Of<ICreateSystemToken>(),
+             _mockLinkBearerServiceOptions.Object
              );
 
             // Act
