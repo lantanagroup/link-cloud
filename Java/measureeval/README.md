@@ -25,11 +25,11 @@ We use the `cli` Maven profile to ensure that `FileSystemInvocation` is used as 
 Format:
 
 ```bash
-java -jar measureeval-<version>.jar "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
+java -jar measureeval-cli.jar "<measure-bundle-path>" "<patient-bundle-path>" "<start>" "<end>"
 ```
 
 Example:
 
 ```bash
-java -jar measureeval-<version>.jar "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
+java -jar measureeval-cli.jar "C:/path/to/measure-bundle.json" "C:/path/to/patient-bundle.json" "2021-01-01" "2021-12-31"
 ```
