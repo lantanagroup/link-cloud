@@ -30,6 +30,7 @@ variables:
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
   
+
 steps:
   - task: DotNetCoreCLI@2
     displayName: Restore
@@ -60,7 +61,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.BuildId)
+        $(Build.SourceBranchName)-$(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
