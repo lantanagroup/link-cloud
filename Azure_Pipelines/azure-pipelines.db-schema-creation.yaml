@@ -304,7 +304,7 @@ stages:
       displayName: Copy Validation SQL Script to Artifact Staging Directory
       inputs:
        SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/'
-       TartgetFolder: $(build.artifactstagingdirectory)/DatabaseScripts/
+       TartgetFolder: $(Build.ArtifactStagingDirectory)\DatabaseScripts
        Contents: '**/validationDb.sql'
     - task: PublishBuildArtifacts@1
       inputs:
