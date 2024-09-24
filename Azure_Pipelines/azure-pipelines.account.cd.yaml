@@ -50,9 +50,10 @@ steps:
       targetType: 'inline'
       script: |
         if ($(Build.SourceBranch) -like "*release/*") {
-        $MyTag = release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)
+        $MyTag = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
         }
-        else { $MyTag = $(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)
+        else { 
+        $MyTag = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
         }
   
   - task: DotNetCoreCLI@2
