@@ -67,7 +67,11 @@ stages:
 
             # Tenant - Return $true if path has changed files
             $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool" 
+            Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
+            
+            # Validation - Return $true if path has changed files
+            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/" -AllMatches).Matches.Count -gt 0) 
+            Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
   ###
@@ -287,6 +291,27 @@ stages:
        ArtifactName: 'scripts'
        publishLocation: 'container'
       displayName: Generate Tenant SQL Script  
+    ###
+  # Validation
+  - job: Validation
+    displayName: "Build Validation"
+    dependsOn: getChangedFiles 
+    # variables: 
+    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
+    #condition: eq(variables.changed, 'True')
+    steps:
+    - task: CopyFiles@2
+      displayName: Copy Validation SQL Script to Artifact Staging Directory
+      inputs:
+       SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/'
+       TartgetFolder: '$(Build.ArtifactStagingDirectory)'
+       Contents: '**/validationDb.sql'
+    - task: PublishBuildArtifacts@1
+      inputs:
+       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+       ArtifactName: 'scripts'
+       publishLocation: 'container'
+      displayName: Generate Validation SQL Script  
   ###
   # Publish
   # - job: Publish
