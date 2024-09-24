@@ -32,6 +32,11 @@ variables:
   
 
 steps:
+  - task: GetRevision@1
+    displayName: 'Get Revision'
+    inputs:
+      VariableName: Revision
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
@@ -61,10 +66,11 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.SourceBranchName)-$(Build.BuildId)
+        $(Build.SourceBranchName)-r$(Revision)-$(Build.BuildId)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'manifest'
+
