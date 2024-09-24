@@ -326,7 +326,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new Exception("Link Token Service Signing Key is missing.");
 
                 //get link token
-                if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.EnableTokenGenerationEndpoint)
+                if (!_linkBearerServiceOptions.Value.AllowAnonymous)
                 {
                     var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
