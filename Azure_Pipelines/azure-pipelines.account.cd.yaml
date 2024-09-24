@@ -37,6 +37,14 @@ steps:
     inputs:
       VariableName: Revision
 
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
@@ -66,7 +74,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.SourceBranchName)-r$(Revision)-$(Build.BuildId)
+        $(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
