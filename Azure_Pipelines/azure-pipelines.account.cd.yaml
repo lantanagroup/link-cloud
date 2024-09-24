@@ -45,6 +45,16 @@ steps:
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ($(Build.SourceBranch) -like "*release/*") {
+        $MyTag = release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)
+        }
+        else { $MyTag = $(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)
+        }
+  
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
@@ -74,7 +84,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.SourceBranch)-r$(Revision)-$(GIT_COMMIT)
+        $MyTag
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
