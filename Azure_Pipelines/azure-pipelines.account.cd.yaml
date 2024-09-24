@@ -61,7 +61,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.SourceBranchName)-r$(Rev:.r)-$(GIT_COMMIT)
+        $(Build.SourceBranchName)-r$(Rev:.r)-$(GIT_COMMIT)-$(Release.Artifacts.{alias}.BuildNumber)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
