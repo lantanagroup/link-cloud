@@ -84,7 +84,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $MyTag
+        $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
