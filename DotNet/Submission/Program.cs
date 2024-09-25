@@ -21,12 +21,8 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Managers;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Application.Services;
-using LantanaGroup.Link.Submission.Domain;
-using LantanaGroup.Link.Submission.Domain.Entities;
-using LantanaGroup.Link.Submission.Infrastructure;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -109,8 +105,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add services to the container.
     builder.Services.AddHttpClient();
     builder.Services.AddScoped<IEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
-    builder.Services.AddTransient<IEntityRepository<TenantSubmissionConfigEntity>, SubmissionEntityRepository<TenantSubmissionConfigEntity>>();
-    builder.Services.AddTransient<ITenantSubmissionManager, TenantSubmissionManager>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -138,33 +132,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
     builder.Services.AddSingleton<RetryJob>();
 
-    //Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<SubmissionHealthCheck>("Submission");
-
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
-    //Add database context
-    builder.Services.AddDbContext<TenantSubmissionDbContext>((sp, options) => {
-        var updateTenantSubmissionConfigEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-        switch (builder.Configuration.GetValue<string>(SubmissionConstants.AppSettingsSectionNames.DatabaseProvider))
-        {
-            case "SqlServer":
-                string? connectionString = builder.Configuration.GetValue<string>(SubmissionConstants.AppSettingsSectionNames.DatabaseConnectionString);
-
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
-                options
-                    .UseSqlServer(connectionString)
-                    .AddInterceptors(updateTenantSubmissionConfigEntityInterceptor);
-
-                break;
-            default:
-                throw new InvalidOperationException("Database provider not supported.");
-        }
-    });
 
     // Add commands
     // TODO
@@ -191,48 +160,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Retry Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     #endregion
-
-    // Add swagger
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(c =>
-    {
-        if (!allowAnonymousAccess)
-        {
-            #region Authentication Schemas
-
-            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-            {
-                Description = $"Authorization using JWT",
-                Name = "Authorization",
-                Type = SecuritySchemeType.Http,
-                BearerFormat = "JWT",
-                In = ParameterLocation.Header,
-                Scheme = JwtBearerDefaults.AuthenticationScheme
-            });
-
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
-            {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
-            });
-
-            #endregion
-        }
-
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        c.IncludeXmlComments(xmlPath);
-
-    });
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -278,15 +205,6 @@ static void SetupMiddleware(WebApplication app)
         app.UseExceptionHandler();
     }
 
-    // Configure the HTTP request pipeline.
-    app.ConfigureSwagger();
-
-    //map health check middleware
-    app.MapHealthChecks("/health", new HealthCheckOptions
-    {
-        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
-
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
@@ -298,8 +216,6 @@ static void SetupMiddleware(WebApplication app)
         app.UseMiddleware<UserScopeMiddleware>();
     }
     app.UseAuthorization();
-
-    app.MapControllers();
 }
 
 #endregion
