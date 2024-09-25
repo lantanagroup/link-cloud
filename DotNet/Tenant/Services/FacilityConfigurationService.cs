@@ -289,9 +289,9 @@ namespace LantanaGroup.Link.Tenant.Services
                 // Try to find the time zone based on the ID stored in the facility object
                 TimeZoneInfo timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
 
-                _logger.LogWarning($"Time zone found: {timeZoneInfo.StandardName}");
+                _logger.LogInformation($"Time zone found: {timeZoneInfo.StandardName}");
 
-                _logger.LogWarning($"Time zone found: {timeZoneInfo.DisplayName}");
+                _logger.LogInformation($"Time zone found: {timeZoneInfo.DisplayName}");
             }
             catch (TimeZoneNotFoundException)
             {
