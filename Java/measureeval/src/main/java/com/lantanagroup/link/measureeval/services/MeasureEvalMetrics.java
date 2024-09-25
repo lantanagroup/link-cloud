@@ -13,7 +13,7 @@ public class MeasureEvalMetrics {
 
   private final LongCounter patientReportableCounter;
   private final LongCounter patientNonReportableCounter;
-  private final LongCounter patientEvaluatedCounter;
+  private final LongCounter measureEvaluatedCounter;
   private final LongCounter recordsReceivedCounter;
   private final LongHistogram evaluationDuration;
 
@@ -28,7 +28,7 @@ public class MeasureEvalMetrics {
     patientNonReportableCounter = meter
             .counterBuilder("Patient_Non_Reportable_Counter")
             .build();
-    patientEvaluatedCounter = meter
+    measureEvaluatedCounter = meter
             .counterBuilder("Patient_Evaluated_Resource_Counter")
             .build();
 
@@ -51,9 +51,9 @@ public class MeasureEvalMetrics {
     patientNonReportableCounter.add(1, attributes);
   }
 
-  public void IncrementPatientEvaluatedCounter(Attributes attributes)
+  public void IncrementMeasureEvaluatedCounter(Attributes attributes)
   {
-    patientEvaluatedCounter.add(1, attributes);
+    measureEvaluatedCounter.add(1, attributes);
   }
 
   public void IncrementRecordsReceivedCounter(Attributes attributes)

@@ -244,22 +244,34 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             switch (value.getQueryType()) {
                 case INITIAL -> {
                     updateReportability(patientStatus, report, measureReport);
-
-                    if (!report.getReportable()) {
-                        produceResourceEvaluatedRecords(patientStatus, report, measureReport);
-                    }
+                    produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
                 }
-                case SUPPLEMENTAL -> produceResourceEvaluatedRecords(patientStatus, report, measureReport);
-                default -> throw new IllegalStateException(
-                        String.format("Unexpected query type: %s", value.getQueryType()));
+                case SUPPLEMENTAL -> produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
 
-        boolean reportable = patientStatus.getReports().stream()
-                .anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+        boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
+        // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
+        updatePatientMetrics(value, patientStatus, reportablePatient);
 
-        if (value.getQueryType() == QueryType.INITIAL && reportable) {
+        // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
+        if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
             produceDataAcquisitionRequestedRecord(value, patientStatus);
+        }
+    }
+
+    private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
+
+        if (value.getQueryType() == QueryType.INITIAL) {
+            Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
+                    put(stringKey("patientId"), patientStatus.getPatientId()).
+                    put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+            if (reportablePatient) {
+                measureEvalMetrics.IncrementPatientReportableCounter(attributes);
+            } else {
+                measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
+            }
         }
     }
 
@@ -310,9 +322,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         // Record the duration of the evaluation
         measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
 
-        // count the number of patients evaluated (reportable or non-reportable)
-        measureEvalMetrics.IncrementPatientEvaluatedCounter(attributes);
-
         return measureReport;
     }
 
@@ -325,33 +334,26 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     }
 
     private void produceResourceEvaluatedRecords (
+            QueryType phase,
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
             MeasureReport measureReport) {
+
         if (logger.isDebugEnabled()) {
             logger.debug("Producing {} records", Topics.RESOURCE_EVALUATED);
         }
 
-
-        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                put(stringKey("patientId"), patientStatus.getPatientId()).
-                put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
-
         var list = measureReportNormalizer.normalize(measureReport);
 
-        if (!report.getReportable()) {
-            var measure = list.stream().filter(h -> h instanceof MeasureReport).findFirst().get();
-            produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), measure);
-
-            // Count non-reportable patients
-            measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
-        } else {
+        if (phase == QueryType.INITIAL && !report.getReportable()) { // produce Evaluated Resource the Initial phase only if the measure is not reportable
+            list.stream().filter(resource -> resource instanceof MeasureReport).findFirst().ifPresent(measure -> produceResourceEvaluatedRecord(patientStatus, report, measure.getIdPart(), measure));
+        }  else if (phase == QueryType.SUPPLEMENTAL && report.getReportable())  { //produce Evaluated Resource only on the Supplemental phase if the measure is reportable
             for (Resource resource : list) {
                 produceResourceEvaluatedRecord(patientStatus, report, measureReport.getIdPart(), resource);
             }
-            // Count reportable patients
-            measureEvalMetrics.IncrementPatientReportableCounter(attributes);
         }
+
+
     }
 
     private void produceResourceEvaluatedRecord (
@@ -359,6 +361,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             PatientReportingEvaluationStatus.Report report,
             String measureReportId,
             Resource resource) {
+
         if (logger.isTraceEnabled()) {
             logger.trace(
                     "Producing {} record: {}/{}",
