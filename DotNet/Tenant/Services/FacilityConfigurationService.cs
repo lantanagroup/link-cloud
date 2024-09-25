@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -21,11 +20,12 @@ using LantanaGroup.Link.Tenant.Interfaces;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
-    public class FacilityConfigurationService : IFacilityConfigurationService { 
+    public class FacilityConfigurationService : IFacilityConfigurationService
+    {
 
         private readonly ILogger<IFacilityConfigurationService> _logger;
-        private  HttpClient _httpClient;
-        private static List<KafkaTopic> _topics = new List<KafkaTopic>();
+        private readonly HttpClient _httpClient;
+        private static   List<KafkaTopic> _topics = new List<KafkaTopic>();
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
         private readonly CreateAuditEventCommand _createAuditEventCommand;
@@ -39,7 +39,8 @@ namespace LantanaGroup.Link.Tenant.Services
             _topics.Add(KafkaTopic.ReportScheduled);
         }
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<IFacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
@@ -83,7 +84,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync(null, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
                 pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
             }
-
+            
 
             return pagedNotificationConfigurations;
         }
@@ -123,8 +124,7 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new ApplicationException($"Facility {newFacility.FacilityId} already exists");
                 }
 
-
-                await this.ValidateSchedules(newFacility);
+                await ValidateSchedules(newFacility);
             }
 
             try
@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 await ValidateSchedules(newFacility);
             }
-
+                
             // audit update facility event
             AuditEventMessage auditMessageEvent = Helper.UpdateFacilityAuditEvent(newFacility, existingFacility);
 
@@ -194,6 +194,7 @@ namespace LantanaGroup.Link.Tenant.Services
                         existingFacility.FacilityId = newFacility.FacilityId;
                         existingFacility.FacilityName = newFacility.FacilityName;
                         existingFacility.ScheduledReports = newFacility.ScheduledReports;
+                        existingFacility.TimeZone = newFacility.TimeZone;
                         await _facilityConfigurationRepo.UpdateAsync(existingFacility, cancellationToken);
                     }
                     else
@@ -282,7 +283,14 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 throw new ApplicationException(validationErrors.ToString());
             }
-
+            // validate timezones
+            if (!TimeZoneInfo.GetSystemTimeZones().Any(x => x.Id == facility.TimeZone))
+            {
+                _logger.LogError("Invalid Timezone: " + facility.TimeZone);
+                throw new ApplicationException("Invalid Timezone: " + facility.TimeZone);
+            }
+           
+          
         }
 
         private async Task ValidateSchedules(FacilityConfigModel facility)
@@ -316,13 +324,12 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportType}";
 
-                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                    throw new Exception("Link Token Service Signing Key is missing.");
-
-
                 //get link token
                 if (_linkTokenServiceConfig.Value.EnableTokenGenerationEndpoint)
                 {
+                    //TODO: add method to get key that includes looking at redis for future use case
+                    if (_linkTokenServiceConfig.Value.SigningKey is null) throw new Exception("Link Token Service Signing Key is missing.");
+
                     var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 }
@@ -334,9 +341,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 {
                     throw new ApplicationException($"Report Type {reportType} is not setup in MeasureEval service.");
                 }
-              
             }
-            return;
         }
 
         static HashSet<string> FindDuplicates(List<string> list)
