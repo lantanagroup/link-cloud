@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
+using KellermanSoftware.CompareNetObjects.TypeComparers;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
@@ -10,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -34,7 +36,6 @@ public interface IQueryListProcessor
     Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
-        ScheduledReport scheduledReport,
         QueryPlan queryPlan,
         List<string> referenceTypes,
         string queryPlanType, 
@@ -50,9 +51,9 @@ public class QueryListProcessor : IQueryListProcessor
     private readonly ProducerConfig _producerConfig;
 
     public QueryListProcessor(
-        ILogger<QueryListProcessor> logger, 
-        IFhirApiService fhirRepo, 
-        IProducer<string, ResourceAcquired> kafkaProducer, 
+        ILogger<QueryListProcessor> logger,
+        IFhirApiService fhirRepo,
+        IProducer<string, ResourceAcquired> kafkaProducer,
         IReferenceResourceService referenceResourceService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -75,7 +76,7 @@ public class QueryListProcessor : IQueryListProcessor
         CancellationToken cancellationToken = default
         )
     {
-        var resources = new List<Resource>();   
+        var resources = new List<Resource>();
         List<ResourceReference> referenceResources = new List<ResourceReference>();
         foreach (var query in queryList)
         {
@@ -152,17 +153,18 @@ public class QueryListProcessor : IQueryListProcessor
     }
 
     public async Task Process(
-        IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList, 
-        GetPatientDataRequest request, 
-        FhirQueryConfiguration fhirQueryConfiguration, 
-        ScheduledReport scheduledReport, 
-        QueryPlan queryPlan, 
-        List<string> referenceTypes, 
-        string queryPlanType, 
+        IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
+        GetPatientDataRequest request,
+        FhirQueryConfiguration fhirQueryConfiguration,
+        QueryPlan queryPlan,
+        List<string> referenceTypes,
+        string queryPlanType,
         CancellationToken cancellationToken = default
         )
     {
         List<ResourceReference> referenceResources = new List<ResourceReference>();
+        var scheduledReport = GetScheduledReport(request.ConsumeResult.Message.Value.ScheduledReports);
+
         foreach (var query in queryList)
         {
             var queryConfig = query.Value;
@@ -183,14 +185,11 @@ public class QueryListProcessor : IQueryListProcessor
 
                 var references = await _fhirRepo.GetSingularBundledResultsAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
+                    request,
                     queryPlanType,
                     referenceTypes,
                     (SingularParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
                     fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(references);
@@ -203,14 +202,11 @@ public class QueryListProcessor : IQueryListProcessor
 
                 var references = await _fhirRepo.GetPagedBundledResultAndGenerateMessagesAsync(
                     fhirQueryConfiguration.FhirServerBaseUrl,
-                    request.ConsumeResult.Message.Value.PatientId,
-                    request.CorrelationId,
-                    request.FacilityId,
+                    request,
                     queryPlanType,
                     referenceTypes,
                     (PagedParameterQueryFactoryResult)builtQuery,
                     (ParameterQueryConfig)queryConfig,
-                    scheduledReport,
                     fhirQueryConfiguration.Authentication);
 
                 referenceResources.AddRange(references);
@@ -228,7 +224,6 @@ public class QueryListProcessor : IQueryListProcessor
                     request,
                     fhirQueryConfiguration,
                     queryInfo,
-                    scheduledReport,
                     queryPlanType);
             }
 
@@ -245,5 +240,10 @@ public class QueryListProcessor : IQueryListProcessor
             Specimen => true,
             _ => false,
         };
+    }
+
+    private ScheduledReport GetScheduledReport(List<ScheduledReport> scheduledReports)
+    {
+        return scheduledReports.OrderByDescending(x => (int)x.Frequency).ToList().FirstOrDefault();
     }
 }

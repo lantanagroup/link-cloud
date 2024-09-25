@@ -17,9 +17,9 @@ public class DataAcquisitionDbContext : DbContext
 
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
-    public DbSet<QueriedFhirResourceRecord> QueriedFhirResources { get; set; }
     public DbSet<QueryPlan> QueryPlan { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
+    public DbSet<FhirQuery> FhirQueries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,21 +93,20 @@ public class DataAcquisitionDbContext : DbContext
                 v => v.ToString()
             );
 
-        //-------------------QueriedFhirResourceRecord-------------------
-        modelBuilder.Entity<QueriedFhirResourceRecord>()
+        //-------------------Retry Repository//-------------------
+        modelBuilder.Entity<RetryEntity>()
+            .Property(x => x.Headers)
+            .HasConversion(
+                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                           v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()));
+
+        //-------------------FhirQuery-------------------
+        modelBuilder.Entity<FhirQuery>()
             .Property(b => b.Id)
             .HasConversion(
                 v => new Guid(v),
                 v => v.ToString()
             );
-
-        //Retry Repository
-        modelBuilder.Entity<RetryEntity>()
-            .Property(x => x.Headers)
-            .HasConversion(
-                           v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                                          v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
-                                                 );
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

@@ -84,7 +84,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                                     {
                                         new Models.Kafka.ScheduledReport
                                         {
-                                            ReportType = request.MeasureId,
+                                            ReportTypes = new string[] { request.MeasureId },
                                             StartDate = request.Start.Value.ToString(),
                                             EndDate = request.End.Value.ToString()
                                         }
