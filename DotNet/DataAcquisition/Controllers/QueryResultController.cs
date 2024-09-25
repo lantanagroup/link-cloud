@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Link.Authorization.Policies;
@@ -10,21 +11,24 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [Route("api/data/{facilityId}/[controller]")]
-public class QueryResultController : ControllerBase
+public class FhirQueriesController : ControllerBase
 {
-    private readonly ILogger<QueryResultController> _logger;
-    private IQueriedFhirResourceManager _queriedFhirResourceManager;
+    private readonly ILogger<FhirQueriesController> _logger;
+    private IFhirQueryManager _fhirQueryManager;
 
-    public QueryResultController(ILogger<QueryResultController> logger, IQueriedFhirResourceManager queriedFhirResourceManager)
+    public FhirQueriesController(ILogger<FhirQueriesController> logger, IFhirQueryManager fhirQueryManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
+        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
     }
 
     /// <summary>
     /// Get query results for a correlation Id
     /// </summary>
+    /// <param name="facilityId"></param>
     /// <param name="correlationId"></param>
+    /// <param name="patientId"></param>
+    /// <param name="resourceType"></param>
     /// <param name="cancellationToken"></param>
     /// <param name="queryType"></param>
     /// <param name="successOnly"></param>
@@ -38,21 +42,21 @@ public class QueryResultController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [HttpGet("{correlationId}")]
-    public async Task<ActionResult<QueryResultsModel>> GetQueryResults(CancellationToken cancellationToken, [FromRoute]string correlationId, string queryType = "", bool successOnly = true)
+    [HttpGet]
+    public async Task<ActionResult<QueryResultsModel>> GetQueries(
+        [FromRoute] string facilityId, [FromQuery] string correlationId, [FromQuery] string patientId, [FromQuery] string resourceType, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(correlationId)) 
+        if (string.IsNullOrWhiteSpace(facilityId)) 
         {
-            return BadRequest("Correlation Id is empty");
+            return BadRequest("facility Id is empty");
         }
 
         try
         {
             var results =
-                await _queriedFhirResourceManager.GetQueryResultsAsync(queryType, correlationId, successOnly,
-                    cancellationToken);
+                await _fhirQueryManager.GetFhirQueriesAsync(facilityId, correlationId, patientId, resourceType, cancellationToken);
 
-            if (results.QueryResults.Count == 0)
+            if (results.Queries.Count == 0)
             {
                 return NotFound();
             }
@@ -61,7 +65,8 @@ public class QueryResultController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get Query Results"), ex, "An exception occurred while attempting to retrieve Query Results for correlationId {correlationId}", correlationId);
+            var sanitizedCorrelationId = correlationId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "").Trim();
+            _logger.LogError(new EventId(DataAcquisitionConstants.LoggingIds.GetItem, "Get FHIR Query Results"), ex, "An exception occurred while attempting to retrieve FHIR Query Results for correlationId {correlationId}", sanitizedCorrelationId);
             throw;
         }
     }

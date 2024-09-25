@@ -5,10 +5,11 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public record ResourceRequiredMessageRequest(string facilityId, string patientId, string queryType, string correlationId, List<ScheduledReport> scheduledReports);
+public record ResourceRequiredMessageRequest(string facilityId, string patientId, string queryType, string correlationId, ReportableEvent ReportableEvent, List<ScheduledReport> scheduledReports);
 
 public interface IBundleEventService<EventKey, EventValue, EventRequest>
 {
@@ -46,7 +47,8 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
                             Resource = resource,
                             ScheduledReports = request.scheduledReports,
                             PatientId = RemovePatientId(e.Resource) ? string.Empty : request.patientId,
-                            QueryType = request.queryType
+                            QueryType = request.queryType,
+                            ReportableEvent = request.ReportableEvent
                         }
                     });
             }
