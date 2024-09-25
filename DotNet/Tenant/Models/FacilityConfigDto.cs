@@ -5,7 +5,8 @@
         public string? Id { get; set; }
         public string FacilityId { get; set; } = null!;
         public string? FacilityName { get; set; }
+        public string TimeZone { get; set; }
         public ScheduledReportDto ScheduledReports { get; set; } = null!;
-
+    
     }
 }

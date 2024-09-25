@@ -44,6 +44,7 @@ namespace TenantTests
                 FacilityId = facilityId,
                 FacilityName = facilityName,
                 ScheduledReports = new ScheduledReportModel(),
+                TimeZone = "America/New_York",
                 CreateDate = DateTime.Now,
                 ModifyDate = DateTime.Now
             };

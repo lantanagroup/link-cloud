@@ -29,6 +29,8 @@ public class PatientReportingEvaluationStatus {
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
+    private String reportableEvent;
+
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<Report> reports = new ArrayList<>();
 
@@ -52,6 +54,7 @@ public class PatientReportingEvaluationStatus {
         private Date startDate;
         private Date endDate;
         private Boolean reportable;
+        private String frequency;
     }
 
     @Getter

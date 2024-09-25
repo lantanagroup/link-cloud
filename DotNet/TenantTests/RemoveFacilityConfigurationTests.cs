@@ -51,7 +51,7 @@ namespace TenantTests
             };
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-              .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+              .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.DeleteAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.measureeval.models.QueryType;
+import com.lantanagroup.link.measureeval.models.ReportableEvent;
 import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
@@ -28,6 +29,8 @@ public abstract class AbstractResourceRecord {
     private QueryType queryType;
     private IBaseResource resource;
 
+    private ReportableEvent reportableEvent;
+
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
@@ -49,8 +52,9 @@ public abstract class AbstractResourceRecord {
     @Getter
     @Setter
     public static class ScheduledReport {
-        private String reportType;
+        private String[] reportTypes;
         private Date startDate;
         private Date endDate;
+        private String frequency;
     }
 }
