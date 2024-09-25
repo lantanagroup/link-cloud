@@ -1,0 +1,54 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+    - DotNet/Shared/*
+
+name: $(BuildDefinitionName)_$(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
+
+variables:
+  buildConfiguration: 'Release'
+  sharedVersion: ''
+
+steps:
+
+  # - task: PowerShell@2
+  #   displayName: Get Version Information
+  #   inputs:
+  #     targetType: 'inline'
+  #     script: |
+  #        $xml = [Xml] (Get-Content .\Shared\Shared.csproj)
+  #        $sharedVersion = $xml.Project.PropertyGroup.Version
+  #        echo $sharedVersion
+  #        echo "##vso[task.setvariable variable=sharedVersion]$sharedVersion"
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: restore
+      projects: 'DotNet/Shared/Shared.csproj'
+      
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: 'DotNet/Shared/Shared.csproj'
+      
+  - task: DotNetCoreCLI@2
+    displayName: 'Pack'
+    inputs:
+     command: 'pack'
+     packagesToPack: 'DotNet/Shared/Shared.csproj'
+     configuration: 'DotNet/Shared/Shared.csproj'
+     packDirectory: '$(build.artifactstagingdirectory)/publish'
+     includesymbols: true
+     modifyOutputPath: false
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: drop'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
+
+  
