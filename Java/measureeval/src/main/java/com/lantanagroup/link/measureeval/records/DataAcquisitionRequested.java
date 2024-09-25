@@ -20,14 +20,19 @@ public class DataAcquisitionRequested {
 
     private QueryType queryType;
 
+    private String reportableEvent;
+
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
+
+
 
     @Getter
     @Setter
     public static class ScheduledReport {
-        private String reportType;
+        private String[] reportTypes;
         private Date startDate;
         private Date endDate;
+        private String frequency;
     }
 }
