@@ -42,17 +42,17 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
-                    BadRequest("Paramater facilityId is null or whitespace");
+                    BadRequest("Parameter facilityId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(patientId))
                 {
-                    BadRequest("Paramater patientId is null or whitespace");
+                    BadRequest("Parameter patientId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(reportScheduleId))
                 {
-                    BadRequest("Paramater reportScheduleId is null or whitespace");
+                    BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
                 var submission = await _submissionEntryManager.SingleOrDefaultAsync(e =>
@@ -62,10 +62,9 @@ namespace LantanaGroup.Link.Report.Controllers
                 {
                     return Ok(submission.PatientSubmission);
                 }
-                else
-                {
-                    return NotFound();
-                }
+
+                return NotFound();
+                
             }
             catch (Exception ex)
             {
