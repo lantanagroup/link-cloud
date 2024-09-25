@@ -4,6 +4,7 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using LantanaGroup.Link.Report.Domain.Managers;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -14,11 +15,13 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly ISubmissionEntryManager _submissionEntryManager;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, ISubmissionEntryManager submissionEntryManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _submissionEntryManager = submissionEntryManager;
         }
 
         /// <summary>
@@ -29,7 +32,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="patientId"></param>
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
-        [HttpGet("Bundle/Patient")]
+        [HttpPost("Bundle/Patient")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -47,9 +50,22 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Paramater patientId is null or whitespace");
                 }
 
-                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
+                if (string.IsNullOrWhiteSpace(reportScheduleId))
+                {
+                    BadRequest("Paramater reportScheduleId is null or whitespace");
+                }
 
-                return Ok(submission);
+                var submission = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                    e.FacilityId == facilityId && e.PatientId == patientId && e.ReportScheduleId == reportScheduleId);
+
+                if (submission != null && submission.PatientSubmission != null)
+                {
+                    return Ok(submission.PatientSubmission);
+                }
+                else
+                {
+                    return NotFound();
+                }
             }
             catch (Exception ex)
             {

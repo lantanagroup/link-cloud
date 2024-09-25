@@ -5,18 +5,17 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -26,7 +25,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
-       //private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
         private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -189,9 +187,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
+                                //This Patient is ready to submit, so build out their bundle.
+                                if (entry.Status == PatientSubmissionStatus.ReadyForSubmission)
+                                {
+                                    entry.PatientSubmission = await _bundler.GenerateBundle(entry.FacilityId, entry.PatientId, entry.ReportScheduleId);
+                                }
+
                                 await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
 
-                                #region Patients To Query & Submision Report Handling
+                                #region Submit Report Handling
 
                                 if (schedule.PatientsToQueryDataRequested)
                                 {

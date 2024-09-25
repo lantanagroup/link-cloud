@@ -128,9 +128,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Producers
     builder.Services.RegisterKafkaProducers(kafkaConnection);
 
-
-
-
     //Producers for Retry/Deadletter
     builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
