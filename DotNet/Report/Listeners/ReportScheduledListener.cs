@@ -19,18 +19,18 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ReportScheduledListener> _logger;
-        private readonly IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<ReportScheduledKey, ReportScheduledValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
-        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
+        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<ReportScheduledKey, ReportScheduledValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IMeasureReportScheduledManager>();
+                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
 
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
@@ -133,7 +133,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.");
                                 }
 
-                                var ent = new MeasureReportScheduleModel
+                                var ent = new ReportScheduleModel
                                 {
                                     FacilityId = key.FacilityId,
                                     ReportStartDate = startDate,
