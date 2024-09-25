@@ -74,6 +74,8 @@ public class ResourceAcquiredListener : BackgroundService
 
     private async System.Threading.Tasks.Task StartConsumerLoop(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Starting Resource Acquired Listener");
+
         using var kafkaConsumer = _consumerFactory.CreateConsumer(new ConsumerConfig
         {
             GroupId = NormalizationConstants.ServiceName,
@@ -81,6 +83,8 @@ public class ResourceAcquiredListener : BackgroundService
         });
 
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
+
+        _logger.LogInformation("Subscribed to topic: {topic}", KafkaTopic.ResourceAcquired.ToString());
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
