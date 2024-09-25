@@ -44,8 +44,13 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 string frequency = (string)dataMap[TenantConstants.Scheduler.Frequency];
 
+                TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 
-                DateTime currentDateInTimeZone = DateTime.UtcNow;
+                // Get the date part only (year, month, day) based on location timezone
+                DateTimeOffset utcNow = DateTimeOffset.UtcNow;
+                DateTimeOffset currentDateTimeInTimeZone = TimeZoneInfo.ConvertTime(utcNow, timeZone);
+
+                DateTime currentDateInTimeZone = currentDateTimeInTimeZone.DateTime;
 
                 // initialize startDate, endDate
                 DateTime startDate = currentDateInTimeZone;
@@ -55,29 +60,32 @@ namespace LantanaGroup.Link.Tenant.Jobs
                 switch (frequency)
                 {
                     case ScheduleService.MONTHLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1);
+                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);          
                         endDate = startDate.AddMonths(1).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Monthly;
                         break;
                     case ScheduleService.WEEKLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day);
+                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day, 0, 0, 0);
                         // set to beginning of week in case is not exactly that
                         DayOfWeek startOfWeek = DayOfWeek.Sunday;
                         DayOfWeek currentDay = startDate.DayOfWeek;
                         int difference = currentDay - startOfWeek;
                         startDate = startDate.AddDays(-difference);
                         // end date of the week
-                        endDate = startDate.AddDays(7).AddSeconds(-1);
+                        endDate = startDate.AddDays(7).AddSeconds(-1);                     
                         reportTypes = facility.ScheduledReports.Weekly;
                         break;
                     case ScheduleService.DAILY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day);
+                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day, 0, 0, 0);
                         endDate = startDate.AddDays(1).AddSeconds(-1);
                         reportTypes = facility.ScheduledReports.Daily;
                         break;
                 }
+                // convert to UTC
+                startDate = TimeZoneInfo.ConvertTimeToUtc(startDate, timeZone);
+                endDate = TimeZoneInfo.ConvertTimeToUtc(endDate, timeZone);
 
-                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} + event for facility {facility.FacilityId} and {frequency} trigger: {trigger}");
+                _logger.LogInformation($"Produce {KafkaTopic.ReportScheduled} event on facility time {currentDateInTimeZone} for facility {facility.FacilityId}, frequency {frequency}, trigger: {trigger}");
 
                 var headers = new Headers();
                 string correlationId = Guid.NewGuid().ToString();
@@ -86,7 +94,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 ReportScheduledKey Key = new ReportScheduledKey()
                 {
-                    FacilityId = facility.FacilityId,
+                    FacilityId = facility.FacilityId
                 };
 
                 var message = new Message<string, object>
