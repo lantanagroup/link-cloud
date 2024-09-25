@@ -2,7 +2,11 @@
 name: "PR Title Check"
 on:
   pull_request:
-    branches: [ dev, LNK-2726-Enforce-Jira-key-in-PR-message ]
+    branches: 
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
     types: [opened, edited, synchronize]
 jobs:
   check-title:
@@ -15,12 +19,12 @@ jobs:
         script: |
           const payload = context.payload
           const prTitle = payload.pull_request.title
-          // The pattern for JIRA ticket format
-          const jiraPattern = /^LNK-\d+([:-]|\s)/g
+          // The pattern for JIRA ticket format LNK-nnnn:<space><PR title>, e.g. LNK-1234: My PR title
+          const jiraPattern = /^LNK-\d+([:]\s)/g
           if (!jiraPattern.test(prTitle)) {
-            console.log('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn: or LNK-nnnn- or LNK-nnnn(space)')
+            console.log('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn:<space>, e.g. LNK-1234: My PR title')
             // Fails the workflow
-            core.setFailed('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn: or LNK-nnnn- or LNK-nnnn(space)')
+            core.setFailed('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn:<space>, e.g. LNK-1234: My PR title')
           } else {
             console.log('PR title format is correct.')
           }
