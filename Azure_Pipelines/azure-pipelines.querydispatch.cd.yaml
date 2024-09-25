@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
     - dev
+    - release/*
   paths:
     include:
     - DotNet/QueryDispatch/*
@@ -59,7 +60,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.BuildId)
+        $(Build.BuildId)_$(Build.SourceBranchName)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
