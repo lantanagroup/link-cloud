@@ -284,13 +284,27 @@ namespace LantanaGroup.Link.Tenant.Services
                 throw new ApplicationException(validationErrors.ToString());
             }
             // validate timezones
-            if (!TimeZoneInfo.GetSystemTimeZones().Any(x => x.Id == facility.TimeZone))
+            try
+            {
+                // Try to find the time zone based on the ID stored in the facility object
+                TimeZoneInfo timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
+
+                _logger.LogInformation($"Time zone found: {timeZoneInfo.StandardName}");
+
+                _logger.LogInformation($"Time zone found: {timeZoneInfo.DisplayName}");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                _logger.LogError($"The time zone ID '{facility.TimeZone}' was not found on this system.");
+                throw new ApplicationException("Timezone Not Found: " + facility.TimeZone);
+            }
+            catch (InvalidTimeZoneException)
             {
                 _logger.LogError("Invalid Timezone: " + facility.TimeZone);
                 throw new ApplicationException("Invalid Timezone: " + facility.TimeZone);
             }
-           
-          
+
+
         }
 
         private async Task ValidateSchedules(FacilityConfigModel facility)
