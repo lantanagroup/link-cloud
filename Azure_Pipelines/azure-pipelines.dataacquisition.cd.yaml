@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
     - dev
+    - release/*
   paths:
     include:
     - DotNet/DataAcquisition/*
@@ -23,7 +24,7 @@ variables:
 - name: tags1
   value: 'latest'
 - name: tags2
-  value: '$(Build.BuildId)'
+  value: '$(Build.BuildId)_$(Build.SourceBranchName)'
 - name: registry-repo-Name
   value: 'link-dataacquisition'
 - name: dockerPath
