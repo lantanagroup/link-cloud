@@ -1,12 +1,12 @@
 trigger:
   branches:
     include:
-    - LNK-2855-auto-db-schema-script
+    - release/*
     #- dev
   paths:
     include:
     - DotNet/*/Migrations
-    - Java/*/resources/schemas
+    - Java/validation/resources/database
     exclude:
     - '*'
     
@@ -79,9 +79,9 @@ stages:
   - job: Account
     displayName: "Generate Account Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -103,9 +103,9 @@ stages:
   - job: Audit
     displayName: "Generate Audit Schema Script"
     dependsOn: getChangedFiles
-    #variables: 
-      #changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -127,9 +127,9 @@ stages:
   - job: Census
     displayName: "Generate Census Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -152,9 +152,9 @@ stages:
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -176,9 +176,9 @@ stages:
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -200,9 +200,9 @@ stages:
   - job: Notification
     displayName: "Generate Notification Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -224,9 +224,9 @@ stages:
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -248,9 +248,9 @@ stages:
   - job: Submission
     displayName: "Build Submission"
     dependsOn: getChangedFiles
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -272,9 +272,9 @@ stages:
   - job: Tenant
     displayName: "Build Tenant"
     dependsOn: getChangedFiles 
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -296,9 +296,9 @@ stages:
   - job: Validation
     displayName: "Build Validation"
     dependsOn: getChangedFiles 
-    # variables: 
-    #   changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-    #condition: eq(variables.changed, 'True')
+    variables: 
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
+    condition: eq(variables.changed, 'True')
     steps:
     - task: CopyFiles@2
       displayName: Copy Validation SQL Script to Artifact Staging Directory
