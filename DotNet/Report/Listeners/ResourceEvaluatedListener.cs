@@ -187,8 +187,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
+                                var entries = await submissionEntryManager.FindAsync(s =>
+                                    s.FacilityId == entry.FacilityId && s.PatientId == entry.PatientId &&
+                                    s.ReportScheduleId == entry.ReportScheduleId);
+
                                 //This Patient is ready to submit, so build out their bundle.
-                                if (entry.Status == PatientSubmissionStatus.ReadyForSubmission)
+                                if (entries.All(e => e.Status == PatientSubmissionStatus.ReadyForSubmission))
                                 {
                                     entry.PatientSubmission = await _bundler.GenerateBundle(entry.FacilityId, entry.PatientId, entry.ReportScheduleId);
                                 }
