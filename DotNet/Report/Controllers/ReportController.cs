@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
         [HttpPost("Bundle/Patient")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientSubmissionModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
@@ -55,12 +55,12 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
-                var submission = await _submissionEntryManager.SingleOrDefaultAsync(e =>
-                    e.FacilityId == facilityId && e.PatientId == patientId && e.ReportScheduleId == reportScheduleId);
+                var submissions = (await _submissionEntryManager.FindAsync(e =>
+                    e.FacilityId == facilityId && e.PatientId == patientId && e.ReportScheduleId == reportScheduleId)).Select(s => s.PatientSubmission).ToList();
 
-                if (submission != null && submission.PatientSubmission != null)
+                if (submissions?.Any() ?? false)
                 {
-                    return Ok(submission.PatientSubmission);
+                    return Ok(submissions);
                 }
 
                 return NotFound();
