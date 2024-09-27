@@ -295,6 +295,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<AccountDbContext>();
+
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();

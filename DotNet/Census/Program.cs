@@ -308,10 +308,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.ConfigureSwagger();
 
-
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-
-    app.AutoMigrateEF<CensusContext>();
 
     if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("Local", StringComparison.InvariantCultureIgnoreCase))
     {
