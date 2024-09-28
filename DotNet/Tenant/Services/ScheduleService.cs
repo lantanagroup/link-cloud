@@ -231,7 +231,6 @@ namespace LantanaGroup.Link.Tenant.Services
                     break;
             }       
 
-            var timeZones = TimeZoneInfo.GetSystemTimeZones();
 
             // set the chron trigger based on timezone
             TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
