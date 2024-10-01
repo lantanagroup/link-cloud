@@ -295,13 +295,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 _logger.LogInformation($"Time zone found: {timeZoneInfo.StandardName}");
 
-                _logger.LogInformation($"Time zone found: {timeZoneInfo.DisplayName}");
-
-                // verify the id of the time zone is IONA format
+                // verify the id of the time zone is IANA format
                 if (!timeZoneInfo.HasIanaId)
                 {
-                    _logger.LogError("Incorrect Timezone format: " + facility.TimeZone +  "(Time zones should be in IONA format for example: America/Chicago)");
-                    throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone + " (Time zones should be in IONA format for example: America/Chicago)");
+                    _logger.LogError("Incorrect Timezone format: " + facility.TimeZone +  "(Time zones should be in IANA format for example: America/Chicago)");
+                    throw new ApplicationException("Incorrect Timezone format: " + facility.TimeZone + " (Time zones should be in IANA format for example: America/Chicago)");
                 }
             }
             catch (TimeZoneNotFoundException)
