@@ -67,7 +67,7 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        if ("$(Build.SourceBranch)" -like "release/") {
+        if ("$(Build.SourceBranch)" -like "*release/*") {
         $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
         }
         else { 
