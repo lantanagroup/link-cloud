@@ -33,6 +33,11 @@ steps:
       jdkArchitectureOption: 'x64'
       jdkSourceOption: 'PreInstalled'
 
+  - task: GetRevision@1
+    displayName: 'Get Revision'
+    inputs:
+      VariableName: Revision
+
   - task: Bash@3
     inputs:
       targetType: 'inline'
