@@ -39,10 +39,11 @@ namespace TenantTests
                 Id = id,
                 FacilityId = facilityId,
                 FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
+                ScheduledReports = new ScheduledReportModel()
             };
+            _model.ScheduledReports.Daily = new string[] { "NHSNdQMAcuteCareHospitalInitialPopulation" };
+            _model.ScheduledReports.Weekly = new string[] { "NHSNRespiratoryPathogenSurveillanceInitialPopulation" };
+            _model.ScheduledReports.Monthly = new string[] { "NHSNGlycemicControlHypoglycemicInitialPopulation" };
 
             _serviceRegistry = new ServiceRegistry()
             {
@@ -50,7 +51,7 @@ namespace TenantTests
             };
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
-              .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+              .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == facilityId), CancellationToken.None)).Returns(Task.FromResult(_model));
 
             _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.DeleteAsync(_model.Id, CancellationToken.None)).Returns(Task.FromResult<bool>(true));

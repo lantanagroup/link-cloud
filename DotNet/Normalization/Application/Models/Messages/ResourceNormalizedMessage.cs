@@ -10,4 +10,5 @@ public class ResourceNormalizedMessage
     public string QueryType { get; set; }
     public object Resource { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }
+    public string ReportableEvent { get; set; }
 }

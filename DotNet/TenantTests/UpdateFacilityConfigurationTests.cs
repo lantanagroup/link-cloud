@@ -1,8 +1,5 @@
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
@@ -11,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Moq.AutoMock;
-using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
+using System.Linq.Expressions;
 
 namespace TenantTests
 {
@@ -20,65 +17,80 @@ namespace TenantTests
     {
         private FacilityConfigModel? _model;
         private ServiceRegistry? _serviceRegistry;
+        private LinkTokenServiceSettings? _linkTokenService;
+        private MeasureConfig? _linkMeasureConfig;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45333";
         private const string id1 = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
-
+        private List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
 
         private AutoMocker? _mocker;
         private FacilityConfigurationService? _service;
 
         public ILogger<FacilityConfigurationService> logger = Mock.Of<ILogger<FacilityConfigurationService>>();
 
-        [Fact]
-        public void TestUpdateFacility()
+
+        private void SetUp()
         {
-            List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
-            scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
-            List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
 
             _model = new FacilityConfigModel()
             {
                 Id = id,
                 FacilityId = facilityId,
                 FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
+                ScheduledReports = new ScheduledReportModel(),
+                TimeZone = "America/New_York",
+                CreateDate = DateTime.Now,
+                ModifyDate = DateTime.Now
             };
+
+            _model.ScheduledReports.Daily = new string[] { "NHSNdQMAcuteCareHospitalInitialPopulation" };
+            _model.ScheduledReports.Weekly = new string[] { "NHSNRespiratoryPathogenSurveillanceInitialPopulation" };
+            _model.ScheduledReports.Monthly = new string[] { "NHSNGlycemicControlHypoglycemicInitialPopulation" };
 
             _serviceRegistry = new ServiceRegistry()
             {
-                MeasureServiceUrl = "test"
+                MeasureServiceUrl = "http://localhost:5678"
             };
 
-            _model.ScheduledTasks.AddRange(scheduledTaskModels);
+            _linkTokenService = new LinkTokenServiceSettings()
+            {
+                SigningKey = "test"
+            };
+
+
+            _linkMeasureConfig = new MeasureConfig()
+            {
+                CheckIfMeasureExists = false,
+            };
+
+            List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
+            facilities.Add(_model);
+        }
+
+
+       [Fact]
+        public void TestUpdateFacility()
+        {
+
+            SetUp();
 
             _mocker = new AutoMocker();
 
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync( _model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-            .Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-            .Setup(p => p.FirstOrDefaultAsync(x => x.FacilityId == _model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).Returns(Task.FromResult(_model));
 
-            _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer(false))
-            .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
+            _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(new MeasureConfig() { CheckIfMeasureExists = false });
 
-            _mocker.GetMock<IOptions<MeasureConfig>>()
-              .Setup(p => p.Value)
-              .Returns(new MeasureConfig());
+            _mocker.GetMock<IOptions<ServiceRegistry>>().Setup(p => p.Value).Returns(_serviceRegistry);
 
-            _mocker.GetMock<IOptions<ServiceRegistry>>()
-                .Setup(p => p.Value)
-                .Returns(_serviceRegistry);
+            _mocker.GetMock<IOptions<LinkTokenServiceSettings>>().Setup(p => p.Value).Returns(_linkTokenService);
 
             Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
 
@@ -88,96 +100,58 @@ namespace TenantTests
 
         }
 
-       [Fact]
+        [Fact]
         public async Task TestErrorUpdateNonExistingFacility()
         {
-            List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
-            scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
 
-            _model = new FacilityConfigModel()
-            {
-                Id = id,
-                FacilityId = facilityId,
-                FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
-            };
-
-            _model.ScheduledTasks.AddRange(scheduledTaskModels);
+            SetUp();
 
             _mocker = new AutoMocker();
 
             _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
-            _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(result: null));
 
-            _ = _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.FirstOrDefaultAsync(x => x.FacilityId == _model.FacilityId, CancellationToken.None)).Returns(Task.FromResult(_model));
+            _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync((FacilityConfigModel)null);
 
-            _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer(false))
-            .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
+            _mocker.GetMock<IOptions<MeasureConfig>>().Setup(p => p.Value).Returns(new MeasureConfig() { CheckIfMeasureExists = false });
 
-            Task<string> _updatedFacilityId = _service.UpdateFacility(id, _model, CancellationToken.None);
+            Task<string> _updatedFacilityId =  _service.UpdateFacility(id, _model, CancellationToken.None);
 
             _mocker.GetMock<IFacilityConfigurationRepo>().Verify(p => p.AddAsync(_model, CancellationToken.None), Times.Once);
 
         }
 
-      /*  [Fact]
-        public async Task TestErrorDuplicateFacility()
-        {
-            List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
+          [Fact]
+           public async Task TestErrorDuplicateFacility()
+           {
 
-            scheduledTaskModels.Add(new ScheduledTaskModel() { KafkaTopic = KafkaTopic.ReportScheduled.ToString(), ReportTypeSchedules = new List<ReportTypeSchedule>() });
+                FacilityConfigModel _modelFound = new FacilityConfigModel()
+                {
+                    Id = id1,
+                    FacilityId = facilityId,
+                    FacilityName = facilityName,
+                    TimeZone = "America/New_York"
+                };
 
-            List<FacilityConfigModel> facilities = new List<FacilityConfigModel>();
+               SetUp();
 
-            _model = new FacilityConfigModel()
-            {
-                Id = id,
-                FacilityId = facilityId,
-                FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
-            };
+               facilities.Add(_model);
 
-            FacilityConfigModel _modelFound = new FacilityConfigModel()
-            {
-                Id = id1,
-                FacilityId = facilityId,
-                FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
-            };
+               _mocker = new AutoMocker();
 
-            _model.ScheduledTasks.AddRange(scheduledTaskModels);
+               _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
-            _mocker = new AutoMocker();
+               _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _service = _mocker.CreateInstance<FacilityConfigurationService>();
+               _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-                .Setup(p => p.UpdateAsync(_model, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
+               _mocker.GetMock<IFacilityConfigurationRepo>().Setup(p => p.FirstOrDefaultAsync(It.IsAny<Expression<Func<FacilityConfigModel, bool>>>(), CancellationToken.None)).ReturnsAsync(_modelFound);
 
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.GetAsync(id, CancellationToken.None)).Returns(Task.FromResult<FacilityConfigModel>(_model));
-
-            _mocker.GetMock<IFacilityConfigurationRepo>()
-           .Setup(p => p.FirstOrDefaultAsync((x => x.FacilityId == _model.FacilityId), CancellationToken.None)).Returns(Task.FromResult(_modelFound));
-
-            _mocker.GetMock<IKafkaProducerFactory<string, object>>()
-            .Setup(p => p.CreateAuditEventProducer(false))
-            .Returns(Mock.Of<IProducer<string, AuditEventMessage>>());
-
-            _ = await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
-        }*/
+               await Assert.ThrowsAsync<ApplicationException>(() => _service.UpdateFacility(id, _model, CancellationToken.None));
+           }
+        
     }
 }

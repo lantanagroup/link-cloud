@@ -2,5 +2,9 @@ namespace LantanaGroup.Link.Tenant.Models.Messages;
 
 public class ReportScheduledMessage
 {
-    public List<KeyValuePair<string, object>> Parameters { get; set; } = new List<KeyValuePair<string, object>>();
+    public string[] ReportTypes { get; set; }
+    public string Frequency { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+
 }
