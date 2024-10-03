@@ -115,14 +115,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     var endDate = value.EndDate.UtcDateTime;
                                     var frequency = value.Frequency.ToString();
 
-                                    _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportType, startDate, endDate);
+                                    _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 
                                     var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key);
 
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
-                                        foreach (var reportType in value.ReportType)
+                                        foreach (var reportType in value.ReportTypes)
                                         {
                                             ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, reportType, frequency, startDate, endDate, correlationId);
                                             await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
                                     else
                                     {
-                                        foreach (var reportType in value.ReportType)
+                                        foreach (var reportType in value.ReportTypes)
                                         {
                                             ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, reportType, frequency, startDate, endDate, correlationId);
                                             await scheduledReportMgr.createScheduledReport(scheduledReport);
