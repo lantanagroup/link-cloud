@@ -9,6 +9,7 @@ using Quartz;
 using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Tenant.Interfaces;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
@@ -18,7 +19,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
     public class FacilityController : ControllerBase
     {
 
-        private readonly FacilityConfigurationService _facilityConfigurationService;
+        private readonly IFacilityConfigurationService _facilityConfigurationService;
 
         private readonly IMapper _mapperModelToDto;
 
@@ -30,7 +31,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         public IScheduler _scheduler { get; set; }
 
 
-        public FacilityController(ILogger<FacilityController> logger, FacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory)
+        public FacilityController(ILogger<FacilityController> logger, IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory)
         {
 
             _facilityConfigurationService = facilityConfigurationService;
@@ -42,18 +43,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 cfg.CreateMap<FacilityConfigModel, FacilityConfigDto>();
                 cfg.CreateMap<PagedConfigModel<FacilityConfigModel>, PagedFacilityConfigDto>();
-                cfg.CreateMap<ScheduledTaskModel.ReportTypeSchedule, ScheduledTaskDto.ReportTypeDtoSchedule>();
-                cfg.CreateMap<ScheduledTaskModel, ScheduledTaskDto>();
-                cfg.CreateMap<MonthlyReportingPlanModel, MonthlyReportingPlanDto>();
+                cfg.CreateMap<ScheduledReportModel, ScheduledReportDto>();
             });
 
             var configDtoToModel = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<FacilityConfigDto, FacilityConfigModel>();
                 cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<FacilityConfigModel>>();
-                cfg.CreateMap<ScheduledTaskDto.ReportTypeDtoSchedule, ScheduledTaskModel.ReportTypeSchedule>();
-                cfg.CreateMap<ScheduledTaskDto, ScheduledTaskModel>();
-                cfg.CreateMap<MonthlyReportingPlanDto, MonthlyReportingPlanModel>();
+                cfg.CreateMap<ScheduledReportDto, ScheduledReportModel>();
             });
 
             _mapperModelToDto = configModelToDto.CreateMapper();
@@ -199,8 +196,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             FacilityConfigModel dest = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(updatedFacility);
 
-            FacilityConfigModel existingFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
-
             // validate id and updatedFacility.id match
             if (id.ToString() != updatedFacility.Id)
             {
@@ -208,9 +203,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 return BadRequest($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
             }
+
+            FacilityConfigModel oldFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
+
+            FacilityConfigModel clonedFacility = oldFacility?.ShallowCopy();
+
+       
             try
             {
-
                 await _facilityConfigurationService.UpdateFacility(id, dest, cancellationToken);
             }
             catch (ApplicationException ex)
@@ -226,12 +226,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 throw;
             }
 
-            // if existingFacility is not null, then update the jobs, else add new jobs
-            if (existingFacility != null)
+            // if clonedFacility is not null, then update the jobs, else add new jobs
+
+            if (clonedFacility != null)
             {
                 using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
                 {
-                    await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
+                    await ScheduleService.UpdateJobsForFacility(dest, clonedFacility, _scheduler);
                 }
             }
             else
@@ -242,7 +243,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 }
             }
 
-            if (existingFacility == null)
+            if (oldFacility == null)
             {
                 return CreatedAtAction(nameof(StoreFacility), new { id = dest.Id }, dest);
             }
@@ -279,7 +280,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
             {
-                await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
+                await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), _scheduler);
             }
 
             return NoContent();

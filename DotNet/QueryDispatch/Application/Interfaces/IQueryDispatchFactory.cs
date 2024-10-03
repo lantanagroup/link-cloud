@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using StackExchange.Redis;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Interfaces
 {

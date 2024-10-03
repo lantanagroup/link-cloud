@@ -29,8 +29,8 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         public ReportScheduledEventListener(
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
-            IQueryDispatchFactory queryDispatchFactory,
-            IProducer<string, AuditEventMessage> auditProducer,
+            IQueryDispatchFactory queryDispatchFactory, 
+            IProducer<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
@@ -74,6 +74,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         ConsumeResult<string, ReportScheduledValue>? consumeResult;
+
                         try
                         {
                             await _reportScheduledConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
@@ -110,7 +111,6 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     string key = consumeResult.Message.Key;
 
-
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
                                     var frequency = value.Frequency.ToString();
@@ -122,6 +122,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
+										
                                         foreach (var reportType in value.ReportTypes)
                                         {
                                             ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, reportType, frequency, startDate, endDate, correlationId);

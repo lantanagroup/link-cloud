@@ -122,8 +122,6 @@ namespace QueryDispatch.Domain.Managers
 
                 }
 
-                //await _dataStore.Update(existingReport);
-
                 await _scheduledReportRepository.UpdateAsync(existingReport);
 
                 _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportType} for facility id {existingReport.FacilityId}");
