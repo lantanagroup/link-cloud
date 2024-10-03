@@ -206,7 +206,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             FacilityConfigModel oldFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
 
-            FacilityConfigModel clonedFacility = oldFacility.ShallowCopy();
+            FacilityConfigModel clonedFacility = oldFacility?.ShallowCopy();
 
        
             try
