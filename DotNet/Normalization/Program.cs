@@ -39,6 +39,7 @@ using System.Reflection;
 using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -211,8 +212,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add health checks
+    var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NormalizationConstants.ServiceName).GetHealthCheckOptions();
+
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     builder.Services.AddSwaggerGen(c =>
     {

@@ -44,6 +44,7 @@ using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Listeners;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -183,8 +184,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
