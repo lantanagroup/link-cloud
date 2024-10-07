@@ -2,6 +2,7 @@
 <configuration scan="true" scanPeriod="10 seconds">
     <springProperty scope="context" name="loki_enabled" source="loki.enabled"/>
     <springProperty scope="context" name="loki_url" source="loki.url"/>
+    <springProperty scope="context" name="loki_app" source="loki.app" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -17,7 +18,7 @@
                 </http>
                 <format>
                     <label>
-                        <pattern>app=link-cloud,component=Validation</pattern>
+                        <pattern>app=${loki_app},component=Validation</pattern>
                         <readMarkers>true</readMarkers>
                     </label>
                     <message>
