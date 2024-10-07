@@ -38,6 +38,7 @@ using System.Text;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -198,8 +199,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services
     builder.Services.AddHostedService<NotificationRequestedListener>();
