@@ -51,6 +51,7 @@ using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -338,8 +339,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add Health Check
+    var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddDbContextCheck<DataAcquisitionDbContext>();
+        .AddDbContextCheck<DataAcquisitionDbContext>()
+        .AddKafka(kafkaHealthOptions);
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
