@@ -2,7 +2,9 @@ artifact:
   init: true
 loki:
   enabled: false
-  url: ''
+  url: '',
+  app: link-dev
+
 server:
   port: 31820
 
