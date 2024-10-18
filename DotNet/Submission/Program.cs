@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -149,6 +150,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
+
+    //Add health checks
+    var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
+
+    builder.Services.AddHealthChecks()
+        .AddKafka(kafkaHealthOptions);
+
+
     // Add repositories
     // TODO
 
@@ -216,6 +226,12 @@ static void SetupMiddleware(WebApplication app)
         app.UseMiddleware<UserScopeMiddleware>();
     }
     app.UseAuthorization();
+
+    //map health check middleware
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+    }).RequireCors("HealthCheckPolicy");
 }
 
 #endregion

@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
@@ -168,8 +169,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddControllers();
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     // Add swagger
     builder.Services.AddEndpointsApiExplorer();
