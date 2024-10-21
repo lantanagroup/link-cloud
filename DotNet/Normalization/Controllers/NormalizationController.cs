@@ -1,10 +1,8 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Normalization.Application.Managers;
+﻿using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -203,40 +201,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
 
             return Accepted();
-        }
-
-        [ApiExplorerSettings(IgnoreApi = true)]
-        public async Task<string> CreateAuditEvent(NormalizationConfigModel model, AuditEventType type)
-        {
-            try
-            {
-                using var producer = _kafkaProducerFactory.CreateAuditEventProducer();
-                Shared.Application.Models.Kafka.AuditEventMessage auditEvent = new Shared.Application.Models.Kafka.AuditEventMessage();
-                auditEvent.ServiceName = "Normalization Service";
-                auditEvent.EventDate = DateTime.UtcNow;
-                //auditEvent.UserId =
-                auditEvent.User = "SystemUser";
-                auditEvent.Action = type;
-                auditEvent.Resource = nameof(NormalizationConfig);
-                auditEvent.Notes = $"{type} for normalization configuration ({model.FacilityId})'.";
-
-                var headers = new Headers();
-                headers.Add("X-Correlation-Id", (Guid.NewGuid().ToByteArray()));
-
-                //write to auditable event occurred topic
-                await producer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string,Shared.Application.Models.Kafka.AuditEventMessage>
-                {
-                    Key = model.FacilityId,
-                    Value = auditEvent,
-                    Headers = headers
-                });
-
-                return model.FacilityId;
-            }
-            catch (Exception ex)
-            {
-                throw new ApplicationException($"Failed to create audit event for {type} normalization configuration for tenant {model.FacilityId}.", ex);
-            }
         }
     }
 }
