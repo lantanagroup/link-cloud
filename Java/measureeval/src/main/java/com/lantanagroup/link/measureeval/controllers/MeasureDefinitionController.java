@@ -1,13 +1,13 @@
 package com.lantanagroup.link.measureeval.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.lantanagroup.link.shared.auth.PrincipalUser;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import com.lantanagroup.link.shared.auth.PrincipalUser;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import org.hl7.fhir.r4.model.Bundle;
@@ -18,10 +18,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/measure-definition")
@@ -33,6 +35,12 @@ public class MeasureDefinitionController {
     private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache evaluatorCache;
 
+
+    final String[] DISALLOWED_FIELDS = new String[]{};
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.setDisallowedFields(DISALLOWED_FIELDS);
+    }
 
     public MeasureDefinitionController(
             MeasureDefinitionRepository repository,
