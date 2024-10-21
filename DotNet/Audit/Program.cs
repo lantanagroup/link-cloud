@@ -42,6 +42,7 @@ using LantanaGroup.Link.Audit.Listeners;
 using LantanaGroup.Link.Audit.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Audit.Application.Services;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -181,8 +182,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AuditConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     //configure CORS
     builder.Services.AddLinkCorsService(options => {
