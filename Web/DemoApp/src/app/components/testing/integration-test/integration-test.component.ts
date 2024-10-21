@@ -39,7 +39,7 @@ const listAnimation = trigger('listAnimation', [
   selector: 'demo-integration-test',
   standalone: true,
   imports: [
-    CommonModule,    
+    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -74,8 +74,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   intervalId!: NodeJS.Timer | null;
   isMonitoring: boolean = false;
   showProcessCard: boolean = false;
+  consumersData: { [key: string]: string } = {};
 
-  constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }    
+  constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }
 
   ngOnDestroy(): void {
     this.stopPollingAuditEvents();
@@ -84,7 +85,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.eventForm = new FormGroup({
       event: new FormControl('', Validators.required)
-    }); 
+    });
 
     this.eventForm.get('event')?.valueChanges.subscribe(change => {
       switch (change) {
@@ -130,6 +131,16 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     this.startPollingAuditEvents();
   }
 
+  createConsumers() {
+    this.testService.startConsumers().subscribe(response => {
+      console.log('Consumer created successfully:', response);
+      this.startPollingConsumerEvents();
+    }, error => {
+      console.error('Error creating consumer:', error);
+    });
+  }
+
+
   startPollingAuditEvents() {
     if (this.auditEvents && this.auditEvents.length > 0) {
       this.auditEvents.splice(0, this.auditEvents.length);
@@ -161,6 +172,20 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
+  startPollingConsumerEvents() {
+    this.intervalId = setInterval( this.pollConsumerEvents.bind(this), 10000); // 10 seconds in milliseconds (1000 ms = 1 second)
+  }
+
+  getKeys(consumersData: { [key: string]: string }): string[] {
+    return Object.keys(consumersData);
+  }
+
+
+  pollConsumerEvents(){
+    this.testService.readConsumers().subscribe(data => {
+      this.consumersData = data;
+    });
+  }
   pollAuditEvents() {
     this.auditService.list('', '', this.correlationId, '', '', '', '', 20, 1).subscribe(data => {
       this.auditEvents = data.records;
@@ -183,7 +208,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       //this.auditEvents.push(testAudit);
 
     });
-    
+
   }
 
 }

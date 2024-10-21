@@ -10,6 +10,7 @@ import { IPatientEvent } from '../../interfaces/testing/patient-event.interface'
 import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/testing/data-acquisition-requested.interface';
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
 import { AppConfigService } from '../app-config.service';
+import {ConsumerResponse} from "../../models/testing/ConsumerResponse";
 
 @Injectable({
   providedIn: 'root'
@@ -25,7 +26,7 @@ export class TestService {
       endDate: endDate
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/report-scheduled`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/report-scheduled`, event)
       .pipe(
         tap(_ => console.log(`Request for a new report scheduled event was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -43,7 +44,7 @@ export class TestService {
       eventType: eventType
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/patient-event`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/patient-event`, event)
       .pipe(
         tap(_ => console.log(`Request for a new patient event was sent.`)),
         map((response: IEntityCreatedResponse) => {
@@ -53,6 +54,32 @@ export class TestService {
     )
   }
 
+  startConsumers(): Observable<IEntityCreatedResponse> {
+
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/start-consumers`, event)
+      .pipe(
+        tap(_ => console.log(`Request for creating consumers.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError(this.handleError)
+      )
+  }
+
+  readConsumers(): Observable<{ [key: string]: string }> {
+
+    return this.http.get<{ [key: string]: string }>(`${this.appConfigService.config?.baseApiUrl}/integration/read-consumers`)
+      .pipe(
+        tap(_ => console.log(`Request for reading consumers.`)),
+        map((response: { [key: string]: string }) => {
+          return response;
+        }),
+        catchError(this.handleError)
+      )
+  }
+
+
+
   generateDataAcquisitionRequestedEvent(facilityId: string, patientId: string, reports: IScheduledReport[]): Observable<IEntityCreatedResponse> {
 
     let event: IDataAcquisitionRequested = {
@@ -61,7 +88,7 @@ export class TestService {
       reports: reports
     };
 
-    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/testing/data-acquisition-requested-event`, event)
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/integration/data-acquisition-requested-event`, event)
       .pipe(
         tap(_ => console.log(`Request for a new data acquisition requested event was sent.`)),
         map((response: IEntityCreatedResponse) => {

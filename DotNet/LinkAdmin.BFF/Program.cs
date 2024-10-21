@@ -119,6 +119,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
+    builder.Services.AddTransient<KafkaConsumerManager>();
+    builder.Services.AddTransient<KafkaConsumerService>();
 
     //Add Redis   
     if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
