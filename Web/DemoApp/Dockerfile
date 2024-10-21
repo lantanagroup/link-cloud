@@ -13,7 +13,7 @@ COPY . .
 RUN npm install -g @angular/cli
 RUN ng build
 
-FROM nginx:1.20.0-alpine
+FROM nginx:1.27.2-alpine
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /build/dist/demo-app/. /usr/share/nginx/html
 EXPOSE 80
