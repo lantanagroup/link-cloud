@@ -21,6 +21,7 @@ using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -94,14 +95,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add IOptions
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));    
+    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection(AccountConstants.AppSettingsSectionNames.UserManagement));
 
     //add factories
-    builder.Services.AddFactories();
+    builder.Services.AddFactories(kafkaConnection);
 
     //add command and queries
     builder.Services.AddCommandAndQueries();
@@ -116,19 +119,22 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    //Add Redis     
-    builder.Services.AddRedisCache(options =>
+    //Add Redis
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
     {
-        options.Environment = builder.Environment;
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
 
-        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+            var redisConnection = builder.Configuration.GetConnectionString("Redis");
 
-        if (string.IsNullOrEmpty(redisConnection))
-            throw new NullReferenceException("Redis Connection String is required.");
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new NullReferenceException("Redis Connection String is required.");
 
-        options.ConnectionString = redisConnection;
-        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
-    });
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+        });
+    }    
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
@@ -183,8 +189,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AccountConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     // Add tenant API service
     builder.Services.AddHttpClient();
@@ -290,6 +299,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
+    app.AutoMigrateEF<AccountDbContext>();
+
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();

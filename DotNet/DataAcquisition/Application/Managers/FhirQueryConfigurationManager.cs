@@ -38,11 +38,6 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             throw new NotFoundException($"No configuration found for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
         }
 
-        if (queryResult.Authentication == null)
-        {
-            throw new NotFoundException($"No Authentication found on configuration for facilityId: {facilityId}. Unable to retrieve Authentication settings.");
-        }
-
         return queryResult.Authentication;
     }
 

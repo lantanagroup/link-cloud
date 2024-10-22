@@ -41,7 +41,7 @@ export class AppComponent implements OnInit, OnChanges {
     this.userProfile = await this.profileService.getProfile();
 
 
-    if (this.userProfile.username === '') {
+    if (this.userProfile.email === '') {
       this.authService.login();
     }
 

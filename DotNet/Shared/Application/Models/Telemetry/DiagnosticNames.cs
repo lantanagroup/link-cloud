@@ -10,6 +10,7 @@
         public const string PatientEvent = "patient.event";
         public const string QueryType = "query.type";
         public const string Resource = "resource";
+        public const string ResourceId = "resource.id";
         public const string NormalizationOperation = "normalization.operation";
         public const string AuditId = "audit.id";
         public const string AuditLogAction = "audit.log.action";

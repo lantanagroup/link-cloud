@@ -1,0 +1,22 @@
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - DemoApp/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: RaulARuiz.angular-cli-1.angular-cli-build-task.AngularCLI@1
+    displayName: 'ng build'
+    inputs:
+      project: DemoApp
+      prod: false
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

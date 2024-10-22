@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Configs;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
@@ -81,6 +83,13 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         _collection.DeleteOne(filter);
+    }
+
+    public virtual async System.Threading.Tasks.Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested) return;
+        var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
+        await _collection.DeleteOneAsync(filter, cancellationToken);
     }
 
     public virtual async System.Threading.Tasks.Task DeleteAsync(string id, CancellationToken cancellationToken = default)
@@ -185,5 +194,10 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         }
 
         return HealthCheckResult.Unhealthy();
+    }
+
+    Task<(List<T>, PaginationMetadata)> IEntityRepository<T>.SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 }

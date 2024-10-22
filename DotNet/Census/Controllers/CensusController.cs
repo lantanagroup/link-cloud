@@ -1,15 +1,10 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Census.Application.Commands;
-using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Census.Controllers;
 
@@ -19,12 +14,13 @@ namespace LantanaGroup.Link.Census.Controllers;
 public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
-    private readonly IMediator _mediator;
-
-    public CensusController(ILogger<CensusController> logger, IMediator mediator)
+    private readonly IPatientCensusHistoryManager _patientCensusHistoryManager;
+    private readonly ICensusPatientListManager _patientListManager;
+    public CensusController(ILogger<CensusController> logger, IPatientCensusHistoryManager patientCensusHistoryManager, ICensusPatientListManager patientListManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _patientCensusHistoryManager = patientCensusHistoryManager ?? throw new ArgumentNullException(nameof(patientCensusHistoryManager));
+        _patientListManager = patientListManager ?? throw new ArgumentNullException(nameof(patientListManager));
     }
 
     /// <summary>
@@ -42,10 +38,8 @@ public class CensusController : Controller
     {
         try
         {
-            var history = await _mediator.Send(new GetCensusHistoryQuery
-            {
-                FacilityId = facilityId
-            });
+            var history = await _patientCensusHistoryManager.GetPatientCensusHistoryByFacilityId(facilityId);
+
             return Ok(history);
         }
         catch (Exception ex)
@@ -72,14 +66,9 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = (await _mediator.Send(new GetAdmittedPatientsQuery
-            {
-                FacilityId = facilityId,
-                StartDate = startDate,
-                EndDate = endDate
-            })).DistinctBy(p => p.PatientId).ToList();
+            var patients = (await _patientListManager.GetPatientList(facilityId, startDate, endDate)).ToList();
 
-            if(patients.Count == 0)
+            if(!patients.Any())
             {
                 return NotFound($"No patients found for facilityId {facilityId}");
             }
@@ -129,10 +118,13 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = await _mediator.Send(new GetCurrentCensusQuery
+            if (string.IsNullOrEmpty(facilityId))
             {
-                FacilityId = facilityId
-            });
+                return BadRequest("FacilityId parameter is null or empty.");
+            }
+
+            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: true);
+
             return Ok(patients);
         }
         catch (Exception ex)
@@ -157,10 +149,8 @@ public class CensusController : Controller
     {
         try
         {
-            var patients = await _mediator.Send(new GetAllPatientsForFacilityQuery
-            {
-                FacilityId = facilityId
-            });
+            var patients = await _patientListManager.GetPatientListForFacility(facilityId, activeOnly: false);
+
             return Ok(patients);
         }
         catch (Exception ex)

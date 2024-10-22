@@ -1,10 +1,7 @@
 using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Audit.Application.Interfaces;
-using LantanaGroup.Link.Audit.Listeners;
-using LantanaGroup.Link.Audit.Application.Commands;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Audit.Application.Factory;
-using LantanaGroup.Link.Audit.Application.Audit.Queries;
-using LantanaGroup.Link.Audit.Infrastructure.AuditHelper;
 using Serilog;
 using Serilog.Enrichers.Span;
 using LantanaGroup.Link.Audit.Infrastructure;
@@ -13,7 +10,6 @@ using LantanaGroup.Link.Audit.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Middleware;
-using System.Diagnostics;
 using Serilog.Settings.Configuration;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Azure.Identity;
@@ -35,15 +31,18 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
-using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.DeadLetter;
-using LantanaGroup.Link.Audit.Application.Handlers.Exceptions.Transient;
 using LantanaGroup.Link.Shared.Application.Services;
 using Quartz.Impl;
 using Quartz;
-using LantanaGroup.Link.Audit.Application.Retry.Commands;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz.Spi;
 using LantanaGroup.Link.Shared.Jobs;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Audit.Listeners;
+using LantanaGroup.Link.Audit.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Audit.Application.Services;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,26 +94,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     //Add problem details
-    builder.Services.AddProblemDetails(options => {
-        options.CustomizeProblemDetails = ctx =>
-        {            
-            ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
-            if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
-            {
-                string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
-                ctx.ProblemDetails.Extensions.Add(new KeyValuePair<string, object?>("traceId", traceId));
-            }      
-
-            if (builder.Environment.IsDevelopment())
-            {
-                ctx.ProblemDetails.Extensions.Add("service", "Audit");
-            }
-            else 
-            {
-                ctx.ProblemDetails.Extensions.Remove("exception");
-            }
-            
-        };                        
+    builder.Services.AddProblemDetailsService(options =>
+    {
+        options.Environment = builder.Environment;
+        options.ServiceName = AuditConstants.ServiceName;
+        options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
 
     // Add services to the container. 
@@ -123,29 +107,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    builder.Services.AddTransient<IAuditHelper, AuditHelper>();
     builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
-    //Add commands
-    builder.Services.AddTransient<ICreateAuditEventCommand, CreateAuditEventCommand>();
-    builder.Services.AddTransient<ICreateRetryEntity, CreateRetryEntity>();
+    // Add kafka connection singleton
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
+    builder.Services.AddSingleton(kafkaConnection);
 
-    //Add queries
-    builder.Services.AddTransient<IGetAuditEventQuery, GetAuditEventQuery>();
-    builder.Services.AddTransient<IGetFacilityAuditEventsQuery, GetFacilityAuditEventsQuery>();
-    builder.Services.AddTransient<IGetAuditEventListQuery, GetAuditEventListQuery>();
+    //Add Managers
+    builder.Services.AddScoped<IAuditManager, AuditManager>();
+
+    //Add event processors
+    builder.Services.AddTransient<IAuditEventProcessor, AuditEventProcessor>();
 
     //Add factories
-    builder.Services.AddTransient<IAuditFactory, AuditFactory>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();    
 
     //Add event exception handlers
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, AuditDeadLetterExceptionHandler<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, AuditDeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, AuditTransientExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, AuditEventMessage>, DeadLetterExceptionHandler<string, AuditEventMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, AuditEventMessage>, TransientExceptionHandler<string, AuditEventMessage>>();
         
 
     //Add persistence interceptors
@@ -185,20 +169,24 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<AuditEventListener>();
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
         builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
         builder.Services.AddTransient<IJobFactory, JobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
+        builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AuditConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     //configure CORS
     builder.Services.AddLinkCorsService(options => {

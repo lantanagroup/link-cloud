@@ -5,8 +5,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Validation;
-using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using FluentValidation;
@@ -31,6 +29,8 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using Microsoft.AspNetCore.HttpOverrides;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,20 +84,29 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add IOptions
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName));
     builder.Services.Configure<SecretManagerSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
     builder.Services.Configure<DataProtectionSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.DataProtection));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
+
+    // Determine if anonymous access is allowed
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+
+    // Add kafka connection singleton
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    if (kafkaConnection is null) throw new NullReferenceException("Kafka Connection is required.");
+    builder.Services.AddSingleton(kafkaConnection);
 
     // Add Kafka Producer Factories
-    builder.Services.AddSingleton<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
+    builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
     // Add fluent validation
     builder.Services.AddValidatorsFromAssemblyContaining(typeof(PatientEventValidator));
 
-    // Add HttpClientFactory
+    // Add HttpClientFactory and Clients
     builder.Services.AddHttpClient();
+    builder.Services.AddLinkClients();
 
     // Add data protection
     builder.Services.AddDataProtection().SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
@@ -111,20 +120,28 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
 
-    //Add Redis
-    Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
-    builder.Services.AddRedisCache(options =>
+    //Add Redis   
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
     {
-        options.Environment = builder.Environment;
+        Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
 
-        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+            var redisConnection = builder.Configuration.GetConnectionString("Redis");
 
-        if (string.IsNullOrEmpty(redisConnection))
-            throw new NullReferenceException("Redis Connection String is required.");
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new NullReferenceException("Redis Connection String is required.");
 
-        options.ConnectionString = redisConnection;
-        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
-    });
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+
+            if (builder.Configuration.GetValue<int>("Cache:Timeout") > 0)
+            {
+                options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
+            }
+        });
+    }    
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
@@ -137,8 +154,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         });
     }
 
-    // Add Link Security
-    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    // Add Link Security    
     if (!allowAnonymousAccess)
     {
         Log.Logger.Information("Registering Link Gateway Security for the Link Admin API.");
@@ -158,6 +174,13 @@ static void RegisterServices(WebApplicationBuilder builder)
             });
     }
 
+    // Add header forwarding
+    Log.Logger.Information("Registering Header Forwarding for the Link Admin API.");
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    });
+
     // Add Endpoints
     if (!allowAnonymousAccess)
     {
@@ -171,10 +194,26 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (builder.Configuration.GetValue<bool>("EnableIntegrationFeature"))
     {
         builder.Services.AddTransient<IApi, IntegrationTestingEndpoints>();
-    }    
+    }
 
     // Add health checks
-    builder.Services.AddHealthChecks();    
+    var healthCheckBuilder = builder.Services.AddHealthChecks()
+        .AddCheck<AccountServiceHealthCheck>("Account Service")
+        .AddCheck<AuditServiceHealthCheck>("Audit Service")
+        .AddCheck<CensusServiceHealthCheck>("Census Service")
+        .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
+        .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
+        .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
+        .AddCheck<NotificationServiceHealthCheck>("Notification Service")
+        .AddCheck<ReportServiceHealthCheck>("Report Service")
+        .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
+        .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+
+    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    {
+        healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
+    }
+
 
     // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();    
@@ -289,15 +328,17 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 #region Setup Middleware
 static void SetupMiddleware(WebApplication app)
-{
+{   
+
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
     }
     else
     {
+        app.UseForwardedHeaders();
         app.UseExceptionHandler();
-    }
+    }    
 
     app.UseStatusCodePages();
 

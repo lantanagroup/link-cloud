@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -29,13 +30,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         public void RegisterEndpoints(WebApplication app)
         {
             var tokenEndpoints = app.MapGroup("/api/auth")
+                .RequireAuthorization([LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName])
                 .WithOpenApi(x => new OpenApiOperation(x)
                 {
                     Tags = new List<OpenApiTag> { new() { Name = "Link Bearer Services" } }
                 });
 
             tokenEndpoints.MapGet("/token", (Delegate)CreateToken)
-                .RequireAuthorization("AuthenticatedUser")
                 .Produces<string>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -46,7 +47,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 });
 
             tokenEndpoints.MapGet("/refresh-key", (Delegate)RefreshKey)
-                .RequireAuthorization(["AuthenticatedUser", PolicyNames.IsLinkAdmin])                
+                .RequireAuthorization([PolicyNames.IsLinkAdmin])                
                 .Produces<KeyRefreshedResponse>(StatusCodes.Status200OK)
                 .Produces(StatusCodes.Status401Unauthorized)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)

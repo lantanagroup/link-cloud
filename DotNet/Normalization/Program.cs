@@ -1,6 +1,7 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
+
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -9,6 +10,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
@@ -19,6 +21,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -33,7 +36,10 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
+using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
+using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,7 +98,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
+    builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
@@ -107,11 +113,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceAcquiredMessage>, KafkaProducerFactory<string, ResourceAcquiredMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceNormalizedMessage>, KafkaProducerFactory<string, ResourceNormalizedMessage>>();
 
+    builder.Services.RegisterKafkaProducer<string, ResourceNormalizedMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        config: new ProducerConfig() { CompressionType = CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
+
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ResourceAcquiredMessage>, DeadLetterExceptionHandler<string, ResourceAcquiredMessage>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
+    builder.Services.AddTransient<IAuditService, AuditService>();
 
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
@@ -174,7 +185,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
     builder.Services.AddTransient<IEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
+
+    //Managers
+    builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
+
+    builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
     builder.Services.AddTransient<ISchedulerFactory, StdSchedulerFactory>();
@@ -182,20 +199,26 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
 
-    if (consumerSettings == null || !consumerSettings.DisableConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
          builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
 
-    if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
+        builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }
 
     //Add health checks
+    var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NormalizationConstants.ServiceName).GetHealthCheckOptions();
+
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     builder.Services.AddSwaggerGen(c =>
     {
@@ -235,8 +258,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
     });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
 
     //Add CORS
     builder.Services.AddLinkCorsService(options => {
@@ -291,16 +312,12 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
 
+    app.AutoMigrateEF<NormalizationDbContext>();
+
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
     // Configure the HTTP request pipeline.
-    app.MapGrpcService<NormalizationService>();
-    //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
-
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        app.MapGrpcReflectionService();
-    }
-
-    app.AutoMigrateEF<NormalizationDbContext>();    
+    app.MapControllers();
 }
 
 #endregion

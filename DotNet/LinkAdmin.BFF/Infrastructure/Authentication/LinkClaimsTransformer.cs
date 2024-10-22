@@ -17,17 +17,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
     {
         private readonly ILogger<LinkClaimsTransformer> _logger;
         private readonly IGetLinkAccount _getLinkAccount;
-        private readonly IDistributedCache _cache;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionOptions;
+        private readonly IOptions<CacheSettings> _cacheSettings;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, IDistributedCache cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions)
+        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions, IServiceScopeFactory serviceScopeFactory, IOptions<CacheSettings> cacheSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionOptions = dataProtectionOptions ?? throw new ArgumentNullException(nameof(dataProtectionOptions));
+            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
         }
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -38,50 +40,77 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
             if (accountId == null) { return principal; }
 
-            var userKey = "user:" + accountId;
-
-            //check if account is in cache, if not get it from the account service
-            var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkUser);
-            var cacheAccount = _cache.GetString(userKey);
-
             Account? account;
 
-            if (cacheAccount is not null)
+            //if no cache providers have been registered, get the account from the account service
+            if (!_cacheSettings.Value.Enabled)
             {
-                if (_dataProtectionOptions.Value.Enabled)
-                {
-                    account = JsonConvert.DeserializeObject<Account>(protector.Unprotect(cacheAccount));
-                }
-                else
-                {
-                    account = JsonConvert.DeserializeObject<Account>(cacheAccount);
-                }
+                account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
             }
             else
-            { 
-                account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
-            }                             
-
-            if (account is null) //if no account found, return an empty principal
             {
-                _logger.LogLinkServiceRequestWarning("Account not found for {accountId}", accountId);
-               
-                var invalidIdentity = new ClaimsIdentity();
-                return new ClaimsPrincipal(invalidIdentity);              
-            };
+                using var scope = _serviceScopeFactory.CreateScope();
+                var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
-            // Cache the account for 5 minutes if it is not already in the cache
-            if(cacheAccount is null)
-            {
-                if (_dataProtectionOptions.Value.Enabled)
+                var userKey = "user:" + accountId;
+
+                //check if account is in cache, if not get it from the account service
+                var protector = _dataProtectionProvider.CreateProtector(LinkAdminConstants.LinkDataProtectors.LinkUser);
+                string? cacheAccount = null;
+
+                try
                 {
-                    _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                    cacheAccount = _cache.GetString(userKey);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCacheException(userKey, ex.Message);
+                }
+
+                if (cacheAccount is not null)
+                {
+                    if (_dataProtectionOptions.Value.Enabled)
+                    {
+                        account = JsonConvert.DeserializeObject<Account>(protector.Unprotect(cacheAccount));
+                    }
+                    else
+                    {
+                        account = JsonConvert.DeserializeObject<Account>(cacheAccount);
+                    }
                 }
                 else
                 {
-                    _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
-                }                
-            }                  
+                    account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
+                }
+
+                if (account is null) //if no account found, return an empty principal
+                {
+                    _logger.LogLinkServiceRequestWarning("Account not found for {accountId}", accountId);
+
+                    var invalidIdentity = new ClaimsIdentity();
+                    return new ClaimsPrincipal(invalidIdentity);
+                };
+
+                // Cache the account for 5 minutes if it is not already in the cache
+                if (cacheAccount is null)
+                {
+                    try
+                    {
+                        if (_dataProtectionOptions.Value.Enabled)
+                        {
+                            _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                        }
+                        else
+                        {
+                            _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogCacheException(userKey, ex.Message);
+                    }
+                }
+            }                              
 
             // Remove the existing 'sub' claim and replace with link account id
             var existingSubClaim = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject);
@@ -109,13 +138,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             {
                 identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, claim));
             }           
-
-            // Add facility ids associated with the user
-            
-            //foreach (var facility in account.Facilities)
-            //{
-            //    identity.AddClaim(new Claim(LinkAuthorizationConstants.LinkSystemClaims.Facility, facility));
-            //}
 
             return principal;
             

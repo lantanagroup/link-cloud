@@ -28,6 +28,9 @@ using System.Diagnostics;
 using System.Reflection;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Factories;
+using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Health;
 
 namespace Tenant
 {
@@ -92,13 +95,12 @@ namespace Tenant
             }
 
             // Add services to the container.
-            builder.Services.AddGrpc();
-            builder.Services.AddGrpcReflection();
             builder.Services.AddHostedService<ScheduleService>();
 
             builder.Services.Configure<MeasureConfig>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.MeasureConfig));
             builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-            builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(KafkaConstants.SectionName));
+            var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+            builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
             builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
             builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
@@ -135,6 +137,8 @@ namespace Tenant
 
 
             builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
+            var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
+            builder.Services.AddSingleton<IProducer<string, object>>(producer);
 
             builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
 
@@ -169,8 +173,11 @@ namespace Tenant
 
 
             //Add health checks
+            var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
+
             builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>("Database");
+                .AddCheck<DatabaseHealthCheck>("Database")
+                .AddKafka(kafkaHealthOptions);
 
             // Add Link Security
             bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -262,11 +269,6 @@ namespace Tenant
             {
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
-
-            if (app.Configuration.GetValue<bool>("AllowReflection"))
-            {
-                app.MapGrpcReflectionService();
-            }
 
             // Ensure database created
             using (var scope = app.Services.CreateScope())

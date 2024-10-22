@@ -14,5 +14,10 @@
         /// The default authentication challenge scheme
         /// </summary>
         public string DefaultChallengeScheme { get; set; } = null!;
+
+        /// <summary>
+        /// Whether anonymous access is enabled
+        /// </summary>
+        public bool EnableAnonymousAccess { get; set; } = false;
     }
 }

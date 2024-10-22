@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.1-dev</version>
     </parent>
 
     <artifactId>measureeval</artifactId>
@@ -126,11 +126,10 @@
             <version>2.4.0-alpha</version>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.10.2</version>
-            <scope>test</scope>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-runtime-telemetry-java17</artifactId>
         </dependency>
+
     </dependencies>
 
     <build>
@@ -147,6 +146,7 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <mainClass>${mainClass}</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -157,4 +157,27 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>api</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <mainClass>com.lantanagroup.link.measureeval.MeasureEvalApplication</mainClass>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>cli</id>
+            <properties>
+                <mainClass>com.lantanagroup.link.measureeval.FileSystemInvocation</mainClass>
+                <logback.configurationFile>src/main/resources/logback-cli.xml</logback.configurationFile>
+            </properties>
+            <build>
+                <finalName>measureeval-cli</finalName>
+            </build>
+        </profile>
+    </profiles>
 </project>

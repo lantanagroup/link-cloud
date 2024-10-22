@@ -24,7 +24,6 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
   public ResourceNormalizedConsumer (
           AbstractResourceRepository resourceRepository,
           PatientReportingEvaluationStatusRepository patientStatusRepository,
-          DataAcquisitionClient dataAcquisitionClient,
           MeasureEvaluatorCache measureEvaluatorCache,
           MeasureReportNormalizer measureReportNormalizer,
           Predicate<MeasureReport> reportabilityPredicate,
@@ -35,7 +34,6 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
     super(
             resourceRepository,
             patientStatusRepository,
-            dataAcquisitionClient,
             measureEvaluatorCache,
             measureReportNormalizer,
             reportabilityPredicate,
@@ -52,7 +50,7 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
   @KafkaListener(topics = Topics.RESOURCE_NORMALIZED)
   public void consume (
           @Header(Headers.CORRELATION_ID) String correlationId,
-          ConsumerRecord<String, ResourceNormalized> record) {
+          ConsumerRecord<String, ResourceNormalized> record){
     doConsume(correlationId, record);
   }
 }
