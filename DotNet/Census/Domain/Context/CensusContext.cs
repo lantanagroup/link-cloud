@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Census.Domain.Context;
@@ -54,5 +55,16 @@ public class CensusContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions())
         );
+    }
+
+    public class CensusContextFactory : IDesignTimeDbContextFactory<CensusContext>
+    {
+        public CensusContext CreateDbContext(string[] args)
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<CensusContext>();
+            optionsBuilder.UseSqlServer();
+
+            return new CensusContext(optionsBuilder.Options);
+        }
     }
 }
