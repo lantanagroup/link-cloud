@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DemoApiGateway.Application.models.census;
+﻿using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.DemoApiGateway.Application.models.census;
 
 namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 {
