@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
+
     <springProperty scope="context" name="loki_enabled" source="loki.enabled"/>
     <springProperty scope="context" name="loki_url" source="loki.url"/>
+    <springProperty scope="context" name="loki_app" source="loki.app" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -17,7 +19,7 @@
                 </http>
                 <format>
                     <label>
-                        <pattern>app=link-cloud,component=MeasureEval,TraceId="%X{traceId}",SpanId="%X{spanId}"</pattern>
+                        <pattern>app=${loki_app},component=MeasureEval,TraceId="%X{traceId}",SpanId="%X{spanId}"</pattern>
                         <readMarkers>true</readMarkers>
                     </label>
                     <message>
@@ -41,13 +43,16 @@
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
-            <root level="INFO">
+            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
+            <root level="WARN">
                 <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI"/>
             </root>
+
         </then>
         <else>
-            <root level="INFO">
+            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
+            <root level="WARN">
                 <appender-ref ref="STDOUT"/>
             </root>
         </else>

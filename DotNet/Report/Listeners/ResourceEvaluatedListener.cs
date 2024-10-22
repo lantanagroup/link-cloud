@@ -15,7 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
-using System.Transactions;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -25,38 +25,36 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
-        private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
-        private readonly IResourceManager _resourceManager;
-        private readonly IMeasureReportScheduledManager _measureReportScheduledManager;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
+       //private readonly IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> _kafkaProducerFactory;
+        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
-        private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly PatientReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
 
         private string Name => this.GetType().Name;
 
-        public ResourceEvaluatedListener(ILogger<ResourceEvaluatedListener> logger, IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
-            IKafkaProducerFactory<SubmissionReportKey, SubmissionReportValue> kafkaProducerFactory,
+        public ResourceEvaluatedListener(
+            ILogger<ResourceEvaluatedListener> logger, 
+            IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
-            MeasureReportSubmissionBundler bundler,
+            PatientReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
-            IResourceManager resourceManager,
-            IMeasureReportScheduledManager measureReportScheduledManager,
-            ISubmissionEntryManager submissionEntryManager)
+            IServiceScopeFactory serviceScopeFactory, 
+            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentException(nameof(kafkaProducerFactory));
             _bundler = bundler;
             _aggregator = aggregator;
-            _resourceManager = resourceManager;
-            _measureReportScheduledManager = measureReportScheduledManager;
-            _submissionEntryManager = submissionEntryManager;
+
+            _serviceScopeFactory = serviceScopeFactory;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -66,6 +64,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
+            _submissionReportProducer = submissionReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -94,34 +93,37 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<ResourceEvaluatedKey, ResourceEvaluatedValue>? consumeResult = null;
                     var facilityId = string.Empty;
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
+
+                            var scope = _serviceScopeFactory.CreateScope();
+                            var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+                            var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+
                             try
                             {
-                                consumeResult = result;
-
-                                if (consumeResult == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
-                                }
-
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
-                                if (!consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                                if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
                                 string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(CorrelationIdStr))
                                 {
-                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {consumeResult.Topic}", AuditEventType.Create);
+                                    throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId) ||
@@ -130,30 +132,30 @@ namespace LantanaGroup.Link.Report.Listeners
                                     key.EndDate == DateTime.MinValue)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.",
-                                        AuditEventType.Create);
+                                        $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
-                                var schedule = await _measureReportScheduledManager.GetMeasureReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, cancellationToken) ??
-                                            throw new TransactionException(
+                                var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, key.StartDate, key.EndDate, key.ReportType, consumeCancellationToken) ??
+                                            throw new TransientException(
                                                 $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {key.ReportType}");
                                 
 
                                 //TODO Find long term solution Daniel Vargas
                                 if (value.IsReportable)
                                 {
-                                    var entry = (await _submissionEntryManager.SingleOrDefaultAsync(e =>
-                                        e.MeasureReportScheduleId == schedule.Id
-                                        && e.PatientId == value.PatientId, cancellationToken));
+                                    var entry = (await submissionEntryManager.SingleOrDefaultAsync(e =>
+                                        e.ReportScheduleId == schedule.Id
+                                        && e.PatientId == value.PatientId, consumeCancellationToken));
 
                                     if (entry == null)
                                     {
                                         entry = new MeasureReportSubmissionEntryModel
                                         {
                                             FacilityId = key.FacilityId,
-                                            MeasureReportScheduleId = schedule.Id,
-                                            PatientId = value.PatientId
+                                            ReportScheduleId = schedule.Id,
+                                            PatientId = value.PatientId,
+                                            CreateDate = DateTime.UtcNow
                                         };
                                     }
 
@@ -163,8 +165,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     if (resource == null)
                                     {
-                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource",
-                                            AuditEventType.Create);
+                                        throw new DeadLetterException($"{Name}: Unable to deserialize event resource");
                                     }
 
                                     if (resource.TypeName == "MeasureReport")
@@ -176,18 +177,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                         IFacilityResource returnedResource = null;
 
                                         var existingReportResource =
-                                            await _resourceManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
-                                                cancellationToken);
+                                            await resourceManager.GetResourceAsync(key.FacilityId, resource.Id, resource.TypeName, value.PatientId,
+                                                consumeCancellationToken);
 
                                         if (existingReportResource != null)
                                         {
                                             returnedResource =
-                                                await _resourceManager.UpdateResourceAsync(existingReportResource,
-                                                    cancellationToken);
+                                                await resourceManager.UpdateResourceAsync(existingReportResource,
+                                                    consumeCancellationToken);
                                         }
                                         else
                                         {
-                                            returnedResource = await _resourceManager.CreateResourceAsync(key.FacilityId, resource, value.PatientId, cancellationToken);
+                                            returnedResource = await resourceManager.CreateResourceAsync(key.FacilityId, resource, value.PatientId, consumeCancellationToken);
                                         }
 
                                         entry.UpdateContainedResource(returnedResource);
@@ -195,11 +196,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     if (entry.Id == null)
                                     {
-                                        await _submissionEntryManager.AddAsync(entry, cancellationToken);
+                                        await submissionEntryManager.AddAsync(entry, consumeCancellationToken);
                                     }
                                     else
                                     {
-                                        await _submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                        await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
                                     }
                                 }
 
@@ -211,12 +212,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         schedule.PatientsToQuery.Remove(value.PatientId);
 
-                                        await _measureReportScheduledManager.UpdateAsync(schedule, cancellationToken);
+                                        await measureReportScheduledManager.UpdateAsync(schedule, consumeCancellationToken);
                                     }
 
                                     var submissionEntries =
-                                        await _submissionEntryManager.FindAsync(
-                                            e => e.MeasureReportScheduleId == schedule.Id, cancellationToken);
+                                        await submissionEntryManager.FindAsync(
+                                            e => e.ReportScheduleId == schedule.Id, consumeCancellationToken);
 
                                     var allReady = submissionEntries.All(x => x.ReadyForSubmission);
 
@@ -228,19 +229,20 @@ namespace LantanaGroup.Link.Report.Listeners
                                             .Select(e => e.MeasureReport)
                                             .ToList();
 
-                                        using var prod = _kafkaProducerFactory.CreateProducer(producerConfig);
-
-                                        var organization = _bundler.CreateOrganization(schedule.FacilityId);
-                                        prod.Produce(nameof(KafkaTopic.SubmitReport),
-                                            new Message<SubmissionReportKey, SubmissionReportValue>
+                                        
+                                        var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
+                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                                        
+                                        _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
+                                            new Message<SubmitReportKey, SubmitReportValue>
                                             {
-                                                Key = new SubmissionReportKey()
+                                                Key = new SubmitReportKey()
                                                 {
                                                     FacilityId = schedule.FacilityId,
                                                     StartDate = schedule.ReportStartDate,
                                                     EndDate = schedule.ReportEndDate
                                                 },
-                                                Value = new SubmissionReportValue()
+                                                Value = new SubmitReportValue()
                                                 {
                                                     PatientIds = patientIds,
                                                     MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
@@ -256,11 +258,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 }
                                             });
 
-                                        prod.Flush(cancellationToken);
+                                        _submissionReportProducer.Flush(consumeCancellationToken);
 
                                         
                                         schedule.SubmitReportDateTime = DateTime.UtcNow;
-                                        await _measureReportScheduledManager.UpdateAsync(schedule, cancellationToken);
+                                        await measureReportScheduledManager.UpdateAsync(schedule, consumeCancellationToken);
                                     }
                                 }
 
@@ -268,66 +270,48 @@ namespace LantanaGroup.Link.Report.Listeners
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
                         }, cancellationToken);
                     }
                     catch (ConsumeException ex)
                     {
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
                         facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-                        var message = new Message<string, string>()
-                        {
-                            Headers = ex.ConsumerRecord.Message.Headers,
-                            Key = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                  ex.ConsumerRecord.Message.Key != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                                : string.Empty,
-                            Value = ex.ConsumerRecord != null && ex.ConsumerRecord.Message != null &&
-                                    ex.ConsumerRecord.Message.Value != null
-                                ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
-                                : string.Empty,
-                        };
 
-                        var dlEx = new DeadLetterException(ex.Message, AuditEventType.Create);
-                        _deadLetterExceptionHandler.HandleException(message.Headers, message.Key, message.Value, dlEx, facilityId);
-                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                        TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
-                        if (offset == null)
-                        {
-                            consumer.Commit();
-                        }
-                        else
-                        {
-                            consumer.Commit(new List<TopicPartitionOffset> { offset });
-                        }
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _logger.LogError(ex, "Error encountered in ResourceEvaluatedListener");
+                        consumer.Commit();
                     }
                 }
             }

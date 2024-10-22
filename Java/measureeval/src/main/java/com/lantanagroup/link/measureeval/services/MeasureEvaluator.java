@@ -36,6 +36,10 @@ public class MeasureEvaluator {
                     fhirContext.getVersion().getVersion().getFhirVersionString());
             throw new IllegalArgumentException("Unsupported FHIR version!");
         }
+        this(fhirContext, bundle, false);
+    }
+
+    private MeasureEvaluator(FhirContext fhirContext, Bundle bundle, boolean isDebug) {
         this.fhirContext = fhirContext;
         options = MeasureEvaluationOptions.defaultOptions();
         EvaluationSettings evaluationSettings = options.getEvaluationSettings();
@@ -48,6 +52,8 @@ public class MeasureEvaluator {
                 .setTerminologyParameterMode(RetrieveSettings.TERMINOLOGY_FILTER_MODE.FILTER_IN_MEMORY)
                 .setSearchParameterMode(RetrieveSettings.SEARCH_FILTER_MODE.FILTER_IN_MEMORY)
                 .setProfileMode(RetrieveSettings.PROFILE_MODE.DECLARED);
+        evaluationSettings.getCqlOptions().getCqlEngineOptions().setDebugLoggingEnabled(isDebug);
+
         this.bundle = bundle;
         if (!this.bundle.hasEntry()) {
             logger.error("Please provide the necessary artifacts (e.g. Measure and Library resources) in the Bundle entry!");
@@ -67,7 +73,11 @@ public class MeasureEvaluator {
     }
 
     public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle) {
-        MeasureEvaluator instance = new MeasureEvaluator(fhirContext, bundle);
+        return compile(fhirContext, bundle, false);
+    }
+
+    public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle, boolean isDebug) {
+        MeasureEvaluator instance = new MeasureEvaluator(fhirContext, bundle, isDebug);
         instance.compile();
         return instance;
     }

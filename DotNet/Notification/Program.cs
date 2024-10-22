@@ -18,7 +18,6 @@ using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
 using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
-using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -39,6 +38,7 @@ using System.Text;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,7 +113,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add services to the container. 
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
@@ -149,7 +150,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddTransient<INotificationConfigurationFactory, NotificationConfigurationFactory>();
     builder.Services.AddTransient<INotificationFactory, NotificationFactory>();
+    
     builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
+    builder.Services.AddSingleton(new KafkaProducerFactory(kafkaConnection).CreateAuditEventProducer());
+
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
 
@@ -195,8 +199,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services
     builder.Services.AddHostedService<NotificationRequestedListener>();
@@ -333,10 +340,9 @@ static void SetupMiddleware(WebApplication app)
 
     if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
     {
-        app.MapGrpcReflectionService();
+        app.UseSwagger();
+        app.UseSwaggerUI();
     }
-
-    app.MapGrpcService<NotificationService>();
 }
 
 #endregion

@@ -2,12 +2,12 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Commands;
-using LantanaGroup.Link.Normalization.Application.Commands.Config;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
+using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
+using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.JsonObjects;
@@ -18,41 +18,40 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using MediatR;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
-using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
 public class ResourceAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourceAcquiredListener> _logger;
-    private readonly IMediator _mediator;
+    private readonly IAuditService _auditService;
     private readonly IKafkaConsumerFactory<string, ResourceAcquiredMessage> _consumerFactory;
-    private readonly IKafkaProducerFactory<string, ResourceNormalizedMessage> _producerFactory;
+    private readonly IProducer<string, ResourceNormalizedMessage> _producer;
     private readonly IDeadLetterExceptionHandler<string, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> _deadLetterExceptionHandler;
     private readonly ITransientExceptionHandler<string, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
         IOptions<ServiceInformation> serviceInformation,
-        IMediator mediator,
+        IServiceScopeFactory scopeFactory,
+        IAuditService auditService,
         IKafkaConsumerFactory<string, ResourceAcquiredMessage> consumerFactory,
-        IKafkaProducerFactory<string, ResourceNormalizedMessage> producerFactory,
         IDeadLetterExceptionHandler<string, string> consumeExceptionHandler,
         IDeadLetterExceptionHandler<string, ResourceAcquiredMessage> deadLetterExceptionHandler,
         ITransientExceptionHandler<string, ResourceAcquiredMessage> transientExceptionHandler,
-        INormalizationServiceMetrics metrics)
+        INormalizationServiceMetrics metrics,
+        IProducer<string, ResourceNormalizedMessage> producer)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
-        _producerFactory = producerFactory ?? throw new ArgumentNullException(nameof(producerFactory));
         _consumeExceptionHandler = consumeExceptionHandler ?? throw new ArgumentNullException(nameof(consumeExceptionHandler));
         _consumeExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _consumeExceptionHandler.Topic = $"{nameof(KafkaTopic.ResourceAcquired)}-Error";
@@ -63,16 +62,9 @@ public class ResourceAcquiredListener : BackgroundService
         _transientExceptionHandler.ServiceName = serviceInformation.Value.Name;
         _transientExceptionHandler.Topic = KafkaTopic.ResourceAcquiredRetry.GetStringValue();
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-    }
 
-    ~ResourceAcquiredListener()
-    {
-     
-    }
-
-    public async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
-    {
-        await base.StartAsync(cancellationToken);
+        _scopeFactory = scopeFactory;
+        _producer = producer ?? throw new ArgumentNullException(nameof(producer));
     }
 
     protected override async System.Threading.Tasks.Task ExecuteAsync(CancellationToken cancellationToken)
@@ -88,8 +80,6 @@ public class ResourceAcquiredListener : BackgroundService
             EnableAutoCommit = false
         });
 
-        using var kafkaProducer = _producerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd }, useOpenTelemetry: true);
-
         kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
@@ -101,16 +91,26 @@ public class ResourceAcquiredListener : BackgroundService
                 {
                     try
                     {
+                        using var scope = _scopeFactory.CreateScope();
+                        var normalizationService = scope.ServiceProvider.GetRequiredService<INormalizationService>();
+                        var configManager = scope.ServiceProvider.GetRequiredService<INormalizationConfigManager>();
+
                         message = result;
 
                         if (message.Key == null || string.IsNullOrWhiteSpace(message.Key))
                         {
-                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.", AuditEventType.Query);
+                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
                         }
 
-                        if (message.Value == null || message.Value.Resource == null || string.IsNullOrWhiteSpace(message.Value.QueryType) || message.Value.ScheduledReports == null)
+                        if (
+                        message.Message.Value == null 
+                            || ((message.Message.Value.Resource == null 
+                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType) 
+                                || message.Message.Value.ScheduledReports == null)
+                               && !message.Message.Value.AcquisitionComplete)
+                        )
                         {
-                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.", AuditEventType.Query);
+                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.");
                         }
 
                         (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
@@ -120,33 +120,59 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", ex);
                         }
 
                         NormalizationConfig? config = null;
                         try
                         {
-                            config = await _mediator.Send(new GetConfigurationEntityQuery
+                            config = await configManager.SingleOrDefaultAsync(c => c.FacilityId == messageMetaData.facilityId, cancellationToken);
+
+                            if (config == null)
                             {
-                                FacilityId = messageMetaData.facilityId
-                            });
+                                throw new NoEntityFoundException("Config for facilityId does not exist.");
+                            }
                         }
                         catch(DbContextNullException ex)
                         {
-                            throw new TransientException("Database context is null.", AuditEventType.Query, ex);
+                            throw new TransientException("Database context is null.", ex);
                         }
                         catch (NoEntityFoundException ex)
                         {
-                            throw new DeadLetterException("Config for facilityId does not exist.", AuditEventType.Query, ex);
+                            throw new TransientException("Config for facilityId does not exist.", ex);
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("An error was encountered retrieving facility configuration.", ex);
+                        }
+
+                        if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
+                        {
+                            _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
+                            var headers = new Headers
+                            {
+                                new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(messageMetaData.correlationId))
+                            };
+                            var resourceNormalizedMessage = new ResourceNormalizedMessage
+                            {
+                                AcquisitionComplete = message.Message.Value.AcquisitionComplete,
+                                PatientId = message.Message.Value.PatientId ?? "",
+                                QueryType = message.Message.Value.QueryType,
+                                ScheduledReports = message.Message.Value.ScheduledReports
+                            };
+                            Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
+                            {
+                                Key = messageMetaData.facilityId,
+                                Headers = headers,
+                                Value = resourceNormalizedMessage
+                            };
+                            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                            return;
                         }
 
                         if (config.OperationSequence == null || config.OperationSequence.Count == 0)
                         {
-                            throw new DeadLetterException("No operation sequence found for facility.", AuditEventType.Query);
+                            throw new DeadLetterException("No operation sequence found for facility.");
                         }
 
                         var opSeq = config.OperationSequence.OrderBy(x => x.Key).ToList();
@@ -160,10 +186,10 @@ public class ResourceAcquiredListener : BackgroundService
                         {
                             if(ex is JsonException || ex is NotSupportedException)
                             {
-                                throw new TransientException("Failed to deserialize resource.", AuditEventType.Query, ex);
+                                throw new TransientException("Failed to deserialize resource.", ex);
                             }
 
-                            throw new DeadLetterException("Failed to deserialize resource.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("Failed to deserialize resource.", ex);
                         }
 
                         var operationCommandResult = new OperationCommandResult
@@ -175,15 +201,15 @@ public class ResourceAcquiredListener : BackgroundService
                         //fix resource ids
                         try
                         {
-                            operationCommandResult = await _mediator.Send(new FixResourceIDCommand
+                            operationCommandResult = await normalizationService.FixResourceId(new FixResourceIDCommand
                             {
                                 Resource = resource,
                                 PropertyChanges = operationCommandResult.PropertyChanges
-                            });
+                            }, cancellationToken);
                         }
                         catch (Exception ex)
                         {
-                            throw new TransientException("An error occurred fixing resource Ids.", AuditEventType.Update, ex);
+                            throw new TransientException("An error occurred fixing resource Ids.", ex);
                         }
 
                         try
@@ -207,44 +233,44 @@ public class ResourceAcquiredListener : BackgroundService
                                 catch (Exception ex)
                                 {
 
-                                    throw new TransientException("Error deserializing Concept Map Operation.", AuditEventType.Query, ex);
+                                    throw new TransientException("Error deserializing Concept Map Operation.", ex);
                                 }
 
                                 operationCommandResult = op.Value switch
                                 {
-                                    ConceptMapOperation => await _mediator.Send(new ApplyConceptMapCommand
+                                    ConceptMapOperation => await normalizationService.ApplyConceptMap(new ApplyConceptMapCommand
                                     {
                                         Resource = resource,
                                         Operation = conceptMapOperation,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    ConditionalTransformationOperation => await _mediator.Send(new ConditionalTransformationCommand
+                                    }, cancellationToken),
+                                    ConditionalTransformationOperation => await normalizationService.ConditionalTransformation(new ConditionalTransformationCommand
                                     {
                                         Resource = resource,
                                         Operation = (ConditionalTransformationOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    CopyElementOperation => await _mediator.Send(new CopyElementCommand
+                                    }, cancellationToken),
+                                    CopyElementOperation => await normalizationService.CopyElement(new CopyElementCommand
                                     {
                                         Resource = resource,
                                         Operation = (CopyElementOperation)op.Value,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    CopyLocationIdentifierToTypeOperation => await _mediator.Send(new CopyLocationIdentifierToTypeCommand
+                                    }, cancellationToken),
+                                    CopyLocationIdentifierToTypeOperation => await normalizationService.CopyLocationIdentifierToType(new CopyLocationIdentifierToTypeCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    PeriodDateFixerOperation => await _mediator.Send(new PeriodDateFixerCommand
+                                    }, cancellationToken),
+                                    PeriodDateFixerOperation => await normalizationService.FixPeriodDates(new PeriodDateFixerCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
-                                    _ => await _mediator.Send(new UnknownOperationCommand
+                                    }, cancellationToken),
+                                    _ => await normalizationService.UnknownOperation(new UnknownOperationCommand
                                     {
                                         Resource = resource,
                                         PropertyChanges = operationCommandResult.PropertyChanges
-                                    }),
+                                    }, cancellationToken)
                                 };
 
                                 _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
@@ -263,18 +289,18 @@ public class ResourceAcquiredListener : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            throw new DeadLetterException("An error was encountered processing Operation Commands.", AuditEventType.Query, ex);
+                            throw new DeadLetterException("An error was encountered processing Operation Commands.", ex);
                         }
 
                         try
                         {
-                            await _mediator.Send(new TriggerAuditEventCommand
+                            await _auditService.TriggerAuditEvent(new TriggerAuditEventCommand
                             {
                                 CorrelationId = messageMetaData.correlationId,
                                 FacilityId = messageMetaData.facilityId,
                                 resourceAcquiredMessage = message.Value,
                                 PropertyChanges = operationCommandResult.PropertyChanges
-                            });
+                            }, cancellationToken);
 
                             var serializedResource = JsonSerializer.SerializeToElement(operationCommandResult.Resource, new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector));
 
@@ -284,10 +310,10 @@ public class ResourceAcquiredListener : BackgroundService
                             };
                             var resourceNormalizedMessage = new ResourceNormalizedMessage
                             {
-                                PatientId = message.Value.PatientId ?? "",
+                                AcquisitionComplete = message.Message.Value.AcquisitionComplete,
+                                PatientId = message.Message.Value.PatientId ?? "",
                                 Resource = serializedResource,
-
-                                QueryType = message.Value.QueryType,
+                                QueryType = message.Message.Value.QueryType,
                                 ScheduledReports = message.Message.Value.ScheduledReports
                             };
                             Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
@@ -296,12 +322,12 @@ public class ResourceAcquiredListener : BackgroundService
                                 Headers = headers,
                                 Value = resourceNormalizedMessage
                             };
-                            await kafkaProducer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+                            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
 
                         }
                         catch (Exception ex)
                         {
-                            throw new TransientException("An error was encountered triggering audit event.", AuditEventType.Create, ex);
+                            throw new TransientException("An error was encountered triggering audit event.", ex);
                         }
                     }
                     catch (DeadLetterException ex)
@@ -325,7 +351,7 @@ public class ResourceAcquiredListener : BackgroundService
                             Notes = $"Data Acquisition processing failure \nException Message: {ex}",
                         };
 
-                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message, AuditEventType.Create), message.Message.Key);
+                        _deadLetterExceptionHandler.HandleException(message, new DeadLetterException("Data Acquisition Exception thrown: " + ex.Message), message.Message.Key);
                     }
                     finally
                     {
@@ -345,17 +371,8 @@ public class ResourceAcquiredListener : BackgroundService
                 }
 
                 string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
-                
-                ConsumeResult<string, string> result = new ConsumeResult<string, string>
-                {
-                    Message = new Message<string, string>
-                    {
-                        Headers = ex.ConsumerRecord?.Message?.Headers,
-                        Key = facilityId,
-                        Value = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Value ?? Array.Empty<byte>())
-                    }
-                };
-                _consumeExceptionHandler.HandleException(result, ex, AuditEventType.Create, facilityId);
+
+                _consumeExceptionHandler.HandleConsumeException(ex, facilityId);
                 TopicPartitionOffset? offset = ex.ConsumerRecord?.TopicPartitionOffset;
                 if (offset == null)
                 {

@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -12,11 +13,12 @@ using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Net.Http;
 using System.Text;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using System.Linq.Expressions;
+using Confluent.Kafka;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -27,7 +29,6 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly ILogger<FacilityConfigurationService> _logger;
         private readonly HttpClient _httpClient;
         private static List<KafkaTopic> _topics = new List<KafkaTopic>();
-        private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IFacilityConfigurationRepo _facilityConfigurationRepo;
         private readonly CreateAuditEventCommand _createAuditEventCommand;
@@ -42,10 +43,9 @@ namespace LantanaGroup.Link.Tenant.Services
         }
 
 
-        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, IKafkaProducerFactory<string, object> kafkaProducerFactory, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+        public FacilityConfigurationService(IFacilityConfigurationRepo facilityConfigurationRepo, ILogger<FacilityConfigurationService> logger, CreateAuditEventCommand createAuditEventCommand, IOptions<ServiceRegistry> serviceRegistry, IOptions<MeasureConfig> measureConfig, HttpClient httpClient, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
         {
             _facilityConfigurationRepo = facilityConfigurationRepo;
-            _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _measureConfig = measureConfig ?? throw new ArgumentNullException(nameof(measureConfig));
             _logger = logger;
@@ -55,28 +55,46 @@ namespace LantanaGroup.Link.Tenant.Services
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
         }
 
-        public async Task<PagedFacilityConfigModel> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
-            var (facilities, metadata) = await _facilityConfigurationRepo.SearchAsync(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+            return await _facilityConfigurationRepo.GetAllAsync();
 
-            var pagedNotificationConfigurations = new PagedFacilityConfigModel(facilities, metadata);
+        }
+
+        public async Task<PagedConfigModel<FacilityConfigModel>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        {
+            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
+            PagedConfigModel<FacilityConfigModel> pagedNotificationConfigurations;
+
+
+            if (!string.IsNullOrEmpty(facilityId) || !string.IsNullOrEmpty(facilityName))
+            {
+                (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync((x => x.FacilityId == facilityId && facilityId != null || x.FacilityName == facilityName && facilityName != null), sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+                pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
+            }
+            else
+            {
+                (List<FacilityConfigModel> facilities, PaginationMetadata metadata) = await _facilityConfigurationRepo.SearchAsync(null, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+                pagedNotificationConfigurations = new PagedConfigModel<FacilityConfigModel>(facilities, metadata);
+            }
+            
 
             return pagedNotificationConfigurations;
         }
 
-        public async Task<FacilityConfigModel> GetFacilityById(Guid id, CancellationToken cancellationToken)
+        public async Task<FacilityConfigModel> GetFacilityById(string id, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Id Query");
-            return await _facilityConfigurationRepo.GetAsyncById(id, cancellationToken);
+            return await _facilityConfigurationRepo.GetAsync(id, cancellationToken);
         }
 
         public async Task<FacilityConfigModel> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Facility Id Query");
 
-            return await _facilityConfigurationRepo.GetAsyncByFacilityId(facilityId, cancellationToken);
+            return await _facilityConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
         }
 
         public async Task CreateFacility(FacilityConfigModel newFacility, CancellationToken cancellationToken)
@@ -110,7 +128,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 using (ServiceActivitySource.Instance.StartActivity("Create the Facility Configuration Command"))
                 {
                     newFacility.MRPCreatedDate = DateTime.UtcNow;
-                    newFacility.Id = Guid.NewGuid();
+                    //newFacility.Id = Guid.NewGuid();
                     await _facilityConfigurationRepo.AddAsync(newFacility, cancellationToken);
                 }
             }
@@ -132,7 +150,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         }
 
-        public async Task<string> UpdateFacility(Guid id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
+        public async Task<string> UpdateFacility(String id, FacilityConfigModel newFacility, CancellationToken cancellationToken = default)
         {
             FacilityConfigModel existingFacility;
 
@@ -229,7 +247,7 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 using (ServiceActivitySource.Instance.StartActivity("Delete the Facility Configuration Command"))
                 {
-                    await _facilityConfigurationRepo.RemoveAsync(existingFacility.Id, cancellationToken);
+                    await _facilityConfigurationRepo.DeleteAsync(existingFacility.Id, cancellationToken);
                 }
             }
             catch (Exception ex)

@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
@@ -16,6 +17,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
@@ -27,6 +29,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue> _kafkaConsumerFactory;
         private readonly SubmissionServiceConfig _submissionConfig;
         private readonly IHttpClientFactory _httpClient;
+        private readonly ServiceRegistry _serviceRegistry;
 
         private readonly ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> _deadLetterExceptionHandler;
@@ -41,8 +44,9 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<SubmissionServiceConfig> submissionConfig,
             IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler, 
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+            IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, 
+            IOptions<ServiceRegistry> serviceRegistry)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -62,6 +66,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+            
+            _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -108,62 +114,58 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var consumeResult = new ConsumeResult<SubmitReportKey, SubmitReportValue>();
                     string facilityId = string.Empty;
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            consumeResult = result;
+                            if (result == null)
+                            {
+                                consumer.Commit();
+                                return;
+                            }
 
                             try
                             {
-                                if (consumeResult == null)
-                                {
-                                    throw new DeadLetterException($"{Name}: consumeResult is null", AuditEventType.Create);
-                                }
-
-                                var key = consumeResult.Message.Key;
-                                var value = consumeResult.Message.Value;
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
                                 if (string.IsNullOrWhiteSpace(key.FacilityId))
                                 {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.", AuditEventType.Create);
+                                    throw new TransientException(
+                                        $"{Name}: FacilityId is null or empty.");
                                 }
-
 
                                 if (value.PatientIds == null || value.PatientIds.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: PatientIds is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: PatientIds is null or contains no elements.");
                                 }
 
                                 if (value.MeasureIds == null || value.MeasureIds.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: MeasureIds is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: MeasureIds is null or contains no elements.");
                                 }
 
                                 if (value.Organization == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: Organization is null.", AuditEventType.Create);
+                                        $"{Name}: Organization is null.");
                                 }
 
                                 if (value.Aggregates == null || value.Aggregates.Count == 0)
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: Aggregates is null or contains no elements.", AuditEventType.Create);
+                                        $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
                                 var httpClient = _httpClient.CreateClient();
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
                                 #region Census Admitted Patient List
-                                string censusRequestUrl = _submissionConfig.CensusUrl +
-                                                          $"/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
+                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
                                 //TODO: add method to get key that includes looking at redis for future use case
                                 if (_linkTokenServiceConfig.Value.SigningKey is null)
@@ -175,11 +177,11 @@ namespace LantanaGroup.Link.Submission.Listeners
 
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
-                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, cancellationToken);
-                                var censusContent = await censusResponse.Content.ReadAsStringAsync(cancellationToken);
+                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
+                                var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
 
                                 if (!censusResponse.IsSuccessStatusCode)
-                                    throw new TransientException("Response from Census service is not successful: " + censusContent, AuditEventType.Query);
+                                    throw new TransientException("Response from Census service is not successful: " + censusContent);
 
                                 List? admittedPatients;
                                 try
@@ -193,27 +195,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 {
                                     _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
                                     _logger.LogDebug("Census service response: " + censusContent);
-                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace,
-                                        AuditEventType.Query, ex.InnerException);
-                                }
-                                #endregion
-
-                                #region DataAcquisition Query Plan
-                                string queryPlans;
-                                try
-                                {
-                                    string dataAcqRequestUrl =
-                                        _submissionConfig.DataAcquisitionUrl + $"/{key.FacilityId}/QueryPlan";
-                                    var dataAcqResponse = await httpClient.GetAsync(dataAcqRequestUrl, cancellationToken);
-                                    queryPlans = await dataAcqResponse.Content.ReadAsStringAsync(cancellationToken);
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error retrieving Query Plans from Data Acquisition service.");
-                                    _logger.LogDebug("Data Acquisition service response: " + censusContent);
-                                    throw new TransientException("Error retrieving Query Plans from Data Acquisition service: " + ex.Message + Environment.NewLine + ex.StackTrace,
-                                        AuditEventType.Query, ex.InnerException);
+                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
                                 }
                                 #endregion
 
@@ -263,7 +245,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -273,7 +255,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -283,17 +265,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
-
-                                    #endregion
-
-                                    #region Query Plans
-
-                                    fileName = "query-plan.json";
-                                    contents = queryPlans;
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        cancellationToken);
+                                        consumeCancellationToken);
 
                                     #endregion
 
@@ -306,14 +278,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         contents = await fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                            cancellationToken);
+                                            consumeCancellationToken);
                                     }
 
                                     #endregion
                                 }
                                 catch (IOException ioException)
                                 {
-                                    throw new TransientException(ioException.Message, AuditEventType.Submit,
+                                    throw new TransientException(ioException.Message,
                                         ioException.InnerException);
                                 }
 
@@ -346,7 +318,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate, key.EndDate, cancellationToken);
+                                                key.StartDate, key.EndDate, consumeCancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
@@ -375,48 +347,55 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                    cancellationToken);
+                                    consumeCancellationToken);
 
                                 #endregion
                             }
                             catch (DeadLetterException ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TransientException ex)
                             {
-                                _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                                var transientException = new TransientException(ex.Message,  ex.InnerException);
 
-                                _transientExceptionHandler.HandleException(consumeResult, transientException, facilityId);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
                             {
-                                _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                consumer.Commit(result);
                             }
                         }, cancellationToken);
 
                     }
                     catch (ConsumeException ex)
                     {
+                        _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
                         if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                         {
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        _deadLetterExceptionHandler.HandleException(new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                        consumer.Commit();
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(ex, facilityId, AuditEventType.Create);
+                        _logger.LogError(ex, "Error encountered in SubmitReportListener");
+                        consumer.Commit();
                     }
                 }
             }
@@ -426,6 +405,18 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
         }
 
         protected string GetRelativeReference(Resource resource)
@@ -465,8 +456,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
-            string requestUrl = _submissionConfig.ReportServiceUrl.Trim('/') +
-                                $"/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
 
             try
             {
@@ -478,7 +468,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (MeasureReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(MeasureReportSubmissionModel), cancellationToken);
+                var patientSubmissionBundle = (PatientReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientReportSubmissionModel), cancellationToken);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
@@ -488,8 +478,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.PatientResources: {patientSubmissionBundle?.PatientResources == null}
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
-
-                var patientBundle = patientSubmissionBundle.PatientResources;
 
                 var otherResources = patientSubmissionBundle.OtherResources;
 
@@ -502,7 +490,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
             catch (Exception ex)
             {
-                throw new TransientException(ex.Message, AuditEventType.Submit, ex.InnerException);
+                throw new TransientException(ex.Message, ex.InnerException);
             }
         }
     }

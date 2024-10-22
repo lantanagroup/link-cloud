@@ -8,6 +8,7 @@
 # ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"${ARTIFACTS_ENDPOINT}\", \"password\":\"${ACCESS_TOKEN}\"}]}"
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
+USER 1001
 WORKDIR /app
 
 ENV \
@@ -35,4 +36,4 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Account.dll"]
-
+##

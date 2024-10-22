@@ -1,16 +1,13 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Normalization.Application.Commands.Config;
+using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
-using LantanaGroup.Link.Normalization.Application.Serializers;
+using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using LantanaGroup.Link.Normalization.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -20,14 +17,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
     public class NormalizationController : ControllerBase
     {
         private readonly ILogger<NormalizationController> _logger;
-        private readonly IMediator _mediator;
+        private readonly INormalizationConfigManager _configManager;
         private readonly IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> _kafkaProducerFactory;
 
         public NormalizationController(IKafkaProducerFactory<string, Shared.Application.Models.Kafka.AuditEventMessage> kafkaProducerFactory,
-            IMediator mediator, ILogger<NormalizationController> logger)
+            ILogger<NormalizationController> logger, INormalizationConfigManager configManager)
         {
             _kafkaProducerFactory = kafkaProducerFactory ?? throw new ArgumentNullException(nameof(kafkaProducerFactory));
-            _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+            _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -49,7 +46,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _mediator.Send(new SaveConfigEntityCommand
+                await _configManager.SaveConfigEntity(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = config,
                     Source = SaveTypeSource.Create
@@ -89,20 +86,19 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NormalizationConfigModel>> GetConfig(string facilityId)
+        public async Task<ActionResult<NormalizationConfig>> GetConfig(string facilityId)
         {
-            NormalizationConfigModel config = null;
+            NormalizationConfig config = null;
             try
             {
-                config = await _mediator.Send(new GetConfigurationModelQuery
-                {
-                    FacilityId = facilityId
-                });
+                config = await _configManager.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
+
+                if (config == null)
+                    throw new NoEntityFoundException($"No Facility found for GET facility {facilityId}.");
             }
             catch(NoEntityFoundException ex)
             {
-                var message = $"No Facility found for GET facility {facilityId}.";
-                _logger.LogError(message, ex);
+                _logger.LogError(ex.Message, ex);
                 return NotFound();
             }
             catch(Exception ex)
@@ -139,7 +135,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _mediator.Send(new SaveConfigEntityCommand
+                await _configManager.SaveConfigEntity(new SaveConfigEntityCommand
                 {
                     NormalizationConfigModel = config,
                     Source = SaveTypeSource.Update,
@@ -188,10 +184,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
             try
             {
-                await _mediator.Send(new DeleteConfigCommand
-                {
-                    FacilityId = facilityId
-                });
+                await _configManager.DeleteAsync(facilityId);
             }
             catch (ConfigOperationNullException ex)
             {

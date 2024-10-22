@@ -264,6 +264,7 @@ services:
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic Service-Healthcheck --replication-factor 1 --partitions 1 --config retention.ms=1
       "
       
   kafka-ui:
@@ -334,6 +335,7 @@ services:
       AutoMigrate: true
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ServiceRegistry: "{}"
       Telemetry__EnableTelemetry: true
@@ -399,8 +401,9 @@ services:
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       ConnectionStrings__Redis: redis_cache:6379
+      Cache__Enabled: true
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
       LinkTokenService__EnableTokenGenerationEndpoint: true
@@ -443,12 +446,15 @@ services:
       ReverseProxy__Routes__route8__ClusterId: ReportService
       ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
-      ReverseProxy__Routes__route9__ClusterId: TenantService
+      ReverseProxy__Routes__route9__ClusterId: ReportService
       ReverseProxy__Routes__route9__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route9__Match__Path: api/facility/{**catch-all}
-      ReverseProxy__Routes__route10__ClusterId: QueryDispatchService
+      ReverseProxy__Routes__route9__Match__Path: api/reportconfig/{**catch-all}
+      ReverseProxy__Routes__route10__ClusterId: TenantService
       ReverseProxy__Routes__route10__AuthorizationPolicy: AuthenticatedUser
-      ReverseProxy__Routes__route10__Match__Path: api/querydispatch/{**catch-all}
+      ReverseProxy__Routes__route10__Match__Path: api/facility/{**catch-all}
+      ReverseProxy__Routes__route11__ClusterId: QueryDispatchService
+      ReverseProxy__Routes__route11__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route11__Match__Path: api/querydispatch/{**catch-all}
       ReverseProxy__Clusters__AccountService__Destinations__destination1__Address: http://account:8060
       ReverseProxy__Clusters__AuditService__Destinations__destination1__Address: http://audit:8062
       ReverseProxy__Clusters__CensusService__Destinations__destination1__Address: http://census:8064
@@ -457,7 +463,6 @@ services:
       ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
       ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
-      ReverseProxy__Clusters__SubmissionService__Destinations__destination1__Address: http://submission:8073
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
       Telemetry__EnableTelemetry: true
@@ -654,7 +659,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       IdentityProviderConfig__Issuer: https://oauth.nhsnlink.org/realms/NHSNLink
       IdentityProviderConfig__Audience: https://oauth.nhsnlink.org/realms/NHSNLink
-      Serilog__WriteTo__1__Args__uri: http://loki:3100
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
       Telemetry__EnableTelemetry: true
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
@@ -849,7 +854,8 @@ services:
       secretManagement.managerUri: https://link-vault.vault.azure.net/
       spring.jpa.hibernate.ddl-auto: update
       authentication.anonymous: true
-      loki.enabled: true
+      spring_profiles_active: dev
+      loki.enabled: false
       loki.url: http://loki:3100
     ports:
       - "8075:8075"

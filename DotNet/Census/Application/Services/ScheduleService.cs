@@ -1,20 +1,18 @@
-﻿namespace LantanaGroup.Link.Census.Application.Services;
-
-using global::Census.Domain.Entities;
+﻿using global::Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Spi;
-using System.Threading;
+
+namespace LantanaGroup.Link.Census.Application.Services;
 
 public class ScheduleService : BackgroundService
 {
     private readonly ILogger<ScheduleService> _logger;
     private readonly ISchedulerFactory _schedulerFactory;
     private readonly IJobFactory _jobFactory;
-    //private readonly ICensusConfigRepository _censusConfigRepo;
-    //private readonly ICensusSchedulingRepository _censusSchedulingRepo;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     private static Dictionary<string, Type> _topicJobs = new Dictionary<string, Type>();
@@ -26,23 +24,18 @@ public class ScheduleService : BackgroundService
     }
 
     public ScheduleService(
-        ILogger<ScheduleService> logger,
+       ILogger<ScheduleService> logger,
        ISchedulerFactory schedulerFactory,
-       //ICensusConfigRepository censusConfigRepo,
        IJobFactory jobFactory,
-       //ICensusSchedulingRepository censusSchedulingRepo,
        IServiceScopeFactory serviceScopeFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
         _jobFactory = jobFactory ?? throw new ArgumentNullException(nameof(jobFactory));
-        //_censusConfigRepo = censusConfigRepo ?? throw new ArgumentNullException(nameof(censusConfigRepo));
-        //_censusSchedulingRepo = censusSchedulingRepo ?? throw new ArgumentNullException(nameof(censusSchedulingRepo));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
     }
 
     public IScheduler Scheduler { get; set; }
-    // static ConcurrentDictionary<string, JobKey> jobs = new ConcurrentDictionary<string, JobKey>();
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -50,7 +43,7 @@ public class ScheduleService : BackgroundService
 
         Scheduler.JobFactory = _jobFactory;
 
-        using var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigRepository>();
+        var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
 
         List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
 

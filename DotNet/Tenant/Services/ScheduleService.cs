@@ -21,6 +21,8 @@ namespace LantanaGroup.Link.Tenant.Services
 
         private readonly IServiceScopeFactory _scopeFactory;
 
+        private readonly FacilityConfigurationService _facilityConfigurationService;
+
         static ScheduleService()
         {
             _topicJobs.Add(KafkaTopic.ReportScheduled.ToString(), typeof(ReportScheduledJob));
@@ -30,11 +32,12 @@ namespace LantanaGroup.Link.Tenant.Services
         public ScheduleService(
            ISchedulerFactory schedulerFactory,
            IServiceScopeFactory serviceScopeFactory,
+         //  FacilityConfigurationService facilityConfigurationService,
            IJobFactory jobFactory)
         {
             _schedulerFactory = schedulerFactory;
             _jobFactory = jobFactory;
-            //   _facilityConfigurationService = facilityConfigurationService;
+           // _facilityConfigurationService = facilityConfigurationService;
             _scopeFactory = serviceScopeFactory;
         }
 
@@ -47,12 +50,12 @@ namespace LantanaGroup.Link.Tenant.Services
 
             Scheduler.JobFactory = _jobFactory;
 
-            //List<FacilityConfigModel> facilities = _facilityConfigurationService.GetAllFacilities(cancellationToken).Result;
+            //List<FacilityConfigModel> facilities = _facilityConfigurationService.GetFacilities();
 
             using (var scope = _scopeFactory.CreateScope())
             {
-                var _context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
-                var facilities = await _context.Facilities.ToListAsync();
+                FacilityConfigurationService facilityConfigurationService = scope.ServiceProvider.GetRequiredService<FacilityConfigurationService>();
+                var facilities = await facilityConfigurationService.GetAllFacilities(cancellationToken);
                 foreach (FacilityConfigModel facility in facilities)
                 {
                     await AddJobsForFacility(facility, Scheduler);

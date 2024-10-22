@@ -1,17 +1,18 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
+using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
@@ -20,7 +21,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
         private readonly ILogger<ReportScheduledEventListener> _logger;
         private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
+        private readonly IProducer<string, AuditEventMessage> _auditProducer;
         private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -29,7 +30,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             ILogger<ReportScheduledEventListener> logger,
             IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory, 
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducer, 
+            IProducer<string, AuditEventMessage> auditProducer, 
             IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
             IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory) 
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _auditProducerFactory = auditProducer;
+            _auditProducer = auditProducer;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
             _serviceScopeFactory = serviceScopeFactory;
@@ -80,13 +81,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 try
                                 {
                                     using var scope = _serviceScopeFactory.CreateScope();
-                                    var _createScheduledReportCommand = scope.ServiceProvider.GetRequiredService<ICreateScheduledReportCommand>();
-                                    var _getScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IGetScheduledReportQuery>();
-                                    var _updateScheduledReportQuery = scope.ServiceProvider.GetRequiredService<IUpdateScheduledReportCommand>();
+                                
+                                    var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
+
+                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
 
                                     if (consumeResult == null || !consumeResult.Message.Key.IsValid() || !consumeResult.Message.Value.IsValid())
                                     {
-                                        throw new DeadLetterException("Invalid Report Scheduled event", AuditEventType.Create);
+                                        throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
                                     string correlationId = string.Empty;
@@ -97,7 +99,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
                                     else
                                     {
-                                        throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
+                                        throw new DeadLetterException("Correlation Id missing");
                                     }
 
                                     ReportScheduledKey key = consumeResult.Message.Key;
@@ -108,14 +110,14 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                             value.Parameters.Single(x => x.Key.Equals("startdate", StringComparison.CurrentCultureIgnoreCase)).Value,
                                             out DateTimeOffset startDateOffset))
                                     {
-                                        throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
+                                        throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}");
                                     }
 
                                     if (!DateTimeOffset.TryParse(
                                             value.Parameters.Single(x => x.Key.Equals("enddate", StringComparison.CurrentCultureIgnoreCase)).Value,
                                             out DateTimeOffset endDateOffset))
                                     {
-                                        throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
+                                        throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}");
                                     }
 
                                     var startDate = startDateOffset.UtcDateTime;
@@ -123,18 +125,18 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key.FacilityId, key.ReportType, startDate, endDate);
 
-                                    var existingRecord = _getScheduledReportQuery.Execute(key.FacilityId);
+                                    var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key.FacilityId);
 
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key.FacilityId);
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await _updateScheduledReportQuery.Execute(existingRecord, scheduledReport);
+                                        await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                        await _createScheduledReportCommand.Execute(scheduledReport);
+                                       await scheduledReportMgr.createScheduledReport(scheduledReport);
                                     }
 
                                     _reportScheduledConsumer.Commit(consumeResult);
@@ -160,40 +162,31 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
 
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key.FacilityId);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key.FacilityId);
 
                                     _reportScheduledConsumer.Commit(consumeResult);
-
-                                    //continue;
                                 }
 
                             }, cancellationToken);
                         }
-                        catch (ConsumeException e)
+                        catch (ConsumeException ex)
                         {
-                            if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                            _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
+
+                            if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
-                                throw new OperationCanceledException(e.Error.Reason, e);
+                                throw new OperationCanceledException(ex.Error.Reason, ex);
                             }
 
-                            var converted_record = new ConsumeResult<string, string>()
-                            {
-                                Message = new Message<string, string>()
-                                {
-                                    Key = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "",
-                                    Value = e.ConsumerRecord.Message.Value != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value) : "",
-                                    Headers = e.ConsumerRecord.Message.Headers
-                                }
-                            };
+                            var facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
 
-                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), string.Empty);
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                            _reportScheduledConsumer.Commit();
-
-                            continue;
+                            var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                            _reportScheduledConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                         }
-                        
                     }
+
                     _reportScheduledConsumer.Close();
                     _reportScheduledConsumer.Dispose();
                 }
@@ -206,16 +199,26 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             }
         }
 
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
+        }
+
         private void ProduceAuditEvent(AuditEventMessage auditEvent, Headers headers)
         {
-            using (var producer = _auditProducerFactory.CreateAuditEventProducer())
-            {
-                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+                _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditEvent,
                     Headers = headers
                 });
-            }
+            
         }
     }
 }

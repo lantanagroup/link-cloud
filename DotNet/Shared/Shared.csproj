@@ -13,11 +13,12 @@
 		<Company>Lantana Consulting Group</Company>
 		<Description>Shared library for Lantana Link</Description>
 		<Product>NHSN Link Shared Library</Product>
-		<VersionPrefix>2.3.3</VersionPrefix>
+		<VersionPrefix>0.1.1-dev</VersionPrefix>
 		<PackageId>com.lantanagroup.link.Shared</PackageId>
 	</PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.Kafka" Version="8.0.1" />
     <PackageReference Include="AutoMapper" Version="13.*" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.1.0" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />

@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -20,7 +22,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
-    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
         entity.Id = Guid.NewGuid().ToString();
 
@@ -31,7 +33,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return result;
     }
 
-    public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken)
+    public virtual async Task<T> UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
         entity = _dbContext.Set<T>().Update(entity).Entity;
 
@@ -41,7 +43,17 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     }
 
-    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken)
+    public virtual async Task DeleteAsync(T? entity, CancellationToken cancellationToken = default)
+    {
+        if (entity is null) return;
+
+        _dbContext.Set<T>().Remove(entity);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+    }
+
+    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
@@ -137,6 +149,49 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
     {
         return await _dbContext.Set<T>().SingleAsync(predicate, cancellationToken);
     }
+
+    public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+    {
+
+        var query = _dbContext.Set<T>().AsNoTracking().AsQueryable();
+
+        if (predicate != null)
+        {
+            query = query.Where(predicate);
+        }
+
+        var count = await query.CountAsync(cancellationToken);
+
+        if (sortOrder != null)
+        {
+            query = sortOrder switch
+            {
+                SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
+                SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
+            };
+        }
+
+        var results = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+        var result = (results, metadata);
+
+        return result;
+    }
+
+    private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+    {
+        var sortKey = sortBy?.ToLower() ?? "";
+        var parameter = Expression.Parameter(typeof(T), "p");
+        var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+        return sortExpression;
+    }
+
 
     public async Task<HealthCheckResult> HealthCheck(int eventId)
     {

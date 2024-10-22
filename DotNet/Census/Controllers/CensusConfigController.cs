@@ -1,10 +1,9 @@
 ﻿using Census.Domain.Entities;
-using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
+using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,12 +15,12 @@ namespace Census.Controllers;
 public class CensusConfigController : Controller
 {
     private readonly ILogger<CensusConfigController> _logger;
-    private readonly IMediator _mediator;
-
-    public CensusConfigController(ILogger<CensusConfigController> logger, IMediator mediator)
+    private readonly ICensusConfigManager _censusConfigManager;
+    
+    public CensusConfigController(ILogger<CensusConfigController> logger, ICensusConfigManager censusConfigManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
     }
 
     /// <summary>
@@ -51,10 +50,7 @@ public class CensusConfigController : Controller
 
         try
         {
-            CensusConfigEntity entity = await _mediator.Send(new CreateCensusConfigCommand
-            {
-                CensusConfigEntity = censusConfig
-            });
+            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
 
             return Created(entity.Id.ToString(), entity);
         }
@@ -86,7 +82,7 @@ public class CensusConfigController : Controller
     {
         try
         {
-            var response = await _mediator.Send(new GetCensusConfigQuery { FacilityId = facilityId });
+            var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
             if (response == null)
                 return NotFound();
 
@@ -105,12 +101,14 @@ public class CensusConfigController : Controller
     /// <param name="censusConfig"></param>
     /// <param name="facilityId"></param>
     /// <returns>
-    ///     No Content: 204
+    ///     Created: 201
+    ///     Accepted: 202
     ///     Bad Scheduled Trigger: 400
     ///     Missing Facility ID: 400
     ///     Server Error: 500
     /// </returns>
-    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigModel))]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
@@ -131,19 +129,17 @@ public class CensusConfigController : Controller
             return BadRequest($"FacilityID in request path does not match facility in request body.");
         }
 
-        CensusConfigModel existingConfig = await _mediator.Send(new GetCensusConfigQuery() { FacilityId = facilityId });
-
         try
         {
-            if (existingConfig != null)
+            var existingEntity = await _censusConfigManager.GetCensusConfigByFacilityId(censusConfig.FacilityId);
+            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
+            if (existingEntity != null)
             {
-                await _mediator.Send(new UpdateCensusConfigCommand { Config = censusConfig });
-                return NoContent();
+                return Accepted(entity);
             }
             else
             {
-                var config = await _mediator.Send(new CreateCensusConfigCommand() { CensusConfigEntity = censusConfig });
-                return Created(config.Id.ToString(), config);
+                return Created(entity.Id.ToString(), entity);
             }
         }
         catch (MissingTenantConfigurationException ex)
@@ -173,9 +169,9 @@ public class CensusConfigController : Controller
     {
         try
         {
-            await _mediator.Send(new DeleteCensusConfigCommand { FacilityId = facilityId });
+            await _censusConfigManager.DeleteCensusConfigByFacilityId(facilityId);
 
-            return NoContent();
+            return Accepted();
         }
         catch (Exception ex)
         {

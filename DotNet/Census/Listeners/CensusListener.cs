@@ -2,48 +2,49 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Census.Application.Commands;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Messages;
+using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
 using Microsoft.Data.SqlClient;
 using System.Text;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Census.Listeners;
 
 public class CensusListener : BackgroundService
 {
     private readonly IKafkaConsumerFactory<string, PatientIDsAcquired> _kafkaConsumerFactory;
-    private readonly IKafkaProducerFactory<string, object> _kafkaProducerFactory;
+    private readonly IProducer<string, object> _kafkaProducer;
     private readonly ILogger<CensusListener> _logger;
-    private readonly IMediator _mediator;
     private readonly IDeadLetterExceptionHandler<string, PatientIDsAcquired> _nonTransientExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<string, string> _consumeErrorHandler;
     private readonly ITransientExceptionHandler<string, PatientIDsAcquired> _transientExceptionHandler;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public CensusListener(ILogger<CensusListener> logger, IMediator mediator, IKafkaConsumerFactory<string, PatientIDsAcquired> kafkaConsumerFactory, IKafkaProducerFactory<string, object> kafkaProducerFactory, IDeadLetterExceptionHandler<string, PatientIDsAcquired> nonTransientExceptionHandler, ITransientExceptionHandler<string, PatientIDsAcquired> transientExceptionHandler, IDeadLetterExceptionHandler<string, string> consumeErrorHandler)
+    public CensusListener(
+        ILogger<CensusListener> logger,
+        IKafkaConsumerFactory<string, PatientIDsAcquired> kafkaConsumerFactory, 
+        IProducer<string, object> kafkaProducer, 
+        IDeadLetterExceptionHandler<string, PatientIDsAcquired> nonTransientExceptionHandler, 
+        ITransientExceptionHandler<string, PatientIDsAcquired> transientExceptionHandler,
+        IServiceScopeFactory scopeFactory)
     {
-        _logger = logger;
-        _mediator = mediator;
-        _kafkaConsumerFactory = kafkaConsumerFactory;
-        _kafkaProducerFactory = kafkaProducerFactory;
-        _nonTransientExceptionHandler = nonTransientExceptionHandler;
-        _transientExceptionHandler = transientExceptionHandler;
-        _consumeErrorHandler = consumeErrorHandler;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
+        _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
+        _nonTransientExceptionHandler = nonTransientExceptionHandler ?? throw new ArgumentNullException(nameof(nonTransientExceptionHandler));
+        _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
+        _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+
 
         _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Retry";
         _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-        _consumeErrorHandler.ServiceName = CensusConstants.ServiceName;
-        _consumeErrorHandler.Topic = nameof(KafkaTopic.PatientIDsAcquired) + "-Error";
-
     }
 
     public override async System.Threading.Tasks.Task StartAsync(CancellationToken cancellationToken)
@@ -66,12 +67,11 @@ public class CensusListener : BackgroundService
         };
         using var kafkaConsumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
 
-        var producerConfig = new ProducerConfig();
-        using var kafkaProducer = _kafkaProducerFactory.CreateProducer(producerConfig, useOpenTelemetry: true);
-
         IEnumerable<BaseResponse>? responseMessages = null;
         kafkaConsumer.Subscribe(KafkaTopic.PatientIDsAcquired.ToString());
         ConsumeResult<string, PatientIDsAcquired>? rawmessage = null;
+
+        using var scope = _scopeFactory.CreateScope();
 
         try
         {
@@ -79,7 +79,7 @@ public class CensusListener : BackgroundService
             {
                 try
                 {
-                    await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientIDsAcquired>?, CancellationToken, System.Threading.Tasks.Task>)(async (result, CancellationToken) =>
                     {
                         rawmessage = result;
 
@@ -91,7 +91,7 @@ public class CensusListener : BackgroundService
                             {                              
                                 if(rawmessage.Message.Value == null)
                                 {
-                                    throw new DeadLetterException("Message value is null", AuditEventType.Query, new MissingFacilityIdException("No message value provided. Unable to process message."));
+                                    throw new DeadLetterException("Message value is null", new MissingFacilityIdException("No message value provided. Unable to process message."));
                                 }
 
                                 var msgValue = rawmessage.Message.Value;
@@ -101,36 +101,33 @@ public class CensusListener : BackgroundService
                                     messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(rawmessage.Message);
                                     if (string.IsNullOrWhiteSpace(messageMetaData.facilityId))
                                     {
-                                        throw new DeadLetterException("Facility ID is null or empty", AuditEventType.Query, new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
+                                        throw new TransientException("Facility ID is null or empty", new MissingFacilityIdException("No Facility ID provided. Unable to process message."));
                                     }
                                 }
                                 catch (MissingFacilityIdException ex)
                                 {
-                                    throw new DeadLetterException("Error extracting facility ID and correlation ID: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new TransientException("Error extracting facility ID and correlation ID: " + ex.Message, ex);
                                 }
 
                                 try
                                 {
-                                    responseMessages = msgValue switch
+                                    var patientIdsAcuiredService = scope.ServiceProvider.GetRequiredService<IPatientIdsAcquiredService>();
+                                    var responseMessages = await patientIdsAcuiredService.ProcessEvent(new ConsumePatientIdsAcquiredEventModel()
                                     {
-                                        PatientIDsAcquired => await _mediator.Send(new ConsumePatientIdsAcquiredEventCommand
-                                        {
-                                            FacilityId = messageMetaData.facilityId,
-                                            Message = msgValue,
-                                        }, cancellationToken),
-                                        _ => null
-                                    };
+                                        FacilityId = messageMetaData.facilityId,
+                                        Message = msgValue,
+                                    }, cancellationToken);
 
-                                    await ProduceEvents(responseMessages, kafkaProducer, cancellationToken);
+                                    await ProduceEvents(responseMessages, cancellationToken);
                                 }
                                 catch(SqlException ex)
                                 {
-                                    throw new TransientException("DB Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new TransientException("DB Error processing message: " + ex.Message, ex);
                                 }
                                 catch (Exception ex)
                                 {
 
-                                    throw new DeadLetterException("Error processing message: " + ex.Message, AuditEventType.Query, ex);
+                                    throw new DeadLetterException("Error processing message: " + ex.Message, ex);
                                 }
 
                                 kafkaConsumer.Commit(rawmessage);
@@ -152,54 +149,33 @@ public class CensusListener : BackgroundService
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                            var auditValue = new AuditEventMessage
-                            {
-                                FacilityId = rawmessage.Message.Key,
-                                Action = AuditEventType.Query,
-                                ServiceName = CensusConstants.ServiceName,
-                                EventDate = DateTime.UtcNow,
-                                Notes = $"Census processing failure \nException Message: {ex}",
-                            };
+                            _nonTransientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Message.Key);
 
-                            await ProduceAuditMessage(null, rawmessage?.Key, auditValue);
-
-                            _nonTransientExceptionHandler.HandleException(rawmessage, new DeadLetterException("Census Exception thrown: " + ex.Message, AuditEventType.Create), rawmessage.Message.Key);
                             kafkaConsumer.Commit(rawmessage);
-
-                            //continue;
                         }
 
-                    }, cancellationToken);
+                    }), cancellationToken);
                 }
-                catch (ConsumeException e)
+                catch (ConsumeException ex)
                 {
-                    if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+
+                    if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                     {
-                        throw new OperationCanceledException(e.Error.Reason, e);
+                        throw new OperationCanceledException(ex.Error.Reason, ex);
                     }
 
-                    var facilityId = e.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key) : "";
+                    var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
 
-                    var converted_record = new ConsumeResult<string, string>()
-                    {
-                        Message = new Message<string, string>()
-                        {
-                            Key = facilityId,
-                            Value = e.ConsumerRecord.Message.Value != null ? System.Text.Json.JsonSerializer.Serialize(e.ConsumerRecord.Message.Value) : "",
-                            Headers = e.ConsumerRecord.Message.Headers
-                        }
-                    };
+                    _nonTransientExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                    _consumeErrorHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), facilityId);
-
-                    kafkaConsumer.Commit();
-                    continue;
+                    var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                    kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                 }
                 catch (Exception ex)
                 {
-                    _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
-                    _nonTransientExceptionHandler.HandleException(rawmessage, ex, AuditEventType.Query, "");
-                    continue;
+                    _logger.LogError(ex, "Error consuming message for topics: [{1}] at {2}", string.Join(", ", kafkaConsumer.Subscription), DateTime.UtcNow);
+                    kafkaConsumer.Commit();
                 }
             }
         }
@@ -211,7 +187,7 @@ public class CensusListener : BackgroundService
         }
     }
 
-    private async System.Threading.Tasks.Task ProduceEvents(IEnumerable<BaseResponse> events, IProducer<string, object> producer, CancellationToken cancellationToken = default)
+    private async System.Threading.Tasks.Task ProduceEvents(IEnumerable<BaseResponse> events, CancellationToken cancellationToken = default)
     {
         foreach (var ev in events)
         {
@@ -233,42 +209,9 @@ public class CensusListener : BackgroundService
                     Value = patientEvent
                 };
 
-                await producer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);
+                await _kafkaProducer.ProduceAsync(KafkaTopic.PatientEvent.ToString(), message);
             }
         }
-    }
-
-    private async System.Threading.Tasks.Task ProduceAuditMessage(string correlationId, string key, AuditEventMessage auditEvent)
-    {
-
-        using var auditProducer = _kafkaProducerFactory.CreateAuditEventProducer();
-
-        Headers? headers = null;
-
-        try
-        {
-            await auditProducer.ProduceAsync(KafkaTopic.AuditableEventOccurred.ToString(), new Message<string, Shared.Application.Models.Kafka.AuditEventMessage>
-            {
-                Key = key,
-                Headers = headers ?? null,
-                Value = new Shared.Application.Models.Kafka.AuditEventMessage
-                {
-                    Action = auditEvent.Action,
-                    CorrelationId = correlationId,
-                    ServiceName = CensusConstants.ServiceName,
-                    EventDate = auditEvent.EventDate,
-                    FacilityId = key,
-                    Notes = auditEvent.Notes,
-                    PropertyChanges = auditEvent.PropertyChanges,
-                    Resource = auditEvent.Resource
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("There was an issue sending an audit.", ex);
-        }
-
     }
 
     private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<string, PatientIDsAcquired> message)

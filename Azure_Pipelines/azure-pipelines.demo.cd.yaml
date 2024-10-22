@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
     - dev
+    - release/*
   paths:
     include:
     - Web/DemoApp/*
@@ -31,13 +32,26 @@ steps:
     inputs:
       versionSpec: '16.x'
     displayName: 'Install Node.js'
- 
+
+  - task: GetRevision@1
+    displayName: 'Get Revision'
+    inputs:
+      VariableName: Revision
+
   - task: Npm@1  
     displayName: 'Angular CLI 13.2.5'  
     inputs:  
       command: custom  
       verbose: false  
       customCommand: 'install -g @angular/cli'
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
   - task: Npm@1  
     displayName: 'npm install'  
@@ -54,6 +68,19 @@ steps:
       workingDir: $(workingDir)
       customCommand: 'run build'
   
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+
   - task: Docker@2
     displayName: "Build & Push DemoApiGateway Docker Image"
     condition: always()
@@ -64,7 +91,7 @@ steps:
       Dockerfile: $(dockerPath)
       tags: |
         latest
-        $(Build.BuildId)
+        $(MyTag)
       buildContext: '$(workingDir)'
 
   - task: PublishPipelineArtifact@1

@@ -4,17 +4,9 @@ using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.Queries;
-using LantanaGroup.Link.QueryDispatch.Application.QueryDispatchConfiguration.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
-using LantanaGroup.Link.QueryDispatch.Listeners;
-using LantanaGroup.Link.QueryDispatch.Persistence.PatientDispatch;
-using LantanaGroup.Link.QueryDispatch.Persistence.QueryDispatchConfiguration;
-using LantanaGroup.Link.QueryDispatch.Persistence.ScheduledReport;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -47,6 +39,14 @@ using QueryDispatch.Domain.Context;
 using QueryDispatch.Persistence.Retry;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.QueryDispatch.Listeners;
+using QueryDispatch.Domain.Managers;
+using QueryDispatch.Domain;
+using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using QueryDispatch.Application.Extensions;
+using HealthChecks.Kafka;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,8 +91,8 @@ else
 // Additional configuration is required to successfully run gRPC on macOS.
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
-
-builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection("KafkaConnection"));
+var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
@@ -117,30 +117,13 @@ builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
 var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
 // Add services to the container.
-builder.Services.AddGrpc();
 builder.Services.AddControllers(options => { options.ReturnHttpNotAcceptable = true; }).AddXmlDataContractSerializerFormatters().AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHttpClient();
 
-//Add commands
-builder.Services.AddTransient<ICreateScheduledReportCommand, CreateScheduledReportCommand>();
 
-builder.Services.AddTransient<ICreatePatientDispatchCommand, CreatePatientDispatchCommand>();
-builder.Services.AddTransient<IDeletePatientDispatchCommand, DeletePatientDispatchCommand>();
+//Register Kafka
+builder.Services.RegisterKafka(kafkaConnection);
 
-builder.Services.AddTransient<ICreateQueryDispatchConfigurationCommand, CreateQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IDeleteQueryDispatchConfigurationCommand, DeleteQueryDispatchConfigurationCommand>();
-builder.Services.AddTransient<IUpdateQueryDispatchConfigurationCommand, UpdateQueryDispatchConfigurationCommand>();
-
-//Add factories
-builder.Services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
-builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
-builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-
-builder.Services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequestedValue>, KafkaProducerFactory<string, DataAcquisitionRequestedValue>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
-builder.Services.AddTransient<IKafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>>();
 
 builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
@@ -148,17 +131,21 @@ builder.Services.AddTransient<IQueryDispatchFactory, QueryDispatchFactory>();
 builder.Services.AddTransient<IQueryDispatchConfigurationFactory, QueryDispatchConfigurationFactory>();
 
 //Add repos
-builder.Services.AddScoped<IScheduledReportRepository, ScheduledReportRepo>();
-builder.Services.AddScoped<IPatientDispatchRepository, PatientDispatchRepo>();
-builder.Services.AddScoped<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
+builder.Services.AddTransient<IEntityRepository<ScheduledReportEntity>, DataEntityRepository<ScheduledReportEntity>>();
+builder.Services.AddTransient<IEntityRepository<PatientDispatchEntity>, DataEntityRepository<PatientDispatchEntity>>();
+builder.Services.AddTransient<IEntityRepository<QueryDispatchConfigurationEntity>, DataEntityRepository<QueryDispatchConfigurationEntity>>();
+builder.Services.AddTransient<IDatabase, Database>();
+
+//builder.Services.AddTransient<IPatientDispatchRepository, PatientDispatchRepo>();
+//builder.Services.AddTransient<IQueryDispatchConfigurationRepository, QueryDispatchConfigurationRepo>();
 builder.Services.AddScoped<IEntityRepository<RetryEntity>, QueryDispatchEntityRepository<RetryEntity>>();
 
-//Add Queries
-builder.Services.AddScoped<IGetScheduledReportQuery, GetScheduledReportQuery>();
-builder.Services.AddScoped<IUpdateScheduledReportCommand, UpdateScheduledReportCommand>();
-builder.Services.AddScoped<IGetQueryDispatchConfigurationQuery, GetQueryDispatchConfigurationQuery>();
-builder.Services.AddScoped<IGetAllQueryDispatchConfigurationQuery, GetAllQueryDispatchConfigurationQuery>();
-builder.Services.AddScoped<IGetAllPatientDispatchQuery, GetAllPatientDispatchQuery>();
+
+// Add Managers
+builder.Services.AddTransient<IQueryDispatchConfigurationManager, QueryDispatchConfigurationManager>();
+builder.Services.AddTransient<IPatientDispatchManager, PatientDispatchManager>();
+builder.Services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
+
 
 //Excepation Handlers
 builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
@@ -170,16 +157,18 @@ builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventVal
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
 //Add Hosted Services
-if (consumerSettings == null || !consumerSettings.DisableConsumer)
+if (consumerSettings != null && !consumerSettings.DisableConsumer)
 {
     builder.Services.AddHostedService<PatientEventListener>();
     builder.Services.AddHostedService<ReportScheduledEventListener>();
     builder.Services.AddHostedService<ScheduleService>();
-    builder.Services.AddSingleton<QueryDispatchJob>();
+
 }
 
-if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
+
+if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
+    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
@@ -187,6 +176,7 @@ if (consumerSettings == null || !consumerSettings.DisableRetryConsumer)
 
 builder.Services.AddSingleton<IJobFactory, JobFactory>();
 builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
+builder.Services.AddSingleton<QueryDispatchJob>();
 
 
 //Add problem details
@@ -255,8 +245,11 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 //Add health checks
+var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, QueryDispatchConstants.ServiceName).GetHealthCheckOptions();
+
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<QueryDispatchDbContext>();
+    .AddDbContextCheck<QueryDispatchDbContext>()
+    .AddKafka(kafkaHealthOptions);
 
 // Logging using Serilog
 builder.Logging.AddSerilog();
@@ -328,10 +321,5 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    app.MapControllers();
-
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
-    {
-        //app.MapGrpcReflectionService();
-    }
+    app.UseEndpoints(endpoints => endpoints.MapControllers());    
 }

@@ -13,10 +13,9 @@
             public const string Serilog = "Serilog";
         }
 
-        public static class AuditExceptionMessages 
+        public static class ProblemTypes
         {
-            public const string NullOrWhiteSpaceFacilityId = "No facility id was given and is required for Audit events.";
-            public const string NullOrWhiteSpaceServiceName = "No service name was given and is required for Audit events.";
+            public const string NotFound = "https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.5";
         }
 
         public static class AuditLoggingIds 
