@@ -10,6 +10,7 @@ import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
+import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
@@ -68,7 +69,6 @@ public class MeasureDefinitionController {
     @GetMapping("/{id}")
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
-        _logger.info("Get measure definition {}", id);
 
         if (user != null){
             Span currentSpan = Span.current();
@@ -82,7 +82,7 @@ public class MeasureDefinitionController {
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
-        _logger.info("Put measure definition {}", id);
+        _logger.info("Put measure definition {}", StringEscapeUtils.escapeJava(id));
 
         if (user != null){
             Span currentSpan = Span.current();
@@ -104,7 +104,6 @@ public class MeasureDefinitionController {
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
-        _logger.info("Evaluate measure definition {}", id);
 
         if (user != null){
             Span currentSpan = Span.current();
