@@ -3,7 +3,6 @@ using LantanaGroup.Link.Report.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -53,7 +52,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
+                _logger.LogError(ex, $"Exception in ReportController.GetSubmissionBundleForPatient");
                 return Problem(ex.Message, statusCode: 500);
             }
         }
