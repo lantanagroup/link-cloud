@@ -1,0 +1,147 @@
+{
+	"info": {
+		"_postman_id": "793403e1-ac6c-4c26-a79d-3872df6d984d",
+		"name": "Tenant Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "23913868",
+		"_collection_link": "https://lantanagroup.postman.co/workspace/BOTW~6a6c2bef-c689-4259-a32e-4826fd674151/collection/18470931-793403e1-ac6c-4c26-a79d-3872df6d984d?action=share&source=collection_link&creator=23913868"
+	},
+	"item": [
+		{
+			"name": "GetAllFacilities",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{tenant-api-base}}/api/Facility",
+					"host": [
+						"{{tenant-api-base}}"
+					],
+					"path": [
+						"api",
+						"Facility"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateFacility",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"FacilityId\": \"Hospital1_static\",\r\n    \"FacilityName\" : \"Hospital1_static\",\r\n    \"ScheduledTasks\" : [\r\n        {\r\n            \"kafkaTopic\": \"ReportScheduled\",\r\n            \"reportTypeSchedules\": [\r\n                {\r\n                    \"ReportType\" : \"NHSNdQMAcuteCareHospitalInitialPopulation\",\r\n                    \"ScheduledTriggers\": [\"0 0 0/2 * * ?\"]\r\n                }\r\n            ]\r\n            \r\n        }\r\n     ]   \r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{tenant-api-base}}/api/Facility",
+					"host": [
+						"{{tenant-api-base}}"
+					],
+					"path": [
+						"api",
+						"Facility"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetFacilityById",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{tenant-api-base}}/api/facility/:id",
+					"host": [
+						"{{tenant-api-base}}"
+					],
+					"path": [
+						"api",
+						"facility",
+						":id"
+					],
+					"query": [
+						{
+							"key": "",
+							"value": "",
+							"disabled": true
+						}
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "LocalDemoHospital001"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateFacility",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"Id\": \"296574a4-4291-45d4-bdd7-47de3097a857\",\r\n    \"FacilityId\": \"Hospital1_static1\",\r\n    \"FacilityName\" : \"Hospital1_static1\",\r\n    \"ScheduledTasks\" : [\r\n        {\r\n            \"kafkaTopic\": \"ReportScheduled\",\r\n            \"reportTypeSchedules\": [\r\n                {\r\n                    \"ReportType\" : \"NHSNdQMAcuteCareHospitalInitialPopulation\",\r\n                    \"ScheduledTriggers\": [\"0 24 20 * * ?\"]  \r\n                }]\r\n        }\r\n     ]\r\n   \r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{tenant-api-base}}/api/facility/296574a4-4291-45d4-bdd7-47de3097a857",
+					"host": [
+						"{{tenant-api-base}}"
+					],
+					"path": [
+						"api",
+						"facility",
+						"296574a4-4291-45d4-bdd7-47de3097a857"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DeleteFacility",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{tenant-api-base}}/api/facility/:id",
+					"host": [
+						"{{tenant-api-base}}"
+					],
+					"path": [
+						"api",
+						"facility",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "Hospital1"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "tenant-api-base",
+			"value": " https://dev-tenant.nhsnlink.org"
+		}
+	]
+}
