@@ -1,253 +1,307 @@
 # Link Cloud
 
+## Table of Contents
+* [Introduction](#introduction)
+* [Link Cloud Services](#link-cloud-services)
+* [Helpful Tools](#helpful-tools)
+* [Docker Installation](#docker-installation)
+* [Quick Tenant Configuration](#quick-tenant-configuration)
+* [Manual Reporting](#manual-reporting)
+* [Reporting Event Workflow](#reporting-event-workflow)
+
 ## Introduction
 
-Link is an open source reference implementation for CDC’s National Healthcare Safety Network (NHSN) reporting. It is an application that aggregates, calculates, and shares line-level clinical data for patients matching NHSN surveillance requirements. It is based on C#/.NET Core, Firely libraries, using Micro Services, Kafka, and other technologies. It is intended for large loads. It uses streaming technologies so that as soon as a patient can be queried, it does, rather than waiting until the end of the reporting cycle to initiate query/evaluate. So, it works through-out the entire month, distributing the workload through the entire month, and then aggregates it at the end of the reporting cycle for a submission.
+NHSNLink is an open-source reference implementation for CDC’s National Healthcare Safety Network (NHSN) reporting. It is an application that aggregates, transforms, evaluates, validates and submits patient-level clinical data for patients matching NHSN surveillance requirements. It is based on a event driven micro service architecture using C#, Java, Kafka and other technologies. NHSNLink is designed to handle large-scale data processing efficiently. It leverages streaming technologies that can be configured to continuously query and evaluate patient data throughout the reporting cycle, rather than waiting until the end to initiate this process.
 
-## Project Set Up
+## Link Cloud Services
 
-Clone the repository to your local machine!
+### Tenant
 
-### Kafka
+The Tenant service is the entry point for configuring a tenant into Link Cloud. The service is responsible for maintaining and generating events for the scheduled measure reporting periods that the tenant is configured for. These events contain the initial information needed for Link Cloud to query resources and perform measure evaluations based on a specific reporting period.
 
-Kafka is a pre-requisite to running any of the services in Link.
+### Census
 
-Launch Kafka and supporting components in docker using `docker-compose-kafka-and-ui.yml` docker compose file: `docker compose -f docker-compose-kafka-and-ui.yml up -d`
+The Census service is primarily responsible for maintaining a tenants admit and discharge patient information needed to determine when a patient is ready for reporting. To accomplish this, the Census service has functionality in place to request an updated FHIR List of recently admitted patients. The frequency that the request is made is based on a Tenant configuration made in the Census service.
 
-This compose file sets up the following services for Kafka:
+### Query Dispatch
 
-* Zookeeper (port 2181)
-* Broker (port 29092)
-* UI (port 8091)
-* REST API (port 38082)
+The Query Dispatch service is primarily responsible for applying a lag period prior to making FHIR resource query requests against a facility endpoint. The current implementation of the Query Dispatch service handles how long Link Cloud should wait before querying for a patient’s FHIR resources after being discharged. To ensure that the encounter related data for the patient has been settled (Medications have been closed, Labs have had their results finalized, etc), tenants are able to customize how long they would like the lag from discharge to querying to be. 
 
-### Mongo DB
+### Data Acquisition 
 
-Using the links below, install MongoDB and MongoDB Atlas. Once completed, create the following databases in MongoDB Atlas:
+The Data Acquistion service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the STU3 Patient List ([Link Here](https://fhir.epic.com/Specifications?api=879)) resource to inform which patients are currently admitted in the facility. While this is the current solution to acquiring the patient census, there are other means of patient acquisition being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.   
 
- - audit
- - census
- - data
- - measureEval
- - normalization
- - notification
- - query
- - report
- - tenant
+### Normalization
 
-Downloads:<br/>
-[MongoDB Atlas](https://www.mongodb.com/try/download/compass)<br/>
-[MongoDB](https://www.mongodb.com/docs/v3.0/tutorial/install-mongodb-on-windows/)<br/>
+FHIR resources queried from EHR endpoints can vary from location to location. There will be occasions where data for specific resources may need to be adjusted to ensure that Link Cloud properly evaluates a patient against dQM’s. The Normalization service is a component in Link Cloud to help make those adjustments in an automated way. The service operates in between the resource acquisition and evaluation steps to ensure that the tenant data is in a readied state for measure evaluation.
 
-### SQL Server
+### Measure Eval 
 
-TBD
+The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the CQF framework ([Link Here](https://github.com/cqframework/cqf-ruler)) to perform the measure evaluations.
 
-### Dotnet Application
+### Report
 
-Open solution in Visual Studio and build the solution (ctrl + shift + b)
+The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process. 
 
-## Service Definitions
+### Submission
+The Submission service is responsible for packaging a tenant's reporting content and submitting them to a configured destination. Currently, the service only writes the submission content to its local file store. The submission package for a reporting period includes the following files:    
 
-### Account Service
+| File | Description | Multiple Files? |
+| ---- | ---- | ---- |
+| Aggregate | A [MeasureReport](https://hl7.org/fhir/R4/measurereport.html) resource that contains references to each patient evaluation for a specific measure | Yes, one per measure | 
+| Patient List | A [List](https://hl7.org/fhir/R4/list.html) resource of all patients that were admitted into the facility during the reporting period | No |
+| Device | A [Device](https://hl7.org/fhir/R4/device.html) resource that details the version of Link Cloud that was used | No |
+| Organization | An [Organization](https://hl7.org/fhir/R4/organization.html) resource for the submitting facility | No |
+| Other Resources | A [Bundle](https://hl7.org/fhir/R4/bundle.html) resource that contains all of the shared resources (Location, Medication, etc) that are referenced in the patient Measure Reports | No |
+| Patient | A [Bundle](https://hl7.org/fhir/R4/bundle.html) resource that contains the MeasureReports and related resources for a patient | Yes, one per evaluated patient |
 
-The Account Service is responsible for the following:
- - Maintain a list of accounts with access to the Link application
- - Add/Remove Groups associated with Accounts
- - Add/Remove permission Roles associated with Accounts and Groups
+An example of the submission package can be found at `\link-cloud\Submission Example`.
 
-#### AppSettings
-**NOTE** You may need to create an appsettings.Local.json file in your cloned copy or update appsettings.development.json with updated kafka settings or postgres connection information.
+### Account
+
+The Account service is responsible for maintaining roles and permissions for Link Cloud users. 
+
+### Audit
+
+The Audit service is responsible for persisting auditable events that are generated by the Link Cloud services.
+
+### Notification
+
+The Notification service is responsible for emailing configured users when a notifiable event occurs when the Link Cloud services attempt to perform their work. 
+
+## Helpful Tools
+
+- SQL Server Management Studio: [Link Here](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver16)
+- Mongo Compass: [Link Here](https://www.mongodb.com/products/tools/compass)
+- Mongo Shell: [Link Here](https://www.mongodb.com/docs/mongodb-shell/)
+- Docker Desktop: [Link Here](https://www.docker.com/products/docker-desktop)
+- Postman: [Link Here](https://www.postman.com)
+
+## Docker Installation
+
+1. Run the following terminal commands at the root directory of the repo to download and build Link Cloud and all necessary dependencies: 
+
 ```
-"KafkaConnection": {
-  "BootstrapServers": [ "localhost:9092/" ],
-  "ClientId": "",
-  "GroupId": "default"
-},
-"Postgres": {
-  "ConnectionString": "Host=localhost;Database=link;Username=user;Password=admin"
-},
+docker compose build
+docker compose up -d		
+``` 
+ 
+The initial building of the services will take a few minutes to run.
+
+2. Confirm that the following Link Cloud service containers are running:
+    - link-account
+    - link-audit
+    - link-bff
+    - link-census
+    - link-dataacquisition
+    - link-measureeval
+    - link-normalization
+    - link-notification
+    - link-querydispatch
+    - link-report
+    - link-submission 
+    - link-tenant
+    - link-validation
+
+3. Confirm that the following Link Cloud dependent containers are running: 
+    - **Databases/Cache**
+      - sql-server
+      - mongo
+      - redis
+
+    - **Telemetry/Observability**
+      - open-telemetry-collector
+      - grafana
+      - loki
+      - promeutheus
+      - tempo
+
+    - **Kafka**
+      - kafka-broker
+      - kafka-rest-proxy
+      - kafka-ui
+
+4. There are two 'init' containers that will start processes to populate SQL database tables and Kafka topics. After the following containers run their process, they will automatically stop. 
+    - kafka-init
+    - sql-init
+
+5. Open a web browser and access Kafka UI. By default, the page can be accessed at `http://localhost:9095`. Click the `Topics` tab and ensure that Kafka topics exist:
+
+<img src="Documentation/Images/readme_kafkaui.png" width="75%" height="75%">
+
+If there aren't any topics populated (shown in the image above), attempt to rerun the following command: `docker compose up kafka_init -d`
+    
+6. Open SQL Server Management Studio and connect. The default server name should be `127.0.0.1,1433`. The `SA` password can be found in the `.env` file (The `LINK_DB_PASS` variable) in the Link Cloud repository. Ensure that the following databases were created:
+    - link-account
+    - link-audit
+    - link-census
+    - link-dataacquisition
+    - link-normalization
+    - link-notification
+    - link-querydispatch
+    - link-tenant
+    - link-validation
+
+If the databases listed above don't exist, attempt to rerun the following command: `docker compose up mssql_init -d`
+
+## Quick Tenant Configuration
+
+Configuration database scripts are provided to generate a tenant named `Test-Hospital`. These scripts will load most of the service configurations needed to run Link Cloud. To be capable of performing resource acquisition, a FHIR endpoint will need to be manually added (detailed below). Here are the steps to run the scripts:
+
+1. Open SQL Server Management Studio and connect to your SQL Server Docker container (Defaulted to port 1433).
+
+2. Open and run `\link-cloud\Scripts\load-sql-data.sql`.
+
+3. To properly query for FHIR resources, update the FHIR endpoints in the SQL `link-dataacquisition` database:
+
+```   
+UPDATE fhirQueryConfiguration
+set FhirServerBaseUrl = '** INSERT FHIR BASE URL HERE **'
+
+UPDATE fhirListConfiguration
+set FhirBaseServerUrl = '** INSERT FHIR BASE URL HERE **'
 ```
 
-#### Endpoints
+4. Open Mongosh in a separate terminal and run the following: `load("\\link-cloud\\Scripts\\load-mongo-data.js")`.
 
-##### Account Operations
-Provided via the AccountService class.  Currently supports basic CRUD and adding/removing accounts from groups and roles.  Generally an AccountMessage maps to AccountModel. Additionally, the Account Service will contain functionality for determining user authorization.
+## Manual Reporting 
 
-###### Account Service gRPC and REST Operations
-- Get all accounts
-  - gRPC: GetAllAccounts(GetAllAccountsMessage) returns (stream AccountMessage)
-  - REST: GET /api/account
-- Get one account
-  - gRPC: GetAccount(GetAccountMessage) returns (AccountMessage)
-  - REST: GET /api/account/{id}
-- Create account
-  - gRPC: CreateAccount(AccountMessage) returns (AccountMessage)
-  - REST: POST /api/account
-- Update account
-  - gRPC: UpdateAccount(AccountMessage) returns (AccountMessage)
-  - REST: PUT /api/account/{id}
-- Delete account
-  - gRPC: DeleteAccount(DeleteAccountMessage) returns (AccountDeletedMessage)
-  - REST: DELETE /api/account/{id}
-- Restore a deleted account
-  - gRPC: RestoreAccount(RestoreAccountMessage) returns (AccountMessage)
-  - REST: POST /api/account/restore/{id}
-- Add an account to a group
-  - gRPC: AddAccountToGroup(AddAccountToGroupMessage) returns (AccountMessage)
-  - REST: POST /api/account/{accountId}/group/{groupId}
-- Remove an account from a group
-  - gRPC: RemoveAccountFromGroup(RemoveAccountFromGroupMessage) returns (AccountRemovedFromGroupMessage)
-  - REST: DELETE /api/account/{accountId}/group/{groupId}
-- Assign a role to an account
-  - gRPC: AddRoleToAccount(AddRoleToAccountMessage) returns (AccountMessage)
-  - REST: POST /api/account/{accountId}/role/{roleId}
-- Remove a role from an account
-  - gRPC: RemoveRoleFromAccount(RemoveRoleFromAccountMessage) returns (RoleRemovedFromAccountMessage)
-  - REST: DELETE /api/account/{accountId}/role/{roleId}
-- User Has Access
-  - gRPC: UserHasAccess(string email, string facilityId string role, string group) returns bool  
+Automated report scheduling can be configured through the Tenant API. However, a manual approach can be done to immediately generate a report. Open Kafka UI and produce the following into the `ReportScheduled` topic:
 
-##### Group Operations
-Provided via the GroupService class.  Currently supports basic CRUD.  Generally a GroupMessage maps to GroupModel.
+**Key:** 
+```
+{
+  "FacilityId": "Test-Hospital",
+  "ReportType": "NHSNdQMAcuteCareHospitalInitialPopulation"
+}
+```
 
-###### Group Service gRPC and REST Operations
-- Get all groups
-  - gRPC: GetAllGroups(GetAllGroupsMessage) returns (stream GroupMessage)
-  - REST: GET /api/group
-- Get one group
-  - gRPC: GetGroup(GetGroupMessage) returns (GroupMessage)
-  - REST: GET /api/group/{id}
-- Create group
-  - gRPC: CreateGroup(GroupMessage) returns (GroupMessage)
-  - REST: POST /api/group
-- Update group
-  - gRPC: UpdateGroup(GroupMessage) returns (GroupMessage)
-  - REST: PUT /api/group/{id}
-- Delete group
-  - gRPC: DeleteGroup(DeleteGroupMessage) returns (GroupDeletedMessage)
-  - REST: DELETE /api/group/{id}
-- Restore a deleted group
-  - gRPC: RestoreGroup(RestoreGroupMessage) returns (GroupMessage)
-  - REST: POST /api/group/restore/{id}
+**Value:**
+```
+{
+  "Parameters": [
+  {
+    "Key": "StartDate",
+    "Value": "2024-09-01T00:00:00"
+  },
+  {
+    "Key": "EndDate",
+    "Value": "2024-09-30T23:59:59"
+  }]
+}
+```
 
-##### Role Operations
-Provided via the RoleService class.  Currently supports basic CRUD.  Generally a RoleMessage maps to RoleModel.
+Because the report generation process runs immediately after the set `EndDate`, allocate enough time (a few minutes) to perform the subsequent steps. 
 
-###### Role Service gRPC and REST Operations
-- Get all roles
-  - gRPC: GetAllRoles(GetAllRolesMessage) returns (stream RoleMessage)
-  - REST: GET /api/role
-- Get one role
-  - gRPC: GetRole(GetRoleMessage) returns (RoleMessage)
-  - REST: GET /api/role/{id}
-- Create role
-  - gRPC: CreateRole(RoleMessage) returns (RoleMessage)
-  - REST: POST /api/role
-- Update role
-  - gRPC: UpdateRole(RoleMessage) returns (RoleMessage)
-  - REST: PUT /api/role/{id}
-- Delete role
-  - gRPC: DeleteRole(DeleteRoleMessage) returns (RoleDeletedMessage)
-  - REST: DELETE /api/role/{id}
-- Restore a deleted role
-  - gRPC: RestoreRole(RestoreRoleMessage) returns (RoleMessage)
-  - REST: POST /api/role/restore/{id}
+To manually admit patients, produce the following into the `PatientIDsAcquired` topic in Kafka UI:
+> [!NOTE]
+> The patients included in the event below are examples only. Add patient identifiers that exist in your EHR endpoint.
 
-### Audit Service
+**Key:**
+```
+Test-Hospital
+```
 
-The Audit service creates and persists audit events triggered from actions that take place throughout Link. As well as:
+**Value:**
+```
+{
+  "PatientIds": {
+  "resourceType": "List",
+  "entry": [
+    {
+      "item": {
+      "reference": "Patient/hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee"
+      }
+    },
+    {
+      "item": {
+      "reference": "Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk"
+      }
+    },
+    {
+      "item": {
+      "reference": "Patient/9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
+      }
+    }]
+  }
+}
+```
 
-Capture and store audit events that take place in Link
- - Create a new audit event
- - List all audit events on record
- - List all audit events on record for a specified facility
- - Provide a single audit event based on Id
+To discharge a patient and begin their reporting workflow, produce the same `PatientIDsAcquired` event without the discharged patient in the list. The example below will discharge `Patient/0VmZaB90pc5yRSefoK6sW9C9WVOvPARAgquBFNtGr6LXk`:
 
-#### Rest Operations
+**Key:**
+```
+Test-Hospital
+```
 
-- Get All Audit Events - **GET api/audit**
-  - searchText: text to use in full text search
-  - filterFacilityBy: return only events where facility id equals
-  - filterServiceBy: return only events where service name equals
-  - filterActionBy: return only events where action equals
-  - filterUserBy: return only events where user id equals
-  - sortBy: property to sort by, Options: FacilityId, Action, ServiceName, Resource, CreatedOn, defaults to CreatedOn
-  - sortOrder: Ascending = 0, Descending = 1, defaults to Ascending
-  - pageSize: results returned per page, max is 20
-  - pageNumber: the page number to return
-- Get one Audit Event - **GET api/audit/{*auditId*}**
-- Get audit events for a facility - **GET api/audit/facility/*{facilityId}***
+**Value:**
+```
+{
+  "PatientIds": {
+  "resourceType": "List",
+    "entry": [
+      {
+        "item": {
+        "reference": "Patient/hJOGSZyFOTIiwEBWUU6p9NKxflMTOLCRRpLbAkfPrfqee"
+        }
+      },
+      {
+        "item": {
+        "reference": "Patient/9mDh8TdqYuZP4JZkjbyDkw1SRwOG6TOhCY8GfClh5QG2m"
+        }
+      }]
+  }
+}
+```
 
-### Census Service
+At the end of the reporting period, the Report service will make additional requests to query and evaluate patients that are currently admitted in the facility prior to submitting. After each of those admitted patients are evaluated, the Report service will then produce a `SubmitReport` event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the `link-submission` container. Select the `files` tab and navigate to the `app\submissions` folder. There, you'll be able to download the submission results for the reporting period:
 
-#### Responsibilities:
-- The census service will be responsible for maintaining and internal schedule in which it will produce events requesting a list of patients that are currently admitted.
-- The census service will persist this list of patients.
-  - Retention of census to be configuration option 
-- The census service (for Epic STU3 facilities) will determine if a patient has been discharged and is ready for additional queries.
+<img src="Documentation/Images/docker_submission.png" width="75%" height="75%">
 
-####
+## Reporting Event Workflow
+> [!NOTE]
+> As Link Cloud continues to develop, the workflow detailed below to generate reports may be subject to large changes.
 
-### Data Acquisition Service
+Detailed below are the steps Link Cloud takes to generate a report for a tenant reporting period. They are broken into phases. Each phase has a sequence diagram to visualize the workflow. 
 
-The Data Acquisition Service does:
- - Manage configuration properties needed to establish a connection with a Fhir endpoint.
- - Manage configuration properties needed to perform query requests.
- - Acquire patient resource data required by the measure definition. 
- - Bundle gathered patient resources into a patient bundle.
+### Report Scheduling
 
-### Measure Evaluation Service
+<img src="Documentation/Images/readme_event_report_scheduling.png" width="75%" height="75%">
 
+At the beginning of a new reporting period, the Tenant service produces a `ReportScheduled` event. The Query Dispatch and Report services consume and persist the reporting information in the event into their databases. The Report service sets an internal cron job (based on the EndDate of the consumed event) to execute the work needed to complete the report. 
 
+### Census Acquisition and Discharge
 
-### Normalization Service
+<img src="Documentation/Images/readme_event_census_discharge.png" width="75%" height="75%">
 
-The normalization service is responsible for ensuring that data for each tenant is transformed into the format necessary for a measure to be evaluated. 
+During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientIDsAcquired` event that contains a list of all patients that are currently admitted in the facility.
 
-### Notification Service
+The Census service consumes the `PatientIDsAcquired` event and applies updates in the database for patients have been admitted or discharged. 
 
-The notification service is responsible for emailing configured users when there is a failure that occurred during the processing of patient data that needs to be addressed by the facility. It will immediately send the notification emails once as they are consumed by the service. Potential enhancements to this service are:
+> [!NOTE]
+> The Census service treats any patient in the PatientIDsAcquired list as an admitted patient. If the Census service has a patient marked as admitted in the database, but the patient is no longer present on the consumed list, it treats the patient as a discharge.
 
-### Patients To Query Service
+A `PatientEvent` Kafka message is produced for each patient that has been discharged.
 
-The Patient To Query Service does: 
- - Consume each patient that is produced to the PatientIDsAcquired topic.
- - Consume each patient that is produced to the DataAcquisitionRequested topic.
- - Transform the consumed records from both Kafka topics into a unified model.
- - Produce a list of patients that are currently admitted in a facility that have not had their resources queried.
+The QueryDispatch service consumes the patient events and appends the tenants' reporting information (the info consumed in the `ReportScheduled` event). The service then sets a cron job based on the configured lag time that the facility wants to apply for each discharge. When that lag time is met, the Query Dispatch service produces a `DataAcquisitionRequested` event to trigger the acquisition and evaluation steps. 
 
-### Query Dispatch Service
+### Resource Acquisition and Evaluation
 
-The responsibilities of the Query Dispatch Service are:
- - Consume, persist, and maintain ReportScheduled events produced from the Tenant service.
- - Consume patient events that occur within Link. For each patient event that is consumed, a schedule will be created to produce a DataAcquisitionRequested event once the scheduled threshold has been met.
+<img src="Documentation/Images/readme_event_acquisition_evaluation.png" width="75%" height="75%">
 
-### Report Service
+A `DataAcquisitionRequested` event is generated for patients that have either been discharged or are still admitted when the reporting period end date is met. This event is the trigger that causes the resource acquisition, normalization and evaluation phases for a patient. 
 
-The responsibility of the Report Service are:
- - Responds to requests to generate a report by acknowledging either a valid report generation request that will be generated or respond with a failure notice that the request
- - Assembles a report through production and consumption of other events from other services depending what is necessary for the report type
- - Stores finished reports in database to allow future retrieval and submission
- - Produces completion events to handle a completed report or a report generation that failed.
+When the Data Acquisition service consumes the `DataAcquisitionRequested` event, the service will use the persisted query plan to make requests to the EHR endpoint for patient FHIR resources that correspond with the report type that is in the value of the consumed event. A `ResourceAcquired` event is produced for each resource that the EHR endpoint responds with.    
 
-### Submission Service
+The Normalization service consumes the `ResourceAcquired` event and applies any normalization configurations that the facility is configured for (Example: Concept Maps). After a resource has been normalized, the service produces a `ResourceNormalized` event.
 
-The responsibilities of the Submission Service are:
- - To manage the configurations needed to authenticate and establish a connection to submission endpoints.
- - Submit reports to the configured endpoint.
- - To support multiple submission destinations for each report type.
- - To acquire a report bundle by performing a GET rest operation to the Report service
+The Measure Eval service consumes the `ResourceNormalized` events and persists each resource into its database. When the service has accounted for every normalized resource for a patient, it will then perform work to bundle and evaluate those resources against the CQF libraries for the report type in the event. The generated MeasureReport and its evaluated resources are then produced as separate `ResourceEvaluated` events
+  
+> [!NOTE]
+> Due to the potential large size of a MeasureReport, the MeasureEval service will produce a single ResourceEvaluated event for the MeasureReport that contains only resource references. Then, the MeasureEval service will produce ResourceEvaluated events for each evaluated resource in the MeasureReport. There is information within the event that allows for the consuming Report service to associate evaluated resources to their corresponding MeasureReport.
 
-### Tenant Service
+> [!NOTE]
+> The MeasureEval service is capable of producing DataAcquisitionRequested events if the reporting measure also includes the need for additional supplemental data for a patient that meets the initial population criteria of a measure. If this is the case, the MeasureEval service will only produce ResourceEvaluated events after it has evaluated a patient that had had their supplemental resources acquired and normalized. 
 
-The Tenant Service does the following:
- - To manage the scheduling in which the following initiating events of the system are produced:
-   - Report Scheduled
-   - Retention Check
- - Connect with the external Monthly Reporting Plan (MRP) API to receive the measure submission schedules per tenant.
- - Manage each tenants configuration for:
-   - Monthly Reporting Plan (Report submission frequency and measure type)
-   - FacilityID (aka, NHSN_Org_ID)
-
+When the end of the reporting period is met, the Report service will confirm that it has MeasureReport's for all discharged patients that were within the reporting period. Additionally, it will request that currently admitted patients be evaluated for that reporting period. The service does this by producing `DataAcquisitionRequested` events for each admitted patient which triggers the acquisition/evaluation workflow mentioned above. After those patient MeasureReports are accounted for, the Report service will produce a `SubmitReport` for the Submission service.
 
