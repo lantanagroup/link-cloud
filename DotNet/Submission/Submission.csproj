@@ -57,5 +57,9 @@
 		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Application\Services\Auth\" />
+	</ItemGroup>
+
 
 </Project>
