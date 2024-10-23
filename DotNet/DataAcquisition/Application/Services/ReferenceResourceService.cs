@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
@@ -8,14 +7,13 @@ using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
