@@ -78,8 +78,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                 RedirectLink = referer + "/dashboard";
             }
 
-            _logger.LogInformation("Based on referer {referer} a redirect URL was determined: {RedirectLink}", referer, RedirectLink);
-
             return Results.Challenge(
                 properties: new AuthenticationProperties
                 {
