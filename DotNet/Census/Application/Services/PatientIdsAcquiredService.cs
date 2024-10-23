@@ -6,6 +6,7 @@ using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Data.SqlClient;
 
 namespace LantanaGroup.Link.Census.Application.Services;
@@ -150,7 +151,7 @@ public class PatientIdsAcquiredService : IPatientIdsAcquiredService
 
         fhirList.Entry.ForEach(x =>
         {
-            var patientId = x.Item.ReferenceElement.Value.Replace("Patient/", "", StringComparison.InvariantCultureIgnoreCase).TrimStart();
+            var patientId = x.Item.ReferenceElement.Value.SplitReference().Trim();
             censusList.Add(new CensusPatientListEntity
             {
                 FacilityId = facilityId,
