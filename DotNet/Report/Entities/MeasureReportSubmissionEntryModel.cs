@@ -21,8 +21,8 @@ namespace LantanaGroup.Link.Report.Entities
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
         [BsonIgnoreIfNull]
         public MeasureReport? MeasureReport { get; set; }
-        public bool ReadyForSubmission { get; private set; } = false;
-        public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
+        public bool ReadyForSubmission { get;  set; } = false;
+        public List<ContainedResource> ContainedResources { get;  set; } = new List<ContainedResource>();
 
         public class ContainedResource
         {
