@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
@@ -29,7 +30,12 @@ public class MeasureEvaluator {
     private final Bundle bundle;
     private final Measure measure;
 
-    public MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
+    private MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
+        if (fhirContext.getVersion().getVersion() != FhirVersionEnum.R4) {
+            logger.error("Unsupported FHIR version! Expected R4 found {}",
+                    fhirContext.getVersion().getVersion().getFhirVersionString());
+            throw new IllegalArgumentException("Unsupported FHIR version!");
+        }
         this(fhirContext, bundle, false);
     }
 
@@ -49,12 +55,21 @@ public class MeasureEvaluator {
         evaluationSettings.getCqlOptions().getCqlEngineOptions().setDebugLoggingEnabled(isDebug);
 
         this.bundle = bundle;
-        measure = bundle.getEntry().stream()
-                .map(Bundle.BundleEntryComponent::getResource)
-                .filter(Measure.class::isInstance)
-                .map(Measure.class::cast)
-                .reduce(StreamUtils::toOnlyElement)
-                .orElseThrow();
+        if (!this.bundle.hasEntry()) {
+            logger.error("Please provide the necessary artifacts (e.g. Measure and Library resources) in the Bundle entry!");
+            throw new IllegalArgumentException("Please provide the necessary artifacts (e.g. Measure and Library resources) in the Bundle entry!");
+        }
+        try {
+            measure = bundle.getEntry().stream()
+                    .map(Bundle.BundleEntryComponent::getResource)
+                    .filter(Measure.class::isInstance)
+                    .map(Measure.class::cast)
+                    .reduce(StreamUtils::toOnlyElement)
+                    .orElseThrow();
+        } catch (Exception e) {
+            logger.error("Error encountered during Measure evaluation: {}", e.getMessage());
+            throw e;
+        }
     }
 
     public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle) {
