@@ -41,15 +41,13 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Paramater reportId is null or whitespace");
                 }
 
-                _logger.LogInformation($"Executing GenerateSubmissionBundleJob for MeasureReportScheduleModel {reportId}");
-
                 MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
 
                 return Ok(submission);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundle for ReportId {reportId}: {ex.Message}");
+                _logger.LogError(ex, "Error in ReportController.GetSubmissionBundle");
                 return Problem(ex.Message, statusCode: 500);
             }
         }
@@ -86,7 +84,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
+                _logger.LogError(ex, $"Exception in ReportController.GetSubmissionBundleForPatient");
                 return Problem(ex.Message, statusCode: 500);
             }
         }
