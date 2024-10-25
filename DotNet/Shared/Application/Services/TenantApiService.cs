@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Services;
 
@@ -26,6 +27,8 @@ public class TenantApiService : ITenantApiService
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
+        string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemoveNonAlphaNumeric(facilityId);
+
         if (_serviceRegistry.Value.TenantService == null)
             throw new Exception("Tenant Service configuration is missing.");
 
@@ -39,10 +42,10 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint}{facilityId.TrimStart('/').TrimEnd('/')}";
+        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint}{sanitizedFacilityId}";
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceApiUrl);
         _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
-        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
+        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
         if (_linkTokenServiceConfig.Value.SigningKey is null)
@@ -51,20 +54,20 @@ public class TenantApiService : ITenantApiService
         //get link token
         var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+
         var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)
         {
             return true;
         }
-        
+
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return false;
         }
 
-        var message = $"Error checking if facility ({facilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
+        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
         _logger.LogError(message);
         throw new Exception(message);
     }
