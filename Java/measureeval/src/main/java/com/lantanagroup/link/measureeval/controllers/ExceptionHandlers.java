@@ -4,7 +4,7 @@ import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
 import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;

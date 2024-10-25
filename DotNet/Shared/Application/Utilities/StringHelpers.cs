@@ -1,6 +1,5 @@
-﻿namespace LantanaGroup.Link.DataAcquisition.Application.Utilities;
-
-public static class Helpers
+﻿namespace LantanaGroup.Link.Shared.Application.Utilities;
+public static class StringHelpers
 {
     public static string SplitReference(this string reference)
     {
