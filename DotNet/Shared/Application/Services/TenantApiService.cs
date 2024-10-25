@@ -27,7 +27,7 @@ public class TenantApiService : ITenantApiService
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
-        string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemoveNonAlphaNumeric(facilityId);
+        string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);
 
         if (_serviceRegistry.Value.TenantService == null)
             throw new Exception("Tenant Service configuration is missing.");
