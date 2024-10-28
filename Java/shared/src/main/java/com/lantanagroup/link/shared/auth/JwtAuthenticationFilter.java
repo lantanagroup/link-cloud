@@ -1,7 +1,7 @@
 package com.lantanagroup.link.shared.auth;
 
 import com.azure.security.keyvault.secrets.SecretClient;
-import com.github.loki4j.client.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import com.lantanagroup.link.shared.config.AuthenticationConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
