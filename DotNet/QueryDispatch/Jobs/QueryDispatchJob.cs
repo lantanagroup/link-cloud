@@ -9,6 +9,7 @@ using System.Text;
 using QueryDispatch.Application.Settings;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using QueryDispatch.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -79,7 +80,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 _acquisitionProducer.Flush();
 
-                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {patientDispatchEntity.FacilityId}");
+                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId)}");
 
                 await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
 
@@ -99,12 +100,12 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
             var auditMessage = new AuditEventMessage
             {
-                FacilityId = patientDispatchEntity.FacilityId,
+                FacilityId = HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId),
                 ServiceName = QueryDispatchConstants.ServiceName,
                 Action = AuditEventType.Create,
                 EventDate = DateTime.UtcNow,
                 Resource = nameof(KafkaTopic.DataAcquisitionRequested),
-                Notes = $"Produced Data Acquisition Event for facilityId: {patientDispatchEntity.FacilityId}"
+                Notes = $"Produced Data Acquisition Event for facilityId: {HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId)}"
             };
 
             _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>

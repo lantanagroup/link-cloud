@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
 using System.Text;
@@ -72,7 +73,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 try
                 {
                     _patientEventConsumer.Subscribe(nameof(KafkaTopic.PatientEvent));
-                    _logger.LogInformation($"Started query dispatch consumer for topic '{KafkaTopic.PatientEvent}' at {DateTime.UtcNow}");
+                    _logger.LogInformation("Started query dispatch consumer for topic '{PatientEvent}' at {UtcNow}", KafkaTopic.PatientEvent, DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
@@ -107,7 +108,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Correlation Id missing");
                                     }
 
-                                    _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
+                                    _logger.LogInformation("Consumed Patient Event for: Facility '{Message.Key}'. PatientId '{PatientId}' with a event type of {EventType}", 
+                                        HtmlInputSanitizer.Sanitize(consumeResult.Message.Key), 
+                                        HtmlInputSanitizer.Sanitize(value.PatientId), 
+                                        HtmlInputSanitizer.Sanitize(value.EventType));
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
                                     ScheduledReportEntity scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
@@ -125,21 +129,21 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (dispatchSchedule == null)
                                     {
-                                        throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"Query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                                     if (dischargeDispatchSchedule == null)
                                     {
-                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
 
                                     if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
                                     {
-                                        throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"No active scheduled report periods found for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     await patientDispatchMgr.createPatientDispatch(patientDispatch);
@@ -162,7 +166,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var auditValue = new AuditEventMessage
                                     {
-                                        FacilityId = consumeResult.Message.Key,
+                                        FacilityId = HtmlInputSanitizer.Sanitize(consumeResult.Message.Key),
                                         Action = AuditEventType.Query,
                                         ServiceName = "QueryDispatch",
                                         EventDate = DateTime.UtcNow,
