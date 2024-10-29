@@ -29,8 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final JwtService jwtService;
   private final AuthenticationConfig authenticationConfig;
 
-  private SecretClient secretClient = null;
-  private String secret;
+  private SecretClient secretClient;
+
 
   public JwtAuthenticationFilter (AuthenticationConfig authenticationConfig, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, Optional<SecretClient> secretClient) {
     super();
