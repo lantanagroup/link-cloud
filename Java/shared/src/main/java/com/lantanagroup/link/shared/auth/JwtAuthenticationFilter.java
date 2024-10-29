@@ -43,14 +43,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+
+    String secret;
+
     // Allow anonymous access to the hosted REST API
     if (this.authenticationConfig.isAnonymous()) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    if (StringUtils.isBlank(secret)  &&  this.secretClient != null){
-      secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
+    if (this.secretClient == null) {
+      throw new SecurityException("SecretClient is not configured");
+    }
+
+    secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
+
+    if (StringUtils.isBlank(secret)) {
+      throw new SecurityException("JWT secret cannot be empty");
     }
 
     String authHeader = request.getHeader("Authorization");
