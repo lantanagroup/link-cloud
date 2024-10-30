@@ -57,6 +57,10 @@ namespace LantanaGroup.Link.Report.Jobs
                 //Make sure we get a fresh object from the DB
                 schedule = await _database.ReportScheduledRepository.GetAsync(schedule.Id);
 
+                schedule.PatientsToQueryDataRequested = true;
+
+                await _database.ReportScheduledRepository.UpdateAsync(schedule);
+
                 _logger.LogInformation(
                     $"Executing GenerateDataAcquisitionRequestsForPatientsToQuery for MeasureReportScheduleModel {schedule.Id}");
 
@@ -149,9 +153,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     }
                 }
 
-                schedule.PatientsToQueryDataRequested = true;
 
-                await _database.ReportScheduledRepository.UpdateAsync(schedule);
 
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
