@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.1.1-dev</version>
+        <version>0.1.1</version>
     </parent>
 
     <artifactId>shared</artifactId>

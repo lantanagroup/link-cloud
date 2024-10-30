@@ -13,7 +13,7 @@
 
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>main</artifactId>
-    <version>0.1.1-dev</version>
+    <version>0.1.1</version>
     <packaging>pom</packaging>
 
     <name>Link Java Modules</name>

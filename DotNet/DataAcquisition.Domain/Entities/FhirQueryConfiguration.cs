@@ -1,8 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Domain.Attributes;
-using System.ComponentModel.DataAnnotations.Schema;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using System.Runtime.Serialization;
 
