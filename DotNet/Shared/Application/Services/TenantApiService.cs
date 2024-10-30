@@ -1,9 +1,11 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+﻿using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Services;
 
@@ -14,18 +16,28 @@ public class TenantApiService : ITenantApiService
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
     private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
     private readonly ICreateSystemToken _createSystemToken;
+    private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
 
-    public TenantApiService(ILogger<TenantApiService> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken)
+    public TenantApiService(
+        ILogger<TenantApiService> logger, 
+        IHttpClientFactory httpClientFactory, 
+        IOptions<ServiceRegistry> serviceRegistry, 
+        IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, 
+        ICreateSystemToken createSystemToken, 
+        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
         _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
         _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
+        _linkBearerServiceOptions = linkBearerServiceOptions ?? throw new ArgumentNullException(nameof(linkBearerServiceOptions));
     }
 
     public async Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default)
     {
+        string sanitizedFacilityId = HtmlInputSanitizer.SanitizeAndRemove(facilityId);
+
         if (_serviceRegistry.Value.TenantService == null)
             throw new Exception("Tenant Service configuration is missing.");
 
@@ -39,19 +51,23 @@ public class TenantApiService : ITenantApiService
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var endpoint = $"{tenantServiceApiUrl.TrimStart('/').TrimEnd('/')}/{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint}{facilityId.TrimStart('/').TrimEnd('/')}";
+        var baseUri = new Uri(tenantServiceApiUrl.TrimEnd('/'));
+        var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.TrimStart('/')}/{sanitizedFacilityId}").ToString();
         _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceApiUrl);
         _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
-        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", facilityId, endpoint);
+        _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
 
         //TODO: add method to get key that includes looking at redis for future use case
-        if (_linkTokenServiceConfig.Value.SigningKey is null)
+        if (!_linkBearerServiceOptions.Value.AllowAnonymous && _linkTokenServiceConfig.Value.SigningKey is null)
             throw new Exception("Link Token Service Signing Key is missing.");
 
         //get link token
-        var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
+        if (!_linkBearerServiceOptions.Value.AllowAnonymous)
+        {
+            var token = await _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2);
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
         var response = await httpClient.GetAsync(endpoint, cancellationToken);
 
         if (response.IsSuccessStatusCode)
@@ -64,7 +80,7 @@ public class TenantApiService : ITenantApiService
             return false;
         }
 
-        var message = $"Error checking if facility ({facilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
+        var message = $"Error checking if facility ({sanitizedFacilityId}) exists in Tenant Service. Status Code: {response.StatusCode}";
         _logger.LogError(message);
         throw new Exception(message);
     }

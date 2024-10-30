@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
 using System.Text;
@@ -107,7 +108,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Correlation Id missing");
                                     }
 
-                                    _logger.LogInformation($"Consumed Patient Event for: Facility '{consumeResult.Message.Key}'. PatientId '{value.PatientId}' with a event type of {value.EventType}");
+                                    _logger.LogInformation($"Consumed Patient Event for: Facility '{HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}'. PatientId '{HtmlInputSanitizer.Sanitize(value.PatientId)}' with a event type of {HtmlInputSanitizer.Sanitize(value.EventType)}");
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
                                     ScheduledReportEntity scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
@@ -125,21 +126,21 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     if (dispatchSchedule == null)
                                     {
-                                        throw new TransientException($"Query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"Query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     DispatchSchedule dischargeDispatchSchedule = dispatchSchedule.DispatchSchedules.FirstOrDefault(x => x.Event == QueryDispatchConstants.EventType.Discharge);
 
                                     if (dischargeDispatchSchedule == null)
                                     {
-                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"'Discharge' query dispatch configuration missing for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     PatientDispatchEntity patientDispatch = _queryDispatchFactory.CreatePatientDispatch(consumeResult.Message.Key, value.PatientId, value.EventType, correlationId, scheduledReport, dischargeDispatchSchedule);
 
                                     if (patientDispatch.ScheduledReportPeriods == null || patientDispatch.ScheduledReportPeriods.Count == 0)
                                     {
-                                        throw new TransientException($"No active scheduled report periods found for facility {consumeResult.Message.Key}");
+                                        throw new TransientException($"No active scheduled report periods found for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
                                     await patientDispatchMgr.createPatientDispatch(patientDispatch);
@@ -148,12 +149,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                 }
                                 catch (DeadLetterException ex)
                                 {
-                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
                                 catch (TransientException ex)
                                 {
-                                    _transientExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
                                 catch (Exception ex)

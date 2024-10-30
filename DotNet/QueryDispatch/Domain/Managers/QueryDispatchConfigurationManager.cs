@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -63,7 +64,7 @@ namespace QueryDispatch.Domain.Managers
 
                 await _repository.UpdateAsync(config, cancellationToken);
 
-                _logger.LogInformation($"Updated query dispatch configuration for facility {config.FacilityId}");
+                _logger.LogInformation($"Updated query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}");
 
 
 
@@ -88,8 +89,8 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to update query dispatch configuration for facility {config.FacilityId}.", ex);
-                throw new ApplicationException($"Failed to update query dispatch configuration for facility {config.FacilityId}.");
+                _logger.LogError($"Failed to update query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.", ex);
+                throw new ApplicationException($"Failed to update query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.");
             }
         }
 
@@ -101,7 +102,7 @@ namespace QueryDispatch.Domain.Managers
             {
                 await _repository.AddAsync(config, cancellationToken);
 
-                _logger.LogInformation($"Created query dispatch configuration for facility {config.FacilityId}");
+                _logger.LogInformation($"Created query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}");
 
 
                     var auditMessage = new AuditEventMessage
@@ -125,8 +126,8 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to create query dispatch configuration for facility {config.FacilityId}.", ex);
-                throw new ApplicationException($"Failed to create query dispatch configuration for facility {config.FacilityId}.");
+                _logger.LogError($"Failed to create query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.", ex);
+                throw new ApplicationException($"Failed to create query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(config.FacilityId)}.");
             }
         }
 
@@ -147,7 +148,7 @@ namespace QueryDispatch.Domain.Managers
                 }
                 await _repository.DeleteAsync(config.Id, cancellationToken);
 
-                _logger.LogInformation($"Deleted query dispatch configuration for facility {facilityId}");
+                _logger.LogInformation($"Deleted query dispatch configuration for facility {HtmlInputSanitizer.Sanitize(facilityId)}");
 
 
                     var auditMessage = new AuditEventMessage
@@ -174,8 +175,8 @@ namespace QueryDispatch.Domain.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to delete query dispatch configuration for facilityId {facilityId}", ex);
-                throw new ApplicationException($"Failed to delete query dispatch configuration for facilityId {facilityId}");
+                _logger.LogError($"Failed to delete query dispatch configuration for facilityId {HtmlInputSanitizer.Sanitize(facilityId)}", ex);
+                throw new ApplicationException($"Failed to delete query dispatch configuration for facilityId {HtmlInputSanitizer.Sanitize(facilityId)}");
             }
         }
 

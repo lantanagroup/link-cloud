@@ -1,8 +1,8 @@
 package com.lantanagroup.link.shared.auth;
 
 import com.azure.security.keyvault.secrets.SecretClient;
+import org.apache.commons.lang3.StringUtils;
 import com.lantanagroup.link.shared.config.AuthenticationConfig;
-import com.nimbusds.oauth2.sdk.util.StringUtils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
@@ -30,7 +30,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private final AuthenticationConfig authenticationConfig;
 
   private SecretClient secretClient = null;
-  private String secret;
 
   public JwtAuthenticationFilter (AuthenticationConfig authenticationConfig, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, Optional<SecretClient> secretClient) {
     super();
@@ -43,14 +42,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+
+    String secret;
+
     // Allow anonymous access to the hosted REST API
     if (this.authenticationConfig.isAnonymous()) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    if (StringUtils.isBlank(secret)  &&  this.secretClient != null){
-      secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
+    if (this.secretClient == null) {
+        throw new SecurityException("SecretClient is not configured");
+    }
+
+    secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
+
+    if (StringUtils.isBlank(secret)) {
+      throw new SecurityException("JWT secret cannot be empty");
     }
 
     String authHeader = request.getHeader("Authorization");
