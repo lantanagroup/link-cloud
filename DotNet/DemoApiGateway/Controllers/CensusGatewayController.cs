@@ -3,7 +3,6 @@ using LantanaGroup.Link.DemoApiGateway.Application.models.census;
 using LantanaGroup.Link.DemoApiGateway.Services.Client;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
-using LantanaGroup.Link.Census.Application.Models;
 using static LantanaGroup.Link.DemoApiGateway.settings.GatewayConstants;
 
 namespace LantanaGroup.Link.DemoApiGateway.Controllers

@@ -3,7 +3,6 @@ using LantanaGroup.Link.DemoApiGateway.Application.models.census;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.Census.Application.Models;
 
 namespace LantanaGroup.Link.DemoApiGateway.Services.Client
 {

@@ -1,13 +1,16 @@
-﻿using System.Runtime.Serialization;
-
-namespace LantanaGroup.Link.Census.Application.Models
+﻿namespace LantanaGroup.Link.DemoApiGateway.Application.models.census
 {
-    [DataContract]
     public class CensusConfigModel
-    {
-        [DataMember]
+    {      
         public string FacilityId { get; set; }
-        [DataMember]
         public string ScheduledTrigger { get; set; }
+
+        public CensusConfigModel() { }
+
+        public CensusConfigModel(string facilityId, string scheduledTrigger)
+        {        
+            FacilityId = facilityId;
+            ScheduledTrigger = scheduledTrigger;
+        }        
     }
 }

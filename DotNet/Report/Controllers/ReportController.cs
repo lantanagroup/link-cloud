@@ -22,35 +22,6 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// Generates the bundle for the report indicated by the provided parameters.
-        /// </summary>
-        /// <param name="reportId"></param>
-        /// <returns></returns>
-        [HttpGet("Bundle/MeasureReport")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(JsonElement))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<MeasureReportSubmissionModel>> GetSubmissionBundle(string reportId)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(reportId))
-                {
-                    BadRequest("Paramater reportId is null or whitespace");
-                }
-
-                MeasureReportSubmissionModel submission = await _bundler.GenerateBundle(reportId);
-
-                return Ok(submission);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in ReportController.GetSubmissionBundle");
-                return Problem(ex.Message, statusCode: 500);
-            }
-        }
-
-        /// <summary>
         /// Returns a serialized PatientSubmissionModel containing all of the Patient level resources and Other resources
         /// for all measure reports for the provided FacilityId, PatientId, and Reporting Period.
         /// </summary>
@@ -82,7 +53,7 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Exception in ReportController.GetSubmissionBundleForPatient");
+                _logger.LogError(ex, $"Error in ReportController.GetSubmissionBundleForPatient for PatientId {patientId}: {ex.Message}");
                 return Problem(ex.Message, statusCode: 500);
             }
         }

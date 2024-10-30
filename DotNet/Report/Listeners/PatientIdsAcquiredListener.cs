@@ -2,8 +2,6 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -12,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
-using static LantanaGroup.Link.Report.Entities.MeasureReportSubmissionEntryModel;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -59,8 +56,6 @@ namespace LantanaGroup.Link.Report.Listeners
             };
 
             using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
-            var scope = _serviceScopeFactory.CreateScope();
-            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
 
             try
             {
@@ -96,7 +91,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Patient Id's Acquired Event");
                                 }
 
-                                var scheduledReports = await database.ReportScheduledRepository.FindAsync(x =>x.FacilityId == key && x.PatientsToQueryDataRequested == false, cancellationToken);
+                                var scheduledReports =
+                                    await database.ReportScheduledRepository.FindAsync(x =>
+                                        x.FacilityId == key, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -114,22 +111,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                     foreach (var patientReference in value.PatientIds.Entry)
                                     {
                                         var patientId = patientReference.Item.Reference.Split('/').Last();
-                                        // delete exiting patient submission entry if it exists
-                                        var entry = (await submissionEntryManager.SingleOrDefaultAsync(e => e.MeasureReportScheduleId == scheduledReport.Id && e.PatientId == patientId, consumeCancellationToken));
-                                        if (entry != null)
-                                        {
-                                            entry.ContainedResources = new List<ContainedResource>();
-                                            entry.MeasureReport = null;
-                                            entry.ReadyForSubmission = false;
-                                            await submissionEntryManager.UpdateAsync(entry);
-                                        }
                                         if (scheduledReport.PatientsToQuery.Contains(patientId))
                                         {
                                             continue;
                                         }
 
                                         scheduledReport.PatientsToQuery.Add(patientId);
-
                                     }
 
                                     try

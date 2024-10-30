@@ -27,17 +27,19 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly ILogger<FacilityController> _logger;
 
         private readonly ISchedulerFactory _schedulerFactory;
+        public IScheduler _scheduler { get; set; }
 
 
         public FacilityController(ILogger<FacilityController> logger, FacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory)
         {
 
             _facilityConfigurationService = facilityConfigurationService;
-            _logger = logger;
             _schedulerFactory = schedulerFactory;
+            _logger = logger;
+            _scheduler = _schedulerFactory.GetScheduler().Result;
 
             var configModelToDto = new MapperConfiguration(cfg =>
-            { 
+            {
                 cfg.CreateMap<FacilityConfigModel, FacilityConfigDto>();
                 cfg.CreateMap<PagedConfigModel<FacilityConfigModel>, PagedFacilityConfigDto>();
                 cfg.CreateMap<ScheduledTaskModel.ReportTypeSchedule, ScheduledTaskDto.ReportTypeDtoSchedule>();
@@ -137,8 +139,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
             // create jobs for the new Facility
             using (ServiceActivitySource.Instance.StartActivity("Add Jobs for Facility"))
             {
-                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await ScheduleService.AddJobsForFacility(facilityConfigModel, scheduler);
+                await ScheduleService.AddJobsForFacility(facilityConfigModel, _scheduler);
             }
 
             return CreatedAtAction(nameof(StoreFacility), new { id = facilityConfigModel.Id }, facilityConfigModel);
@@ -225,21 +226,19 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 throw;
             }
 
-            var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-
             // if existingFacility is not null, then update the jobs, else add new jobs
             if (existingFacility != null)
             {
                 using (ServiceActivitySource.Instance.StartActivity("Update Jobs for Facility"))
                 {
-                    await ScheduleService.UpdateJobsForFacility(dest, existingFacility, scheduler);
+                    await ScheduleService.UpdateJobsForFacility(dest, existingFacility, _scheduler);
                 }
             }
             else
             {
                 using (ServiceActivitySource.Instance.StartActivity("Create Jobs for Facility"))
                 {
-                    await ScheduleService.AddJobsForFacility(dest, scheduler);
+                    await ScheduleService.AddJobsForFacility(dest, _scheduler);
                 }
             }
 
@@ -280,8 +279,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
             {
-                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, scheduler);
+                await ScheduleService.DeleteJobsForFacility(existingFacility.Id.ToString(), existingFacility.ScheduledTasks, _scheduler);
             }
 
             return NoContent();

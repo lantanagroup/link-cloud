@@ -89,18 +89,7 @@ namespace LantanaGroup.Link.Report.Services
 
             jobDataMap.Put(ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel, reportSchedule);
 
-
-            var offset = new DateTimeOffset(
-                reportSchedule.ReportEndDate.Year,
-                reportSchedule.ReportEndDate.Month,
-                reportSchedule.ReportEndDate.Day,
-                reportSchedule.ReportEndDate.Hour,
-                reportSchedule.ReportEndDate.Minute,
-                reportSchedule.ReportEndDate.Second,
-                TimeSpan.Zero // Adjust this to the correct UTC offset, if needed
-                );
-
-           // var offset = DateBuilder.DateOf(reportSchedule.ReportEndDate.Hour, reportSchedule.ReportEndDate.Minute, reportSchedule.ReportEndDate.Second, reportSchedule.ReportEndDate.Day, reportSchedule.ReportEndDate.Month);
+            var offset = DateBuilder.DateOf(reportSchedule.ReportEndDate.Hour, reportSchedule.ReportEndDate.Minute, reportSchedule.ReportEndDate.Second, reportSchedule.ReportEndDate.Day, reportSchedule.ReportEndDate.Month);
 
             return TriggerBuilder
                 .Create()

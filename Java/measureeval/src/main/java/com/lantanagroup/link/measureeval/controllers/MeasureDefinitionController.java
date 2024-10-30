@@ -1,16 +1,15 @@
 package com.lantanagroup.link.measureeval.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.lantanagroup.link.shared.auth.PrincipalUser;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
-import com.lantanagroup.link.shared.auth.PrincipalUser;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
-import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
@@ -19,12 +18,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-
 
 @RestController
 @RequestMapping("/api/measure-definition")
@@ -36,12 +33,6 @@ public class MeasureDefinitionController {
     private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache evaluatorCache;
 
-
-    final String[] DISALLOWED_FIELDS = new String[]{};
-    @InitBinder
-    public void initBinder(WebDataBinder binder) {
-        binder.setDisallowedFields(DISALLOWED_FIELDS);
-    }
 
     public MeasureDefinitionController(
             MeasureDefinitionRepository repository,
@@ -69,6 +60,7 @@ public class MeasureDefinitionController {
     @GetMapping("/{id}")
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
+        _logger.info("Get measure definition {}", id);
 
         if (user != null){
             Span currentSpan = Span.current();
@@ -82,7 +74,7 @@ public class MeasureDefinitionController {
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Bundle bundle) {
-        _logger.info("Put measure definition {}", StringEscapeUtils.escapeJava(id));
+        _logger.info("Put measure definition {}", id);
 
         if (user != null){
             Span currentSpan = Span.current();
@@ -104,6 +96,7 @@ public class MeasureDefinitionController {
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
+        _logger.info("Evaluate measure definition {}", id);
 
         if (user != null){
             Span currentSpan = Span.current();

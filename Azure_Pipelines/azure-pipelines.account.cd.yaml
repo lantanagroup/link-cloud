@@ -31,7 +31,6 @@ variables:
   value: 'NHSNLink ACR Premium'
   
 
-
 steps:
   - task: GetRevision@1
     displayName: 'Get Revision'
