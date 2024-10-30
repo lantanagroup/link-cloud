@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
             options?.Invoke(linkBearerServiceOptions);
 
             //add token commands            
+            services.AddOptions<LinkBearerServiceOptions>().Configure(options);
             services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             services.AddTransient<ICreateUserToken, CreateUserToken>();
 
