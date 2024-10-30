@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.DemoApiGateway.Application.models.census
+﻿using LantanaGroup.Link.Census.Application.Models;
+
+namespace LantanaGroup.Link.DemoApiGateway.Application.models.census
 {
     public class PagedCensusConfigModel
     {

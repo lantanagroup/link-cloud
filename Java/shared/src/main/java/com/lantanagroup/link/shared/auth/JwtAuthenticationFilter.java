@@ -31,7 +31,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private SecretClient secretClient;
 
-
   public JwtAuthenticationFilter (AuthenticationConfig authenticationConfig, JwtService jwtService, HandlerExceptionResolver handlerExceptionResolver, Optional<SecretClient> secretClient) {
     super();
 
@@ -44,9 +43,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-    String secret;
-
     // Allow anonymous access to the hosted REST API
+    String secret = "";
+
     if (this.authenticationConfig.isAnonymous()) {
       filterChain.doFilter(request, response);
       return;
