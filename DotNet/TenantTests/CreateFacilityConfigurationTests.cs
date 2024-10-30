@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Moq.AutoMock;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
+using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 namespace TenantTests
 {
@@ -20,6 +21,7 @@ namespace TenantTests
     {
         private FacilityConfigModel? _model;
         private ServiceRegistry? _serviceRegistry;
+        private LinkBearerServiceOptions _linkBearerServiceOptions;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
         private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
@@ -52,9 +54,17 @@ namespace TenantTests
 
             _model.ScheduledTasks.AddRange(scheduledTaskModels);
 
+            _linkBearerServiceOptions = new LinkBearerServiceOptions()
+            {
+                AllowAnonymous = true
+            };
+
             _mocker = new AutoMocker();
 
-           _service = _mocker.CreateInstance<FacilityConfigurationService>();
+            Mock<IOptions<LinkBearerServiceOptions>> _mockLinkBearerServiceOptions = _mocker.GetMock<IOptions<LinkBearerServiceOptions>>();
+            _mockLinkBearerServiceOptions.Setup(p => p.Value).Returns(_linkBearerServiceOptions);
+
+            _service = _mocker.CreateInstance<FacilityConfigurationService>();
 
             _ = _mocker.GetMock<IFacilityConfigurationRepo>()
                 .Setup(p => p.AddAsync(_model, CancellationToken.None)).ReturnsAsync(_model);
