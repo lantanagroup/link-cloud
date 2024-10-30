@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -48,16 +49,15 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetFhirConfiguration"), ex, "An exception occurred while attempting to get a fhir query configuration with a facility id of {id}", facilityId);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetFhirConfiguration"), ex, "An exception occurred while attempting to get a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(facilityId));
             throw;
         }
     }
 
     /// <summary>
-    /// Creates or updates a FhirQueryConfiguration record for a given facilityId.
+    /// Creates a FhirQueryConfiguration record for a given facilityId.
     /// Supported Authentication Types: Basic, Epic
     /// </summary>
-    /// <param name="facilityId"></param>
     /// <param name="fhirListConfiguration"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
@@ -88,7 +88,42 @@ public class QueryListController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create or update a fhir query configuration with a facility id of {id}", fhirListConfiguration.FacilityId);
+            _logger.LogError(new EventId(LoggingIds.GenerateItems, "PostFhirConfiguration"), ex, "An exception occurred while attempting to create a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Creates or updates a FhirQueryConfiguration record for a given facilityId.
+    /// Supported Authentication Types: Basic, Epic
+    /// </summary>
+    /// <param name="fhirListConfiguration"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpPut("fhirQueryList")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<FhirListConfiguration>> PutFhirConfiguration([FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
+        {
+            return BadRequest();
+        }
+
+        try
+        {
+            var entity = await _fhirQueryListConfigurationManager.UpdateAsync(fhirListConfiguration, cancellationToken);
+
+            return Ok(entity);
+        }
+        catch (MissingFacilityConfigurationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
             throw;
         }
     }
