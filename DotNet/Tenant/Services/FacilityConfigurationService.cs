@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -17,10 +16,6 @@ using System.Text;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using System.Linq.Expressions;
-using Confluent.Kafka;
-using System.Linq.Expressions;
-using Confluent.Kafka;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -416,11 +411,6 @@ namespace LantanaGroup.Link.Tenant.Services
                     throw new ApplicationException($"MeasureEval service configuration from \"ServiceRegistry.MeasureServiceUrl\" is missing");
 
                 string requestUrl = _serviceRegistry.Value.MeasureServiceUrl + $"/api/measure-definition/{reportTypeSchedule.ReportType}";
-
-                //TODO: add method to get key that includes looking at redis for future use case
-                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                    throw new Exception("Link Token Service Signing Key is missing.");
-
 
                 //get link token
                 if (!_linkBearerServiceOptions.Value.AllowAnonymous)
