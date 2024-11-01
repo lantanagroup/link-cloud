@@ -1,8 +1,13 @@
-﻿namespace LantanaGroup.Link.QueryDispatch.Application.Models
+﻿using System.Runtime.Serialization;
+
+namespace LantanaGroup.Link.QueryDispatch.Application.Models
 {
+    [DataContract]
     public class ReportScheduledKey
     {
+        [DataMember]
         public string FacilityId { get; set; }
+        [DataMember]
         public string ReportType { get; set; }
 
         public bool IsValid()
