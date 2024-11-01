@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +15,7 @@ public class CensusConfigController : Controller
 {
     private readonly ILogger<CensusConfigController> _logger;
     private readonly ICensusConfigManager _censusConfigManager;
-    
+
     public CensusConfigController(ILogger<CensusConfigController> logger, ICensusConfigManager censusConfigManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -56,14 +55,15 @@ public class CensusConfigController : Controller
         }
         catch (MissingTenantConfigurationException ex)
         {
-            _logger.LogError(ex.Message);
-            
             return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.InsertItem, "Create Census Config"), ex, "An exception occurred while attempting to create an Census config with an id of {id}", censusConfig.FacilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Create");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
     }
 
@@ -90,8 +90,11 @@ public class CensusConfigController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Census Config"), ex, "An exception occurred while attempting to get a Census config with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Get");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
     }
 
@@ -144,13 +147,15 @@ public class CensusConfigController : Controller
         }
         catch (MissingTenantConfigurationException ex)
         {
-            _logger.LogError(ex.Message);
             return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.UpdateItem, "Update Census Config"), ex, "An exception occurred while attempting to update a Census config with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Put");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
     }
 
@@ -175,8 +180,11 @@ public class CensusConfigController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.DeleteItem, "Delete Census Config"), ex, "An exception occurred while attempting to delete a Census config with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Delete");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
     }
 }
