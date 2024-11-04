@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error checking if facility ({request.FacilityId}) exists in Tenant Service.");
+                _logger.LogError(ex, "Exception in NormalizationConfigManager.SaveConfigEntity");
                 throw;
             }
 

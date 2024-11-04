@@ -1,8 +1,10 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
@@ -15,10 +17,6 @@ using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using static LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using System.Linq.Expressions;
-using Confluent.Kafka;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -238,6 +236,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
                 if (existingFacility is null)
                 {
+                    facilityId = HtmlInputSanitizer.Sanitize(facilityId);
                     _logger.LogError($"Facility with Id: {facilityId} Not Found");
                     throw new ApplicationException($"Facility with Id: {facilityId} Not Found");
                 }
