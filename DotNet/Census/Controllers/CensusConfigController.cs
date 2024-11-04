@@ -55,7 +55,10 @@ public class CensusConfigController : Controller
         }
         catch (MissingTenantConfigurationException ex)
         {
-            return BadRequest(ex.Message);
+            return Problem(
+                detail: "No Facility for the provided FacilityId was found.",
+                statusCode: StatusCodes.Status404NotFound
+            );
         }
         catch (Exception ex)
         {
