@@ -1,11 +1,14 @@
 ﻿using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.QueryDispatch.Application.Models
+namespace LantanaGroup.Link.QueryDispatch.Application.Models;
+
+[DataContract]
+public class QueryDispatchConfiguration
 {
-    public class QueryDispatchConfiguration
-    {
-        public string? FacilityId { get; set; }
-        public List<DispatchSchedule> DispatchSchedules { get; set; }
+    [DataMember]
+    public string? FacilityId { get; set; }
+    [DataMember]
+    public List<DispatchSchedule> DispatchSchedules { get; set; }
 
-    }
 }
