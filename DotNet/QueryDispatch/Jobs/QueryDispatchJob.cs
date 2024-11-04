@@ -9,6 +9,7 @@ using System.Text;
 using QueryDispatch.Application.Settings;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using QueryDispatch.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -79,7 +80,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
 
                 _acquisitionProducer.Flush();
 
-                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {patientDispatchEntity.FacilityId}");
+                _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: {HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId)}");
 
                 await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
 

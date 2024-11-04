@@ -1,7 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
-using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,8 +43,8 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Census History"), ex, "An exception occurred while attempting to get census history with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusController.GetCensusHistory");
+            return Problem(detail: "An error occurred while retrieving census history.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 
@@ -68,7 +67,7 @@ public class CensusController : Controller
         {
             var patients = (await _patientListManager.GetPatientList(facilityId, startDate, endDate)).ToList();
 
-            if(!patients.Any())
+            if (!patients.Any())
             {
                 return NotFound($"No patients found for facilityId {facilityId}");
             }
@@ -98,8 +97,8 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Admitted Patients"), ex, "An exception occurred while attempting to get admitted patients with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusController.GetAdmittedPatients");
+            return Problem(detail: "An error occurred while retrieving facility admitted patients.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 
@@ -129,8 +128,8 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "Get Current Census"), ex, "An exception occurred while attempting to get current census with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusController.GetCurrentCensus");
+            return Problem(detail: "An error occurred while retrieving current census.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 
@@ -155,8 +154,8 @@ public class CensusController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "Get All Patients For Facility"), ex, "An exception occurred while attempting to get All Patients For Facility with an id of {id}", facilityId);
-            throw;
+            _logger.LogError(ex, "Exception encountered in CensusController.GetAllPatientsForFacility");
+            return Problem(detail: "An error occurred while retrieving all the facility patients.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 }

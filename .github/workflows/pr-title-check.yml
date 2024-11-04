@@ -13,18 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check PR title
-      uses: actions/github-script@v4
+      uses: actions/github-script@v6
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const payload = context.payload
           const prTitle = payload.pull_request.title
-          // The pattern for JIRA ticket format LNK-nnnn:<space><PR title>, e.g. LNK-1234: My PR title
-          const jiraPattern = /^LNK-\d+([:]\s)/g
-          if (!jiraPattern.test(prTitle)) {
-            console.log('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn:<space>, e.g. LNK-1234: My PR title')
-            // Fails the workflow
-            core.setFailed('Could not find a LNK Jira ticket in PR title! Must begin with LNK-nnnn:<space>, e.g. LNK-1234: My PR title')
+          const prTitleExpectedPattern = /(^LNK-\d+:\s)|(^TECH_DEBT:\s)/g
+          const prTitleMismatchError = 'Invalid PR title! Must begin with LNK-nnnn:<space> or TECH_DEBT:<space>, e.g. LNK-1234: My PR title, or TECH_DEBT: My PR title'
+          if (!prTitleExpectedPattern.test(prTitle)) {
+            // Fail the workflow
+            console.log(prTitleMismatchError)
+            core.setFailed(prTitleMismatchError)
           } else {
             console.log('PR title format is correct.')
           }

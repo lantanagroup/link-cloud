@@ -4,7 +4,6 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
-using Microsoft.EntityFrameworkCore;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -70,26 +69,14 @@ public class CensusConfigManager : ICensusConfigManager
 
             try
             {
+                await _censusConfigRepository.UpdateAsync(existingEntity, cancellationToken);
+
                 await _censusSchedulingRepo.UpdateJobsForFacility(existingEntity,
                     await _schedulerFactory.GetScheduler(cancellationToken));
             }
             catch (Exception ex)
             {
-                var message =
-                    $"Error re-scheduling job for facility {existingEntity.FacilityID} {ex.Message}\n{ex.InnerException}\n{ex.Source}\n{ex.StackTrace}";
-                _logger.LogError(message, ex);
-                throw;
-            }
-
-            try
-            {
-                await _censusConfigRepository.UpdateAsync(existingEntity, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                var message =
-                    $"Error saving config for facility {existingEntity.FacilityID} {ex.Message}\n{ex.InnerException}\n{ex.Source}\n{ex.StackTrace}";
-                _logger.LogError(message, ex);
+                _logger.LogError(ex, "Exception in CensusConfigManager.AddOrUpdateCensusConfig");
                 throw;
             }
         }
@@ -106,26 +93,14 @@ public class CensusConfigManager : ICensusConfigManager
 
             try
             {
+                await _censusConfigRepository.AddAsync(existingEntity, cancellationToken);
+
                 await _censusSchedulingRepo.AddJobForFacility(existingEntity,
                     await _schedulerFactory.GetScheduler(cancellationToken));
             }
             catch (Exception ex)
             {
-                var message =
-                    $"Error scheduling job for facility {existingEntity.FacilityID}\n{ex.Message}\n{ex.InnerException}\n{ex.Source}\n{ex.StackTrace}";
-                _logger.LogError(message, ex);
-                throw;
-            }
-
-            try
-            {
-                await _censusConfigRepository.AddAsync(existingEntity, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                //TODO: Daniel - doesn't do anything with the message
-                var message =
-                    $"Error saving config for facility {existingEntity.FacilityID} {ex.Message}\n{ex.InnerException}\n{ex.Source}\n{ex.StackTrace}";
+                _logger.LogError(ex, "Exception in CensusConfigManager.AddOrUpdateCensusConfig");
                 throw;
             }
         }
