@@ -406,8 +406,8 @@ services:
       Cache__Enabled: true
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
-      LinkTokenService__EnableTokenGenerationEndpoint: true
-      LinkTokenService__Authority:      
+      LinkTokenService__EnableTokenGenerationEndpoint: false
+      LinkTokenService__Authority: placeholder
       LinkTokenService__LinkAdminEmail:      
       LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true

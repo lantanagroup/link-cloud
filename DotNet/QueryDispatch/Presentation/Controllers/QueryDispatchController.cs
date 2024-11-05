@@ -4,11 +4,13 @@ using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 {
@@ -68,7 +70,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GetItem, "Get QueryDispatch configuration"), ex, "An exception occurred while attempting to retrieve a QueryDispatch configuration for facility {facilityId}", facilityId);
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GetItem, "Get QueryDispatch configuration"), ex, "An exception occurred while attempting to retrieve a QueryDispatch configuration for facility {facilityId}", HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }
@@ -97,7 +99,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             if (string.IsNullOrWhiteSpace(model.FacilityId))
             {
-                _logger.LogError($"Facility Id was not provided in the new query dispatch configuration: {model}.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Facility Id was not provided in the new query dispatch configuration: {model}.", HtmlInputSanitizer.Sanitize(JsonSerializer.Serialize(model)));
                 return BadRequest("Facility Id is required in order to create a query dispatch configuration.");
             }
 
@@ -105,8 +107,8 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
-                    return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.GenerateItems), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
+                    return BadRequest("Duration format is invalid: " + HtmlInputSanitizer.Sanitize(schedule.Duration) + ". Please provide a valid duration format.");
                 }
             }
 
@@ -135,7 +137,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + model.FacilityId);
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Post QueryDispatch configuration"), ex, "An exception occurred while attempting to save a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(model.FacilityId));
 
                 throw;
             }
@@ -167,7 +169,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + facilityId);
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.DeleteItem, "Delete QueryDispatch configuration"), ex, "An exception occurred while attempting to delete a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }
@@ -198,7 +200,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             if (string.IsNullOrWhiteSpace(facilityId))
             {
-                _logger.LogError($"Facility Id was not provided in the update query dispatch configuration: {model}.");
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Facility Id was not provided in the update query dispatch configuration: {model}.", HtmlInputSanitizer.Sanitize(facilityId));
                 return BadRequest("Facility Id is required in order to update a query dispatch configuration.");
             }
 
@@ -206,7 +208,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 if (!IsDurationFormatValid(schedule.Duration))
                 {
-                    _logger.LogError($"Duration format is invalid: {schedule.Duration}.");
+                    _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Update QueryDispatch configuration"), "Duration format is invalid: {schedule.Duration}.", HtmlInputSanitizer.Sanitize(schedule.Duration));
                     return BadRequest("Duration format is invalid: " + schedule.Duration + ". Please provide a valid duration format.");
                 }
             }
@@ -237,7 +239,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + facilityId);
+                _logger.LogError(new EventId(QueryDispatchConstants.LoggingIds.UpdateItem, "Put QueryDispatch configuration"), ex, "An exception occurred while attempting to update a QueryDispatch configuration for facility " + HtmlInputSanitizer.Sanitize(facilityId));
 
                 throw;
             }
