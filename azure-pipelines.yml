@@ -88,9 +88,7 @@ steps:
       repository: link-${{ value }}
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
-      tags: |
-        latest
-        $(MyTag)
+      tags: $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
 
   - task: PublishPipelineArtifact@1
