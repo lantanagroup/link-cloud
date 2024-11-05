@@ -126,9 +126,9 @@ public class KnowledgeArtifactBuilder {
         }
     }
 
-    static class CohortMeasureWithValueSet {
-        private static final String MEASURE_ID = "CohortMeasureWithValueSet";
-        private static final String LIBRARY_ID = "CohortLibraryWithValueSet";
+    static class CohortMeasureWithValueSetTrue {
+        private static final String MEASURE_ID = "CohortMeasureWithValueSetTrue";
+        private static final String LIBRARY_ID = "CohortLibraryWithValueSetTrue";
         private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
         private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
@@ -137,6 +137,24 @@ public class KnowledgeArtifactBuilder {
 
         public static Library library() {
             return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.COHORT_IP_TRUE_WITH_VALUESET);
+        }
+
+        public static Bundle bundle() {
+            return BundleBuilder.build(library(), measure(), ValueSetBuilder.inpatientEncounter());
+        }
+    }
+
+    static class CohortMeasureWithValueSetFalse {
+        private static final String MEASURE_ID = "CohortMeasureWithValueSetFalse";
+        private static final String LIBRARY_ID = "CohortLibraryWithValueSetFalse";
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
+        public static Measure measure() {
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
+        }
+
+        public static Library library() {
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.COHORT_IP_FALSE_WITH_VALUESET);
         }
 
         public static Bundle bundle() {

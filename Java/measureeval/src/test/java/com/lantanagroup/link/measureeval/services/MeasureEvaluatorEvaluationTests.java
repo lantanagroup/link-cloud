@@ -43,8 +43,8 @@ class MeasureEvaluatorEvaluationTests {
     }
 
     @Test
-    void cohortMeasureWithValueSetTest() {
-        var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithValueSet.bundle();
+    void cohortMeasureWithValueSetTrueTest() {
+        var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
         validateMeasurePackage(measurePackage);
         var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
@@ -63,6 +63,21 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
         Assertions.assertTrue(report.getEvaluatedResource().get(1).hasReference());
         Assertions.assertEquals("Patient/simple-patient", report.getEvaluatedResource().get(1).getReference());
+    }
+
+    @Test
+    void cohortMeasureWithValueSetFalseTest() {
+        var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithValueSetFalse.bundle();
+        validateMeasurePackage(measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
+                new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
+
+        // test measurement period results
+        validateMeasurementPeriod(report.getPeriod(), 2024, 0, 1, 2024, 11, 31);
+
+        // test population results
+        Assertions.assertEquals(0, getPopulation("initial-population", report).getCount());
     }
 
     @Test

@@ -23,7 +23,7 @@ public class CqlLibraries {
               false""";
 
     public static final String COHORT_IP_TRUE_WITH_VALUESET = """
-            library CohortLibraryWithValueSet version '1.0.0'
+            library CohortLibraryWithValueSetTrue version '1.0.0'
                             
             using FHIR version '4.0.1'
             
@@ -39,6 +39,24 @@ public class CqlLibraries {
             define "Inpatient Encounters":
               ["Encounter": type in "Inpatient Encounter Codes"] InpatientEncounter
                 where InpatientEncounter.period.start.value in day of "Measurement Period"\s""";
+
+    public static final String COHORT_IP_FALSE_WITH_VALUESET = """
+            library CohortLibraryWithValueSetFalse version '1.0.0'
+                            
+            using FHIR version '4.0.1'
+            
+            valueset "Inpatient Encounter Codes": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.666.5.307'
+            
+            parameter "Measurement Period" default Interval[@2022-01-01, @2023-01-01)
+                            
+            context Patient
+
+            define "Initial Population":
+              "Inpatient Encounters"
+              
+            define "Inpatient Encounters":
+              ["Encounter": type in "Inpatient Encounter Codes"] InpatientEncounter
+                where not (InpatientEncounter.period.start.value in day of "Measurement Period")""";
 
     public static final String COHORT_IP_TRUE_WITH_SDE = """
             library CohortLibraryWithSDE version '1.0.0'
