@@ -13,6 +13,19 @@ parameters:
   default:
   - account
   - audit
+  - bff
+  - census
+  - dataacquisition
+  - demo-app
+  - measureeval
+  - normalization
+  - notification
+  - patientquery
+  - querydispatch
+  - report
+  - submission
+  - tenant
+  - validation
 
 variables:
 - group: link-cloud-variables
