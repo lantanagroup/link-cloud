@@ -98,17 +98,17 @@ steps:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'manifest'
   
-  - task: Kubernetes@1
-    inputs:
-      connectionType: 'Azure Resource Manager'
-      azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
-      azureResourceGroup: 'nhsnlink-rg'
-      kubernetesCluster: 'nhsnlink-aks'
-      namespace: 'scale-test'
-      command: 'set'
-      arguments: 'image -n scale-test deployment ${{ value }} ${{ value }}=nhsnlinkprem.azurecr.io/link-${{ value }}:$(tag_value)'
-      secretType: 'dockerRegistry'
-      containerRegistryType: 'Azure Container Registry'
+  # - task: Kubernetes@1
+  #   inputs:
+  #     connectionType: 'Azure Resource Manager'
+  #     azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
+  #     azureResourceGroup: 'nhsnlink-rg'
+  #     kubernetesCluster: 'nhsnlink-aks'
+  #     namespace: 'scale-test'
+  #     command: 'set'
+  #     arguments: 'image -n scale-test deployment ${{ value }} ${{ value }}=nhsnlinkprem.azurecr.io/link-${{ value }}:$(tag_value)'
+  #     secretType: 'dockerRegistry'
+  #     containerRegistryType: 'Azure Container Registry'
 
 # Next Service
 ##############
