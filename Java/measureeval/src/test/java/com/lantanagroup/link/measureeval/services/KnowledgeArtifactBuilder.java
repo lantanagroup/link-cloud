@@ -3,8 +3,12 @@ package com.lantanagroup.link.measureeval.services;
 import org.hl7.fhir.r4.model.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class KnowledgeArtifactBuilder {
+
+    private final static String BASE_MEASURE_URL = "https://example.com/Measure/";
+    private final static String BASE_LIBRARY_URL = "https://example.com/Library/";
 
     static class MeasurePopulationGroup {
         public static Measure.MeasureGroupPopulationComponent initialPopulation() {
@@ -88,257 +92,197 @@ public class KnowledgeArtifactBuilder {
     static class SimpleCohortMeasureTrue {
         private static final String MEASURE_ID = "CohortMeasureTrue";
         private static final String LIBRARY_ID = "CohortLibraryTrue";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
+
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
-            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_COHORT_IP_TRUE.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_COHORT_IP_TRUE);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            return bundle;
+            return BundleBuilder.build(library(), measure());
         }
     }
 
     static class SimpleCohortMeasureFalse {
         private static final String MEASURE_ID = "CohortMeasureFalse";
         private static final String LIBRARY_ID = "CohortLibraryFalse";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
-            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_COHORT_IP_FALSE.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_COHORT_IP_FALSE);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            return bundle;
+            return BundleBuilder.build(library(), measure());
         }
     }
 
     static class CohortMeasureWithValueSet {
         private static final String MEASURE_ID = "CohortMeasureWithValueSet";
         private static final String LIBRARY_ID = "CohortLibraryWithValueSet";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
-            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "cohort", MeasurePopulationGroup.initialPopulation());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.COHORT_IP_TRUE_WITH_VALUESET.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.COHORT_IP_TRUE_WITH_VALUESET);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            bundle.addEntry().setResource(ValueSetBuilder.inpatientEncounter());
-            return bundle;
+            return BundleBuilder.build(library(), measure(), ValueSetBuilder.inpatientEncounter());
         }
     }
 
     static class CohortMeasureWithSDE {
         private static final String MEASURE_ID = "CohortMeasureWithSDE";
         private static final String LIBRARY_ID = "CohortLibraryWithSDE";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.setId(MEASURE_ID);
-            measure.setMeta(new Meta().addProfile(
-                    "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cohort-measure-cqfm").addProfile(
-                            "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-measure-cqfm"));
-            measure.addExtension().setValue(new StringType("Encounter"))
-                    .setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis");
-            measure.addLibrary(LIBRARY_URL);
-            measure.addType().addCoding().setSystem("http://terminology.hl7.org/CodeSystem/measure-type").setCode("outcome");
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("cohort")));
-            measure.addGroup().addPopulation(MeasurePopulationGroup.initialPopulation());
-            var sde = new Measure.MeasureSupplementalDataComponent();
-            sde.setId("sde-condition");
-            sde.setDescription("SDE Condition");
-            sde.setCriteria(new Expression().setLanguage("text/cql-identifier").setExpression("SDE Condition"));
-            sde.addUsage().addCoding().setCode("supplemental-data").setSystem("http://terminology.hl7.org/CodeSystem/measure-data-usage");
-            measure.addSupplementalData(sde);
-            return measure;
+            return MeasureBuilder.buildSingleSde(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "outcome", "cohort", "sde-condition", "SDE Condition", "SDE Condition", MeasurePopulationGroup.initialPopulation());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.COHORT_IP_TRUE_WITH_SDE.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.COHORT_IP_TRUE_WITH_SDE);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            bundle.addEntry().setResource(ValueSetBuilder.inpatientEncounter());
-            return bundle;
+            return BundleBuilder.build(library(), measure(), ValueSetBuilder.inpatientEncounter());
         }
     }
 
     static class SimpleProportionMeasureAllTrueNoExclusion {
         private static final String MEASURE_ID = "ProportionMeasureAllTrueNoExclusion";
         private static final String LIBRARY_ID = "ProportionLibraryAllTrueNoExclusion";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("proportion")));
-            measure.addGroup()
-                    .addPopulation(MeasurePopulationGroup.initialPopulation())
-                    .addPopulation(MeasurePopulationGroup.numerator())
-                    .addPopulation(MeasurePopulationGroup.numeratorExclusion())
-                    .addPopulation(MeasurePopulationGroup.denominator())
-                    .addPopulation(MeasurePopulationGroup.denominatorExclusion());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "proportion", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorExclusion(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorExclusion());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_PROPORTION_ALL_TRUE_NO_EXCLUSION.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_PROPORTION_ALL_TRUE_NO_EXCLUSION);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            return bundle;
+            return BundleBuilder.build(library(), measure());
         }
     }
 
     static class SimpleProportionMeasureAllFalse {
         private static final String MEASURE_ID = "ProportionMeasureAllFalse";
         private static final String LIBRARY_ID = "ProportionLibraryAllFalse";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("proportion")));
-            measure.addGroup()
-                    .addPopulation(MeasurePopulationGroup.initialPopulation())
-                    .addPopulation(MeasurePopulationGroup.numerator())
-                    .addPopulation(MeasurePopulationGroup.numeratorExclusion())
-                    .addPopulation(MeasurePopulationGroup.denominator())
-                    .addPopulation(MeasurePopulationGroup.denominatorExclusion());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "proportion", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorExclusion(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorExclusion());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_PROPORTION_ALL_FALSE.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_PROPORTION_ALL_FALSE);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            return bundle;
+            return BundleBuilder.build(library(), measure());
         }
     }
 
     static class SimpleRatioMeasure {
         private static final String MEASURE_ID = "RatioMeasure";
         private static final String LIBRARY_ID = "RatioLibrary";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
 
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("ratio")));
-            measure.addGroup()
-                    .addPopulation(MeasurePopulationGroup.initialPopulation())
-                    .addPopulation(MeasurePopulationGroup.numerator())
-                    .addPopulation(MeasurePopulationGroup.numeratorObservation())
-                    .addPopulation(MeasurePopulationGroup.denominator())
-                    .addPopulation(MeasurePopulationGroup.denominatorObservation());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "ratio", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.numerator(), MeasurePopulationGroup.numeratorExclusion(), MeasurePopulationGroup.denominator(), MeasurePopulationGroup.denominatorExclusion());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_RATIO.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_RATIO);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
-            return bundle;
+            return BundleBuilder.build(library(), measure());
         }
     }
 
     static class SimpleContinuousVariableMeasure {
         private static final String MEASURE_ID = "ContinuousVariableMeasure";
         private static final String LIBRARY_ID = "ContinuousVariableLibrary";
-        private static final String LIBRARY_URL = "https://example.com/Library/" + LIBRARY_ID;
+        private static final String MEASURE_URL = BASE_MEASURE_URL + MEASURE_ID;
+        private static final String LIBRARY_URL = BASE_LIBRARY_URL + LIBRARY_ID;
 
         public static Measure measure() {
-            Measure measure = new Measure();
-            measure.addLibrary(LIBRARY_URL);
-            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode("continuous-variable")));
-            measure.addGroup()
-                    .addPopulation(MeasurePopulationGroup.initialPopulation())
-                    .addPopulation(MeasurePopulationGroup.measurePopulation())
-                    .addPopulation(MeasurePopulationGroup.measurePopulationExclusion());
-            measure.setId(MEASURE_ID);
-            return measure;
+            return MeasureBuilder.build(MEASURE_ID, MEASURE_URL, LIBRARY_URL, "continuous-variable", MeasurePopulationGroup.initialPopulation(), MeasurePopulationGroup.measurePopulation(), MeasurePopulationGroup.measurePopulationExclusion());
         }
 
         public static Library library() {
-            Library library = new Library().setVersion("1.0.0").setName(LIBRARY_ID).setUrl(LIBRARY_URL);
-            library.addContent().setContentType("text/cql").setData(CqlLibraries.SIMPLE_CONTINUOUS_VARIABLE.getBytes(StandardCharsets.UTF_8));
-            library.setId(LIBRARY_ID);
-            return library;
+            return LibraryBuilder.build(LIBRARY_ID, "1.0.0", LIBRARY_ID, LIBRARY_URL, CqlLibraries.SIMPLE_CONTINUOUS_VARIABLE);
         }
 
         public static Bundle bundle() {
-            Bundle bundle = new Bundle();
-            bundle.addEntry().setResource(library());
-            bundle.addEntry().setResource(measure());
+            return BundleBuilder.build(library(), measure());
+        }
+    }
+
+    static class MeasureBuilder {
+        public static Measure build(String id, String url, String libraryUrl, String scoring, Measure.MeasureGroupPopulationComponent ... populations) {
+            var measure = new Measure();
+            measure.setUrl(url);
+            measure.addLibrary(libraryUrl);
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode(scoring)));
+            measure.addGroup().setPopulation(Arrays.stream(populations).toList());
+            measure.setId(id);
+            return measure;
+        }
+
+        public static Measure buildSingleSde(String id, String url, String libraryUrl, String type, String scoring, String sdeId, String sdeDescription, String sdeExpression, Measure.MeasureGroupPopulationComponent ... populations) {
+            var measure = new Measure();
+            measure.setUrl(url);
+            measure.addLibrary(libraryUrl);
+            measure.setMeta(new Meta().addProfile(
+                    "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cohort-measure-cqfm").addProfile(
+                    "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/computable-measure-cqfm"));
+            measure.addExtension().setValue(new StringType("Encounter"))
+                    .setUrl("http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-populationBasis");
+            measure.addType().addCoding().setSystem("http://terminology.hl7.org/CodeSystem/measure-type").setCode(type);
+            measure.setScoring(new CodeableConcept().addCoding(new Coding().setCode(scoring)));
+            measure.addGroup().setPopulation(Arrays.stream(populations).toList());
+            var sde = new Measure.MeasureSupplementalDataComponent();
+            sde.setId(sdeId);
+            sde.setDescription(sdeDescription);
+            sde.setCriteria(new Expression().setLanguage("text/cql-identifier").setExpression(sdeExpression));
+            sde.addUsage().addCoding().setCode("supplemental-data").setSystem("http://terminology.hl7.org/CodeSystem/measure-data-usage");
+            measure.addSupplementalData(sde);
+            measure.setId(id);
+            return measure;
+        }
+    }
+
+    static class LibraryBuilder {
+        public static Library build(String id, String version, String name, String url, String cql) {
+            var library = new Library().setVersion(version).setName(name).setUrl(url);
+            library.addContent().setContentType("text/cql").setData(cql.getBytes(StandardCharsets.UTF_8));
+            library.setId(id);
+            return library;
+        }
+    }
+
+    static class BundleBuilder {
+        public static Bundle build(Resource ... resources) {
+            var bundle = new Bundle();
+            Arrays.stream(resources).forEach(resource -> bundle.addEntry().setResource(resource));
             return bundle;
         }
     }

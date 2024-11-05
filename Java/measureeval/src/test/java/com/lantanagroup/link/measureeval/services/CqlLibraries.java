@@ -101,7 +101,7 @@ public class CqlLibraries {
             define "Denominator":
               true
               
-            define "Denominator Exclusion"
+            define "Denominator Exclusion":
               false""";
 
     public static final String SIMPLE_PROPORTION_ALL_FALSE = """
@@ -123,7 +123,7 @@ public class CqlLibraries {
             define "Denominator":
               false
               
-            define "Denominator Exclusion"
+            define "Denominator Exclusion":
               false""";
 
     public static final String SIMPLE_RATIO = """
