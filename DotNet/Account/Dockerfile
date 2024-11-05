@@ -1,12 +1,5 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# ARG ACCESS_TOKEN="mbygihet4uek5omhnuatzdxu5npiqz2rw3i6i7bgywaqwtshafaq"
-# ARG ARTIFACTS_ENDPOINT="https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json"
-
-# Configure the environment variables
-# ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
-# ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"${ARTIFACTS_ENDPOINT}\", \"password\":\"${ACCESS_TOKEN}\"}]}"
-
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-jammy-amd64 AS base
 USER 1001
 WORKDIR /app
