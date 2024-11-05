@@ -9,7 +9,6 @@ pool:
 
 parameters:
 - name: tag
-  displayName: Which Tag do you want to Deploy?
   type: object
   default:
   - account
@@ -36,7 +35,7 @@ variables:
   
 
 steps:
-- ${{ each value in parameters.tag }}
+- ${{ each value in parameters.tag }}:
   - task: GetRevision@1
     displayName: 'Get Revision'
     inputs:
@@ -86,7 +85,7 @@ steps:
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
+      repository: link-${{ value }}
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
       tags: |
@@ -107,7 +106,7 @@ steps:
       kubernetesCluster: 'nhsnlink-aks'
       namespace: 'scale-test'
       command: 'set'
-      arguments: 'image -n scale-test deployment account account=nhsnlinkprem.azurecr.io/link-account:$(tag_value)'
+      arguments: 'image -n scale-test deployment ${{ value }} ${{ value }}=nhsnlinkprem.azurecr.io/link-${{ value }}:$(tag_value)'
       secretType: 'dockerRegistry'
       containerRegistryType: 'Azure Container Registry'
 
