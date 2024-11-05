@@ -10,10 +10,10 @@ pool:
 parameters:
 - name: tag
   displayName: Which Tag do you want to Deploy?
-  type: string
-  values:
-    - account
-    - audit
+  type: object
+  default:
+  - account
+  - audit
 
 variables:
 - group: link-cloud-variables
@@ -36,7 +36,7 @@ variables:
   
 
 steps:
-- ${{ each value in parametes.tag }}
+- ${{ each value in parameters.tag }}
   - task: GetRevision@1
     displayName: 'Get Revision'
     inputs:
