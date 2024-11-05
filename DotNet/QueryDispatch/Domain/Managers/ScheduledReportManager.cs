@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
@@ -88,7 +87,7 @@ namespace QueryDispatch.Domain.Managers
 
                 ReportPeriodEntity newReportPeriod = newReport.ReportPeriods[0];
 
-                ReportPeriodEntity existingReportPeriod = existingReport.ReportPeriods.FirstOrDefault(x => x.ReportType == newReportPeriod.ReportType);
+                ReportPeriodEntity existingReportPeriod = existingReport.ReportPeriods.FirstOrDefault(x => x.Frequency == newReportPeriod.Frequency);
                 if (existingReportPeriod != null)
                 {
                     var resultChanges = _compareLogic.Compare(existingReport.ReportPeriods, newReport.ReportPeriods);
@@ -112,7 +111,7 @@ namespace QueryDispatch.Domain.Managers
                 {
                     existingReport.ReportPeriods.Add(new ReportPeriodEntity()
                     {
-                        ReportType = newReportPeriod.ReportType,
+                        ReportTypes = newReportPeriod.ReportTypes,
                         StartDate = newReportPeriod.StartDate,
                         EndDate = newReportPeriod.EndDate,
                         CreateDate = DateTime.UtcNow,
@@ -124,7 +123,7 @@ namespace QueryDispatch.Domain.Managers
 
                 await _scheduledReportRepository.UpdateAsync(existingReport);
 
-                _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportType} for facility id {existingReport.FacilityId}");
+                _logger.LogInformation($"Update scheduled report type {newReportPeriod.ReportTypes} for facility id {existingReport.FacilityId}");
 
                 var headers = new Headers
                     {
