@@ -7,10 +7,10 @@ pool:
 # Account
 ##############
 
-parameters:
-- name: tag
-  displayName: Which Tag do you want to Deploy?
-  type: string
+# parameters:
+# - name: tag
+#   displayName: Which Tag do you want to Deploy?
+#   type: string
 
 variables:
 - group: link-cloud-variables
@@ -26,6 +26,8 @@ variables:
   value: '**/DotNet/Account/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
+- name: tag_ref
+  value: 'tags/refs/'
 - name: tag_value
   value: 'v0.1.1.gamma.5'
   
