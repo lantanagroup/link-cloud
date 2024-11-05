@@ -7,10 +7,14 @@ pool:
 # Account
 ##############
 
-# parameters:
-# - name: tag
-#   displayName: Which Tag do you want to Deploy?
-#   type: string
+parameters:
+- name: tag
+  displayName: Which Tag do you want to Deploy?
+  type: string
+  values:
+    - Test1
+    - Test2
+    - Test3
 
 variables:
 - group: link-cloud-variables
