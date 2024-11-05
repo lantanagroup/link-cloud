@@ -26,6 +26,8 @@ variables:
   value: '**/DotNet/Account/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
+- name: tag_value
+  value: 'v0.1.1.gamma.5'
   
 
 steps:
@@ -98,9 +100,9 @@ steps:
       azureSubscriptionEndpoint: 'NHSNLink-RG ARM'
       azureResourceGroup: 'nhsnlink-rg'
       kubernetesCluster: 'nhsnlink-aks'
-      namespace: 'test-scale'
+      namespace: 'scale-test'
       command: 'set'
-      arguments: 'image -n scale-test deployment account account=nhsnlinkprem.azurecr.io/link-account:v0.1.1.gamma.5'
+      arguments: 'image -n scale-test deployment account account=nhsnlinkprem.azurecr.io/link-account:$(tag_value)'
       secretType: 'dockerRegistry'
       containerRegistryType: 'Azure Container Registry'
 
