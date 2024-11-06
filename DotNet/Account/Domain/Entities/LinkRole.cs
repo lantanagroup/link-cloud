@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Security.Claims;
 using LantanaGroup.Link.Account.Application.Interfaces.Domain;
 
@@ -15,7 +16,7 @@ namespace LantanaGroup.Link.Account.Domain.Entities
         /// </remarks>
         public LinkRole()
         {
-            Id = Guid.NewGuid().ToString();
+            Id = Guid.NewGuid();
         }
 
         /// <summary>
@@ -30,7 +31,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
             Name = name;
         }
 
-        public string Id { get; set; }
+        [MaxLength(36)]
+        public Guid Id { get; set; }
         public string? Name { get; set; }
         public string? Description { get; set; }
         public DateTime CreatedOn { get; set; }
@@ -51,7 +53,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
     public class LinkRoleClaim
     {
         public int Id { get; set; } = default!;
-        public string RoleId { get; set; } = default!;
+        [MaxLength(36)]
+        public Guid RoleId { get; set; } = default!;
         public string? ClaimType { get; set; }
         public string? ClaimValue { get; set; }
 

@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 var requestor = context.User;
                 var createdUser = await command.Execute(requestor, model, context.RequestAborted);
 
-                logger.LogUserCreated(createdUser.Id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogUserCreated(createdUser.Id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 //build resource uri
                 var uriBuilder = new UriBuilder

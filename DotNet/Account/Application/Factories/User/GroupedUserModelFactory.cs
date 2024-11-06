@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
             return model;
         }
 
-        public GroupedUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName)
+        public GroupedUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName)
         {
             GroupedUserModel model = new()
             {

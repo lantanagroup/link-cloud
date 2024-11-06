@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("DeactivateUser:Execute",
                 [
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountDeactivatedCounter(tagList);
-                _logger.LogDeactivateUser(user.Id, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                _logger.LogDeactivateUser(user.Id.ToString(), requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage
@@ -93,7 +93,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogDeactivateUserException(userId, ex.Message);
+                _logger.LogDeactivateUserException(userId.ToString(), ex.Message);
                 throw;
             }                  
         }

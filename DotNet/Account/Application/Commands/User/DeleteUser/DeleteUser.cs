@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("ActivateUser:Execute", tagList);
@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (!result)
                 {
-                    _logger.LogDeleteUserException(userId, "Failed to delete user");
+                    _logger.LogDeleteUserException(userId.ToString(), "Failed to delete user");
                     return false;
                 }
 
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountDeletedCounter(tagList);
-                _logger.LogDeleteUser(userId, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                _logger.LogDeleteUser(userId.ToString(), requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage

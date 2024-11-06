@@ -9,12 +9,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class DeleteExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id,
+        public static async Task<IResult> Handle(HttpContext context, Guid id,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetLinkUserEntity queryUser, [FromServices] IDeleteUser command)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A user id is required");
                 }
@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     return Results.Problem("Failed to delete user");
                 }
 
-                logger.LogDeleteUser(id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogDeleteUser(id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.NoContent();
             }
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogDeleteUserException(id, ex.Message);
+                logger.LogDeleteUserException(id.ToString(), ex.Message);
                 throw;
             }            
         }
