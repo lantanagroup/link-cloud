@@ -16,7 +16,7 @@ parameters:
   - bff
   - census
   - dataacquisition
-  - demo-app
+  # - demo-app
   - measureeval
   - normalization
   - notification
