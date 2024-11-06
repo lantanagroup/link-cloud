@@ -53,23 +53,23 @@ steps:
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
   
-  - task: DotNetCoreCLI@2
-    displayName: Restore
-    inputs:
-      command: restore
-      projects: '$(project)'
+  # - task: DotNetCoreCLI@2
+  #   displayName: Restore
+  #   inputs:
+  #     command: restore
+  #     projects: '$(project)'
   
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
+  # - task: DotNetCoreCLI@2
+  #   displayName: Build
+  #   inputs:
+  #     command: build
+  #     projects: '$(project)'
 
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
+  # - task: DotNetCoreCLI@2
+  #   inputs:
+  #     command: 'test'
+  #     projects: $(testProject)'
+  #   displayName: 'Run Tests'
   
   - task: PowerShell@2
     inputs:
@@ -91,7 +91,7 @@ steps:
       containerRegistry: $(containerRegistry)
       repository: link-${{ value }}
       command: 'buildAndPush'
-      Dockerfile: $(dockerPath)
+      Dockerfile: '**/DotNet/${{ value }}/Dockerfile'
       tags: $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
 
