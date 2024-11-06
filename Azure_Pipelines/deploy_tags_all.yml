@@ -41,7 +41,7 @@ variables:
 steps:
 - ${{ each value in parameters.tag }}:
   - task: GetRevision@1
-    displayName: 'Get Revision'
+    displayName: 'Get Revision - ${{ value }}'
     inputs:
       VariableName: Revision
 
