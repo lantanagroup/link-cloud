@@ -163,7 +163,8 @@ public class ResourceAcquiredListener : BackgroundService
                                 AcquisitionComplete = message.Message.Value.AcquisitionComplete,
                                 PatientId = message.Message.Value.PatientId ?? "",
                                 QueryType = message.Message.Value.QueryType,
-                                ScheduledReports = message.Message.Value.ScheduledReports
+                                ScheduledReports = message.Message.Value.ScheduledReports,
+                                ReportableEvent = message.Message.Value.ReportableEvent
                             };
                             Message<string, ResourceNormalizedMessage> produceMessage = new Message<string, ResourceNormalizedMessage>
                             {
