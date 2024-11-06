@@ -11,8 +11,8 @@ parameters:
 - name: tag
   type: object
   default:
-  - account
-  - audit
+  - Account
+  - Audit
   - bff
   - census
   - dataacquisition
