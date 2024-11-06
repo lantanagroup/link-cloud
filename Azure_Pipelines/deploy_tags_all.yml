@@ -33,19 +33,10 @@ variables:
   value: 'DotNet/Account/Account.csproj'
 - name: testProject
   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
-- name: serviceName
-  value: 'Account'
-- name: registry-repo-Name
-  value: 'link-account'
 - name: dockerPath
   value: '**/DotNet/Account/Dockerfile'
 - name: containerRegistry
-  value: 'NHSNLink ACR Premium'
-- name: tag_ref
-  value: 'tags/refs/'
-- name: tag_value
-  value: 'v0.1.1.gamma.5'
-  
+  value: 'NHSNLink ACR Premium'  
 
 steps:
 - ${{ each value in parameters.tag }}:
