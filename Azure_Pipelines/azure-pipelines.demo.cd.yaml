@@ -17,7 +17,6 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: registry-repo-Name
-#  value: 'link-demo-app'
   value: 'link-demo'
 - name: dockerPath
   value: '**/Web/DemoApp/Dockerfile'
