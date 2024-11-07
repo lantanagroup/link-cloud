@@ -3,6 +3,7 @@ resources:
   - pipeline: pipeline-trigger
     # project: azure-pipelines.yml
     source: Deploy_All_New
+    trigger: true
 
 
 trigger:
