@@ -14,9 +14,9 @@ namespace LantanaGroup.Link.Tenant.Services
     public class ScheduleService : IHostedService
     {
 
-        public const string MONTHLY = "monthly";
-        public const string WEEKLY = "weekly";
-        public const string DAILY = "daily";
+        public const string MONTHLY = "Monthly";
+        public const string WEEKLY = "Weekly";
+        public const string DAILY = "Daily";
 
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly Quartz.Spi.IJobFactory _jobFactory;
@@ -219,7 +219,7 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 case MONTHLY:
                     ScheduledTrigger = "0 0 0 1 * ? *";
-                    //ScheduledTrigger = "0 40 15 * * ? *";
+                    //ScheduledTrigger = "0 11 14 * * ? *";
                     break;
                 case WEEKLY:
                     ScheduledTrigger = "0 0 0 ? * 1 *";

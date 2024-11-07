@@ -92,20 +92,15 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 headers.Add("X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId));
 
-                ReportScheduledKey Key = new ReportScheduledKey()
-                {
-                    FacilityId = facility.FacilityId
-                };
-
                 var message = new Message<string, object>
                 {
-                    Key = JsonSerializer.Serialize(Key),
+                    Key = facility.FacilityId,
                     Headers = headers,
-                    Value = new ReportScheduledMessage()
+                    Value  = new ReportScheduledMessage()
                     {
                         ReportTypes = reportTypes,
                         Frequency = frequency,
-                        StartDate = startDate,
+                        StartDate = startDate,                       
                         EndDate = endDate
                     },
                 };
