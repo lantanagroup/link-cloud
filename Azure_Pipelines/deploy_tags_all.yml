@@ -16,8 +16,8 @@ parameters:
 #  - Bff
   - Census
   - Dataacquisition
-  - Demo-app
-  - Measureeval
+#  - Demo-app
+#  - Measureeval
   - Normalization
   - Notification
   - Patientquery
@@ -117,13 +117,24 @@ jobs:
 - job: Job2_BFF
   steps:
     - task: Docker@2
-      displayName: "Build & Push Account Docker Image"
+      displayName: "Build & Push Account Docker Image - BFF"
       condition: always()
       inputs:
         containerRegistry: $(containerRegistry)
         repository: 'link-bff'
         command: 'buildAndPush'
         Dockerfile: '**/DotNet/LinkAdmin.BFF/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - DEMO"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry)
+        repository: 'link-demo'
+        command: 'buildAndPush'
+        Dockerfile: '**/Web/DemoApp/Dockerfile'
         tags: $(MyTag)
         buildContext: '$(Build.Repository.LocalPath)'
 
