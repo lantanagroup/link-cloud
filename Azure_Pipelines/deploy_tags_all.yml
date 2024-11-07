@@ -114,5 +114,19 @@ jobs:
   #     secretType: 'dockerRegistry'
   #     containerRegistryType: 'Azure Container Registry'
 
+- job: Job2_BFF
+  steps:
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry)
+        repository: 'link-bff'
+        command: 'buildAndPush'
+        Dockerfile: '**/DotNet/LinkAdmin.BFF/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+
 # Next Service
 ##############
