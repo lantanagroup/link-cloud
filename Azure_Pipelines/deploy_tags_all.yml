@@ -115,6 +115,11 @@ jobs:
 
 - job: Job2
   steps:
+    - task: GetRevision@1
+      displayName: 'Get Revision'
+      inputs:
+        VariableName: Revision
+
     - task: Bash@3
       inputs:
         targetType: 'inline'
