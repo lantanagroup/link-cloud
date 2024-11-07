@@ -138,6 +138,17 @@ jobs:
         tags: $(MyTag)
         buildContext: '$(Build.Repository.LocalPath)'
 
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - MeasureEval"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry)
+        repository: 'link-measureeval'
+        command: 'buildAndPush'
+        Dockerfile: 'Java/measureeval/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
 
 # Next Service
 ##############
