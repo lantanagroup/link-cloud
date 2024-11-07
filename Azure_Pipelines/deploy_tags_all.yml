@@ -24,7 +24,7 @@ parameters:
   - Report
   - Submission
   - Tenant
-  - Validation
+#  - Validation
 
 variables:
 - group: link-cloud-variables
@@ -166,6 +166,17 @@ jobs:
         repository: 'link-measureeval'
         command: 'buildAndPush'
         Dockerfile: 'Java/measureeval/Dockerfile'
+        tags: $(MyTag)
+        buildContext: '$(Build.Repository.LocalPath)'
+
+    - task: Docker@2
+      displayName: "Build & Push Account Docker Image - Validation"
+      condition: always()
+      inputs:
+        containerRegistry: $(containerRegistry)
+        repository: 'link-validation'
+        command: 'buildAndPush'
+        Dockerfile: 'Java/validation/Dockerfile'
         tags: $(MyTag)
         buildContext: '$(Build.Repository.LocalPath)'
 
