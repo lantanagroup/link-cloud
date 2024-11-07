@@ -20,7 +20,7 @@ parameters:
 #  - Measureeval
   - Normalization
   - Notification
-  - Querydispatch
+  - QueryDispatch
   - Report
   - Submission
   - Tenant
