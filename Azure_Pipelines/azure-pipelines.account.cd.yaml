@@ -1,10 +1,8 @@
 resources:
   pipelines:
   - pipeline: pipeline-trigger
-    # project: azure-pipelines.yml
-    source: Deploy_All_New
+    source: Deploy_All_Services
     trigger: true
-
 
 trigger:
   branches:
