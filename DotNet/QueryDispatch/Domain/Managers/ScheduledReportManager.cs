@@ -105,6 +105,8 @@ namespace QueryDispatch.Domain.Managers
                     });
                     existingReportPeriod.StartDate = newReportPeriod.StartDate;
                     existingReportPeriod.EndDate = newReportPeriod.EndDate;
+                    existingReportPeriod.Frequency = newReportPeriod.Frequency;
+                    existingReportPeriod.ReportTypes = newReportPeriod.ReportTypes;
                     existingReportPeriod.CorrelationId = newReportPeriod.CorrelationId;
                     existingReportPeriod.ModifyDate = DateTime.UtcNow;
                 }
@@ -115,6 +117,7 @@ namespace QueryDispatch.Domain.Managers
                         ReportType = newReportPeriod.ReportType,
                         StartDate = newReportPeriod.StartDate,
                         EndDate = newReportPeriod.EndDate,
+                        Frequency = newReportPeriod.Frequency,
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow,
                         CorrelationId = newReportPeriod.CorrelationId
