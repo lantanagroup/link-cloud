@@ -113,7 +113,7 @@ jobs:
   #     secretType: 'dockerRegistry'
   #     containerRegistryType: 'Azure Container Registry'
 
-- job: Job2_BFF
+- job: Job2
   steps:
     - task: Docker@2
       displayName: "Build & Push Account Docker Image - BFF"
