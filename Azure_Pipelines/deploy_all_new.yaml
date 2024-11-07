@@ -1,7 +1,6 @@
 name: Deploy_All
 
-# trigger:
-# - dev
+trigger: none
 
 pool:
     vmImage: ubuntu-latest
