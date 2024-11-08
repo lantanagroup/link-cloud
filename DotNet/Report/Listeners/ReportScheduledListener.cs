@@ -133,6 +133,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,
                                         Frequency = frequency,
+                                        ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
                                     };
 
