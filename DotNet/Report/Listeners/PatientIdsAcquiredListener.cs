@@ -113,14 +113,29 @@ namespace LantanaGroup.Link.Report.Listeners
                                         foreach (var patientReference in value.PatientIds.Entry)
                                         {
                                             var patientId = patientReference.Item.Reference.Split('/').Last();
-                                            _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+
+                                            var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                                       e.ReportScheduleId == scheduledReport.Id
+                                                       && e.PatientId == patientId
+                                                       && e.ReportType == reportType, consumeCancellationToken);
+
+                                            if (entry == null)
                                             {
-                                                PatientId = patientId,
-                                                Status = PatientSubmissionStatus.NotEvaluated,
-                                                ReportScheduleId = scheduledReport.Id,
-                                                FacilityId = scheduledReport.FacilityId,
-                                                ReportType = reportType,
-                                            });
+
+                                                _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                {
+                                                    PatientId = patientId,
+                                                    Status = PatientSubmissionStatus.NotEvaluated,
+                                                    ReportScheduleId = scheduledReport.Id,
+                                                    FacilityId = scheduledReport.FacilityId,
+                                                    ReportType = reportType,
+                                                });
+                                            }
+                                            else
+                                            {
+                                                entry.Status = PatientSubmissionStatus.NotEvaluated;
+                                                _submissionEntryManager.UpdateAsync(entry);
+                                            }
                                         }
                                     }
                                 }
