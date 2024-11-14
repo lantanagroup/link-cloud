@@ -1,34 +1,34 @@
 ﻿[← Back Home](../README.md)
 
-## Data Acquisition
+## Data Acquisition Overview
 
-### Overview
+The Data Acquisition service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the [Epic FHIR STU3 Patient List](https://fhir.epic.com/Specifications?api=879) resource to inform which patients are currently admitted in the facility. While this is the current solution to acquiring the patient census, there are other means of patient acquisition being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.
 
 - **Technology**: .NET Core
 - **Image Name**: link-dataacquisition
 - **Port**: 8080
 - **Database**: MSSQL (previously Mongo)
 
-### Environment Variables
+## Environment Variables
 
 | Name                                        | Value                         | Secret? |
 |---------------------------------------------|-------------------------------|---------|
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-### Kafka Connection
+## Kafka Connection
 
 | Name                                    | Value                    | Secret? |
 |-----------------------------------------|--------------------------|---------|
 | KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No      |
 | KafkaConnection:GroupId                  | data-acquisition-events  | No      |
 
-### Consumed Events
+## Consumed Events
 
 - **PatientEvent**
 - **PatientBulkAcquisitionScheduled**
 
-### Produced Events
+## Produced Events
 
 - **PatientIdsAcquired**
 - **PatientAcquired**

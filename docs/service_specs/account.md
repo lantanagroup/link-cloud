@@ -1,6 +1,8 @@
 ﻿[← Back Home](../README.md)
 
-## Overview
+## Account Overview
+
+The Account service is responsible for maintaining roles and permissions for Link Cloud users.
 
 - **Technology**: .NET Core
 - **Image Name**: link-account
@@ -9,27 +11,27 @@
 
 ## Environment Variables
 
-### App Config
+## App Config
 
 | Name                                     | Value                           | Secret? |
 |------------------------------------------|---------------------------------|---------|
 | ExternalConfigurationSource              | AzureAppConfiguration           | No      |
 | ConnectionStrings__AzureAppConfiguration | `<AzureAppConfigEndpoint>`      | Yes     |
 
-### Kafka Connection
+## Kafka Connection
 
 | Name                               | Value                    | Secret? |
 |------------------------------------|--------------------------|---------|
 | KafkaConnection:BootstrapServers:0  | `<KafkaBootstrapServer>` | No      |
 | KafkaConnection:GroupId             | Account                  | No      |
 
-### Database Settings (MSSQL)
+## Database Settings (MSSQL)
 
 | Name                   | Value                | Secret? |
 |------------------------|----------------------|---------|
 | Postgres:ConnectionString | `<ConnectionString>` | Yes   |
 
-### Tenant API Settings
+## Tenant API Settings
 
 | Name                                       | Value                              | Secret? |
 |--------------------------------------------|------------------------------------|---------|

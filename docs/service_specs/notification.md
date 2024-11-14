@@ -1,8 +1,8 @@
 ﻿[← Back Home](../README.md)
 
-## Notification
+## Notification Overview
 
-### Overview
+The Notification service is responsible for emailing configured users when a notifiable event occurs when the Link Cloud services attempt to perform their work.
 
 - **Technology**: .NET Core
 - **Image Name**: link-notification
@@ -10,7 +10,7 @@
 - **Database**: MSSQL
 - **Scale**: 0-3
 
-### Environment Variables
+## Environment Variables
 
 | Name                                                     | Value                         | Secret? |
 |----------------------------------------------------------|-------------------------------|---------|
@@ -29,10 +29,10 @@
 | Link:Notification:SmtpConnection:UseOAuth2               | false or true                 | No      |
 | Link:Notification:EnableSwagger                          | true (DEV and TEST)           | No      |
 
-### Consumed Events
+## Consumed Events
 
 - **NotificationRequested**
 
-### Produced Events
+## Produced Events
 
 - **AuditableEventOccurred**

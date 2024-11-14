@@ -1,8 +1,6 @@
-﻿## Backend For Frontend (BFF)
+﻿> ⚠️ **Note:** This service is planned to be renamed to "admin-bff".
 
-> ⚠️ **Note:** This service is planned to be renamed to "admin-bff".
-
-### Overview
+## Backend for Frontend (BFF) Overview
 
 - **Technology**: .NET Core
 - **Image Name**: link-bff
@@ -10,7 +8,7 @@
 - **Database**: NONE
 - **Scale**: 0-3
 
-### Environment Variables
+## Environment Variables
 
 | Name                                        | Value                         | Secret? |
 |---------------------------------------------|-------------------------------|---------|

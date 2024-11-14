@@ -1,15 +1,15 @@
 ﻿[← Back Home](../README.md)
 
-## Report
+## Report Overview
 
-### Overview
+The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process.
 
 - **Technology**: .NET Core
 - **Image Name**: link-report
 - **Port**: 8080
 - **Database**: MSSQL (previously Mongo)
 
-### Environment Variables
+## Environment Variables
 
 | Name                                        | Value                         | Secret? |
 |---------------------------------------------|-------------------------------|---------|
@@ -23,14 +23,14 @@
 | MongoDB:CollectionName                      | report                        | No      |
 | TenantApiSettings:TenantServiceBaseEndpoint | `<TenantApiUrl>/api`          | No      |
 
-### Consumed Events
+## Consumed Events
 
 - **ReportScheduled**
 - **MeasureEvaluated**
 - **PatientsToQuery**
 - **ReportSubmitted**
 
-### Produced Events
+## Produced Events
 
 - **SubmitReport**
 - **DataAcquisitionRequested**

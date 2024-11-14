@@ -1,8 +1,8 @@
 ﻿[← Back Home](../README.md)
 
-## Normalization
+## Normalization Overview
 
-### Overview
+FHIR resources queried from EHR endpoints can vary from location to location. There will be occasions where data for specific resources may need to be adjusted to ensure that Link Cloud properly evaluates a patient against dQM’s. The Normalization service is a component in Link Cloud to help make those adjustments in an automated way. The service operates in between the resource acquisition and evaluation steps to ensure that the tenant data is in a readied state for measure evaluation.
 
 - **Technology**: .NET Core
 - **Image Name**: link-normalization
@@ -10,14 +10,14 @@
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
 
-### Environment Variables
+## Environment Variables
 
 | Name                                        | Value                         | Secret? |
 |---------------------------------------------|-------------------------------|---------|
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-### Kafka Connection
+## Kafka Connection
 
 | Name                                    | Value                    | Secret? |
 |-----------------------------------------|--------------------------|---------|
@@ -25,18 +25,18 @@
 | KafkaConnection:GroupId                  | normalization-events     | No      |
 | KafkaConnection:ClientId                 | normalization-events     | No      |
 
-### Database Settings (MSSQL)
+## Database Settings (MSSQL)
 
 | Name                   | Value                      | Secret? |
 |------------------------|----------------------------|---------|
 | MongoDB:ConnectionString | `<DatabaseConnectionString>` | Yes   |
 | MongoDb:DatabaseName     | `<NormalizationDatabaseName>` | No  |
 
-### Consumed Events
+## Consumed Events
 
 - **PatientDataAcquired**
 
-### Produced Events
+## Produced Events
 
 - **PatientNormalized**
 - **NotificationRequested**

@@ -1,6 +1,8 @@
 ﻿[← Back Home](../README.md)
 
-## Census
+## Census Overview
+
+The Census service is primarily responsible for maintaining a tenants admit and discharge patient information needed to determine when a patient is ready for reporting. To accomplish this, the Census service has functionality in place to request an updated FHIR List of recently admitted patients. The frequency that the request is made is based on a Tenant configuration made in the Census service.
 
 - **Technology**: .NET Core
 - **Image Name**: link-census

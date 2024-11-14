@@ -1,8 +1,8 @@
 ﻿[← Back Home](../README.md)
 
-## Tenant
+## Tenant Overview
 
-### Overview
+The Tenant service is the entry point for configuring a tenant into Link Cloud. The service is responsible for maintaining and generating events for the scheduled measure reporting periods that the tenant is configured for. These events contain the initial information needed for Link Cloud to query resources and perform measure evaluations based on a specific reporting period.
 
 - **Technology**: .NET Core
 - **Image Name**: link-tenant
@@ -10,7 +10,7 @@
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
 
-### Environment Variables
+## Environment Variables
 
 | Name                                        | Value                         | Secret? |
 |---------------------------------------------|-------------------------------|---------|
@@ -24,10 +24,10 @@
 | MeasureServiceRegistry:MeasureServiceApiUrl | `<MeasureServiceUrl>`         | No      |
 | EnableSwagger                               | true (DEV and TEST)           | No      |
 
-### Consumed Events
+## Consumed Events
 
 - **NONE**
 
-### Produced Events
+## Produced Events
 
 - **ReportScheduled**

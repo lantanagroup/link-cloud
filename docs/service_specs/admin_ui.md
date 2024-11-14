@@ -2,7 +2,7 @@
 
 > ⚠️ **Note:** This service is currently called "demo app" and is planned to be renamed.
 
-### Overview
+## Admin UI Overview
 
 - **Technology**: JavaScript (TypeScript) & Angular
 - **Image Name**: link-admin-ui
@@ -10,13 +10,13 @@
 - **Database**: NONE
 - **Scale**: 0-5
 
-### Volumes
+## Volumes
 
 | Volume                        | Mount Path                                   | Sub-path               |
 |-------------------------------|----------------------------------------------|------------------------|
 | Azure Storage Account         | `/usr/share/nginx/html/assets/app.config.local.json` | `app.config.local.json` |
 
-### app.config.local.json
+## app.config.local.json
 
 ```json
 {
