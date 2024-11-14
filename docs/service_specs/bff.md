@@ -1,4 +1,6 @@
-﻿> ⚠️ **Note:** This service is planned to be renamed to "admin-bff".
+﻿[← Back Home](../README.md)
+
+> ⚠️ **Note:** This service is planned to be renamed to "admin-bff".
 
 ## Backend for Frontend (BFF) Overview
 

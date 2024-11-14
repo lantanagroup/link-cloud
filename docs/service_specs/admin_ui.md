@@ -1,4 +1,6 @@
-﻿## Admin UI
+﻿[← Back Home](../README.md)
+
+## Admin UI
 
 > ⚠️ **Note:** This service is currently called "demo app" and is planned to be renamed.
 
