@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -140,10 +141,22 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {value.ReportType}");
 
 
-                                var entry = await submissionEntryManager.SingleAsync(e =>
+                                var entry = await submissionEntryManager.SingleOrDefaultAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
+
+                                if (entry == null)
+                                {
+                                    entry = await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                    {
+                                        PatientId = value.PatientId,
+                                        Status = PatientSubmissionStatus.NotEvaluated,
+                                        ReportScheduleId = schedule.Id,
+                                        FacilityId = facilityId,
+                                        ReportType = value.ReportType,
+                                    });
+                                }
 
                                 if (value.IsReportable)
                                 {
@@ -214,11 +227,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                         var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ReadyForSubmission).Select(s => s.PatientId).ToList();
 
                                         List<MeasureReport?> measureReports = submissionEntries
-                                            .Select(e => e.MeasureReport)
-                                            .Where(report => report != null)
-                                            .ToList();
+                                              .Select(e => e.MeasureReport)
+                                              .Where(report => report != null)
+                                              .ToList()
 
-                                        
                                         var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
                                             ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
                                         
