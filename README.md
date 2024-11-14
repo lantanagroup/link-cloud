@@ -74,7 +74,7 @@ The initial building of the services will take a few minutes to run.
 
 5. Open a web browser and access Kafka UI. By default, the page can be accessed at `http://localhost:9095`. Click the `Topics` tab and ensure that Kafka topics exist:
 
-<img src="Documentation/Images/readme_kafkaui.png" width="75%" height="75%">
+<img src="docs/images/readme_kafkaui.png" width="75%" height="75%" alt="Kafka UI showing Link topics" />
 
 If there aren't any topics populated (shown in the image above), attempt to rerun the following command: `docker compose up kafka_init -d`
     
@@ -203,7 +203,7 @@ Test-Hospital
 
 At the end of the reporting period, the Report service will make additional requests to query and evaluate patients that are currently admitted in the facility prior to submitting. After each of those admitted patients are evaluated, the Report service will then produce a `SubmitReport` event to inform the Submission service that a report is complete. To access the submission package open Docker Desktop and click the `link-submission` container. Select the `files` tab and navigate to the `app\submissions` folder. There, you'll be able to download the submission results for the reporting period:
 
-<img src="Documentation/Images/docker_submission.png" width="75%" height="75%">
+<img src="docs/images/docker_submission.png" width="75%" height="75%" alt="Docker Desktop UI showing submissions folder" />
 
 ## Reporting Event Workflow
 > [!NOTE]
@@ -213,13 +213,13 @@ Detailed below are the steps Link Cloud takes to generate a report for a tenant 
 
 ### Report Scheduling
 
-<img src="Documentation/Images/readme_event_report_scheduling.png" width="75%" height="75%">
+<img src="docs/images/readme_event_report_scheduling.png" width="75%" height="75%" alt="UML diagram showing events for report scheduling" />
 
 At the beginning of a new reporting period, the Tenant service produces a `ReportScheduled` event. The Query Dispatch and Report services consume and persist the reporting information in the event into their databases. The Report service sets an internal cron job (based on the EndDate of the consumed event) to execute the work needed to complete the report. 
 
 ### Census Acquisition and Discharge
 
-<img src="Documentation/Images/readme_event_census_discharge.png" width="75%" height="75%">
+<img src="docs/images/readme_event_census_discharge.png" width="75%" height="75%" alt="UML diagram showing events for census of patients" />
 
 During the reporting period, the Census service is configured to continually request a new list of patients admitted in a facility by producing the `CensusAcquisitionScheduled` event. The Data Acquisition service consumed this event and queries the facility's List endpoint. After receiving a response back from the EHR endpoints, the Data Acquisition service then produces a `PatientIDsAcquired` event that contains a list of all patients that are currently admitted in the facility.
 
@@ -234,7 +234,7 @@ The QueryDispatch service consumes the patient events and appends the tenants' r
 
 ### Resource Acquisition and Evaluation
 
-<img src="Documentation/Images/readme_event_acquisition_evaluation.png" width="75%" height="75%">
+<img src="docs/images/readme_event_acquisition_evaluation.png" width="75%" height="75%" alt="UML diagram showing events for data acquisition and evaluation" />
 
 A `DataAcquisitionRequested` event is generated for patients that have either been discharged or are still admitted when the reporting period end date is met. This event is the trigger that causes the resource acquisition, normalization and evaluation phases for a patient. 
 
