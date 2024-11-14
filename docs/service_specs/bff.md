@@ -16,15 +16,27 @@
 |---------------------------------------------|-------------------------------|---------|
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-| GatewayConfig:KafkaBootstrapServers:0       | `<KafkaBootstrapServer>`      | No      |
-| GatewayConfig:AuditServiceApiUrl            | `<URL> (without /api)`        | No      |
-| GatewayConfig:NotificationServiceApiUrl     | `<URL> (without /api)`        | No      |
-| GatewayConfig:TenantServiceApiUrl           | `<URL> (without /api)`        | No      |
-| GatewayConfig:CensusServiceApiUrl           | `<URL> (without /api)`        | No      |
-| GatewayConfig:ReportServiceApiUrl           | `<URL> (without /api)`        | No      |
-| GatewayConfig:MeasureServiceApiUrl          | `<URL> (without /api)`        | No      |
-| IdentityProviderConfig:Issuer               | ??                            | No      |
-| IdentityProviderConfig:Audience             | ??                            | No      |
-| IdentityProviderConfig:NameClaimType        | email                         | No      |
-| IdentityProviderConfig:RoleClaimType        | roles                         | No      |
-| IdentityProviderConfig:ValidTypes           | `[ "at+jwt", "JWT" ]`         | No      |
+
+## App Settings
+
+### Service Endpoints
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| GatewayConfig__KafkaBootstrapServers__0      | `<KafkaBootstrapServer>`       | No       |
+| GatewayConfig__AuditServiceApiUrl            | `<URL> (without /api)`         | No       |
+| GatewayConfig__NotificationServiceApiUrl     | `<URL> (without /api)`         | No       |
+| GatewayConfig__TenantServiceApiUrl           | `<URL> (without /api)`         | No       |
+| GatewayConfig__CensusServiceApiUrl           | `<URL> (without /api)`         | No       |
+| GatewayConfig__ReportServiceApiUrl           | `<URL> (without /api)`         | No       |
+| GatewayConfig__MeasureServiceApiUrl          | `<URL> (without /api)`         | No       |
+
+### Identity Provider
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| IdentityProviderConfig__Issuer               | ??                             | No       |
+| IdentityProviderConfig__Audience             | ??                             | No       |
+| IdentityProviderConfig__NameClaimType        | email                          | No       |
+| IdentityProviderConfig__RoleClaimType        | roles                          | No       |
+| IdentityProviderConfig__ValidTypes           | `[ "at+jwt", "JWT" ]`          | No       |

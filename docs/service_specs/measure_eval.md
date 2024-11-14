@@ -16,19 +16,21 @@ The Measure Eval service is a Java based application that is primarily responsib
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-## Kafka Connection
+## App Settings
 
-| Name                                    | Value                    | Secret? |
-|-----------------------------------------|--------------------------|---------|
-| KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No      |
-| KafkaConnection:GroupId                  | measure-events           | No      |
+### Kafka Connection
 
-## Measure Evaluation Config
+| Name                                     | Value                     | Secret? |
+|------------------------------------------|---------------------------|---------|
+| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No      |
+| KafkaConnection__GroupId                 | measure-events            | No      |
 
-| Name                                      | Value                                           | Secret? |
-|-------------------------------------------|-------------------------------------------------|---------|
-| MeasureEvalConfig:TerminologyServiceUrl   | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
-| MeasureEvalConfig:EvaluationServiceUrl    | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
+### Measure Evaluation Config
+
+| Name                                       | Value                                           | Secret? |
+|--------------------------------------------|-------------------------------------------------|---------|
+| MeasureEvalConfig__TerminologyServiceUrl   | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
+| MeasureEvalConfig__EvaluationServiceUrl    | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
 
 ## Consumed Events
 

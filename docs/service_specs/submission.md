@@ -23,18 +23,39 @@ An example of the submission package can be found at `\link-cloud\Submission Exa
 
 ## Environment Variables
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-| KafkaConnection:BootstrapServers:0          | `<KafkaBootstrapServer>`      | No      |
-| KafkaConnection:GroupId                     | submission-events             | No      |
-| KafkaConnection:ClientId                    | submission-events             | No      |
-| MongoDB:ConnectionString                    | `<ConnectionString>`          | Yes     |
-| MongoDb:DatabaseName                        | `<DatabaseName>`              | No      |
-| SubmissionServiceConfig:ReportServiceUrl    | `<ReportServiceUrl>/api/Report/GetSubmissionBundle` | No      |
-| FileSystemConfig:FilePath                   | `/data/Submission`            | No      |
-| EnableSwagger                               | true (DEV and TEST)           | No      |
+| Name                                         | Value                                                | Secret?  |
+|----------------------------------------------|------------------------------------------------------|----------|
+| Link__Audit__ExternalConfigurationSource     | AzureAppConfiguration                                | No       |
+| ConnectionStrings__AzureAppConfiguration     | `<AzureAppConfigEndpoint>`                           | Yes      |
+
+## App Settings
+
+### Kafka
+
+| Name                                         | Value                                                | Secret?  |
+|----------------------------------------------|------------------------------------------------------|----------|
+| KafkaConnection__BootstrapServers__0         | `<KafkaBootstrapServer>`                             | No       |
+| KafkaConnection__GroupId                     | submission-events                                    | No       |
+| KafkaConnection__ClientId                    | submission-events                                    | No       |
+
+### Database
+| Name                                         | Value                                                | Secret?  |
+|----------------------------------------------|------------------------------------------------------|----------|
+| MongoDB__ConnectionString                    | `<ConnectionString>`                                 | Yes      |
+| MongoDb__DatabaseName                        | `<DatabaseName>`                                     | No       |
+
+### Service Endpoints
+
+| Name                                         | Value                                                | Secret?  |
+|----------------------------------------------|------------------------------------------------------|----------|
+| SubmissionServiceConfig__ReportServiceUrl    | `<ReportServiceUrl>/api/Report/GetSubmissionBundle`  | No       |
+
+### Additional Settings
+
+| Name                                         | Value                                                | Secret?  |
+|----------------------------------------------|------------------------------------------------------|----------|
+| FileSystemConfig__FilePath                   | `/data/Submission`                                   | No       |
+| EnableSwagger                                | true (DEV and TEST)                                  | No       |
 
 ## Consumed Events
 

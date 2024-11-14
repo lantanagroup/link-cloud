@@ -1,7 +1,7 @@
 
 ## Overview
 
-This page and its references includes documentation for Link's services and the functionality those services supoprts.
+This page and its references include documentation for Link's services and the functionality those services supports.
 
 ## Functionality
 

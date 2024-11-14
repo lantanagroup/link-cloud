@@ -16,12 +16,14 @@ The Data Acquisition service is responsible for connecting and querying a tenant
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-## Kafka Connection
+## App Settings
 
-| Name                                    | Value                    | Secret? |
-|-----------------------------------------|--------------------------|---------|
-| KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No      |
-| KafkaConnection:GroupId                  | data-acquisition-events  | No      |
+### Kafka Connection
+
+| Name                                     | Value                     | Secret?  |
+|------------------------------------------|---------------------------|----------|
+| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No       |
+| KafkaConnection__GroupId                 | data-acquisition-events   | No       |
 
 ## Consumed Events
 

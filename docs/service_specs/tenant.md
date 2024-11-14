@@ -12,17 +12,39 @@ The Tenant service is the entry point for configuring a tenant into Link Cloud. 
 
 ## Environment Variables
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-| KafkaConnection:BootstrapServers:0          | `<KafkaBootstrapServer>`      | No      |
-| KafkaConnection:GroupId                     | tenant-events                 | No      |
-| MongoDB:ConnectionString                    | `<ConnectionString>`          | Yes     |
-| MongoDB:DatabaseName                        | `<DatabaseName>`              | No      |
-| MongoDB:CollectionName                      | tenant                        | No      |
-| MeasureServiceRegistry:MeasureServiceApiUrl | `<MeasureServiceUrl>`         | No      |
-| EnableSwagger                               | true (DEV and TEST)           | No      |
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| Link__Audit__ExternalConfigurationSource     | AzureAppConfiguration          | No       |
+| ConnectionStrings__AzureAppConfiguration     | `<AzureAppConfigEndpoint>`     | Yes      |
+
+## App Settings
+
+### Kafka
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| KafkaConnection__BootstrapServers__0         | `<KafkaBootstrapServer>`       | No       |
+| KafkaConnection__GroupId                     | tenant-events                  | No       |
+
+### Database
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| MongoDB__ConnectionString                    | `<ConnectionString>`           | Yes      |
+| MongoDB__DatabaseName                        | `<DatabaseName>`               | No       |
+| MongoDB__CollectionName                      | tenant                         | No       |
+
+### Service Endpoints
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| MeasureServiceRegistry__MeasureServiceApiUrl | `<MeasureServiceUrl>`          | No       |
+
+### Additional Settings
+
+| Name                                         | Value                          | Secret?  |
+|----------------------------------------------|--------------------------------|----------|
+| EnableSwagger                                | true (DEV and TEST)            | No       |
 
 ## Consumed Events
 

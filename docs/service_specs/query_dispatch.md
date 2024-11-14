@@ -5,7 +5,7 @@
 The Query Dispatch service is primarily responsible for applying a lag period prior to making FHIR resource query requests against a facility endpoint. The current implementation of the Query Dispatch service handles how long Link Cloud should wait before querying for a patient’s FHIR resources after being discharged. To ensure that the encounter related data for the patient has been settled (Medications have been closed, Labs have had their results finalized, etc), tenants are able to customize how long they would like the lag from discharge to querying to be.
 
 - **Technology**: .NET Core
-- **Image**: link-querydispatch
+- **Image Name**: link-querydispatch
 - **Port**: 8080
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
@@ -17,27 +17,29 @@ The Query Dispatch service is primarily responsible for applying a lag period pr
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-## Kafka Connection
+## App Settings
 
-| Name                                    | Value                    | Secret? |
-|-----------------------------------------|--------------------------|---------|
-| KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No      |
-| KafkaConnection:GroupId                  | query-dispatch-events    | No      |
-| KafkaConnection:ClientId                 | query-dispatch-events    | No      |
+### Kafka Connection
 
-## Database Settings (MSSQL)
+| Name                                     | Value                     | Secret? |
+|------------------------------------------|---------------------------|---------|
+| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No      |
+| KafkaConnection__GroupId                 | query-dispatch-events     | No      |
+| KafkaConnection__ClientId                | query-dispatch-events     | No      |
 
-| Name                   | Value                | Secret? |
-|------------------------|----------------------|---------|
-| MongoDB:ConnectionString | `<ConnectionString>` | Yes   |
-| MongoDB:DatabaseName     | `<DatabaseName>`     | No    |
-| MongoDB:CollectionName   | `<CollectionName>`   | No    |
+### Database Settings (MSSQL)
 
-## Additional Settings
+| Name                      | Value                | Secret?  |
+|---------------------------|----------------------|----------|
+| MongoDB__ConnectionString | `<ConnectionString>` | Yes      |
+| MongoDB__DatabaseName     | `<DatabaseName>`     | No       |
+| MongoDB__CollectionName   | `<CollectionName>`   | No       |
 
-| Name         | Value                          | Secret? |
-|--------------|--------------------------------|---------|
-| EnableSwagger | true (DEV and TEST)           | No      |
+### Additional Settings
+
+| Name          | Value                           | Secret? |
+|---------------|---------------------------------|---------|
+| EnableSwagger | true (DEV and TEST)             | No      |
 
 ## Consumed Events
 

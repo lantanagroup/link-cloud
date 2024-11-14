@@ -15,13 +15,30 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 |---------------------------------------------|-------------------------------|---------|
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-| KafkaConnection:BootstrapServers:0          | `<KafkaBootstrapServer>`      | No      |
-| KafkaConnection:GroupId                     | report-events                 | No      |
-| KafkaConnection:ClientId                    | report-events                 | No      |
-| MongoDB:ConnectionString                    | `<ConnectionString>`          | Yes     |
-| MongoDB:DatabaseName                        | `<DatabaseName>`              | No      |
-| MongoDB:CollectionName                      | report                        | No      |
-| TenantApiSettings:TenantServiceBaseEndpoint | `<TenantApiUrl>/api`          | No      |
+
+## App Settings
+
+### Kafka
+
+| Name                                          | Value                          | Secret? |
+|-----------------------------------------------|--------------------------------|---------|
+| KafkaConnection__BootstrapServers__0          | `<KafkaBootstrapServer>`       | No      |
+| KafkaConnection__GroupId                      | report-events                  | No      |
+| KafkaConnection__ClientId                     | report-events                  | No      |
+
+### Database
+
+| Name                                          | Value                          | Secret? |
+|-----------------------------------------------|--------------------------------|---------|
+| MongoDB__ConnectionString                     | `<ConnectionString>`           | Yes     |
+| MongoDB__DatabaseName                         | `<DatabaseName>`               | No      |
+| MongoDB__CollectionName                       | report                         | No      |
+
+### Service Endpoints
+
+| Name                                          | Value                          | Secret? |
+|-----------------------------------------------|--------------------------------|---------|
+| TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantApiUrl>/api`           | No      |
 
 ## Consumed Events
 

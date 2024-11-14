@@ -17,20 +17,22 @@ FHIR resources queried from EHR endpoints can vary from location to location. Th
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-## Kafka Connection
+## App Settings
 
-| Name                                    | Value                    | Secret? |
-|-----------------------------------------|--------------------------|---------|
-| KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No      |
-| KafkaConnection:GroupId                  | normalization-events     | No      |
-| KafkaConnection:ClientId                 | normalization-events     | No      |
+### Kafka Connection
 
-## Database Settings (MSSQL)
+| Name                                     | Value                     | Secret? |
+|------------------------------------------|---------------------------|---------|
+| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No      |
+| KafkaConnection__GroupId                 | normalization-events      | No      |
+| KafkaConnection__ClientId                | normalization-events      | No      |
 
-| Name                   | Value                      | Secret? |
-|------------------------|----------------------------|---------|
-| MongoDB:ConnectionString | `<DatabaseConnectionString>` | Yes   |
-| MongoDb:DatabaseName     | `<NormalizationDatabaseName>` | No  |
+### Database Settings (MSSQL)
+
+| Name                      | Value                         | Secret?  |
+|---------------------------|-------------------------------|----------|
+| MongoDB__ConnectionString | `<DatabaseConnectionString>`  | Yes      |
+| MongoDb__DatabaseName     | `<NormalizationDatabaseName>` | No       |
 
 ## Consumed Events
 

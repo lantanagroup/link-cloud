@@ -12,34 +12,34 @@ The Census service is primarily responsible for maintaining a tenants admit and 
 
 ## Environment Variables
 
-### App Settings
-
 | Name                                       | Value                         | Secret? |
 |--------------------------------------------|-------------------------------|---------|
 | Link__Audit__ExternalConfigurationSource   | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration   | `<AzureAppConfigEndpoint>`    | Yes     |
 
+## App Settings
+
 ### Kafka Connection
 
-| Name                                    | Value                | Secret? |
-|-----------------------------------------|----------------------|---------|
-| KafkaConnection:BootstrapServers:0       | `<KafkaBootstrapServer>` | No  |
-| KafkaConnection:GroupId                  | census-events        | No      |
-| KafkaConnection:ClientId                 | census-events        | No      |
+| Name                                    | Value                    | Secret?  |
+|-----------------------------------------|--------------------------|----------|
+| KafkaConnection__BootstrapServers__0    | `<KafkaBootstrapServer>` | No       |
+| KafkaConnection__GroupId                | census-events            | No       |
+| KafkaConnection__ClientId               | census-events            | No       |
 
 ### Tenant API Settings
 
-| Name                          | Value                           | Secret? |
-|-------------------------------|---------------------------------|---------|
-| TenantApiSettings:TenantServiceBaseEndpoint | `<TenantApiUrl>/api` | No      |
+| Name                                         | Value                  | Secret? |
+|----------------------------------------------|------------------------|---------|
+| TenantApiSettings__TenantServiceBaseEndpoint | `<TenantApiUrl>/api`   | No      |
 
 ### Database Settings (MSSQL)
 
-| Name                    | Value                | Secret? |
-|-------------------------|----------------------|---------|
-| MongoDB:ConnectionString | `<ConnectionString>` | Yes     |
-| MongoDb:DatabaseName     | `<DatabaseName>`     | No      |
-| MongoDb:CollectionName   | `census`             | No      |
+| Name                      | Value                | Secret? |
+|---------------------------|----------------------|---------|
+| MongoDB__ConnectionString | `<ConnectionString>` | Yes     |
+| MongoDb__DatabaseName     | `<DatabaseName>`     | No      |
+| MongoDb__CollectionName   | `census`             | No      |
 
 ## Consumed Events
 

@@ -16,13 +16,15 @@ The Audit service is responsible for persisting auditable events that are genera
 | Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
 | ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
 
-## Kafka Connection
+## App Config
 
-| Name                                    | Value                    | Secret? |
-|-----------------------------------------|--------------------------|---------|
-| Link:Audit:KafkaConnection:BootstrapServers:0 | `<KafkaBootstrapServer>` | No      |
-| Link:Audit:KafkaConnection:GroupId          | audit-events             | No      |
-| Link:Audit:KafkaConnection:ClientId         | audit-events             | No      |
+### Kafka Connection
+
+| Name                                              | Value                    | Secret? |
+|---------------------------------------------------|--------------------------|---------|
+| Link__Audit__KafkaConnection__BootstrapServers__0 | `<KafkaBootstrapServer>` | No      |
+| Link__Audit__KafkaConnection__GroupId             | audit-events             | No      |
+| Link__Audit__KafkaConnection__ClientId            | audit-events             | No      |
 
 ## Consumed Events
 

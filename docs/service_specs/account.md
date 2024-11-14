@@ -11,31 +11,31 @@ The Account service is responsible for maintaining roles and permissions for Lin
 
 ## Environment Variables
 
-## App Config
-
 | Name                                     | Value                           | Secret? |
 |------------------------------------------|---------------------------------|---------|
 | ExternalConfigurationSource              | AzureAppConfiguration           | No      |
 | ConnectionStrings__AzureAppConfiguration | `<AzureAppConfigEndpoint>`      | Yes     |
 
-## Kafka Connection
+## App Config
 
-| Name                               | Value                    | Secret? |
-|------------------------------------|--------------------------|---------|
-| KafkaConnection:BootstrapServers:0  | `<KafkaBootstrapServer>` | No      |
-| KafkaConnection:GroupId             | Account                  | No      |
+### Kafka Connection
 
-## Database Settings (MSSQL)
+| Name                                 | Value                     | Secret?  |
+|--------------------------------------|---------------------------|----------|
+| KafkaConnection__BootstrapServers__0 | `<KafkaBootstrapServer>`  | No       |
+| KafkaConnection__GroupId             | Account                   | No       |
 
-| Name                   | Value                | Secret? |
-|------------------------|----------------------|---------|
-| Postgres:ConnectionString | `<ConnectionString>` | Yes   |
+### Database Settings (MSSQL)
 
-## Tenant API Settings
+| Name                       | Value                 | Secret?  |
+|----------------------------|-----------------------|----------|
+| Postgres__ConnectionString | `<ConnectionString>`  | Yes      |
 
-| Name                                       | Value                              | Secret? |
-|--------------------------------------------|------------------------------------|---------|
-| TenantApiSettings:TenantServiceBaseEndpoint | `<TenantServiceUrl>/api`          | No      |
+### Tenant API Settings
+
+| Name                                          | Value                               | Secret? |
+|-----------------------------------------------|-------------------------------------|---------|
+| TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantServiceUrl>/api`            | No      |
 
 ## Consumed Events
 

@@ -14,8 +14,8 @@
 
 ## Volumes
 
-| Volume                        | Mount Path                                   | Sub-path               |
-|-------------------------------|----------------------------------------------|------------------------|
+| Volume                        | Mount Path                                           | Sub-path                |
+|-------------------------------|------------------------------------------------------|-------------------------|
 | Azure Storage Account         | `/usr/share/nginx/html/assets/app.config.local.json` | `app.config.local.json` |
 
 ## app.config.local.json
