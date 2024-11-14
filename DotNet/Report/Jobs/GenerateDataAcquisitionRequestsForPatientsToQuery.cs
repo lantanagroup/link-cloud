@@ -115,6 +115,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 {
                     var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
+                        .Where(report => report != null)
                         .ToList();
 
                     var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ReadyForSubmission).Select(s => s.PatientId).ToList();
