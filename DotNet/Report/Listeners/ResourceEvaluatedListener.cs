@@ -215,6 +215,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                         List<MeasureReport?> measureReports = submissionEntries
                                             .Select(e => e.MeasureReport)
+                                            .Where(report => report != null)
                                             .ToList();
 
                                         
