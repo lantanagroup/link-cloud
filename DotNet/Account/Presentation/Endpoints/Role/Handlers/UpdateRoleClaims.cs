@@ -10,12 +10,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 {
     public static class UpdateRoleClaims
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkClaimsModel model,
+        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkClaimsModel model,
             [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole queryRole, [FromServices] IUpdateRoleClaims command)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A role id is required");
                 }
@@ -43,7 +43,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogRoleClaimAssignmentException(id, string.Join(",", model.Claims), ex.Message);
+                logger.LogRoleClaimAssignmentException(id.ToString(), string.Join(",", model.Claims), ex.Message);
                 throw;
             }
             

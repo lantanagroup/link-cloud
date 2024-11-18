@@ -8,12 +8,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 {
     public static class GetRoleById
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id, 
             [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole query)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A role id is required");
                 }
@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogFindRoleException(id, ex.Message);
+                logger.LogFindRoleException(id.ToString(), ex.Message);
                 throw;
             }
             

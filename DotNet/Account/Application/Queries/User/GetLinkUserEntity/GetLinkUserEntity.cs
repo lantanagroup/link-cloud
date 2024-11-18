@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         }
 
-        public async Task<LinkUser> Execute(string id, CancellationToken cancellationToken = default)
+        public async Task<LinkUser> Execute(Guid id, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, id)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetLinkUserEntity:Execute", tagList);
@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             try
             {
 
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     throw new ArgumentException("A user id is required");
                 }

@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
             return model;
         }
 
-        public LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? roles, List<string>? userClaims, List<string>? roleClaims)
+        public LinkUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? roles, List<string>? userClaims, List<string>? roleClaims)
         {
             LinkUserModel model = new()
             {

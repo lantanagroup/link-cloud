@@ -2,9 +2,9 @@
 {
     public class LinkUserModel
     {
-        public LinkUserModel() : this(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
+        public LinkUserModel() : this(Guid.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, [], [], []) { }
 
-        public LinkUserModel(string id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims)
+        public LinkUserModel(Guid id, string username, string firstName, string? middleName, string lastName, string email, List<string> roles, List<string> userClaims, List<string> roleClaims)
         {
             Id = id;
             Username = username;
@@ -21,7 +21,7 @@
         /// The unique identifier for the user
         /// </summary>
         /// <example>5d7096b5-aa51-4f29-a840-6df98aaa9356</example>
-        public string Id { get; set; }
+        public Guid Id { get; set; }
 
         /// <summary>
         /// The first name of the user

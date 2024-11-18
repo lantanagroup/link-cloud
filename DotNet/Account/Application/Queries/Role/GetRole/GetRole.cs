@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
             _linkRoleModelFactory = linkRoleModelFactory ?? throw new ArgumentNullException(nameof(linkRoleModelFactory));
         }
 
-        public async Task<LinkRoleModel> Execute(string roleId, CancellationToken cancellationToken = default)
+        public async Task<LinkRoleModel> Execute(Guid roleId, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("GetRole:Execute");
 

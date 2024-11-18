@@ -19,7 +19,7 @@ namespace AccountUnitTests
         {
             return new LinkUser()
             {
-                Id = AccountTestsConstants.accountId,
+                Id = Guid.Parse(AccountTestsConstants.accountId),
                 UserName = "testUser",
                 Email = AccountTestsConstants.email,
                 FirstName = "Tester",
@@ -33,7 +33,7 @@ namespace AccountUnitTests
         {
             return new LinkRole()
             {
-                Id = AccountTestsConstants.roleId,
+                Id = Guid.Parse(AccountTestsConstants.roleId),
                 Name = "TestRole"
             };
         }

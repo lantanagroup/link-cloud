@@ -10,12 +10,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class UpdateUserClaims
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkClaimsModel model,
+        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkClaimsModel model,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IUpdateUserClaims command)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A user id is required");
                 }
@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 
                 user.UserClaims = model.Claims;
                 
-                logger.LogUpdateUser(user.Id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogUpdateUser(user.Id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.Ok(user);
             }
@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogUpdateUserException(id, ex.Message);
+                logger.LogUpdateUserException(id.ToString(), ex.Message);
                 throw;
             }
             
