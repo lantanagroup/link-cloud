@@ -94,7 +94,7 @@ public class QueryListController : Controller
     }
 
     /// <summary>
-    /// Creates or updates a FhirQueryConfiguration record for a given facilityId.
+    /// Updates a FhirQueryConfiguration record for a given facilityId.
     /// Supported Authentication Types: Basic, Epic
     /// </summary>
     /// <param name="fhirListConfiguration"></param>
@@ -124,6 +124,43 @@ public class QueryListController : Controller
         catch (Exception ex)
         {
             _logger.LogError(new EventId(LoggingIds.UpdateItem, "PutFhirConfiguration"), ex, "An exception occurred while attempting to update a fhir query configuration with a facility id of {id}", HtmlInputSanitizer.Sanitize(fhirListConfiguration.FacilityId));
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Deletes a FhirQueryConfiguration record for a given facilityId.
+    /// Supported Authentication Types: Basic, Epic
+    /// </summary>
+    /// <param name="fhirListConfiguration"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpDelete("{facilityId}/fhirQueryList")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteFhirConfiguration(string facilityId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest();
+        }
+
+        var sanitizedFacilityId = HtmlInputSanitizer.Sanitize(facilityId);
+
+        try
+        {
+            var entity = await _fhirQueryListConfigurationManager.DeleteAsync(sanitizedFacilityId, cancellationToken);
+
+            return Accepted();
+        }
+        catch (MissingFacilityConfigurationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(new EventId(LoggingIds.DeleteItem, "DeleteFhirConfiguration"), ex, "An exception occurred while attempting to delete a fhir query list configuration with a facility id of {id}", sanitizedFacilityId);
             throw;
         }
     }

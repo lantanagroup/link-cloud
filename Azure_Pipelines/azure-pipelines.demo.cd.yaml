@@ -1,3 +1,9 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Deploy_All_Services
+    trigger: true
+
 trigger:
   branches:
     include:
@@ -17,7 +23,7 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: registry-repo-Name
-  value: 'link-demo-app'
+  value: 'link-demo'
 - name: dockerPath
   value: '**/Web/DemoApp/Dockerfile'
 - name: workingDir
