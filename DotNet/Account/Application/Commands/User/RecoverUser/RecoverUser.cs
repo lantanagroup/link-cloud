@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
-        public async Task<LinkUserModel> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<LinkUserModel> Execute(ClaimsPrincipal? requestor, Guid userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("RecoverUser:Execute", tagList);
@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountRestoredCounter(tagList);
-                _logger.LogUserRecovery(userId, user.LastModifiedBy ?? "Unknown");
+                _logger.LogUserRecovery(userId.ToString(), user.LastModifiedBy ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage

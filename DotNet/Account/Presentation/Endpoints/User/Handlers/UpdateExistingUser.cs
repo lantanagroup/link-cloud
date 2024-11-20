@@ -10,13 +10,13 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class UpdateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkUserModel model, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkUserModel model, 
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid queryUser, [FromServices] IGetUserByEmail queryUserByEmail,
             [FromServices] ICreateUser createUserCommand, [FromServices] IUpdateUser command)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A user id is required");
                 }
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     //create new user
                     var createdUser = await createUserCommand.Execute(requestor, model, context.RequestAborted);
 
-                    logger.LogUserCreated(createdUser.Id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                    logger.LogUserCreated(createdUser.Id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                     //build resource uri
                     var uriBuilder = new UriBuilder
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     return Results.Problem("Failed to update user");
                 }
 
-                logger.LogUpdateUser(id, context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogUpdateUser(id.ToString(), context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.NoContent();
             }
@@ -75,7 +75,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogUpdateUserException(id, ex.Message);
+                logger.LogUpdateUserException(id.ToString(), ex.Message);
                 throw;
             }            
         }

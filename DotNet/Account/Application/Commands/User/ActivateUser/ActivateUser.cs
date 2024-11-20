@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("ActivateUser:Execute", tagList);
@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                 if (!result)
                 {
-                    _logger.LogActivateUserException(user.Id, "Failed to activiate user");
+                    _logger.LogActivateUserException(user.Id.ToString(), "Failed to activiate user");
                     return false;
                 }
 
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     activity?.AddTag(tag.Key, tag.Value);
                 }
                 _metrics.IncrementAccountActiviatedCounter(tagList);
-                _logger.LogActivateUser(userId, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                _logger.LogActivateUser(userId.ToString(), requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event
                 var auditMessage = new AuditEventMessage

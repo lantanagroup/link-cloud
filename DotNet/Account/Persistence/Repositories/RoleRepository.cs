@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
-        public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
             var role = await _dbContext.Roles.FindAsync([id], cancellationToken);
             if(role is null)
@@ -44,7 +44,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
-        public async Task<bool> AddClaimAsync(string roleId, Claim claim, CancellationToken cancellationToken = default)
+        public async Task<bool> AddClaimAsync(Guid roleId, Claim claim, CancellationToken cancellationToken = default)
         {
             var role = await _dbContext.Roles
                 .Include(x => x.RoleClaims)
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;
         }
 
-        public async Task<bool> RemoveClaimAsync(string roleId, Claim claim, CancellationToken cancellationToken = default)
+        public async Task<bool> RemoveClaimAsync(Guid roleId, Claim claim, CancellationToken cancellationToken = default)
         {
             var role = await _dbContext.Roles
                 .Include(x => x.RoleClaims)
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return await _dbContext.SaveChangesAsync(cancellationToken) > 0;            
         }
 
-        public async Task<LinkRole> GetRoleAsync(string roleId, bool noTracking = true, CancellationToken cancellationToken = default)
+        public async Task<LinkRole> GetRoleAsync(Guid roleId, bool noTracking = true, CancellationToken cancellationToken = default)
         {
             var role = noTracking ?
                 await _dbContext.Roles.AsNoTracking()
@@ -119,7 +119,7 @@ namespace LantanaGroup.Link.Account.Persistence.Repositories
             return roles;
         }
 
-        public async Task<IEnumerable<Claim>> GetClaimsAsync(string roleId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<Claim>> GetClaimsAsync(Guid roleId, CancellationToken cancellationToken = default)
         {
             var roleClaims = await _dbContext.Roles.AsNoTracking()
                 .Where(x => x.Id == roleId)
