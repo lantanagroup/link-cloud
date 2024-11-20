@@ -35,7 +35,7 @@ public class CensusConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CensusConfigModel censusConfig)
+    public async Task<IActionResult> Create(CensusConfigModel censusConfig)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -56,16 +56,16 @@ public class CensusConfigController : Controller
         catch (MissingTenantConfigurationException ex)
         {
             return Problem(
-                detail: "No Facility for the provided FacilityId was found.",
-                statusCode: StatusCodes.Status404NotFound
+              detail: "No Facility for the provided FacilityId was found.",
+              statusCode: StatusCodes.Status404NotFound
             );
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception encountered in CensusConfigController.Create");
             return Problem(
-                detail: "An error occurred while processing your request.",
-                statusCode: StatusCodes.Status500InternalServerError
+              detail: "An error occurred while processing your request.",
+              statusCode: StatusCodes.Status500InternalServerError
             );
         }
     }
@@ -95,8 +95,8 @@ public class CensusConfigController : Controller
         {
             _logger.LogError(ex, "Exception encountered in CensusConfigController.Get");
             return Problem(
-                detail: "An error occurred while processing your request.",
-                statusCode: StatusCodes.Status500InternalServerError
+              detail: "An error occurred while processing your request.",
+              statusCode: StatusCodes.Status500InternalServerError
             );
         }
     }
@@ -118,7 +118,7 @@ public class CensusConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
-    public async Task<ActionResult<CensusConfigModel>> Put([FromBody] CensusConfigModel censusConfig, string facilityId)
+    public async Task<ActionResult<CensusConfigModel>> Put(CensusConfigModel censusConfig, string facilityId)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -156,8 +156,8 @@ public class CensusConfigController : Controller
         {
             _logger.LogError(ex, "Exception encountered in CensusConfigController.Put");
             return Problem(
-                detail: "An error occurred while processing your request.",
-                statusCode: StatusCodes.Status500InternalServerError
+              detail: "An error occurred while processing your request.",
+              statusCode: StatusCodes.Status500InternalServerError
             );
         }
     }
@@ -185,8 +185,8 @@ public class CensusConfigController : Controller
         {
             _logger.LogError(ex, "Exception encountered in CensusConfigController.Delete");
             return Problem(
-                detail: "An error occurred while processing your request.",
-                statusCode: StatusCodes.Status500InternalServerError
+              detail: "An error occurred while processing your request.",
+              statusCode: StatusCodes.Status500InternalServerError
             );
         }
     }
