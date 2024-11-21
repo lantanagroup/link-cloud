@@ -10,12 +10,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.Role.Handlers
 {
     public static class UpdateExistingRole
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, LinkRoleModel model,
+        public static async Task<IResult> Handle(HttpContext context, Guid id, LinkRoleModel model,
             [FromServices] ILogger<RoleEndpoints> logger, [FromServices] IGetRole roleQuery, [FromServices] IUpdateRole command, [FromServices] ICreateRole createCommand)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A role id is required");
                 }

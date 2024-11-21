@@ -9,12 +9,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class ActivateExistingUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id,
+        public static async Task<IResult> Handle(HttpContext context, Guid id,
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid userQuery, [FromServices] IActiviateUser command)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A user id is required");
                 }
@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     return Results.Problem("Failed to activate an existing user");
                 }
 
-                logger.LogActivateUser(id, requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogActivateUser(id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.NoContent();
             }
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogActivateUserException(id, ex.Message);
+                logger.LogActivateUserException(id.ToString(), ex.Message);
                 throw;
             }
 

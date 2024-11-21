@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.Role
 {
     public interface IGetRole
     {
-        Task<LinkRoleModel> Execute(string roleId, CancellationToken cancellationToken = default);
+        Task<LinkRoleModel> Execute(Guid roleId, CancellationToken cancellationToken = default);
     }
 }

@@ -8,12 +8,12 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 {
     public static class GetUser
     {
-        public static async Task<IResult> Handle(HttpContext context, string id, 
+        public static async Task<IResult> Handle(HttpContext context, Guid id, 
             [FromServices] ILogger<UserEndpoints> logger, [FromServices] IGetUserByid query)
         {
             try
             {
-                if (string.IsNullOrEmpty(id))
+                if (id == Guid.Empty)
                 {
                     return Results.BadRequest("A user id is required");
                 }
@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                     return Results.NotFound();
                 }
 
-                logger.LogFindUser(id, context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
+                logger.LogFindUser(id.ToString(), context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.Ok(user);
             }
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                logger.LogFindUserException(id, ex.Message);
+                logger.LogFindUserException(id.ToString(), ex.Message);
                 throw;
             }
             

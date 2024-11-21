@@ -21,14 +21,14 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
             _linkUserModelFactory = linkUserModelFactory ?? throw new ArgumentNullException(nameof(linkUserModelFactory));
         }
 
-        public async Task<LinkUserModel> Execute(string id, CancellationToken cancellationToken = default)
+        public async Task<LinkUserModel> Execute(Guid id, CancellationToken cancellationToken = default)
         {
             List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, id)];
             using Activity? activity = ServiceActivitySource.Instance.StartActivityWithTags("GetUserById:Execute", tagList);
 
             try
             {
-                if(string.IsNullOrEmpty(id))
+                if(id == Guid.Empty)
                 {
                     throw new ArgumentException("A user id is required");
                 }

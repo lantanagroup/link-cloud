@@ -2,9 +2,9 @@
 {
     public class ListRoleModel
     {
-        public ListRoleModel() : this(string.Empty, string.Empty, string.Empty) { }
+        public ListRoleModel() : this(Guid.Empty, string.Empty, string.Empty) { }
 
-        public ListRoleModel(string id, string name, string description)
+        public ListRoleModel(Guid id, string name, string description)
         {
             Id = id;
             Name = name;
@@ -15,7 +15,7 @@
         /// The id of the role
         /// </summary>
         /// <example>627c8762-de3c-4c92-a9f5-25483b6e7922</example>
-        public string Id { get; set; }
+        public Guid Id { get; set; }
 
         /// <summary>
         /// The name of the role
