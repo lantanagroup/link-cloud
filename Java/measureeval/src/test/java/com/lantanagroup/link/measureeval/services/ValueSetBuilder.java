@@ -3,8 +3,19 @@ package com.lantanagroup.link.measureeval.services;
 import org.hl7.fhir.r4.model.Enumerations;
 import org.hl7.fhir.r4.model.ValueSet;
 
+/**
+ * Utility class for building FHIR {@link ValueSet} resources.
+ * This class provides methods to create and configure value sets for specific use cases.
+ */
 public class ValueSetBuilder {
 
+    /**
+     * Builds a {@link ValueSet} representing inpatient encounters.
+     * This value set includes SNOMED CT codes for different types of hospital admissions, such as emergency,
+     * elective, and general admissions.
+     *
+     * @return A {@link ValueSet} resource configured for inpatient encounters.
+     */
     public static ValueSet inpatientEncounter() {
         var system = "http://snomed.info/sct";
         var version = "http://snomed.info/sct/731000124108/version/20210901";

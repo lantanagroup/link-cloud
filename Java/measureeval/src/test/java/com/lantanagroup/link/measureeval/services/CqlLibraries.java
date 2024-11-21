@@ -1,5 +1,10 @@
 package com.lantanagroup.link.measureeval.services;
 
+/**
+ * Utility class containing predefined Clinical Quality Language (CQL) libraries as static constants.
+ * These libraries are used for testing and evaluation of FHIR measures in various scenarios,
+ * including cohort, proportion, ratio, and continuous variable measures.
+ */
 public class CqlLibraries {
 
     public static final String SIMPLE_COHORT_IP_TRUE = """
