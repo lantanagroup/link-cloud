@@ -25,11 +25,18 @@ The Account service is responsible for maintaining roles and permissions for Lin
 | KafkaConnection__BootstrapServers__0 | `<KafkaBootstrapServer>`  | No       |
 | KafkaConnection__GroupId             | Account                   | No       |
 
+### Redis
+
+| Name                     | Value                     | Secret? |
+|--------------------------|---------------------------|--------|
+| ConnectionStrings__Redis | `<RedisConnectionString>` | Yes    |
+| Cache__Enabled           | true/false                | No     |
+
 ### Database Settings (MSSQL)
 
-| Name                       | Value                 | Secret?  |
-|----------------------------|-----------------------|----------|
-| Postgres__ConnectionString | `<ConnectionString>`  | Yes      |
+| Name                                  | Value                 | Secret?  |
+|---------------------------------------|-----------------------|----------|
+| ConnectionStrings__DatabaseConnection | `<ConnectionString>`  | Yes      |
 
 ### Tenant API Settings
 

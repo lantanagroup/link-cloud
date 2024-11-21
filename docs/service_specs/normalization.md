@@ -29,10 +29,9 @@ FHIR resources queried from EHR endpoints can vary from location to location. Th
 
 ### Database Settings (MSSQL)
 
-| Name                      | Value                         | Secret?  |
-|---------------------------|-------------------------------|----------|
-| MongoDB__ConnectionString | `<DatabaseConnectionString>`  | Yes      |
-| MongoDb__DatabaseName     | `<NormalizationDatabaseName>` | No       |
+| Name                                  | Value                         | Secret?  |
+|---------------------------------------|-------------------------------|----------|
+| ConnectionStrings__DatabaseConnection | `<DatabaseConnectionString>`  | Yes      |
 
 ## Consumed Events
 
