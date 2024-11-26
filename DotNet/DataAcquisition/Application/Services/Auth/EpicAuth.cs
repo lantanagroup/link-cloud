@@ -49,10 +49,8 @@ public class EpicAuth : IAuth
             {
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
-                {
-                    _logger.LogInformation($"The bearer information was acquired.");
                     return (false, new AuthenticationHeaderValue("Bearer", accessToken));
-                }
+                
             }
         }
         catch (Exception ex)
