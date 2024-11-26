@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Crypto;
@@ -8,6 +9,7 @@ using Org.BouncyCastle.Security;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 
@@ -45,12 +47,10 @@ public class EpicAuth : IAuth
 
             if (responseJson != null)
             {
-                var accessToken = responseJson.RootElement.GetProperty("access_token").GetString();
+                var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
-                {
-                    _logger.LogInformation($"Bearer Information Acquired.");
                     return (false, new AuthenticationHeaderValue("Bearer", accessToken));
-                }
+                
             }
         }
         catch (Exception ex)
@@ -59,6 +59,14 @@ public class EpicAuth : IAuth
         }
 
         return (false, null);
+    }
+
+    private string Sanitize(string input)
+    {
+        var sanitizedInput = HtmlInputSanitizer.Sanitize(Sanitize(input));
+        sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\\-\\_ ]", string.Empty, RegexOptions.Compiled);
+        sanitizedInput = Regex.Replace(sanitizedInput, @"\t|\n|\r", "");
+        return sanitizedInput;
     }
 
     private string GetJwt(AuthenticationConfiguration authSettings)
