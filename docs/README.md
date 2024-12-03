@@ -6,6 +6,7 @@ This page and its references include documentation for Link's services and the f
 ## Functionality
 
 * [Census Management](functionality/census_management.md)
+* [Data Acquisition](functionality/data_acquisition.md)
 * [Measure Evaluation](functionality/measure_eval.md)
 * [Normalization](functionality/normalization.md)
 * Submission
