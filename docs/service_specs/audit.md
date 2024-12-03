@@ -26,11 +26,13 @@ The Audit service is responsible for persisting auditable events that are genera
 | Link__Audit__KafkaConnection__GroupId             | audit-events             | No      |
 | Link__Audit__KafkaConnection__ClientId            | audit-events             | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **AuditableEventOccurred**
 
-## Produced Events
+### Produced Events
 
 - **NONE**
 

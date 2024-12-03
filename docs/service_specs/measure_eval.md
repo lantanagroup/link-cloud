@@ -32,11 +32,13 @@ The Measure Eval service is a Java based application that is primarily responsib
 | MeasureEvalConfig__TerminologyServiceUrl   | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
 | MeasureEvalConfig__EvaluationServiceUrl    | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **PatientDataNormalized**
 
-## Produced Events
+### Produced Events
 
 - **MeasureEvaluated**
 - **NotificationRequested**

@@ -51,11 +51,13 @@ The Notification service is responsible for emailing configured users when a not
 |-------------------------------------------------------------|-------------------------------|---------|
 | Link__Notification__EnableSwagger                           | true (DEV and TEST)           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **NotificationRequested**
 
-## Produced Events
+### Produced Events
 
 - **AuditableEventOccurred**
 

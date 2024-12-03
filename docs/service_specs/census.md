@@ -41,11 +41,13 @@ The Census service is primarily responsible for maintaining a tenants admit and 
 | MongoDb__DatabaseName     | `<DatabaseName>`     | No      |
 | MongoDb__CollectionName   | `census`             | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **Event**: `PatientIDsAcquired`
 
-## Produced Events
+### Produced Events
 
 - **Event**: `PatientCensusScheduled`
 

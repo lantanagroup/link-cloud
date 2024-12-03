@@ -40,14 +40,16 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 |-----------------------------------------------|--------------------------------|---------|
 | TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantApiUrl>/api`           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **ReportScheduled**
 - **MeasureEvaluated**
 - **PatientsToQuery**
 - **ReportSubmitted**
 
-## Produced Events
+### Produced Events
 
 - **SubmitReport**
 - **DataAcquisitionRequested**

@@ -46,11 +46,13 @@ The Tenant service is the entry point for configuring a tenant into Link Cloud. 
 |----------------------------------------------|--------------------------------|----------|
 | EnableSwagger                                | true (DEV and TEST)            | No       |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **NONE**
 
-## Produced Events
+### Produced Events
 
 - **ReportScheduled**
 

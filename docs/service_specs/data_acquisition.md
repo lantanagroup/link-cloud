@@ -25,12 +25,14 @@ The Data Acquisition service is responsible for connecting and querying a tenant
 | KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No       |
 | KafkaConnection__GroupId                 | data-acquisition-events   | No       |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **PatientEvent**
 - **PatientBulkAcquisitionScheduled**
 
-## Produced Events
+### Produced Events
 
 - **PatientIdsAcquired**
 - **PatientAcquired**

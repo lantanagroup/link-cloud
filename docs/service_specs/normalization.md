@@ -33,11 +33,13 @@ FHIR resources queried from EHR endpoints can vary from location to location. Th
 |---------------------------------------|-------------------------------|----------|
 | ConnectionStrings__DatabaseConnection | `<DatabaseConnectionString>`  | Yes      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **PatientDataAcquired**
 
-## Produced Events
+### Produced Events
 
 - **PatientNormalized**
 - **NotificationRequested**

@@ -41,12 +41,14 @@ The Query Dispatch service is primarily responsible for applying a lag period pr
 |---------------|---------------------------------|---------|
 | EnableSwagger | true (DEV and TEST)             | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **ReportScheduled**
 - **PatientEvent**
 
-## Produced Events
+### Produced Events
 
 - **DataAcquisitionRequested**
 
