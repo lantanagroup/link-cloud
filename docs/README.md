@@ -12,6 +12,7 @@ This page and its references include documentation for Link's services and the f
 * [Normalization](functionality/normalization.md)
 * Submission
   * [Folder Structure](functionality/submission_folder.md)
+* [Telemetry](functionality/telemetry.md)
 
 ## Service Specifications
 
