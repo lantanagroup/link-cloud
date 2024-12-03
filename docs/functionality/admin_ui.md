@@ -1,4 +1,6 @@
-﻿# Administrative UI Documentation
+﻿[← Back Home](../README.md)
+
+# Administrative UI Documentation
 
 ## Overview
 

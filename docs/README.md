@@ -5,6 +5,7 @@ This page and its references include documentation for Link's services and the f
 
 ## Functionality
 
+* [Admin UI](functionality/admin_ui.md)
 * [Census Management](functionality/census_management.md)
 * [Data Acquisition](functionality/data_acquisition.md)
 * [Measure Evaluation](functionality/measure_eval.md)
