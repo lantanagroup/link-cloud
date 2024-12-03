@@ -23,6 +23,8 @@ Telemetry is a key component of the system, providing observability into the per
     - Enables building and sharing dashboards for monitoring and analysis.
     - Dashboards for specific insights are actively being developed and can be exported/imported.
 
+> Note: The components mentioned above are not part of this code base. They are open source components that are deployed as part of the applications architecture to support telemetry/observability.
+
 ## Current Capabilities
 
 - **Default Telemetry**:
