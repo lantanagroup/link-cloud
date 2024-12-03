@@ -1,4 +1,6 @@
-﻿# Telemetry
+﻿[← Back Home](../README.md)
+
+# Telemetry
 
 Telemetry is a key component of the system, providing observability into the performance, health, and behavior of the services. The system leverages a combination of tools and frameworks to collect, aggregate, and visualize trace, metric, and log data.
 
