@@ -53,3 +53,15 @@ The Tenant service is the entry point for configuring a tenant into Link Cloud. 
 ## Produced Events
 
 - **ReportScheduled**
+
+## API Operations
+
+The **Tenant** service provides REST endpoints for managing facility configurations and related metadata.
+
+- **GET /api/Facility**: Retrieve a paged list of facilities based on filters such as `facilityId`, `facilityName`, and sorting options.
+- **POST /api/Facility**: Create a new facility configuration.
+- **GET /api/Facility/{facilityId}**: Retrieve a specific facility configuration by `facilityId`.
+- **PUT /api/Facility/{id}**: Update an existing facility configuration by `id`.
+- **DELETE /api/Facility/{facilityId}**: Delete a facility configuration by `facilityId`.
+
+These operations support managing tenant-specific configurations and workflows efficiently.

@@ -49,3 +49,14 @@ The Query Dispatch service is primarily responsible for applying a lag period pr
 ## Produced Events
 
 - **DataAcquisitionRequested**
+
+## API Operations
+
+The **Query Dispatch** service provides REST endpoints for managing query dispatch configurations for each facility. These configurations define schedules and triggers for dispatching queries.
+
+- **GET /api/querydispatch/configuration/facility/{facilityId}**: Retrieve a query dispatch configuration for a specific facility by `facilityId`.
+- **POST /api/querydispatch/configuration**: Create a new query dispatch configuration.
+- **PUT /api/querydispatch/configuration/facility/{facilityId}**: Update the query dispatch configuration for a specific facility by `facilityId`.
+- **DELETE /api/querydispatch/configuration/facility/{facilityId}**: Delete the query dispatch configuration for a specific facility by `facilityId`.
+
+Each operation supports the customization and management of query dispatch schedules and triggers, ensuring efficient and accurate query dispatching across workflows.

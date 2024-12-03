@@ -42,4 +42,8 @@ Currently, Link persists only the **FHIR ID** of each patient. This identifier a
 
 ### Future Considerations
 
-In the interest of enhancing the user interface, Link is considering storing additional data elements, such as the **patient name** associated with each FHIR ID. This would provide users with meaningful patient identifiers, facilitating easier navigation and record management within the Link UI.
+In the interest of enhancing the user interface, Link is considering storing additional data elements, such as the **patient name** associated with each FHIR ID. This would provide users with meaningful patient identifiers, facilitating easier navigation and record management within the Link UI.---
+
+---
+
+For more details on the Census service, refer to the [Census Service Specification](../service_specs/census.md).

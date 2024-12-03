@@ -33,3 +33,16 @@ The Audit service is responsible for persisting auditable events that are genera
 ## Produced Events
 
 - **NONE**
+
+## API Operations
+
+The **Audit** service provides REST endpoints for managing and retrieving audit logs. These endpoints allow for the creation, retrieval, and deletion of audit records, facilitating comprehensive tracking of system activities.
+
+### Available REST Operations
+
+- **POST /api/Audit**: Create a new audit log entry.
+- **GET /api/Audit/{id}**: Retrieve a specific audit log entry by its unique identifier.
+- **GET /api/Audit**: Retrieve a list of audit log entries, with optional filtering and pagination.
+- **DELETE /api/Audit/{id}**: Delete a specific audit log entry by its unique identifier.
+
+These operations enable effective management and monitoring of audit logs, ensuring transparency and accountability within the system.
