@@ -9,7 +9,9 @@ This page and its references include documentation for Link's services and the f
 * [Census Management](functionality/census_management.md)
 * [Data Acquisition](functionality/data_acquisition.md)
 * [Measure Evaluation](functionality/measure_eval.md)
+* [Notifications](functionality/notifications.md)
 * [Normalization](functionality/normalization.md)
+* [Kafka Retry Topics](functionality/retry_topics.md)
 * Submission
   * [Folder Structure](functionality/submission_folder.md)
 * [Telemetry](functionality/telemetry.md)
