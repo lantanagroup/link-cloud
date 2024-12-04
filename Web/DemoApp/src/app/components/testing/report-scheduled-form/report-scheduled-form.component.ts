@@ -41,7 +41,7 @@ import { TestService } from '../../../services/gateway/testing.service';
 export class ReportScheduledFormComponent implements OnInit {
   @Output() eventGenerated = new EventEmitter<string>();
 
-  eventRequestedForm!: FormGroup;  
+  eventRequestedForm!: FormGroup;
   reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
 
   constructor(private testService: TestService, private snackBar: MatSnackBar) { }
@@ -70,7 +70,7 @@ export class ReportScheduledFormComponent implements OnInit {
   get endDateControl(): FormArray {
     return this.eventRequestedForm.get('endDate') as FormArray;
   }
-  
+
   compareReportTypes(object1: any, object2: any) {
     return (object1 && object2) && object1 === object2;
   }

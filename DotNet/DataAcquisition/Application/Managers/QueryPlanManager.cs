@@ -43,7 +43,7 @@ public class QueryPlanManager : IQueryPlanManager
 
     public async Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default)
     {
-        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.ReportType == entity.ReportType, cancellationToken);
+        var existingQueryPlan = await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == entity.FacilityId && q.Type == entity.Type, cancellationToken);
 
         entity.ModifyDate = DateTime.UtcNow;
 
@@ -52,7 +52,7 @@ public class QueryPlanManager : IQueryPlanManager
             existingQueryPlan.InitialQueries = entity.InitialQueries;
             existingQueryPlan.SupplementalQueries = entity.SupplementalQueries;
             existingQueryPlan.PlanName = entity.PlanName;
-            existingQueryPlan.ReportType = entity.ReportType;
+            existingQueryPlan.Type = entity.Type;
             existingQueryPlan.EHRDescription = entity.EHRDescription;
             existingQueryPlan.LookBack = entity.LookBack;
             existingQueryPlan.ModifyDate = entity.ModifyDate;

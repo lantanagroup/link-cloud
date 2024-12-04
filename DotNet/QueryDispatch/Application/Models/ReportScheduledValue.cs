@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using QueryDispatch.Application.Models;
 using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Models
@@ -7,11 +8,17 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
     public class ReportScheduledValue
     {
         [DataMember]
-        public List<KeyValuePair<string, string>> Parameters { get; set; }
+        public List<string> ReportTypes { get; set; }
+        [DataMember]
+        public Frequency Frequency { get; set; }
+        [DataMember]
+        public DateTimeOffset StartDate { get; set; }
+        [DataMember]
+        public DateTimeOffset EndDate { get; set; }
 
         public bool IsValid()
         {
-            if (Parameters == null || Parameters.Count == 0)
+            if (ReportTypes == null || ReportTypes.Count <= 0 || StartDate == default || EndDate == default)
             {
                 return false;
             }

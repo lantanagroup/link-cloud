@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.Report.Entities
     {
         public string FacilityId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
+        public string ReportScheduleId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         [JsonConverter(typeof(FhirResourceConverter<Bundle>))]

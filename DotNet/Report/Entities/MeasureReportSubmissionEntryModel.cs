@@ -18,11 +18,15 @@ namespace LantanaGroup.Link.Report.Entities
         public string FacilityId { get; set; } = string.Empty;
         public string ReportScheduleId { get; set; } = string.Empty;
         public string PatientId { get; set; } = string.Empty;
+        public string ReportType { get; set; } = string.Empty;
         [BsonSerializer(typeof(MongoFhirBaseSerDes<MeasureReport>))]
         [BsonIgnoreIfNull]
         public MeasureReport? MeasureReport { get; set; }
-        public bool ReadyForSubmission { get; private set; } = false;
+
+        public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.NotEvaluated;
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
+
+        public PatientSubmissionModel? PatientSubmission { get; set; }
 
         public class ContainedResource
         {
@@ -64,7 +68,10 @@ namespace LantanaGroup.Link.Report.Entities
                 }
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null);
+            if (ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null))
+            {
+                Status = PatientSubmissionStatus.ReadyForSubmission;
+            }
         }
 
 
@@ -89,7 +96,10 @@ namespace LantanaGroup.Link.Report.Entities
                 containedResource.DocumentId = facilityResource.GetId();
             }
 
-            ReadyForSubmission = ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null);
+            if (ContainedResources.All(x => !string.IsNullOrWhiteSpace(x.DocumentId) && MeasureReport != null))
+            {
+                Status = PatientSubmissionStatus.ReadyForSubmission;
+            }
         }
     }
 }

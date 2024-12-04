@@ -4,6 +4,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using LantanaGroup.Link.Report.Domain.Managers;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -14,11 +16,13 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly ISubmissionEntryManager _submissionEntryManager;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, ISubmissionEntryManager submissionEntryManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _submissionEntryManager = submissionEntryManager;
         }
 
         /// <summary>
@@ -29,27 +33,39 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="patientId"></param>
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
-        [HttpGet("Bundle/Patient")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
+        [HttpPost("Bundle/Patient")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientSubmissionModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
-                    BadRequest("Paramater facilityId is null or whitespace");
+                    BadRequest("Parameter facilityId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(patientId))
                 {
-                    BadRequest("Paramater patientId is null or whitespace");
+                    BadRequest("Parameter patientId is null or whitespace");
                 }
 
-                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
+                if (string.IsNullOrWhiteSpace(reportScheduleId))
+                {
+                    BadRequest("Parameter reportScheduleId is null or whitespace");
+                }
 
-                return Ok(submission);
+                var submissions = (await _submissionEntryManager.FindAsync(e =>
+                    e.FacilityId == facilityId && e.PatientId == patientId && e.ReportScheduleId == reportScheduleId)).Select(s => s.PatientSubmission).ToList();
+
+                if (submissions?.Any() ?? false)
+                {
+                    return Ok(submissions);
+                }
+
+                return NotFound();
+
             }
             catch (Exception ex)
             {

@@ -25,7 +25,6 @@ namespace LantanaGroup.Link.Tenant.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.FacilityConfigModel", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
@@ -41,11 +40,9 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("MRPCreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("MRPModifyDate")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -56,89 +53,35 @@ namespace LantanaGroup.Link.Tenant.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.FacilityConfigModel", b =>
                 {
-                    b.OwnsMany("LantanaGroup.Link.Tenant.Entities.MonthlyReportingPlanModel", "MonthlyReportingPlans", b1 =>
+                    b.OwnsOne("LantanaGroup.Link.Tenant.Entities.ScheduledReportModel", "ScheduledReports", b1 =>
                         {
                             b1.Property<Guid>("FacilityConfigModelId")
                                 .HasColumnType("uniqueidentifier");
 
-                            b1.Property<int>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("int");
-
-                            b1.Property<int?>("ReportMonth")
-                                .HasColumnType("int");
-
-                            b1.Property<string>("ReportType")
+                            b1.Property<string>("Daily")
+                                .IsRequired()
                                 .HasColumnType("nvarchar(max)");
 
-                            b1.Property<int?>("ReportYear")
-                                .HasColumnType("int");
+                            b1.Property<string>("Monthly")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
 
-                            b1.HasKey("FacilityConfigModelId", "Id");
+                            b1.Property<string>("Weekly")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.HasKey("FacilityConfigModelId");
 
                             b1.ToTable("Facilities");
 
-                            b1.ToJson("MonthlyReportingPlans");
+                            b1.ToJson("ScheduledReports");
 
                             b1.WithOwner()
                                 .HasForeignKey("FacilityConfigModelId");
                         });
 
-                    b.OwnsMany("LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel", "ScheduledTasks", b1 =>
-                        {
-                            b1.Property<Guid>("FacilityConfigModelId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<int>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("int");
-
-                            b1.Property<string>("KafkaTopic")
-                                .HasColumnType("nvarchar(max)");
-
-                            b1.HasKey("FacilityConfigModelId", "Id");
-
-                            b1.ToTable("Facilities");
-
-                            b1.ToJson("ScheduledTasks");
-
-                            b1.WithOwner()
-                                .HasForeignKey("FacilityConfigModelId");
-
-                            b1.OwnsMany("LantanaGroup.Link.Tenant.Entities.ScheduledTaskModel+ReportTypeSchedule", "ReportTypeSchedules", b2 =>
-                                {
-                                    b2.Property<Guid>("ScheduledTaskModelFacilityConfigModelId")
-                                        .HasColumnType("uniqueidentifier");
-
-                                    b2.Property<int>("ScheduledTaskModelId")
-                                        .HasColumnType("int");
-
-                                    b2.Property<int>("Id")
-                                        .ValueGeneratedOnAdd()
-                                        .HasColumnType("int");
-
-                                    b2.Property<string>("ReportType")
-                                        .HasColumnType("nvarchar(max)");
-
-                                    b2.Property<string>("ScheduledTriggers")
-                                        .HasColumnType("nvarchar(max)");
-
-                                    b2.HasKey("ScheduledTaskModelFacilityConfigModelId", "ScheduledTaskModelId", "Id");
-
-                                    b2.ToTable("Facilities");
-
-                                    b2.ToJson("ReportTypeSchedules");
-
-                                    b2.WithOwner()
-                                        .HasForeignKey("ScheduledTaskModelFacilityConfigModelId", "ScheduledTaskModelId");
-                                });
-
-                            b1.Navigation("ReportTypeSchedules");
-                        });
-
-                    b.Navigation("MonthlyReportingPlans");
-
-                    b.Navigation("ScheduledTasks");
+                    b.Navigation("ScheduledReports")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
