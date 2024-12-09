@@ -33,11 +33,11 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="patientId"></param>
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
-        [HttpPost("Bundle/Patient")]
+        [HttpGet("Bundle/Patient")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientSubmissionModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
+        public async Task<ActionResult<List<PatientSubmissionModel>>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
         {
             try
             {
