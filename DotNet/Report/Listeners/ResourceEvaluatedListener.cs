@@ -208,14 +208,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                 await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
 
                                 var entries = await submissionEntryManager.FindAsync(s =>
-                                    s.FacilityId == entry.FacilityId && s.PatientId == entry.PatientId &&
-                                    s.ReportScheduleId == entry.ReportScheduleId
+                                    s.FacilityId == entry.FacilityId
+                                    && s.ReportScheduleId == entry.ReportScheduleId
                                     && s.Status != PatientSubmissionStatus.NotReportable, cancellationToken);
 
                                 #region Submit Report Handling
                                 if (schedule.PatientsToQueryDataRequested)
                                 {
-                                    var allReady = entries.All(x => x.Status != PatientSubmissionStatus.NotEvaluated);
+                                    var allReady = entries.All(x => x.Status == PatientSubmissionStatus.ReadyForSubmission);
 
                                     if (allReady)
                                     {
