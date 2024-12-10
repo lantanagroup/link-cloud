@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+
             migrationBuilder.CreateTable(
                 name: "Facilities",
                 columns: table => new

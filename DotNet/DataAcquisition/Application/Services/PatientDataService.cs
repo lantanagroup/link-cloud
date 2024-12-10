@@ -1,15 +1,18 @@
 ﻿using Confluent.Kafka;
 using DataAcquisition.Domain;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -69,8 +72,7 @@ public class PatientDataService : IPatientDataService
             cancellationToken) ?? throw new NotFoundException("Patient not found.");
         var queryPlan = (
             await _queryPlanManager.FindAsync(
-                q => q.FacilityId.ToLower() == request.FacilityId.ToLower()
-            && q.PlanName.ToLower() == request.ConsumeResult.Value.ScheduledReports.FirstOrDefault().ReportType.ToLower(), cancellationToken))
+                q => q.FacilityId.ToLower() == request.FacilityId.ToLower(), cancellationToken))
             .FirstOrDefault();
 
         if (queryPlan == null)
@@ -110,14 +112,19 @@ public class PatientDataService : IPatientDataService
         var dataAcqRequested = request.ConsumeResult.Message.Value;
 
         FhirQueryConfiguration fhirQueryConfiguration = null;
-        List<QueryPlan> queryPlans = null;
+        QueryPlan? queryPlan = null;
 
         try
         {
             fhirQueryConfiguration = await _fhirQueryManager.GetAsync(request.FacilityId, cancellationToken);
-            queryPlans = await _queryPlanManager.FindAsync(q => q.FacilityId == request.FacilityId, cancellationToken);
+            Frequency reportableEventTranslation = ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult.Value.ReportableEvent);
+            queryPlan = (await _queryPlanManager.FindAsync(
+                q => q.FacilityId == request.FacilityId 
+                    && q.Type == reportableEventTranslation
+                , cancellationToken))
+                ?.FirstOrDefault();
 
-            if (fhirQueryConfiguration == null || queryPlans == null)
+            if (fhirQueryConfiguration == null || queryPlan == null)
             {
                 throw new MissingFacilityConfigurationException(
                     $"No configuration for {request.FacilityId} exists.");
@@ -168,16 +175,13 @@ public class PatientDataService : IPatientDataService
                 }, cancellationToken);
         }
 
-        foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
-        {
-            var queryPlan = queryPlans.FirstOrDefault(x => x.ReportType == scheduledReport.ReportType);
-
+        //foreach (var scheduledReport in dataAcqRequested.ScheduledReports)
+        //{
             if (queryPlan != null)
             {
                 var initialQueries = queryPlan.InitialQueries.OrderBy(x => x.Key);
                 var supplementalQueries = queryPlan.SupplementalQueries.OrderBy(x => x.Key);
 
-                //var referenceTypes = queryPlan.InitialQueries.Where(x => x.GetType() == typeof(ReferenceQueryConfig)).Select(x => ((ReferenceQueryConfig)x.Value).ResourceType).ToList();
                 var referenceTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList();
                 referenceTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>().Select(x => x.ResourceType).Distinct().ToList());
 
@@ -187,7 +191,6 @@ public class PatientDataService : IPatientDataService
                             dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? initialQueries : supplementalQueries,
                             request,
                             fhirQueryConfiguration,
-                            scheduledReport,
                             queryPlan,
                             referenceTypes,
                             dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase) ? QueryPlanType.Initial.ToString() : QueryPlanType.Supplemental.ToString(), cancellationToken);
@@ -208,7 +211,7 @@ public class PatientDataService : IPatientDataService
                     throw;
                 }
             }
-        }
+        //}
 
         //produce tailing message to indicate acquisition is complete
         await ProduceTailingMessage(request.FacilityId, request.CorrelationId, patientId, dataAcqRequested.QueryType, dataAcqRequested.ScheduledReports, cancellationToken);

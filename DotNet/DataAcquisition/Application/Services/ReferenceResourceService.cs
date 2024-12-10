@@ -33,7 +33,6 @@ public interface IReferenceResourceService
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
-        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default);
 }
@@ -42,7 +41,6 @@ public class ReferenceResourceService : IReferenceResourceService
 {
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
-    private readonly IQueriedFhirResourceManager _queriedFhirResourceManager;
     private readonly IFhirApiService _fhirRepo;
     private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
@@ -52,14 +50,12 @@ public class ReferenceResourceService : IReferenceResourceService
         IReferenceResourcesManager referenceResourcesManager,
         IFhirApiService fhirRepo,
         IProducer<string, ResourceAcquired> kafkaProducer,
-        IQueriedFhirResourceManager queriedFhirResourceManager,
         IDataAcquisitionServiceMetrics metrics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _referenceResourcesManager = referenceResourcesManager ?? throw new ArgumentNullException(nameof(referenceResourcesManager));
         _fhirRepo = fhirRepo ?? throw new ArgumentNullException(nameof(fhirRepo));
         _kafkaProducer = kafkaProducer ?? throw new ArgumentNullException(nameof(kafkaProducer));
-        _queriedFhirResourceManager = queriedFhirResourceManager ?? throw new ArgumentNullException(nameof(queriedFhirResourceManager));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
@@ -111,7 +107,6 @@ public class ReferenceResourceService : IReferenceResourceService
         GetPatientDataRequest request,
         FhirQueryConfiguration fhirQueryConfiguration,
         ReferenceQueryConfig referenceQueryConfig,
-        ScheduledReport report,
         string queryPlanType,
         CancellationToken cancellationToken = default)
     {
@@ -132,20 +127,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 request.FacilityId);
 
         foreach(var existingReference in existingReferenceResources)
-        {
-            await _queriedFhirResourceManager.AddAsync(new QueriedFhirResourceRecord
-            {
-                CorrelationId = request.CorrelationId,
-                FacilityId = request.FacilityId,
-                IsSuccessful = true,
-                PatientId = request.ConsumeResult.Message.Value.PatientId.SplitReference(),
-                QueryType = queryPlanType,
-                ResourceId = existingReference.ResourceId,
-                ResourceType = referenceQueryFactoryResult.ResourceType,
-                CreateDate = DateTime.UtcNow,
-                ModifyDate = DateTime.UtcNow
-            });              
-
+        {          
             await GenerateMessage(
             FhirResourceDeserializer.DeserializeFhirResource(existingReference),
             request.FacilityId,
@@ -167,11 +149,8 @@ public class ReferenceResourceService : IReferenceResourceService
             await _fhirRepo.GetReferenceResourceAndGenerateMessage(
             fhirQueryConfiguration.FhirServerBaseUrl,
             referenceQueryFactoryResult.ResourceType,
-            request.ConsumeResult.Message.Value.PatientId.SplitReference(),
-            request.FacilityId,
-            request.CorrelationId,
+            request,
             queryPlanType,
-            report,
             x,
             referenceQueryConfig,
             fhirQueryConfiguration.Authentication);

@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
                 });
 
-            integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)                
+            integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)
                 .AddEndpointFilter<ValidationFilter<PatientEvent>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                     Description = "Produces a new patient event that will be sent to the broker. Allows for testing processes outside of scheduled events."
                 });
 
-            integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)                
+            integrationEndpoints.MapPost("/report-scheduled", CreateReportScheduled)
                 .AddEndpointFilter<ValidationFilter<ReportScheduled>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                 .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
@@ -83,7 +83,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
             var correlationId = await _createPatientEvent.Execute(model, user?.FindFirst(ClaimTypes.Email)?.Value);
             return Results.Ok(new EventProducerResponse
-            { 
+            {
                 Id = correlationId,
                 Message = $"The patient event was created succcessfully with a correlation id of '{correlationId}'."
             });
