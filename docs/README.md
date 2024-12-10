@@ -12,8 +12,7 @@ This page and its references include documentation for Link's services and the f
 * [Notifications](functionality/notifications.md)
 * [Normalization](functionality/normalization.md)
 * [Kafka Retry Topics](functionality/retry_topics.md)
-* Submission
-  * [Folder Structure](functionality/submission_folder.md)
+* [Submission Folder Structure](functionality/submission_folder.md)
 * [Telemetry](functionality/telemetry.md)
 * [Tenant/Facility Management](functionality/tenant_mgmt.md)
 
