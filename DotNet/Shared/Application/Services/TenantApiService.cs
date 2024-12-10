@@ -1,11 +1,11 @@
-﻿using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Http.Headers;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 
 namespace LantanaGroup.Link.Shared.Application.Services;
 
@@ -15,16 +15,10 @@ public class TenantApiService : ITenantApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
     private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
-    private readonly ICreateSystemToken _createSystemToken;
     private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
+    private readonly ICreateSystemToken _createSystemToken;
 
-    public TenantApiService(
-        ILogger<TenantApiService> logger, 
-        IHttpClientFactory httpClientFactory, 
-        IOptions<ServiceRegistry> serviceRegistry, 
-        IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, 
-        ICreateSystemToken createSystemToken, 
-        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
+    public TenantApiService(ILogger<TenantApiService> logger, IHttpClientFactory httpClientFactory, IOptions<ServiceRegistry> serviceRegistry, IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));

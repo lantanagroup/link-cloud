@@ -19,7 +19,6 @@ namespace TenantTests
         private ServiceRegistry? _serviceRegistry;
         private const string facilityId = "TestFacility_002";
         private const string facilityName = "TestFacility_002";
-        private static readonly List<ScheduledTaskModel> scheduledTaskModels = new List<ScheduledTaskModel>();
         private const string id = "7241D6DA-4D15-4A41-AECC-08DC4DB45323";
 
         private AutoMocker? _mocker;
@@ -35,17 +34,16 @@ namespace TenantTests
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
+                ScheduledReports = new ScheduledReportModel()
             };
+            _model.ScheduledReports.Daily = new string[] { "NHSNdQMAcuteCareHospitalInitialPopulation" };
+            _model.ScheduledReports.Weekly = new string[] { "NHSNRespiratoryPathogenSurveillanceInitialPopulation" };
+            _model.ScheduledReports.Monthly = new string[] { "NHSNGlycemicControlHypoglycemicInitialPopulation" };
 
             _serviceRegistry = new ServiceRegistry()
             {
                 MeasureServiceUrl = "test"
             };
-
-            _model.ScheduledTasks.AddRange(scheduledTaskModels);
 
             _mocker = new AutoMocker();
 
@@ -74,15 +72,17 @@ namespace TenantTests
         public void TestGetFacilities()
         {
 
-
             _model = new FacilityConfigModel()
             {
                 FacilityId = facilityId,
                 FacilityName = facilityName,
-                ScheduledTasks = new List<ScheduledTaskModel>(),
-                MRPCreatedDate = DateTime.Now,
-                MRPModifyDate = DateTime.Now
+                ScheduledReports = new ScheduledReportModel()
             };
+
+            _model.ScheduledReports.Daily = new string[] { "NHSNdQMAcuteCareHospitalInitialPopulation" };
+            _model.ScheduledReports.Weekly = new string[] { "NHSNRespiratoryPathogenSurveillanceInitialPopulation" };
+            _model.ScheduledReports.Monthly = new string[] { "NHSNGlycemicControlHypoglycemicInitialPopulation" };
+
 
             _serviceRegistry = new ServiceRegistry()
             {
@@ -97,8 +97,6 @@ namespace TenantTests
             PaginationMetadata _pagedMetaData = new PaginationMetadata(10, 1, 2);
 
             var output = (facilities: _facilities, metadata: _pagedMetaData);
-
-            _model.ScheduledTasks.AddRange(scheduledTaskModels);
 
             _mocker = new AutoMocker();
 

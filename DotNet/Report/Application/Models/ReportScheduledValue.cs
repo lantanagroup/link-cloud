@@ -2,6 +2,9 @@
 {
     public class ReportScheduledValue
     {
-        public List<KeyValuePair<string, string>>? Parameters { get; set; }
+        public string[] ReportTypes { get; set; }
+        public string Frequency { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
     }
 }

@@ -24,7 +24,7 @@ public class SecurityConfig {
   private final AuthenticationConfig authenticationConfig;
 
   public SecurityConfig(JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter, AuthenticationConfig authenticationConfig) {
-    this.point = point;;
+    this.point = point;
     this.authFilter = authFilter;
     this.authenticationConfig = authenticationConfig;
   }

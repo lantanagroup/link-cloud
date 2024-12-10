@@ -14,18 +14,20 @@ public class ResourceEvaluated {
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String measureReportId;
 
+    private Boolean isReportable;
+
+    private String reportType;
+
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 
     private IBaseResource resource;
 
-    private Boolean isReportable;
-
     @Getter
     @Setter
     public static class Key {
         private String facilityId;
-        private String reportType;
+        private String frequency;
         private Date startDate;
         private Date endDate;
     }
