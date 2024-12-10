@@ -39,7 +39,7 @@ const listAnimation = trigger('listAnimation', [
   selector: 'demo-integration-test',
   standalone: true,
   imports: [
-    CommonModule,    
+    CommonModule,
     MatSnackBarModule,
     FormsModule,
     ReactiveFormsModule,
@@ -75,7 +75,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   isMonitoring: boolean = false;
   showProcessCard: boolean = false;
 
-  constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }    
+  constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }
 
   ngOnDestroy(): void {
     this.stopPollingAuditEvents();
@@ -84,7 +84,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.eventForm = new FormGroup({
       event: new FormControl('', Validators.required)
-    }); 
+    });
 
     this.eventForm.get('event')?.valueChanges.subscribe(change => {
       switch (change) {
@@ -183,7 +183,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       //this.auditEvents.push(testAudit);
 
     });
-    
+
   }
 
 }

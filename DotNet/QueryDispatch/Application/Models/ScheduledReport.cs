@@ -6,7 +6,9 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
     public class ScheduledReport
     {
         [DataMember]
-        public string ReportType { get; set; }
+        public List<string> ReportTypes { get; set; }
+        [DataMember]
+        public string Frequency { get; set; }
         [DataMember]
         public DateTime StartDate { get; set; }
         [DataMember]

@@ -19,18 +19,18 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ReportScheduledListener> _logger;
-        private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<ReportScheduledKey, ReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private string Name => this.GetType().Name;
 
-        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
+        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             ISchedulerFactory schedulerFactory,
-            ITransientExceptionHandler<ReportScheduledKey, ReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
+            ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
             IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -92,61 +92,56 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
-                                facilityId = key.FacilityId;
 
-                                if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                    string.IsNullOrWhiteSpace(key.ReportType))
+                                facilityId = key;
+                                var startDate = value.StartDate;
+                                var endDate = value.EndDate;
+                                var frequency = value.Frequency;
+                                var reportTypes = value.ReportTypes;
+
+                                if (string.IsNullOrWhiteSpace(facilityId))
                                 {
                                     throw new DeadLetterException(
-                                        $"{Name}: One or more required Key/Value properties are null or empty.");
+                                        $"{Name}: FacilityId is null or empty.");
                                 }
 
-                                DateTimeOffset startDateOffset;
-                                if (!DateTimeOffset.TryParse(
-                                        value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
-                                        out startDateOffset))
+                                if (reportTypes == null || reportTypes.Length == 0)
                                 {
-                                    throw new DeadLetterException($"{Name}: Start Date could not be parsed");
+                                    throw new DeadLetterException(
+                                        $"{Name}: ReportTypes is null or empty.");
                                 }
-
-                                DateTimeOffset endDateOffset;
-                                if (!DateTimeOffset.TryParse(
-                                        value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
-                                        out endDateOffset))
-                                {
-                                    throw new DeadLetterException($"{Name}: End Date could not be parsed");
-                                }
-
-                                
-                                var startDate = startDateOffset.UtcDateTime;
-                                var endDate = endDateOffset.UtcDateTime;
 
                                 // Check if this already exists
                                 var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate 
-                                                                                                        && x.ReportType == key.ReportType, consumeCancellationToken);
+                                                                                                        && x.ReportEndDate == endDate
+                                                                                                        && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
 
-                                if (existing != null)
+                                ReportScheduleModel? reportSchedule;
+                                if(existing != null) 
                                 {
-                                    throw new DeadLetterException(
-                                        "MeasureReportScheduled data already exists for the provided FacilityId, ReportType, and Reporting period.");
+                                    reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
+
+                                    await MeasureReportScheduleService.RescheduleJob(reportSchedule,
+                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
                                 }
-
-                                var ent = new ReportScheduleModel
+                                else
                                 {
-                                    FacilityId = key.FacilityId,
-                                    ReportStartDate = startDate,
-                                    ReportEndDate = endDate,
-                                    ReportType = key.ReportType,
-                                    CreateDate = DateTime.UtcNow
-                                };
+                                    reportSchedule = new ReportScheduleModel
+                                    {
+                                        FacilityId = facilityId,
+                                        ReportStartDate = startDate,
+                                        ReportEndDate = endDate,
+                                        Frequency = frequency,
+                                        ReportTypes = reportTypes,
+                                        CreateDate = DateTime.UtcNow
+                                    };
 
-                                var reportSchedule = await measureReportScheduledManager.AddAsync(ent, consumeCancellationToken);
+                                    reportSchedule = await measureReportScheduledManager.AddAsync(reportSchedule, consumeCancellationToken);
 
-                                await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                    await _schedulerFactory.GetScheduler(consumeCancellationToken));
-                                
+                                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
+                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                }
                             }
                             catch (DeadLetterException ex)
                             {

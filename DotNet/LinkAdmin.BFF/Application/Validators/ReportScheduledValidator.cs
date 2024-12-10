@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
                 .Must((x, y) => x.StartDate < x.EndDate)
                     .WithMessage("StartDate must be before EndDate")
                 .Must((x, y) => x.StartDate < DateTime.Now)
-                    .WithMessage("StartDate must be in the past");                    
+                    .WithMessage("StartDate must be in the past");
 
             RuleFor(x => x.EndDate)
                 .NotEmpty()

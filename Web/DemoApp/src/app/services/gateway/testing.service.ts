@@ -50,7 +50,7 @@ export class TestService {
           return response;
         }),
         catchError(this.handleError)
-    )
+      )
   }
 
   generateDataAcquisitionRequestedEvent(facilityId: string, patientId: string, reports: IScheduledReport[]): Observable<IEntityCreatedResponse> {

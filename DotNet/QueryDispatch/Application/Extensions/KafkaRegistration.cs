@@ -10,7 +10,7 @@ public static class KafkaRegistration
 {
     public static void RegisterKafka(this IServiceCollection services, KafkaConnection kafkaConnection)
     {
-        services.AddTransient<IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue>>();
+        services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
         services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
         services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
 
@@ -30,8 +30,8 @@ public static class KafkaRegistration
         var patientProducer = new KafkaProducerFactory<string, PatientEventValue>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
         services.AddSingleton(patientProducer);
 
-        services.AddTransient<IKafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>, KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>>();
-        var reportProducer = new KafkaProducerFactory<ReportScheduledKey, ReportScheduledValue>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
+        services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
+        var reportProducer = new KafkaProducerFactory<string, ReportScheduledValue>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
         services.AddSingleton(reportProducer);
     }
 }
