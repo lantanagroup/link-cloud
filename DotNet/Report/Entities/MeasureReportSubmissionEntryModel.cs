@@ -26,8 +26,6 @@ namespace LantanaGroup.Link.Report.Entities
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.NotEvaluated;
         public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
-        public PatientSubmissionModel? PatientSubmission { get; set; }
-
         public class ContainedResource
         {
             public string ResourceType { get; set; } = string.Empty;

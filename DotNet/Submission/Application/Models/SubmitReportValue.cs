@@ -1,6 +1,4 @@
 ﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Shared.Application.Converters;
-using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Submission.Application.Models
 {

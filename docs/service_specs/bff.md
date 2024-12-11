@@ -40,3 +40,29 @@
 | IdentityProviderConfig__NameClaimType        | email                          | No       |
 | IdentityProviderConfig__RoleClaimType        | roles                          | No       |
 | IdentityProviderConfig__ValidTypes           | `[ "at+jwt", "JWT" ]`          | No       |
+
+## API Operations
+
+The **BFF** service provides REST endpoints to support user authentication, session management, and integration testing. These endpoints serve as a bridge between the frontend and backend systems.
+
+### Available REST Operations
+
+#### Authentication and Session Management
+
+- **GET /api/login**: Initiates the login process for Link.
+- **GET /api/user**: Retrieves information about the currently logged-in user.
+- **GET /api/logout**: Logs out the currently logged-in user.
+- **GET /api/auth/token**: Generates a bearer token for the current user to interact with Link services.
+- **GET /api/auth/refresh-key**: Refreshes the signing key used for Link bearer tokens.
+
+#### Integration Testing
+
+- **POST /api/integration/patient-event**: Produces a patient event for testing purposes.
+- **POST /api/integration/report-scheduled**: Produces a report scheduled event for testing purposes.
+- **POST /api/integration/data-acquisition-requested**: Produces a data acquisition requested event for testing purposes.
+
+### Service Information
+
+- **GET /api/info**: Retrieves basic service information for the BFF service.
+
+These operations enable robust session management, integration testing, and backend connectivity for frontend applications.

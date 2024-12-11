@@ -32,13 +32,33 @@ The Measure Eval service is a Java based application that is primarily responsib
 | MeasureEvalConfig__TerminologyServiceUrl   | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
 | MeasureEvalConfig__EvaluationServiceUrl    | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **PatientDataNormalized**
 
-## Produced Events
+### Produced Events
 
 - **MeasureEvaluated**
 - **NotificationRequested**
 
-> **Note**: This service is being re-designed as a Java application to use CQFramework libraries directly rather than relying on a separate CQF-Ruler installation.
+## API Operations
+
+The **Measure Evaluation Service** provides REST endpoints to manage measure definitions and evaluate clinical data against those measures.
+
+### Measure Definitions
+
+- **GET /api/measure-definition/{id}**: Retrieves a specific measure definition by its ID.
+- **PUT /api/measure-definition/{id}**: Creates or updates a measure definition with the specified ID.
+- **GET /api/measure-definition**: Retrieves a list of all measure definitions.
+
+### Measure Evaluation
+
+- **POST /api/measure-definition/{id}/$evaluate**: Evaluates a measure against clinical data provided in the request body.
+
+### Health Check
+
+- **GET /health**: Performs a health check to verify the service is operational.
+
+These operations support the management of measure definitions and the evaluation of clinical data against defined measures.
