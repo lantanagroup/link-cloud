@@ -65,11 +65,10 @@ Creates `RetryEntity` objects by:
 
 ### Retry Settings
 
-> TODO: Where is this configuration stored? How is it managed? 
+The retry settings are found in the `ConsumerSettings` property in each service's app/system configuration:
 
-- Maximum retry attempts
-- Retry intervals (with exponential backoff)
-- Dead-letter handling configuration
+* DisableRetryConsumer: Disables the consumption of retry events
+* RetryDuration: The duration for retry attempts. This is specified in [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) format and is a list of retries. Each duration entry in the array represents the time to wait each time. If there are three entries, it will retry three times.
 
 ### Header Management
 
