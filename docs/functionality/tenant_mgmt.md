@@ -56,6 +56,35 @@ A fully functional tenant requires configuration across multiple services. Each 
 - Alert preferences
 - Communication channels
 
+#### Census Services
+
+- Facility identification
+  - Facility ID linking
+  - Tenant API endpoint configuration
+  - Base service URLs
+- Patient Census Management
+  - FHIR List query frequency settings
+  - Admission tracking parameters
+  - Discharge monitoring configurations
+  - Patient information retention policies
+
+#### Query Dispatch Service
+
+- Facility Configuration
+  - Facility ID mapping
+  - FHIR endpoint connections
+  - Resource query parameters
+- Query Timing Management
+  - Discharge lag period settings
+  - Resource query scheduling
+  - Data settlement wait times
+  - Query retry parameters
+- Resource Query Settings
+  - FHIR resource type configurations
+  - Query batch sizes
+  - Performance optimization parameters
+  - Resource filtering rules
+
 ## Important Notes
 
 1. Creating a tenant configuration in the Tenant service alone does not create a fully functional tenant. Additional configuration in other services is required.
