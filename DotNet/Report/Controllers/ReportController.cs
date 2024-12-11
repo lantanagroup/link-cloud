@@ -16,13 +16,11 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, ISubmissionEntryManager submissionEntryManager)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
-            _submissionEntryManager = submissionEntryManager;
         }
 
         /// <summary>
@@ -34,10 +32,10 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
         [HttpGet("Bundle/Patient")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<PatientSubmissionModel>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<PatientSubmissionModel>>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
+        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
         {
             try
             {
@@ -56,15 +54,9 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
-                var submissions = (await _submissionEntryManager.FindAsync(e =>
-                    e.FacilityId == facilityId && e.PatientId == patientId && e.ReportScheduleId == reportScheduleId)).Select(s => s.PatientSubmission).ToList();
+                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
 
-                if (submissions?.Any() ?? false)
-                {
-                    return Ok(submissions);
-                }
-
-                return NotFound();
+                return Ok(submission);
 
             }
             catch (Exception ex)

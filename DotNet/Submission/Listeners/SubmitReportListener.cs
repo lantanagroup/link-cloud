@@ -175,7 +175,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
                                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
                                 var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
@@ -291,7 +290,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 #region Patient and Other Resources Bundles
 
-                                var patientIds = value.PatientIds.Distinct().ToList();
+                                var patientIds = value.PatientIds.Select(p => p).ToList();
 
                                 var batchSize = _submissionConfig.PatientBundleBatchSize;
 
@@ -453,8 +452,6 @@ namespace LantanaGroup.Link.Submission.Listeners
             var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-
             string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
             try
@@ -467,7 +464,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (PatientReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientReportSubmissionModel), cancellationToken);
+                var patientSubmissionBundle = (PatientSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientSubmissionModel), cancellationToken);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {

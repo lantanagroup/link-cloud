@@ -43,12 +43,6 @@ namespace LantanaGroup.Link.Report.Core
 
         public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, string reportScheduleId)
         {
-            if (string.IsNullOrEmpty(facilityId))
-                throw new Exception($"GenerateBundle: no facilityId supplied");
-
-            if (string.IsNullOrEmpty(patientId))
-                throw new Exception($"GenerateBundle: no patientId supplied");
-
             var schedule = await _reportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportScheduleId) ?? throw new Exception($"No Measure Reports Scheduled for reportScheduleId of {reportScheduleId}");
 
             var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
