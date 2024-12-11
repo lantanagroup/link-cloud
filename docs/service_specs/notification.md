@@ -51,10 +51,29 @@ The Notification service is responsible for emailing configured users when a not
 |-------------------------------------------------------------|-------------------------------|---------|
 | Link__Notification__EnableSwagger                           | true (DEV and TEST)           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **NotificationRequested**
 
-## Produced Events
+### Produced Events
 
 - **AuditableEventOccurred**
+
+## API Operations
+
+The **Notification** service provides REST endpoints for managing notifications and their configurations. These endpoints enable users to create, retrieve, update, and delete notifications and configurations for specific facilities.
+
+- **GET /api/notification/info**: Retrieve general information about the notification service.
+- **GET /api/notification**: Retrieve a list of notifications based on filters, with pagination and sorting options.
+- **GET /api/notification/{id}**: Retrieve a specific notification by its unique ID.
+- **GET /api/notification/facility/{facilityId}**: Retrieve notifications associated with a specific facility, with pagination and sorting options.
+- **GET /api/notification/configuration**: Retrieve a list of notification configurations with filters, pagination, and sorting options.
+- **GET /api/notification/configuration/facility/{facilityId}**: Retrieve the notification configuration for a specific facility by `facilityId`.
+- **GET /api/notification/configuration/{id}**: Retrieve a specific notification configuration by its unique ID.
+- **POST /api/notification/configuration**: Create a new notification configuration.
+- **PUT /api/notification/configuration**: Update an existing notification configuration.
+- **DELETE /api/notification/configuration/{id}**: Delete a notification configuration by its unique ID.
+
+Each operation supports the management of notification delivery and configurations, ensuring timely and accurate communication across facilities and workflows.

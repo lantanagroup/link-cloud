@@ -57,10 +57,16 @@ An example of the submission package can be found at `\link-cloud\Submission Exa
 | FileSystemConfig__FilePath                   | `/data/Submission`                                   | No       |
 | EnableSwagger                                | true (DEV and TEST)                                  | No       |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **SubmitReport**
 
-## Produced Events
+### Produced Events
 
 - **ReportSubmitted**
+
+## API Operations
+
+The **Submission** service does not provide any REST endpoints for external consumption. The service is only responsible for consuming Kafka events, and then packaging and submitting the reporting content to a configured destination.
