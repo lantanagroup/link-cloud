@@ -38,16 +38,21 @@ public class TenantApiService : ITenantApiService
         if (!_serviceRegistry.Value.TenantService.CheckIfTenantExists)
             return true;
 
-        var tenantServiceApiUrl = _serviceRegistry.Value.TenantService.TenantServiceApiUrl;
+       var tenantServiceUrl = _serviceRegistry.Value.TenantService.TenantServiceUrl;
 
-        if (string.IsNullOrWhiteSpace(tenantServiceApiUrl))
+        if (string.IsNullOrWhiteSpace(tenantServiceUrl))
             throw new Exception("Tenant Service URL is missing.");
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var baseUri = new Uri(tenantServiceApiUrl.TrimEnd('/'));
-        var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.TrimStart('/')}/{sanitizedFacilityId}").ToString();
-        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceApiUrl);
+
+        var baseUri = new Uri(tenantServiceUrl);
+
+
+       var endpoint = new Uri(baseUri, $"{_serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint.TrimStart('/')}/{sanitizedFacilityId}").ToString();
+
+
+        _logger.LogInformation("Tenant Base Endpoint: {0}", tenantServiceUrl);
         _logger.LogInformation("Tenant Relative Endpoint: {0}", _serviceRegistry.Value.TenantService.GetTenantRelativeEndpoint);
         _logger.LogInformation("Checking if facility ({1}) exists in Tenant Service. Endpoint: {2}", sanitizedFacilityId, endpoint);
 
