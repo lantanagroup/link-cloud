@@ -7,6 +7,6 @@ namespace LantanaGroup.Link.Account.Application.Interfaces.Factories.User
     {
         GroupedUserModel Create(LinkUser user);
         GroupedUserModel Create(LinkUserModel user);
-        GroupedUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName);
+        GroupedUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName);
     }
 }

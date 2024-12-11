@@ -9,6 +9,7 @@ using System.Text;
 using QueryDispatch.Application.Settings;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using QueryDispatch.Domain.Managers;
+using QueryDispatch.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
@@ -53,14 +54,16 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                 {
                     PatientId = patientDispatchEntity.PatientId,
                     ScheduledReports = new List<ScheduledReport>(),
-                    QueryType = QueryTypes.Initial.ToString()
+                    QueryType = QueryTypes.Initial.ToString(),
+                    ReportableEvent = ReportableEvents.Discharge.ToString()
                 };
 
                 foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
                 {
                     dataAcquisitionRequestedValue.ScheduledReports.Add(new ScheduledReport
                     {
-                        ReportType = scheduledReportPeriod.ReportType,
+                        ReportTypes = scheduledReportPeriod.ReportTypes,
+                        Frequency = scheduledReportPeriod.Frequency,
                         StartDate = scheduledReportPeriod.StartDate,
                         EndDate = scheduledReportPeriod.EndDate
                     });

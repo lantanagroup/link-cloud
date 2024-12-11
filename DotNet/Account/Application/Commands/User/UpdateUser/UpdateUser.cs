@@ -134,10 +134,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                             if (!result)
                             {
-                                _logger.LogUserClaimAssignmentException(user.Id, userClaim.Type, userClaim.Value, "Failed to add claim while updating user.");
+                                _logger.LogUserClaimAssignmentException(user.Id.ToString(), userClaim.Type, userClaim.Value, "Failed to add claim while updating user.");
                             }
 
-                            _logger.LogUserClaimAssignment(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+                            _logger.LogUserClaimAssignment(user.Id.ToString(), userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
                         }
 
                     }
@@ -154,10 +154,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
 
                             if (!result)
                             {
-                                _logger.LogUserClaimRemovalException(user.Id, userClaim.Type, userClaim.Value, "Failed to remove claim while updating user.");
+                                _logger.LogUserClaimRemovalException(user.Id.ToString(), userClaim.Type, userClaim.Value, "Failed to remove claim while updating user.");
                             }
 
-                            _logger.LogUserClaimRemoval(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+                            _logger.LogUserClaimRemoval(user.Id.ToString(), userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
                         }
                     }
                 }

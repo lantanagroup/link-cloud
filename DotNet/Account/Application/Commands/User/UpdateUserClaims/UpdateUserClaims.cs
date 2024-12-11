@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string userId, List<string> claims, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, List<string> claims, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
 
@@ -59,7 +59,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         var outcome = await _userRepository.AddClaimToUserAsync(user.Id, newClaim, cancellationToken);
                         if(outcome)
                         {
-                            _logger.LogUserClaimAssignment(user.Id, newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                            _logger.LogUserClaimAssignment(user.Id.ToString(), newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                         }
                     }                    
                 }
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         var outcome = await _userRepository.RemoveClaimFromUserAsync(user.Id, removedClaim, cancellationToken);
                         if (outcome)
                         {
-                            _logger.LogUserClaimRemoval(user.Id, removedClaim.Type, removedClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                            _logger.LogUserClaimRemoval(user.Id.ToString(), removedClaim.Type, removedClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                         }
                     }
                 }

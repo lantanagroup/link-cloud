@@ -8,7 +8,7 @@ namespace DataAcquisition.Domain
         IEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
         IEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
         IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
-        IEntityRepository<QueriedFhirResourceRecord> QueriedFhirResourceRepository { get; set; }
+        IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
     }
     public class Database : IDatabase
@@ -16,20 +16,20 @@ namespace DataAcquisition.Domain
         public IEntityRepository<QueryPlan> QueryPlanRepository { get; set; }
         public IEntityRepository<FhirQueryConfiguration> FhirQueryConfigurationRepository { get; set; }
         public IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
-        public IEntityRepository<QueriedFhirResourceRecord> QueriedFhirResourceRepository { get; set; }
+        public IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
 
         public Database(
             IEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
             IEntityRepository<FhirListConfiguration> fhirListQueryListConfigurationRepository,
-            IEntityRepository<QueriedFhirResourceRecord> queriedFhirResourceRepository,
+            IEntityRepository<FhirQuery> fhirQueryRepository,
             IEntityRepository<ReferenceResources> referenceResourcesRepository,
             IEntityRepository<QueryPlan> queryPlans)
         {
             QueryPlanRepository = queryPlans;
             FhirQueryConfigurationRepository = queryConfigurationRepository;
             FhirListConfigurationRepository = fhirListQueryListConfigurationRepository;
-            QueriedFhirResourceRepository = queriedFhirResourceRepository;
+            FhirQueryRepository = fhirQueryRepository;
             ReferenceResourcesRepository = referenceResourcesRepository;
         }
     }

@@ -2,9 +2,9 @@
 {
     public class LinkRoleModel
     {
-        public LinkRoleModel() : this(string.Empty, string.Empty, string.Empty, []) { }
+        public LinkRoleModel() : this(Guid.Empty, string.Empty, string.Empty, []) { }
 
-        public LinkRoleModel(string id, string name, string description, List<string> claims)
+        public LinkRoleModel(Guid id, string name, string description, List<string> claims)
         {
             Id = id;
             Name = name;
@@ -16,7 +16,7 @@
         /// The id of the role
         /// </summary>
         /// <example>627c8762-de3c-4c92-a9f5-25483b6e7922</example>
-        public string Id { get; set; }
+        public Guid Id { get; set; }
 
         /// <summary>
         /// The name of the role

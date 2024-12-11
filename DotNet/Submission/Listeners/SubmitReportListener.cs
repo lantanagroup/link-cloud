@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    string facilityId = string.Empty;
+
                     try
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
@@ -124,14 +124,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 consumer.Commit();
                                 return;
                             }
-
+                            string facilityId = string.Empty;
                             try
                             {
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 facilityId = key.FacilityId;
 
-                                if (string.IsNullOrWhiteSpace(key.FacilityId))
+                                if (string.IsNullOrWhiteSpace(facilityId))
                                 {
                                     throw new TransientException(
                                         $"{Name}: FacilityId is null or empty.");
@@ -174,7 +174,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 //Add link token
                                 var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
                                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
@@ -291,7 +290,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 #region Patient and Other Resources Bundles
 
-                                var patientIds = value.PatientIds.Distinct().ToList();
+                                var patientIds = value.PatientIds.Select(p => p).ToList();
 
                                 var batchSize = _submissionConfig.PatientBundleBatchSize;
 
@@ -318,7 +317,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var otherResources = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.StartDate, key.EndDate, consumeCancellationToken);
+                                                key.ReportScheduleId, consumeCancellationToken);
 
                                             otherResourcesBag.Add(otherResources);
                                         }));
@@ -385,7 +384,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                       string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
 
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
@@ -439,8 +438,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <param name="endDate"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate,
-            DateTime endDate, CancellationToken cancellationToken)
+        private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
         {
             var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
 
@@ -454,9 +452,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-
-            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
             try
             {
@@ -468,7 +464,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (PatientReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientReportSubmissionModel), cancellationToken);
+                var patientSubmissionBundle = (PatientSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientSubmissionModel), cancellationToken);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {

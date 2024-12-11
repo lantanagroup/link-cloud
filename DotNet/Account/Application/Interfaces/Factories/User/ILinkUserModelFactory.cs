@@ -7,6 +7,6 @@ namespace LantanaGroup.Link.Account.Application.Interfaces.Factories.User
     public interface ILinkUserModelFactory
     {
         LinkUserModel Create(LinkUser user);
-        LinkUserModel Create(string userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? roles, List<string>? userClaims, List<string>? roleClaims);
+        LinkUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName, List<string>? roles, List<string>? userClaims, List<string>? roleClaims);
     }
 }

@@ -2,6 +2,8 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.Serialization;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 
@@ -12,7 +14,7 @@ public class QueryPlan : BaseEntityExtended
     [DataMember]
     public string PlanName { get; set; }
     [DataMember]
-    public string ReportType { get; set; }
+    public Frequency Type { get; set; }
     [DataMember]
     public string FacilityId { get; set; }
     [DataMember]

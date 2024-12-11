@@ -10,6 +10,10 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
+using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Entities;
+using Microsoft.AspNetCore.Mvc.TagHelpers;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -20,10 +24,11 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<string, PatientIdsAcquiredValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> _deadLetterExceptionHandler;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-
+        private readonly ISubmissionEntryManager _submissionEntryManager;
         private string Name => this.GetType().Name;
 
         public PatientIdsAcquiredListener(ILogger<PatientIdsAcquiredListener> logger, IKafkaConsumerFactory<string, PatientIdsAcquiredValue> kafkaConsumerFactory,
+            ISubmissionEntryManager submissionEntryManager,
           ITransientExceptionHandler<string, PatientIdsAcquiredValue> transientExceptionHandler,
           IDeadLetterExceptionHandler<string, PatientIdsAcquiredValue> deadLetterExceptionHandler, IServiceScopeFactory serviceScopeFactory)
         {
@@ -31,6 +36,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _serviceScopeFactory = serviceScopeFactory;
 
+            _submissionEntryManager = submissionEntryManager;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -92,8 +98,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var scheduledReports =
-                                    await database.ReportScheduledRepository.FindAsync(x =>
-                                        x.FacilityId == key, cancellationToken);
+                                    await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.PatientsToQueryDataRequested == false, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -103,29 +108,35 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested))
                                 {
-                                    if (scheduledReport.PatientsToQuery == null)
+                                    foreach (var reportType in scheduledReport.ReportTypes)
                                     {
-                                        scheduledReport.PatientsToQuery = new List<string>();
-                                    }
-
-                                    foreach (var patientReference in value.PatientIds.Entry)
-                                    {
-                                        var patientId = patientReference.Item.Reference.Split('/').Last();
-                                        if (scheduledReport.PatientsToQuery.Contains(patientId))
+                                        foreach (var patientReference in value.PatientIds.Entry)
                                         {
-                                            continue;
+                                            var patientId = patientReference.Item.Reference.Split('/').Last();
+
+                                            var entry = await _submissionEntryManager.SingleOrDefaultAsync(e =>
+                                                       e.ReportScheduleId == scheduledReport.Id
+                                                       && e.PatientId == patientId
+                                                       && e.ReportType == reportType, consumeCancellationToken);
+
+                                            if (entry == null)
+                                            {
+
+                                                _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                {
+                                                    PatientId = patientId,
+                                                    Status = PatientSubmissionStatus.NotEvaluated,
+                                                    ReportScheduleId = scheduledReport.Id,
+                                                    FacilityId = scheduledReport.FacilityId,
+                                                    ReportType = reportType,
+                                                });
+                                            }
+                                            else
+                                            {
+                                                entry.Status = PatientSubmissionStatus.NotEvaluated;
+                                                _submissionEntryManager.UpdateAsync(entry);
+                                            }
                                         }
-
-                                        scheduledReport.PatientsToQuery.Add(patientId);
-                                    }
-
-                                    try
-                                    {
-                                        await database.ReportScheduledRepository.UpdateAsync(scheduledReport, consumeCancellationToken);
-                                    }
-                                    catch (Exception)
-                                    {
-                                        throw new TransientException("Failed to update ReportSchedule");
                                     }
                                 }
                             }

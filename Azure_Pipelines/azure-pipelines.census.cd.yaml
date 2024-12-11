@@ -1,3 +1,9 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Deploy_All_Services
+    trigger: true
+
 trigger:
   branches:
     include:
@@ -115,4 +121,3 @@ steps:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
       ArtifactName: 'drop'
       publishLocation: 'Container'
-  

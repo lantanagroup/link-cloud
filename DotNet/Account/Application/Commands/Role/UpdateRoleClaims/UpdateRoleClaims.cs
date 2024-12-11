@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         }
 
-        public async Task<bool> Execute(ClaimsPrincipal? requestor, string roleId, List<string> claims, CancellationToken cancellationToken = default)
+        public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid roleId, List<string> claims, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("UpdateClaims:Execute");
 
@@ -46,7 +46,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                 if (role is null)
                 {
-                    _logger.LogRoleClaimAssignmentException(roleId, string.Join(",", claims), "Role not found");
+                    _logger.LogRoleClaimAssignmentException(roleId.ToString(), string.Join(",", claims), "Role not found");
                     return false;
                 }
 
@@ -66,7 +66,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                     if (outcome)
                     { 
-                        _logger.LogRoleClaimAssignment(role.Id, newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                        _logger.LogRoleClaimAssignment(role.Id.ToString(), newClaim.Type, newClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                     }
                 }
 
@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
 
                         if (outcome)
                         {
-                            _logger.LogRoleClaimAssignment(role.Id, roleClaim.Type, roleClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
+                            _logger.LogRoleClaimAssignment(role.Id.ToString(), roleClaim.Type, roleClaim.Value, requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
                         }
                     }
                 }

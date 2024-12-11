@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
 {
     public interface IGetLinkUserEntity
     {
-        Task<LinkUser> Execute(string id, CancellationToken cancellationToken = default);
+        Task<LinkUser> Execute(Guid id, CancellationToken cancellationToken = default);
     }
 }

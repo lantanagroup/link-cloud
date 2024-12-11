@@ -11,5 +11,6 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
         public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();
         [DataMember]
         public string QueryType { get; set; } = QueryTypes.Initial.ToString();
+        public string ReportableEvent { get; set; } = String.Empty;
     }
 }

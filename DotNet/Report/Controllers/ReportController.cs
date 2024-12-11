@@ -4,6 +4,8 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using LantanaGroup.Link.Report.Domain.Managers;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -33,23 +35,29 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<ActionResult<PatientSubmissionModel>> GetSubmissionBundleForPatient(string facilityId, string patientId, string reportScheduleId)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
-                    BadRequest("Paramater facilityId is null or whitespace");
+                    BadRequest("Parameter facilityId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(patientId))
                 {
-                    BadRequest("Paramater patientId is null or whitespace");
+                    BadRequest("Parameter patientId is null or whitespace");
                 }
 
-                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
+                if (string.IsNullOrWhiteSpace(reportScheduleId))
+                {
+                    BadRequest("Parameter reportScheduleId is null or whitespace");
+                }
+
+                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
 
                 return Ok(submission);
+
             }
             catch (Exception ex)
             {

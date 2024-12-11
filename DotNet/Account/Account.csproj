@@ -43,8 +43,7 @@
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Migrations\" />
-  </ItemGroup>
-
+	<ItemGroup>
+		<Folder Include="Migrations\" />
+	</ItemGroup>
 </Project>

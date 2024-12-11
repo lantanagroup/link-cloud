@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Account.Application.Interfaces.Domain;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Security.Claims;
 
@@ -8,7 +9,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
     [Table("Users")]
     public class LinkUser : IBaseEntity
     {
-        public string Id { get; set; } = string.Empty;
+        [MaxLength(36)]
+        public Guid Id { get; set; }
         public string? UserName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
@@ -30,8 +32,10 @@ namespace LantanaGroup.Link.Account.Domain.Entities
     [Table("UserRoles")]
     public class LinkUserRole
     {
-        public string UserId { get; set; } = default!;
-        public string RoleId { get; set; } = default!;
+        [MaxLength(36)]
+        public Guid UserId { get; set; } = default!;
+        [MaxLength(36)]
+        public Guid RoleId { get; set; } = default!;
 
         public virtual LinkUser User { get; set; } = default!;
         public virtual LinkRole Role { get; set; } = default!;
@@ -41,7 +45,8 @@ namespace LantanaGroup.Link.Account.Domain.Entities
     public class LinkUserClaim
     {
         public int Id { get; set; }
-        public string UserId { get; set; } = string.Empty;
+        [MaxLength(36)]
+        public Guid UserId { get; set; }
         public string? ClaimType { get; set; }
         public string? ClaimValue { get; set; }     
 

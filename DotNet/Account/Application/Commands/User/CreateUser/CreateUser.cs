@@ -38,7 +38,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             {
                 var user = new LinkUser
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.NewGuid(),
                     FirstName = model.FirstName,
                     MiddleName = model.MiddleName,
                     LastName = model.LastName,
@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     throw new ApplicationException($"Unable to create user.");
                 }
 
-                _logger.LogUserCreated(user.Id, user.CreatedBy ?? "Unknown");
+                _logger.LogUserCreated(user.Id.ToString(), user.CreatedBy ?? "Unknown");
 
                 //Increment the account added counter
                 _metrics.IncrementAccountAddedCounter([]);
@@ -80,10 +80,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         result = await _userRepository.AddRoleAsync(user.Id, linkRole, cancellationToken);
                         if (!result)
                         {
-                            _logger.LogUserRoleAssignmentException(user.Id, role, "Failed to add role.");
+                            _logger.LogUserRoleAssignmentException(user.Id.ToString(), role, "Failed to add role.");
                         }
 
-                        _logger.LogUserAddedToRole(user.Id, role, user.CreatedBy ?? "Unknown");
+                        _logger.LogUserAddedToRole(user.Id.ToString(), role, user.CreatedBy ?? "Unknown");
                     }                    
                 }           
                 
@@ -98,10 +98,10 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                         result = await _userRepository.AddClaimToUserAsync(user.Id, userClaim, cancellationToken);
                         if (!result)
                         {
-                            _logger.LogUserClaimAssignmentException(user.Id, userClaim.Type, userClaim.Value, "Failed to add claim while creating user.");
+                            _logger.LogUserClaimAssignmentException(user.Id.ToString(), userClaim.Type, userClaim.Value, "Failed to add claim while creating user.");
                         }
 
-                        _logger.LogUserClaimAssignment(user.Id, userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
+                        _logger.LogUserClaimAssignment(user.Id.ToString(), userClaim.Type, userClaim.Value, user.CreatedBy ?? "Unknown");
 
                     }                    
                 }
