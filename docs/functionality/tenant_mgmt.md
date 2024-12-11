@@ -26,7 +26,7 @@ A fully functional tenant requires configuration across multiple services. Each 
 - Basic facility information
 - Reporting schedules
 - Monthly reporting plans
-- Task scheduling
+- Multi-measure reporting configurations
 
 #### Data Acquisition Service
 
