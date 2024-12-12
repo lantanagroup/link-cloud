@@ -14,7 +14,7 @@ This page and its references include documentation for Link's services and the f
 * [Normalization](functionality/normalization.md)
 * Security
   * [Security Overview](functionality/security_overview.md)
-  * [OAuth & Cookie Flow](functionality/oauth_cookie_flow.md)
+  * [OAuth & Cookie Flow](functionality/oauth_flow.md)
 * [Submission Folder Structure](functionality/submission_folder.md)
 * [Telemetry](functionality/telemetry.md)
 * [Tenant/Facility Management](functionality/tenant_mgmt.md)

@@ -24,6 +24,86 @@ The Link Admin BFF (Backend for Frontend) implements a secure authentication flo
     - The BFF uses the OAuth tokens to make authenticated requests to backend services
     - Token refresh is handled transparently by the BFF when needed
 
+## Cookie Security
+
+- Cookies are HTTP-only to prevent XSS attacks
+- Secure flag ensures cookies only sent over HTTPS
+- Anti-forgery protection enabled
+- Session cookies with server-side storage
+
+## Token Security
+
+- OAuth tokens never exposed to the frontend
+- Tokens stored securely server-side
+- Token refresh handled by BFF
+- Short-lived access tokens with automatic refresh
+
+## CORS Protection
+
+- Strict CORS policy configured
+- Credentials mode enabled for cookie transmission
+- Only trusted origins allowed
+
+## PKCE (Proof Key for Code Exchange)
+
+PKCE is implemented to secure the OAuth authorization code flow and prevent authorization code interception attacks:
+
+**Code Verifier Generation**
+
+   - A cryptographically random code verifier is generated for each authentication request
+   - The verifier is stored securely server-side in the BFF
+   - Length and character requirements follow OAuth PKCE specifications
+
+**Code Challenge**
+
+   - The code challenge is derived from the verifier using SHA-256
+   - Challenge is included in the initial authorization request
+   - The challenge method is set to "S256" (SHA-256)
+
+**Code Exchange**
+
+   - Original code verifier is included when exchanging the authorization code
+   - OAuth provider validates the code challenge/verifier pair
+   - Prevents malicious actors from using intercepted auth codes
+
+## State Parameter Protection
+
+The state parameter provides CSRF protection during the OAuth flow:
+
+**State Generation**
+
+   - Cryptographically secure random state value generated per request
+   - State is bound to the user's session
+   - Stored server-side in the BFF
+
+**State Validation**
+
+   - State parameter included in authorization request
+   - Returned state must match the original stored value
+   - Requests with invalid/missing state are rejected
+   - Protects against CSRF and replay attacks
+
+## Scope Restrictions
+
+OAuth scopes are strictly controlled to limit access:
+
+**Required Scopes**
+
+openid profile email
+
+**Scope Validation**
+
+- Only pre-configured scopes are allowed
+- Scope requests are validated against allowed list
+- Additional scopes require explicit configuration
+- Prevents scope elevation attacks
+
+**Scope Usage**
+
+- Scopes map to specific API permissions
+- Access tokens only receive approved scopes
+- Resource access is restricted by granted scopes
+
 ## Configuration
 
 The BFF's OAuth and cookie settings are configured in `appsettings.json`:
@@ -52,28 +132,6 @@ The BFF's OAuth and cookie settings are configured in `appsettings.json`:
   }
 }
 ```
-
-## Security Considerations
-
-**Cookie Security**
-
-- Cookies are HTTP-only to prevent XSS attacks
-- Secure flag ensures cookies only sent over HTTPS 
-- Anti-forgery protection enabled 
-- Session cookies with server-side storage
-
-**Token Security**
-
-- OAuth tokens never exposed to the frontend 
-- Tokens stored securely server-side
-- Token refresh handled by BFF
-- Short-lived access tokens with automatic refresh
-
-**CORS Protection**
-
-- Strict CORS policy configured
-- Credentials mode enabled for cookie transmission
-- Only trusted origins allowed
 
 ## UI Integration
 
