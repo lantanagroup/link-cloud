@@ -42,3 +42,21 @@ When deployed, each service provides a Swagger UI for exploring its API. The Swa
 * Java Services
   * UI: `/swagger-ui.html`
   * JSON: `/v3/api-docs`
+
+## Java
+
+### Kafka Authentication
+
+If Kafka requires authentication (such as SASL_PLAINTEXT) the Java services use the following (example) properties:
+
+| Property Name                             | Value                                                                                               |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| spring.kafka.properties.sasl.jaas.config  | org.apache.kafka.common.security.plain.PlainLoginModule required username=\"XXX\" password=\"XXX\"; |
+| spring.kafka.properties.sasl.mechanism    | PLAIN                                                                                               |
+| spring.kafka.properties.security.protocol | SASL_PLAINTEXT                                                                                      |
+
+These properties can be applied when running/debugging the services locally by passing them as VM arguments, such as `-Dspring.kafka.properties.sasl.mechanism=PLAIN`.
+
+### Azure App Config
+
+Note: If a Java service is configured to use Azure App Config, keys in ACA take precedence over Java VM args _and_ Environment Variables.

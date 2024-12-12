@@ -11,10 +11,14 @@ The Measure Eval service is a Java based application that is primarily responsib
 
 ## Environment Variables
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
+| Name                                        | Secret? | Description                                                   |
+|---------------------------------------------|---------|---------------------------------------------------------------|
+| SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED | No      | Boolean value to enable or disable use of Azure App Config    |
+| AZURE_APP_CONFIG_ENDPOINT                   | No      | If App Config enabled, the URI to the ACA instance.           |
+| AZURE_CLIENT_ID                             | No      | The client id to use for authentication for ACA.              |
+| AZURE_CLIENT_SECRET                         | Yes     | The secret/password to use for ACA authentication.            |
+| AZURE_TENANT_ID                             | No      | The tenant id that the configured ACA instance is located in. |
+| LOKI_URL                                    | No      | The URL to Loki where logs should persisted.                  |
 
 ## App Settings
 
