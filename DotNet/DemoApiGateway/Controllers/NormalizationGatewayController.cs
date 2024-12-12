@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> CreateNormalizationConfig([FromBody]NormalizationConfigModel model)
+        public async Task<IActionResult> CreateNormalizationConfig(NormalizationConfigModel model)
         {
             if (model == null) { return BadRequest("No configuration provided."); }
 
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> UpdateNormalizationConfig(string facilityId, [FromBody]NormalizationConfigModel model)
+        public async Task<IActionResult> UpdateNormalizationConfig(string facilityId, NormalizationConfigModel model)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
             {
