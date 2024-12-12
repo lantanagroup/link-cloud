@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.measureeval.configs.LinkConfig;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import org.springframework.stereotype.Service;
@@ -13,10 +14,12 @@ public class MeasureEvaluatorCache {
     private final FhirContext fhirContext;
     private final MeasureDefinitionRepository definitionRepository;
     private final Map<String, MeasureEvaluator> instancesById = new ConcurrentHashMap<>();
+    private final LinkConfig linkConfig;
 
-    public MeasureEvaluatorCache(FhirContext fhirContext, MeasureDefinitionRepository definitionRepository) {
+    public MeasureEvaluatorCache(FhirContext fhirContext, MeasureDefinitionRepository definitionRepository, LinkConfig linkConfig) {
         this.fhirContext = fhirContext;
         this.definitionRepository = definitionRepository;
+        this.linkConfig = linkConfig;
     }
 
     public MeasureEvaluator get(String id) {
@@ -25,7 +28,7 @@ public class MeasureEvaluatorCache {
             if (measureDefinition == null) {
                 return null;
             }
-            return MeasureEvaluator.compile(fhirContext, measureDefinition.getBundle());
+            return MeasureEvaluator.compile(fhirContext, measureDefinition.getBundle(), this.linkConfig.isCqlDebug());
         });
     }
 

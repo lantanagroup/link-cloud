@@ -51,6 +51,7 @@ spring:
 
 link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
+  cql-debug: false
 
 secret-management:
   key-vault-uri: ''

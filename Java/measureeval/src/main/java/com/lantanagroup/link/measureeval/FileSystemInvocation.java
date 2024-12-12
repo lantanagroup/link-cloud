@@ -138,7 +138,7 @@ public class FileSystemInvocation {
                 .orElseThrow(() -> new IllegalArgumentException("Patient resource not found in bundle"));
     }
 
-    private static void evaluatePatientBundle(String patientBundlePath, Bundle patientBundle, String start, String end, MeasureEvaluator evaluator) {
+    private static void evaluatePatientBundle(Bundle patientBundle, String start, String end, MeasureEvaluator evaluator, boolean isDebug) {
         Patient patient = findPatient(patientBundle);
         var report = evaluator.evaluate(
                 new DateTimeType(start),
@@ -171,11 +171,11 @@ public class FileSystemInvocation {
 
                 for (Bundle patientBundle : patientBundles) {
                     logger.info("\n===================================================");
-                    evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+                    evaluatePatientBundle(patientBundle, start, end, evaluator, true);
                 }
             } else {
                 Bundle patientBundle = getBundle(patientBundlePath);
-                evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+                evaluatePatientBundle(patientBundle, start, end, evaluator, true);
             }
         } catch (Exception e) {
             System.err.println("Error occurred while evaluating measure: " + e.getMessage());

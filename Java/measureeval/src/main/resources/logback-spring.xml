@@ -41,9 +41,11 @@
         </then>
     </if>
 
+    <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="debug"/>
+    <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
+
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
-            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
             <root level="WARN">
                 <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI"/>
@@ -51,7 +53,6 @@
 
         </then>
         <else>
-            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
             <root level="WARN">
                 <appender-ref ref="STDOUT"/>
             </root>

@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.controllers;
 
+import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
@@ -98,21 +99,41 @@ public class MeasureDefinitionController {
         return entity;
     }
 
+    @GetMapping("/{id}/{library-id}/$cql")
+    @PreAuthorize("hasAuthority('IsLinkAdmin')")
+    @Operation(summary = "Get the CQL for a measure definition's library", tags = {"Measure Definitions"})
+    public String getMeasureLibraryCQL(
+            @PathVariable("id") String measureId,
+            @PathVariable("library-id") String libraryId,
+            @RequestParam(value = "range", required = false) String range) {
+
+        // TODO: Test the range format
+
+        // TODO: Get library
+
+        // TODO: Get CQL from library
+
+        // TODO: Find range in CQL
+
+        // TODO: Respond with CQL
+
+        return null;
+    }
+
     @PostMapping("/{id}/$evaluate")
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
-    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters) {
+    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters, @RequestParam(required = false, defaultValue = "false") boolean debug) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
-        MeasureEvaluator evaluator = evaluatorCache.get(id);
-        if (evaluator == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+
         try {
-            return evaluator.evaluate(parameters);
+            // Compile the measure every time because the debug flag may have changed from what's in the cache
+            MeasureDefinition measureDefinition = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), measureDefinition.getBundle(), parameters, debug);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
