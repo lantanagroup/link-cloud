@@ -35,7 +35,7 @@ public class CensusConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CensusConfigModel censusConfig)
+    public async Task<IActionResult> Create(CensusConfigModel censusConfig)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -118,7 +118,7 @@ public class CensusConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
-    public async Task<ActionResult<CensusConfigModel>> Put([FromBody] CensusConfigModel censusConfig, string facilityId)
+    public async Task<ActionResult<CensusConfigModel>> Put(CensusConfigModel censusConfig, string facilityId)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {

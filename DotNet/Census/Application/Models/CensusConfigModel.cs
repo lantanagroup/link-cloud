@@ -1,13 +1,12 @@
-﻿using System.Runtime.Serialization;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.Census.Application.Models
 {
-    [DataContract]
     public class CensusConfigModel
     {
-        [DataMember]
+        [Required]
         public string FacilityId { get; set; }
-        [DataMember]
+        [Required]
         public string ScheduledTrigger { get; set; }
     }
 }
