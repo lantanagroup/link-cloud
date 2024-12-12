@@ -97,7 +97,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
         string facilityId, 
-        [FromBody] QueryPlan? queryPlan, 
+        QueryPlan? queryPlan, 
         CancellationToken cancellationToken)
     {
         try
@@ -181,7 +181,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        [FromBody] QueryPlan? queryPlan,
+        QueryPlan? queryPlan,
         CancellationToken cancellationToken)
     {
         try

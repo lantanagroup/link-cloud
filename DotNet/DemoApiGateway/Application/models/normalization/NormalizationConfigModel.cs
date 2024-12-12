@@ -1,11 +1,13 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.DemoApiGateway.Application.models.interfaces;
+﻿using LantanaGroup.Link.DemoApiGateway.Application.models.interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace LantanaGroup.Link.DemoApiGateway.Application.models.normalization
 {
     public class NormalizationConfigModel
     {
+        [Required]
         public string FacilityId { get; set; }
+        [Required]
         public Dictionary<string, INormalizationOperation> OperationSequence { get; set; }
     }  
     
