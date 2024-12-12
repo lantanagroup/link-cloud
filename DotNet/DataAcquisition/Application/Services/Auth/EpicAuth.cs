@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Crypto;
@@ -63,9 +62,7 @@ public class EpicAuth : IAuth
 
     private string Sanitize(string input)
     {
-        var sanitizedInput = HtmlInputSanitizer.Sanitize(Sanitize(input));
-        sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\\-\\_ ]", string.Empty, RegexOptions.Compiled);
-        sanitizedInput = Regex.Replace(sanitizedInput, @"\t|\n|\r", "");
+        var sanitizedInput = Regex.Replace(input, @"\t|\n|\r", string.Empty, RegexOptions.Compiled).Trim();
         return sanitizedInput;
     }
 
