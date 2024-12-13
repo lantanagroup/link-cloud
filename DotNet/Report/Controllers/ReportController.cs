@@ -78,9 +78,17 @@ namespace LantanaGroup.Link.Report.Controllers
                     BadRequest("Paramater patientId is null or whitespace");
                 }
 
-                var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
+                try
+                {
+                    var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, startDate, endDate);
 
-                return Ok(submission);
+                    return Ok(submission);
+                }
+                catch (ArgumentException e)
+                {
+                    return NotFound(e.Message);
+                }
+
             }
             catch (Exception ex)
             {

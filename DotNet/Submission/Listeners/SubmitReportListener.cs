@@ -456,7 +456,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            string dtFormat = "yyyy-MM-ddTHH:mm:ssZ";
 
             string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
 

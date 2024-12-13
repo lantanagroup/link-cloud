@@ -49,7 +49,13 @@ namespace LantanaGroup.Link.Report.Core
             if (string.IsNullOrEmpty(patientId))
                 throw new Exception($"GenerateBundle: no patientId supplied");
 
-            var schedules = await _measureReportScheduledManager.GetMeasureReportSchedules(facilityId, startDate, endDate) ?? throw new Exception($"No Measure Reports Scheduled for facility {facilityId} and date range of {startDate} - {endDate}");
+            var schedules =
+                await _measureReportScheduledManager.GetMeasureReportSchedules(facilityId, startDate, endDate);
+
+            if (schedules == null || schedules.Count == 0)
+            {
+                throw new ArgumentException($"No Report Schedules found for facility {facilityId} and date range of {startDate} - {endDate}");
+            }
 
             var entries = await _database.SubmissionEntryRepository.FindAsync(e =>
                 e.FacilityId == facilityId && e.PatientId == patientId &&
