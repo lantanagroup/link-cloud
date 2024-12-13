@@ -77,14 +77,6 @@ namespace LantanaGroup.Link.Report.Core
 
                 MeasureReport mr = entry.MeasureReport;
 
-                var config =
-                    (await _database.ReportConfigRepository.FindAsync(x =>
-                        x.FacilityId == facilityId && x.ReportType == schedule.ReportType)).FirstOrDefault();
-
-                if (config == null)
-                    throw new Exception($"No report configs found for Facility {schedule.FacilityId}");
-
-
                 foreach(var r in entry.ContainedResources)
                 {
                     if (r.DocumentId == null)
@@ -140,8 +132,7 @@ namespace LantanaGroup.Link.Report.Core
                 _metrics.IncrementReportGeneratedCounter(new List<KeyValuePair<string, object?>>() {
                     new KeyValuePair<string, object?>("facilityId", schedule.FacilityId),
                     new KeyValuePair<string, object?>("measure.schedule.id", measureReportScheduleId),
-                    new KeyValuePair<string, object?>("measure", mr.Measure),
-                    new KeyValuePair<string, object?>("bundling.type", config?.BundlingType)
+                    new KeyValuePair<string, object?>("measure", mr.Measure)
                 });
             }
 
