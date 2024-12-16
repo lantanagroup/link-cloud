@@ -24,7 +24,7 @@ public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
             String range = matcher.group(2);
             String output = matcher.group(3)
                     .replaceAll("org.hl7.fhir.r4.model.", "")
-                    .replaceAll("@[0-9A-z]{8}", "");
+                    .replaceAll("@[0-9A-Fa-f]{8}", "");
             String cql = null;
 
             MeasureEvaluatorCache measureEvalCache = ApplicationContextProvider.getApplicationContext().getBean(MeasureEvaluatorCache.class);
