@@ -10,6 +10,7 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+    <appender name="cql" class="com.lantanagroup.link.measureeval.utils.CqlLogAppender"/>
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
@@ -41,7 +42,9 @@
         </then>
     </if>
 
-    <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="debug"/>
+    <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="DEBUG" additivity="false">
+        <appender-ref ref="cql"/>
+    </logger>
     <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>

@@ -7,9 +7,12 @@
             </Pattern>
         </layout>
     </appender>
+    <appender name="cql" class="com.lantanagroup.link.measureeval.utils.CqlLogAppender"/>
 
     <logger name="com.lantanagroup.link" level="info"/>
-    <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="debug"/>
+    <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="DEBUG" additivity="false">
+        <appender-ref ref="cql"/>
+    </logger>
 
     <root level="info">
         <appender-ref ref="CONSOLE"/>
