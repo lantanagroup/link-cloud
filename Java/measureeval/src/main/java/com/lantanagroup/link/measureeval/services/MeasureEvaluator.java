@@ -5,6 +5,7 @@ import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.measureeval.repositories.LinkInMemoryFhirRepository;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import lombok.Getter;
 import org.hl7.fhir.r4.model.*;
 import org.opencds.cqf.fhir.api.Repository;
 import org.opencds.cqf.fhir.cql.EvaluationSettings;
@@ -26,6 +27,7 @@ public class MeasureEvaluator {
 
     private final FhirContext fhirContext;
     private final MeasureEvaluationOptions options;
+    @Getter
     private final Bundle bundle;
     private final Measure measure;
 
