@@ -42,16 +42,19 @@ public class CqlUtils {
         // Find range in CQL
         if (range != null) {
             // Split range into start and end line/column
-            StringBuilder rangeCql = CqlUtils.getCqlRange(range, cql);
-
-            return rangeCql.toString();
+            return CqlUtils.getCqlRange(range, cql);
         }
 
         return cql;
     }
 
-    private static StringBuilder getCqlRange(String range, String cql) {
+    private static String getCqlRange(String range, String cql) {
         String[] rangeParts = range.split(":|-");
+
+        if (rangeParts.length != 4) {
+            return cql;
+        }
+
         int startLine = Integer.parseInt(rangeParts[0]);
         int startColumn = Integer.parseInt(rangeParts[1]);
         int endLine = Integer.parseInt(rangeParts[2]);
@@ -75,6 +78,7 @@ public class CqlUtils {
                 rangeCql.append("\n");
             }
         }
-        return rangeCql;
+
+        return rangeCql.toString();
     }
 }
