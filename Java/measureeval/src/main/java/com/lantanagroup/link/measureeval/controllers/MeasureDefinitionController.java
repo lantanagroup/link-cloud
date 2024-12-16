@@ -12,6 +12,7 @@ import com.lantanagroup.link.measureeval.utils.CqlUtils;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -103,6 +104,9 @@ public class MeasureDefinitionController {
     @GetMapping("/{id}/{library-id}/$cql")
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Get the CQL for a measure definition's library", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    @Parameter(name = "library-id", description = "The ID of the library in the measure definition", required = true)
+    @Parameter(name = "range", description = "The range of the CQL to return (e.g. 37:1-38:22)", required = false)
     public String getMeasureLibraryCQL(
             @PathVariable("id") String measureId,
             @PathVariable("library-id") String libraryId,
@@ -121,6 +125,9 @@ public class MeasureDefinitionController {
     @PostMapping("/{id}/$evaluate")
     @PreAuthorize("hasAuthority('IsLinkAdmin')")
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    @Parameter(name = "parameters", description = "The parameters to use in the evaluation", required = true)
+    @Parameter(name = "debug", description = "Whether to log CQL debugging information during evaluation", required = false)
     public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters, @RequestParam(required = false, defaultValue = "false") boolean debug) {
 
         if (user != null){
