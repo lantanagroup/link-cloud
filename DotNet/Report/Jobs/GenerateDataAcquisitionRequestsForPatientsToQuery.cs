@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
+using Hl7.Fhir.Model;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -46,11 +47,12 @@ namespace LantanaGroup.Link.Report.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
+            MeasureReportScheduleModel? schedule = null;
             try
             {
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                var schedule =
+                schedule =
                     (MeasureReportScheduleModel)triggerMap[
                         ReportConstants.MeasureReportSubmissionScheduler.ReportScheduleModel];
 
@@ -153,15 +155,16 @@ namespace LantanaGroup.Link.Report.Jobs
                     }
                 }
 
-
-
                 // remove the job from the scheduler
                 await MeasureReportScheduleService.DeleteJob(schedule, await _schedulerFactory.GetScheduler());
             }
             catch (Exception ex)
             {
-                _logger.LogError(null, ex, $"Error encountered in GenerateDataAcquisitionRequestsForPatientsToQuery: {ex.Message + Environment.NewLine + ex.StackTrace}");
-                throw;
+                _logger.LogError(ex, "Exception encountered during GenerateDataAcquisitionRequestsForPatientsToQuery");
+                if (schedule != null)
+                {
+                    await MeasureReportScheduleService.RescheduleJob(schedule, await _schedulerFactory.GetScheduler());
+                }
             }
         }
     }
