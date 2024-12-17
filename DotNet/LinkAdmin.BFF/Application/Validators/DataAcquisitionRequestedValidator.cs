@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
 
             RuleForEach(x => x.ScheduledReports)
                 .SetValidator(new ScheduledReportValidator());
-
+           
         }
     }
 
@@ -35,9 +35,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
     {
         public ScheduledReportValidator()
         {
-            RuleFor(x => x.ReportType)
+            RuleFor(x => x.ReportTypes)
                 .NotEmpty()
-                    .WithMessage("ReportType is required");
+                    .WithMessage("ReportTypes is required");
 
             RuleFor(x => x.StartDate)
                 .NotEmpty()
@@ -49,9 +49,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
 
             RuleFor(x => x.EndDate)
                 .NotEmpty()
-                    .WithMessage("EndDate is required");
+                    .WithMessage("EndDate is required");                
 
         }
-
+        
     }
 }
