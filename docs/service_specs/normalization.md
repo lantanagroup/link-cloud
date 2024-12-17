@@ -33,11 +33,24 @@ FHIR resources queried from EHR endpoints can vary from location to location. Th
 |---------------------------------------|-------------------------------|----------|
 | ConnectionStrings__DatabaseConnection | `<DatabaseConnectionString>`  | Yes      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **PatientDataAcquired**
 
-## Produced Events
+### Produced Events
 
 - **PatientNormalized**
 - **NotificationRequested**
+
+## API Operations
+
+The **Normalization** service provides REST endpoints for managing normalization configurations for each tenant. These configurations dictate how FHIR resources are normalized upon acquisition.
+
+- **POST /api/Normalization**: Create a new normalization configuration for a tenant.
+- **GET /api/Normalization/{facilityId}**: Retrieve the normalization configuration for a specific tenant by `facilityId`.
+- **PUT /api/Normalization/{facilityId}**: Update the normalization configuration for a specific tenant by `facilityId`.
+- **DELETE /api/Normalization/{facilityId}**: Delete the normalization configuration for a specific tenant by `facilityId`.
+
+Each operation enables tenants to customize the normalization process to meet their specific requirements, ensuring data consistency and compliance across workflows.

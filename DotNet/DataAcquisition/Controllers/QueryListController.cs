@@ -65,7 +65,7 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration([FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfiguration>> PostFhirConfiguration(FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
@@ -104,7 +104,7 @@ public class QueryListController : Controller
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FhirListConfiguration))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<FhirListConfiguration>> PutFhirConfiguration([FromBody] FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
+    public async Task<ActionResult<FhirListConfiguration>> PutFhirConfiguration(FhirListConfiguration fhirListConfiguration, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {

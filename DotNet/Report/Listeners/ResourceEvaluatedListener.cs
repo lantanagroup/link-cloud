@@ -200,21 +200,16 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
-                                if (entry.Status == PatientSubmissionStatus.ReadyForSubmission)
-                                {
-                                    entry.PatientSubmission = await _bundler.GenerateBundle(entry.FacilityId, entry.PatientId, entry.ReportScheduleId);
-                                }
-
                                 await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
-
-                                var entries = await submissionEntryManager.FindAsync(s =>
-                                    s.FacilityId == entry.FacilityId
-                                    && s.ReportScheduleId == entry.ReportScheduleId
-                                    && s.Status != PatientSubmissionStatus.NotReportable, cancellationToken);
 
                                 #region Submit Report Handling
                                 if (schedule.PatientsToQueryDataRequested)
                                 {
+                                    var entries = await submissionEntryManager.FindAsync(s =>
+                                        s.FacilityId == entry.FacilityId
+                                        && s.ReportScheduleId == entry.ReportScheduleId
+                                        && s.Status != PatientSubmissionStatus.NotReportable, cancellationToken);
+
                                     var allReady = entries.All(x => x.Status == PatientSubmissionStatus.ReadyForSubmission);
 
                                     if (allReady)

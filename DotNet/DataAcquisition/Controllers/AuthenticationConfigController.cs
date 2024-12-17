@@ -125,7 +125,7 @@ public class AuthenticationConfigController : Controller
     public async Task<ActionResult<AuthenticationConfiguration>> CreateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
-        [FromBody] AuthenticationConfiguration authenticationConfiguration, 
+        AuthenticationConfiguration authenticationConfiguration, 
         CancellationToken cancellationToken)
     {
         try
@@ -212,7 +212,7 @@ public class AuthenticationConfigController : Controller
     public async Task<ActionResult> UpdateAuthenticationSettings(
         string facilityId,
         QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
-        [FromBody] AuthenticationConfiguration? authenticationConfiguration,
+        AuthenticationConfiguration? authenticationConfiguration,
         CancellationToken cancellationToken)
     {
         try

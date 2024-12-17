@@ -2,7 +2,7 @@
 
 ## Table of Contents
 * [Introduction](#introduction)
-* [Link Cloud Services](#link-cloud-services)
+* [Documentation](#documentation)
 * [Helpful Tools](#helpful-tools)
 * [Docker Installation](#docker-installation)
 * [Quick Tenant Configuration](#quick-tenant-configuration)

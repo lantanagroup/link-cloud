@@ -40,15 +40,25 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 |-----------------------------------------------|--------------------------------|---------|
 | TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantApiUrl>/api`           | No      |
 
-## Consumed Events
+## Kafka Events/Topics
+
+### Consumed Events
 
 - **ReportScheduled**
 - **MeasureEvaluated**
 - **PatientsToQuery**
 - **ReportSubmitted**
 
-## Produced Events
+### Produced Events
 
 - **SubmitReport**
 - **DataAcquisitionRequested**
 - **NotificationRequested**
+
+## API Operations
+
+The **Report** service provides REST endpoints for retrieving serialized patient submission data based on reporting criteria.
+
+- **GET /api/Report/Bundle/Patient**: Retrieve a serialized `PatientSubmissionModel` containing all patient-level resources and associated resources for all measure reports, filtered by `facilityId`, `patientId`, and a specified reporting period (`startDate` and `endDate`).
+
+This operation supports reporting and analytics workflows by enabling access to comprehensive patient-level data for specified timeframes.
