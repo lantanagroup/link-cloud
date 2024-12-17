@@ -2,7 +2,7 @@
 
 The Link system implements Role-Based Access Control (RBAC) through a claims-based authorization model. Currently, the system has a single "Admin" role configured which has access to all available permissions.
 
-![RBAC](../images/security.jpg)
+![RBAC](../images/security.png)
 
 ## Claims/Permissions
 
