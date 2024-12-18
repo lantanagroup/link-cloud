@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
 
         /// <summary>
-        /// The type of measure report to be generated
+        /// The frequency to generate the report
         /// </summary>
         /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
         public string Frequency { get; set; } = string.Empty;
@@ -30,9 +30,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         public DateTime? StartDate { get; set; }
 
         /// <summary>
-        /// The type of measure report to be generated
+        /// The Delay for the report period
         /// </summary>
-        /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
         public string Delay { get; set; } = string.Empty;
 
     }
