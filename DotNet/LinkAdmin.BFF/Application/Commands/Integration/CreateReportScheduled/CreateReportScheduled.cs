@@ -53,7 +53,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Value = new ReportScheduledMessage()
                     {
                         ReportTypes = model.ReportTypes,
-                        Frequency = model.Frequency,
+                        Frequency = model.Frequency.ToString(),
                         StartDate = model.StartDate,
                         EndDate = EndDate1,
 

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using AngleSharp.Css.Values;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -10,17 +11,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <example>TestFacility01</example>
         public string FacilityId { get; set; } = string.Empty;
 
-
         /// <summary>
         /// The frequency to generate the report
         /// </summary>
-        /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
-        public string Frequency { get; set; } = string.Empty;
+        public Frequency Frequency { get; set; }
 
         /// <summary>
         /// The type of measure report to be generated
         /// </summary>
-        /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
         public List<string> ReportTypes { get; set; } = new List<string>();
 
         /// <summary>
@@ -33,7 +31,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The Delay for the report period
         /// </summary>
         public string Delay { get; set; } = string.Empty;
-
+  
     }
 
     public class ReportScheduledMessage
@@ -41,18 +39,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         public List<string> ReportTypes { get; set; } = new List<string>();
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
-        public string Frequency { get; set; } = string.Empty;
+        public string Frequency { get; set;}
     }
 
     public class ReportScheduledKey
     {
         public string? FacilityId { get; set; }
-       // public string? ReportType { get; set; }
 
-        public static implicit operator string(ReportScheduledKey v)
-        {
-            throw new NotImplementedException();
-        }
     }
 
     public class ScheduledReport
