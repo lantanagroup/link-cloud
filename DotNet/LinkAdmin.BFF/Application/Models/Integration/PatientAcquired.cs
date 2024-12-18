@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// Key for the patient event (FacilityId)
         /// </summary>
         /// <example>TestFacility01</example>
-        public string facilityId { get; set; } = string.Empty;
+        public string FacilityId { get; set; } = string.Empty;
 
         /// <summary>
         /// The id of the patient subject to the event

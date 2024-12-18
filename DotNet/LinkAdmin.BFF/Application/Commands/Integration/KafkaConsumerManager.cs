@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
     public class KafkaConsumerManager
     {
-        private readonly List<Task> _consumerTasks = new List<Task>();
+ 
         private readonly List<(IConsumer<Ignore, string>, CancellationTokenSource)> _consumers;
         private readonly KafkaConnection _kafkaConnection;
         private readonly KafkaConsumerService _kafkaConsumerService;
@@ -90,22 +90,21 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
 
-
             _consumers.Add((consumer, cts));
 
-            var consumerTask = Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, consumer, cts.Token));
-
-            _consumerTasks.Add(consumerTask);
+            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, consumer, cts.Token));
         }
 
-        public void StopAllConsumers()
+        public async Task StopAllConsumers()
         {
 
             foreach (var consumerTuple in _consumers)
             {
                 consumerTuple.Item2.Cancel();
             }
+
             _consumers.Clear();
+
         }
 
         public Dictionary<string, string> readAllConsumers()

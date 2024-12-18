@@ -90,7 +90,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                });
 
 
-            integrationEndpoints.MapPost("/start-consumers", CreateConsumersRequested)
+            integrationEndpoints.MapPost("/start-consumers", (Delegate)CreateConsumersRequested)
                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -127,7 +127,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         }
 
-        public Task CreateConsumersRequested(HttpContext context, PatientEvent model)
+        public Task CreateConsumersRequested(HttpContext context)
         {
             _kafkaConsumerManager.CreateAllConsumers();
             return Task.CompletedTask;
@@ -147,9 +147,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             }*/
             return Results.Ok(list);
         }
-        public Task DeleteConsumersRequested(HttpContext context)
+        public async Task<Task> DeleteConsumersRequested(HttpContext context)
         {
-            _kafkaConsumerManager.StopAllConsumers();
+            await _kafkaConsumerManager.StopAllConsumers();
             return Task.CompletedTask;
         }
 

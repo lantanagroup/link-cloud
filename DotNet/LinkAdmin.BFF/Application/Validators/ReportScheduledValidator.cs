@@ -22,7 +22,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Validators
                     .WithMessage("StartDate must be in the past");
             RuleFor(x => x.Delay)
               .NotEmpty()
-                  .WithMessage("Delay is required");
+                  .WithMessage("Delay is required")
+                .Must(delay => double.TryParse(delay, out _))
+                 .WithMessage("Delay must be a valid number");
 
         }
     }

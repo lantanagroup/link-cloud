@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The type of measure report to be generated
         /// </summary>
         /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
-        public List<string> ReportTypes { get; set; } = [];
+        public List<string> ReportTypes { get; set; } = new List<string>();
 
         /// <summary>
         /// The start date for the report period
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class ReportScheduledMessage
     {
-        public List<string> ReportTypes { get; set; } = [];
+        public List<string> ReportTypes { get; set; } = new List<string>();
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public string Frequency { get; set; } = string.Empty;
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The type of measure report to be generated
         /// </summary>
         /// <example>NHSNdQMAcuteCareHospitalInitialPopulation</example>
-        public List<string> ReportTypes { get; set; } = [];
+        public List<string> ReportTypes { get; set; } = new List<string>();
 
         /// <summary>
         /// The start date for the reporting period

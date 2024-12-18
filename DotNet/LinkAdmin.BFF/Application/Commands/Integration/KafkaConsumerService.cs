@@ -11,11 +11,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ILogger<KafkaConsumerService> _logger;
 
-        public KafkaConsumerService( IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
+        public KafkaConsumerService( IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
         {
             _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public void StartConsumer(string groupId, string topic, IConsumer<Ignore, string> consumer, CancellationToken cancellationToken)
@@ -51,16 +53,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                             _cache.SetString(topic, serializedList);
                         }
-                        Console.WriteLine($"Consumed message '{consumeResult.Message.Value}' from topic {consumeResult.Topic}, partition {consumeResult.Partition}, offset {consumeResult.Offset}, correlation {correlationId}");
+                        _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}",consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
                     }
                 }
                 catch (ConsumeException e)
                 {
-                    Console.WriteLine($"Error occurred: {e.Error.Reason}");
+                    _logger.LogError(e, "Error occurred: {Reason}", e.Error.Reason);
                 }
                 catch (OperationCanceledException)
                 {
-                    Console.WriteLine($"Consumer {consumer.Name} stopped.");
+                    _logger.LogInformation("Consumer {ConsumerName} stopped.", consumer.Name);
                     consumer.Dispose();
                 }
                 finally

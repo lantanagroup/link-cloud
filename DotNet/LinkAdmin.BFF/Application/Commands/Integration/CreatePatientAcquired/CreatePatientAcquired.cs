@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
-        public async Task<string> Execute(PatientAcquired model, string? userId = null)
+        public async Task<string> Execute(PatientAcquired model, string? userId = null, CancellationToken cancellationToken = default)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Producing Patient Acquired Event");
             string correlationId = Guid.NewGuid().ToString();
@@ -51,13 +51,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, object>
                 {
-                    Key = model.facilityId,
+                    Key = model.FacilityId,
                     Value = new PatientAcquiredMessage { PatientIds = patientList },
                     Headers = headers
                 };
 
                 await _producer.ProduceAsync(nameof(KafkaTopic.PatientIDsAcquired), message);
-                _logger.LogKafkaProducerDataAcquisitionRequested(correlationId);
 
                 return correlationId;
 
@@ -66,7 +65,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.RecordException(ex);
-                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientEvent), ex.Message);
+                _logger.LogKafkaProducerException(nameof(KafkaTopic.PatientIDsAcquired), ex.Message);
                 throw;
             }
 
