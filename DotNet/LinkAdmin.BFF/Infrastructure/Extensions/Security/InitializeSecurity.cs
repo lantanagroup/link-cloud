@@ -76,7 +76,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 options.Cookie.SecurePolicy = securityServiceOptions.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;                
                 options.Cookie.Path = configuration.GetValue<string>("Authentication:Schemas:Cookie:Path");                
                 options.Cookie.SameSite = SameSiteMode.Strict;
-                options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
                 options.LoginPath = "/api/login";
                 options.LogoutPath = "/api/logout";
 

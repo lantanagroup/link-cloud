@@ -91,7 +91,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
 
     // Determine if anonymous access is allowed
-    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
 
     // Add kafka connection singleton
     var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
@@ -170,7 +170,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy("AuthenticatedUser", pb =>
             {
-                pb.RequireAssertion(context => true);
+                pb.RequireAssertion(_ => true);
             });
     }
 
@@ -197,17 +197,23 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add health checks
-    var healthCheckBuilder = builder.Services.AddHealthChecks()
-        .AddCheck<AccountServiceHealthCheck>("Account Service")
-        .AddCheck<AuditServiceHealthCheck>("Audit Service")
-        .AddCheck<CensusServiceHealthCheck>("Census Service")
-        .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
-        .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
-        .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
-        .AddCheck<NotificationServiceHealthCheck>("Notification Service")
-        .AddCheck<ReportServiceHealthCheck>("Report Service")
-        .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
-        .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+    var monitorBackend = builder.Configuration.GetValue<bool>("MonitorBackendHealthChecks");
+    var healthCheckBuilder = builder.Services.AddHealthChecks();
+    
+    if (monitorBackend)
+    {
+        healthCheckBuilder
+            .AddCheck<AccountServiceHealthCheck>("Account Service")
+            .AddCheck<AuditServiceHealthCheck>("Audit Service")
+            .AddCheck<CensusServiceHealthCheck>("Census Service")
+            .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
+            .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
+            .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
+            .AddCheck<NotificationServiceHealthCheck>("Notification Service")
+            .AddCheck<ReportServiceHealthCheck>("Report Service")
+            .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
+            .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+    }
 
     if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
     {
