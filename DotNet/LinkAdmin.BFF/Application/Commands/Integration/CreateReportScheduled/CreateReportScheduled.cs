@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     EndDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
                
-                 DateTime EndDate1 = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
+                 DateTime normalizedEndDate = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
                  if (model.ReportTypes == null || !model.ReportTypes.Any())
                  {
                     throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     throw new ArgumentException("Invalid frequency value", nameof(model.Frequency));
                  }
                 
-                if (model.StartDate >= EndDate1)
+                if (model.StartDate >= normalizedEndDate)
                 {
                     throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));
                 }
@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         ReportTypes = model.ReportTypes,
                         Frequency = model.Frequency.ToString(),
                         StartDate = model.StartDate,
-                        EndDate = EndDate1,
+                        EndDate = normalizedEndDate,
 
                     },
                 };

@@ -14,6 +14,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// <summary>
         /// The frequency to generate the report
         /// </summary>
+        /// <example>Daily</example>
         public Frequency Frequency { get; set; }
 
         /// <summary>
