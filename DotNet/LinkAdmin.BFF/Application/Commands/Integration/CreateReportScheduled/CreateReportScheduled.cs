@@ -13,6 +13,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly ILogger<CreateReportScheduled> _logger;
         private readonly IProducer<string, object> _producer;
+        private const double DEFAULT_DELAY_MINUTES = 5;
+        private const double MAX_DELAY_MINUTES = 60 * 24;
 
         public CreateReportScheduled(ILogger<CreateReportScheduled> logger, IProducer<string, object> producer)
         {
@@ -32,20 +34,44 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
 
-                string Key = model.FacilityId;
+                string Key = string.IsNullOrEmpty(model.FacilityId) ? throw new ArgumentException("FacilityId cannot be null or empty", nameof(model.FacilityId)) : model.FacilityId;
 
                 DateTime EndDate = DateTime.UtcNow;
 
                 if (double.TryParse(model.Delay, out double delay))
                 {
-                   EndDate = DateTime.UtcNow.AddMinutes(delay);
+                    if (delay < 0)
+                    {
+                        throw new ArgumentException("Delay cannot be negative", nameof(model.Delay));
+                    }
+                    if (delay > MAX_DELAY_MINUTES)
+                    {
+                        throw new ArgumentException($"Delay cannot exceed {MAX_DELAY_MINUTES} minutes", nameof(model.Delay));
+                    }
+                    EndDate = DateTime.UtcNow.AddMinutes(delay);
                 }
                 else
                 {
-                   EndDate = DateTime.UtcNow.AddMinutes(5); // default to 5 minutes
+                    _logger.LogWarning("Invalid delay value '{Delay}'. Using default delay of {DefaultDelay} minutes", model.Delay, DEFAULT_DELAY_MINUTES);
+                    EndDate = DateTime.UtcNow.AddMinutes(DEFAULT_DELAY_MINUTES); // default to 5 minutes
                 }
                
-                DateTime EndDate1 = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
+                 DateTime EndDate1 = new DateTime(EndDate.Year, EndDate.Month, EndDate.Day, EndDate.Hour, EndDate.Minute, 0, DateTimeKind.Utc);
+                 if (model.ReportTypes == null || !model.ReportTypes.Any())
+                 {
+                    throw new ArgumentException("At least one report type must be specified", nameof(model.ReportTypes));
+                 }
+                
+                 if (!Enum.IsDefined(typeof(Frequency), model.Frequency))
+                 {
+                    throw new ArgumentException("Invalid frequency value", nameof(model.Frequency));
+                 }
+                
+                if (model.StartDate >= EndDate1)
+                {
+                    throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));
+                }
+                
                 var message = new Message<string, object>
                 {
                     Key = model.FacilityId,

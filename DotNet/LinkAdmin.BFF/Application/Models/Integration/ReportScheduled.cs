@@ -36,9 +36,27 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 
     public class ReportScheduledMessage
     {
+        /// <summary>
+        /// List of report types to be generated
+        /// </summary>
         public List<string> ReportTypes { get; set; } = new List<string>();
+
+        /// <summary>
+        /// The start date for the reporting period
+        /// </summary>
+        /// <example>2024-01-31T23:59:59Z</example>
         public DateTime? StartDate { get; set; }
+
+        /// <summary>
+        /// The end date for the reporting period
+        /// </summary>
+        /// <example>2024-01-31T23:59:59Z</example>
         public DateTime? EndDate { get; set; }
+
+        /// <summary>
+        /// The frequency to generate the report
+        /// </summary>
+        /// <example>Daily</example>
         public string Frequency { get; set;}
     }
 
