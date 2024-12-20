@@ -13,6 +13,7 @@ using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Reflection;
+using System.Reflection.Metadata;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -25,6 +26,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Swagger;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
@@ -303,7 +305,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
-
+        c.DocumentFilter<ServiceSpecAppender>();
     });
 
     // Add logging redaction services
