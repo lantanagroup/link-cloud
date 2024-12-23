@@ -79,8 +79,8 @@ public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
     private void processLogEntry(String libraryId, String range, String output, String cql) {
         if (cql != null) {
             Pattern definePattern = Pattern.compile("^define \"([^\"]+)\"");
-            Matcher matcher = cql != null ? definePattern.matcher(cql) : null;
-            if (matcher != null && matcher.find()) {
+            Matcher matcher = definePattern.matcher(cql);
+            if (matcher.find()) {
                 String definition = matcher.group(1);
                 logger.info("CQL DEBUG: libraryId={}, range={}, output={}, cql-definition={}", libraryId, range, output, definition);
             } else {
