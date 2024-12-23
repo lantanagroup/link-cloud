@@ -141,7 +141,7 @@ public class MeasureEvaluator {
             for (MeasureReport.MeasureReportGroupComponent group : doEvaluate(periodStart, periodEnd, subject, additionalData).getGroup()) {
                 logger.trace("Group {}: {}", group.getId(), group.getPopulation().size());
                 for (MeasureReport.MeasureReportGroupPopulationComponent population : group.getPopulation()) {
-                    logger.trace("Population {}: {} - {}", population.getCode().getCodingFirstRep().getDisplay(), population.getCount());
+                    logger.trace("Population {}: {}", population.getCode().getCodingFirstRep().getDisplay(), population.getCount());
                 }
             }
 
