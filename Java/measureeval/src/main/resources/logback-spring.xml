@@ -45,18 +45,18 @@
     <logger name="org.opencds.cqf.cql.engine.debug.DebugUtilities" level="DEBUG" additivity="false">
         <appender-ref ref="cql"/>
     </logger>
-    <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
+    <logger name="com.lantanagroup.link" level="WARN"/>
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
-            <root level="WARN">
+            <root level="info">
                 <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI"/>
             </root>
 
         </then>
         <else>
-            <root level="WARN">
+            <root level="info">
                 <appender-ref ref="STDOUT"/>
             </root>
         </else>
