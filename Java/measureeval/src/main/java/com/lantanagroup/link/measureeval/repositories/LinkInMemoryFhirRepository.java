@@ -9,6 +9,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
+/**
+ * This class extends the InMemoryFhirRepository to provide a transaction method that will update the resources in the repository.
+ * This implementation is primarily used to avoid the exception stack trace that is thrown when the InMemoryFhirRepository.transaction method is called by measure eval, but is not implemented
+ * in the default InMemoryFhirRepository.
+ */
 public class LinkInMemoryFhirRepository extends InMemoryFhirRepository {
     private static final Logger logger = LoggerFactory.getLogger(LinkInMemoryFhirRepository.class);
 
