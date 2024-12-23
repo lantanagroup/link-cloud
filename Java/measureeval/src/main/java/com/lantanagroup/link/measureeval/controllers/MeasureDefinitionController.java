@@ -13,6 +13,7 @@ import com.lantanagroup.link.shared.auth.PrincipalUser;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import javassist.NotFoundException;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -119,7 +120,12 @@ public class MeasureDefinitionController {
 
         // Get the measure definition from the repo by ID
         MeasureDefinition measureDefinition = repository.findById(measureId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        return CqlUtils.getCql(measureDefinition.getBundle(), libraryId, range);
+
+        try {
+            return CqlUtils.getCql(measureDefinition.getBundle(), libraryId, range);
+        } catch (NotFoundException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
+        }
     }
 
     @PostMapping("/{id}/$evaluate")

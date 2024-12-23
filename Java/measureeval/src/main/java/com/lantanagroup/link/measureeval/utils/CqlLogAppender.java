@@ -4,6 +4,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import javassist.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,11 @@ public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
             MeasureEvaluator evaluator = measureEvalCache.get(libraryId);       // Assume the measure id is the same as the library id since the log entry doesn't output the measure url/id
 
             if (evaluator != null) {
-                cql = CqlUtils.getCql(evaluator.getBundle(), libraryId, range);
+                try {
+                    cql = CqlUtils.getCql(evaluator.getBundle(), libraryId, range);
+                } catch (NotFoundException e) {
+                    logger.warn("Failed to get CQL for libraryId={}, range={}, output={}", libraryId, range, output);
+                }
             }
 
             // Custom processing with libraryId and range

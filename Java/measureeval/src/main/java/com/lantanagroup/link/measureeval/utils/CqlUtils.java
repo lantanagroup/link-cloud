@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.utils;
 
+import javassist.NotFoundException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Library;
 import org.hl7.fhir.r4.model.ResourceType;
@@ -9,7 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Optional;
 
 public class CqlUtils {
-    public static String getCql(Bundle bundle, String libraryId, String range) {
+    public static String getCql(Bundle bundle, String libraryId, String range) throws NotFoundException {
         // Get library from the measure definition bundle based on the libraryId
         Optional<Library> library = bundle.getEntry().stream()
                 .filter(entry -> {
@@ -29,7 +30,7 @@ public class CqlUtils {
                 .map(entry -> (Library) entry.getResource());
 
         if (library.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Library not found in measure definition bundle");
+            throw new NotFoundException("Library not found in measure definition bundle");
         }
 
         // Get CQL from library's "content" and base64 decode it
