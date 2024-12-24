@@ -88,6 +88,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 AutoOffsetReset = AutoOffsetReset.Earliest
             };
 
+            if (_kafkaConnection.SaslProtocolEnabled)
+            {
+                config.SecurityProtocol = SecurityProtocol.SaslPlaintext;
+                config.SaslMechanism = SaslMechanism.Plain;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
+            }
+
             var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
 
             _consumers.Add((consumer, cts));
