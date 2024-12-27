@@ -34,6 +34,7 @@ This page and its references include documentation for Link's services and the f
 * [Report](service_specs/report.md)
 * [Submission](service_specs/submission.md)
 * [Tenant](service_specs/tenant.md)
+* [Validation](service_specs/validation.md)
 
 ### Service Swagger Specifications
 
