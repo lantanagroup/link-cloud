@@ -67,8 +67,6 @@ Categories are used to classify validation results (since there tend to be many)
 
 - `GET /health`: Performs a health check to verify the service is operational.
 
-These operations support the management of measure definitions and the evaluation of clinical data against defined measures.
-
 ## Future Considerations
 
 * Operation to bulk _retrieve_ categories and their rules that can be updated in an text editor and then provided back to the _bulk save_ operation.
