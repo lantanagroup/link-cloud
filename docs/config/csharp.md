@@ -23,7 +23,7 @@ The following should be specified as environment variables when launching the se
 |--------------------------------------|---------------------------|-----------|----------|
 | KafkaConnection__BootstrapServers__0 | Kafka broker address      | Yes       | No       |
 | KafkaConnection__GroupId             | Consumer group identifier | Yes       | No       |
-| KafkaConnection__ClientId            | Consumer group identifier | Yes       | No       |
+| KafkaConnection__ClientId            | Unique client identifier  | Yes       | No       |
 
 ### SASL Plain Text Authentication
 
