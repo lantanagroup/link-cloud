@@ -37,13 +37,13 @@ See [Submission Functionality](../functionality/submission_folder.md) for more i
 
 ### Additional Settings
 
-| Name                                                | Value     | Description                                                                                                   | Secret? |
-|-----------------------------------------------------|-----------|---------------------------------------------------------------------------------------------------------------|---------|
+| Name                                                | Value     | Description                                                                                                  | Secret? |
+|-----------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------|---------|
 | SubmissionServiceConfig__SubmissionDirectory        | \<string> | The location of where to store submission files until they are ready to be submitted. i.e. `/data/Submission` | No      |
-| SubmissionServiceConfig__PatientBundleBatchSize     | 1         |                                                                                                               | No      |
-| SubmissionServiceConfig__MeasureNames__0__Url       | \<string> | URL of measure                                                                                                | No      |
-| SubmissionServiceConfig__MeasureNames__0__MeasureId | \<string> | ID of measure                                                                                                 | No      |
-| SubmissionServiceConfig__MeasureNames__0__ShortName | \<string> | Short name of the measure (used in building submission file name)                                             | No      |
+| SubmissionServiceConfig__PatientBundleBatchSize     | 1         | The number of patients to process during submission in parallel (as seperate threads)                        | No      |
+| SubmissionServiceConfig__MeasureNames__0__Url       | \<string> | URL of measure                                                                                               | No      |
+| SubmissionServiceConfig__MeasureNames__0__MeasureId | \<string> | ID of measure                                                                                                | No      |
+| SubmissionServiceConfig__MeasureNames__0__ShortName | \<string> | Short name of the measure (used in building submission file name)                                            | No      |
 
 ## Kafka Events/Topics
 
