@@ -3,23 +3,16 @@ package com.lantanagroup.link.measureeval.utils;
 import javassist.NotFoundException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Library;
-import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Optional;
-
 public class CqlUtils {
-    public static String getCql(Bundle bundle, String libraryId, String range) throws NotFoundException {
-        // Get library from the measure definition bundle based on the libraryId
-        Optional<Library> library = bundle.getEntry().stream()
-                .filter(entry -> {
-                    if (!entry.hasResource() || entry.getResource().getResourceType() != ResourceType.Library) {
-                        return false;
-                    }
-
-                    Library l = (Library) entry.getResource();
-
+    public static Library getLibrary(Bundle bundle, String libraryId) {
+        return bundle.getEntry().stream()
+                .map(Bundle.BundleEntryComponent::getResource)
+                .filter(Library.class::isInstance)
+                .map(Library.class::cast)
+                .filter(l -> {
                     if (l.getUrl() == null) {
                         return false;
                     }
@@ -27,14 +20,20 @@ public class CqlUtils {
                     return l.getUrl().endsWith("/" + libraryId);
                 })
                 .findFirst()
-                .map(entry -> (Library) entry.getResource());
+                .orElse(null);
+    }
 
-        if (library.isEmpty()) {
+    public static String getCql(Bundle bundle, String libraryId, String range) throws NotFoundException {
+        Library library = getLibrary(bundle, libraryId);
+        if (library == null) {
             throw new NotFoundException("Library not found in measure definition bundle");
         }
+        return getCql(library, range);
+    }
 
+    public static String getCql(Library library, String range) throws NotFoundException {
         // Get CQL from library's "content" and base64 decode it
-        String cql = library.get().getContent().stream()
+        String cql = library.getContent().stream()
                 .filter(content -> content.hasContentType() && content.getContentType().equals("text/cql"))
                 .findFirst()
                 .map(content -> new String(content.getData()))

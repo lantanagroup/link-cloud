@@ -1,10 +1,12 @@
 package com.lantanagroup.link.measureeval.utils;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
-import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
-import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import com.lantanagroup.link.measureeval.services.LibraryResolver;
 import javassist.NotFoundException;
+import org.hl7.fhir.r4.model.Library;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +18,23 @@ import java.util.regex.Pattern;
 public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
     private static final Logger logger = LoggerFactory.getLogger(CqlLogAppender.class);
     private static final Pattern LOG_PATTERN = Pattern.compile("([\\w.]+)\\.(\\d+:\\d+-\\d+:\\d+)\\(\\d+\\):\\s*(\\{\\}|[^\\s]+)");
+
+    private final LibraryResolver libraryResolver;
+
+    public CqlLogAppender(LibraryResolver libraryResolver) {
+        this.libraryResolver = libraryResolver;
+    }
+
+    public static CqlLogAppender start(LoggerContext context, LibraryResolver libraryResolver) {
+        CqlLogAppender appender = new CqlLogAppender(libraryResolver);
+        appender.setContext(context);
+        appender.start();
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger("org.opencds.cqf.cql.engine.debug.DebugUtilities");
+        logger.setLevel(Level.DEBUG);
+        logger.setAdditive(false);
+        logger.addAppender(appender);
+        return appender;
+    }
 
     @Override
     protected void append(ILoggingEvent event) {
@@ -33,12 +52,12 @@ public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
             // Group the resources in the output
             output = groupResources(output);
 
-            MeasureEvaluatorCache measureEvalCache = ApplicationContextProvider.getApplicationContext().getBean(MeasureEvaluatorCache.class);
-            MeasureEvaluator evaluator = measureEvalCache.get(libraryId);       // Assume the measure id is the same as the library id since the log entry doesn't output the measure url/id
-
-            if (evaluator != null) {
+            Library library = libraryResolver.resolve(libraryId);
+            if (library == null) {
+                logger.warn("Failed to resolve library: {}", libraryId);
+            } else {
                 try {
-                    cql = CqlUtils.getCql(evaluator.getBundle(), libraryId, range);
+                    cql = CqlUtils.getCql(library, range);
                 } catch (NotFoundException e) {
                     logger.warn("Failed to get CQL for libraryId={}, range={}, output={}", libraryId, range, output);
                 }

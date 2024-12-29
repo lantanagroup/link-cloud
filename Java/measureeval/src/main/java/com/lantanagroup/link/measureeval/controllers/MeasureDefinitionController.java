@@ -142,9 +142,10 @@ public class MeasureDefinitionController {
         }
 
         try {
-            // Compile the measure every time because the debug flag may have changed from what's in the cache
-            MeasureDefinition measureDefinition = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), measureDefinition.getBundle(), parameters, debug);
+            // Ensure that a measure evaluator is cached (so that CQL logging can use it)
+            MeasureEvaluator evaluator = evaluatorCache.get(id);
+            // But recompile the bundle every time because the debug flag may not match what's in the cache
+            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
