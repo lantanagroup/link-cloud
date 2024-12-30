@@ -56,5 +56,5 @@ secret-management:
   key-vault-uri: ''
 
 authentication:
-  anonymous: true
+  anonymous: false
   authority: 'https://localhost:7004'

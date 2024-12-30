@@ -9,22 +9,17 @@ The Audit service is responsible for persisting auditable events that are genera
 - **Port**: 8080
 - **Database**: MSSQL
 
-## Environment Variables
+## Common Configurations
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-
-## App Config
-
-### Kafka Connection
-
-| Name                                              | Value                    | Secret? |
-|---------------------------------------------------|--------------------------|---------|
-| Link__Audit__KafkaConnection__BootstrapServers__0 | `<KafkaBootstrapServer>` | No      |
-| Link__Audit__KafkaConnection__GroupId             | audit-events             | No      |
-| Link__Audit__KafkaConnection__ClientId            | audit-events             | No      |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
 ## Kafka Events/Topics
 
