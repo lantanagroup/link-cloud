@@ -36,4 +36,4 @@ This approach ensures consistent, reliable evaluation of healthcare quality meas
 
 ### Testing
 
-The measure engine may be tested against arbitrary data using the $evaluate operation that is custom-built for this purpose in the measure evaluation service.
+The measure engine may be tested against arbitrary data using the $evaluate operation (which is custom-built for this purpose in the measure evaluation service) or using the `measureeval-cli.jar` that can be built separately from the service; see [measureeval/README.md](../../Java/measureeval/README.md) for more information.
