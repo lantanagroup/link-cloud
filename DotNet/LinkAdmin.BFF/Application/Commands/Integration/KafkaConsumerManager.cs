@@ -13,32 +13,38 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
     public class KafkaConsumerManager
     {
- 
-        private readonly List<(IConsumer<Ignore, string>, CancellationTokenSource)> _consumers;
+    
+
+        private readonly List<(IConsumer<string, string>, CancellationTokenSource)> _consumers;
         private readonly KafkaConnection _kafkaConnection;
         private readonly KafkaConsumerService _kafkaConsumerService;
         private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        private readonly static string errorTopic = "-Error";
+        public static readonly string delimitator = ":";
+
         // construct a list of topics 
         private List<(string, string)> kafkaTopics = new List<(string, string)>
           {
             ("ReportScheduledDyn", KafkaTopic.ReportScheduled.ToString()),
-            ("ReportScheduledDyn", KafkaTopic.ReportScheduled.ToString()+"-Error"),
+            ("ReportScheduledDyn", KafkaTopic.ReportScheduled.ToString() + errorTopic),
             ("CensusDyn", KafkaTopic.PatientIDsAcquired.ToString()),
-            ("CensusDyn", KafkaTopic.PatientIDsAcquired.ToString()+"-Error"),
+            ("CensusDyn", KafkaTopic.PatientIDsAcquired.ToString() + errorTopic),
             ("QueryDispatchDyn", KafkaTopic.PatientEvent.ToString()),
-            ("QueryDispatchDyn", KafkaTopic.PatientEvent.ToString()+"-Error"),
+            ("QueryDispatchDyn", KafkaTopic.PatientEvent.ToString() + errorTopic),
             ("DataAcquisitionDyn", KafkaTopic.DataAcquisitionRequested.ToString()),
-            ("DataAcquisitionDyn", KafkaTopic.DataAcquisitionRequested.ToString()+"-Error"),
+            ("DataAcquisitionDyn", KafkaTopic.DataAcquisitionRequested.ToString() + errorTopic),
             ("AcquiredDyn", KafkaTopic.ResourceAcquired.ToString()),
-            ("AcquiredDyn", KafkaTopic.ResourceAcquired.ToString()+"-Error"),
+            ("AcquiredDyn", KafkaTopic.ResourceAcquired.ToString() + errorTopic),
             ("NormalizationDyn", KafkaTopic.ResourceNormalized.ToString()),
-            ("NormalizationDyn", KafkaTopic.ResourceNormalized.ToString()+"-Error"),
-             ("ReportDyn", KafkaTopic.SubmitReport.ToString()),
-            ("ReportDyn", KafkaTopic.SubmitReport.ToString()+"-Error"),
+            ("NormalizationDyn", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
             ("ResourceEvaluatedDyn", KafkaTopic.ResourceEvaluated.ToString()),
-            ("ResourceEvaluatedDyn", KafkaTopic.ResourceEvaluated.ToString()+"-Error"),        
+            ("ResourceEvaluatedDyn", KafkaTopic.ResourceEvaluated.ToString() + errorTopic),
+            ("ReportDyn", KafkaTopic.SubmitReport.ToString()),
+            ("ReportDyn", KafkaTopic.SubmitReport.ToString() + errorTopic),
           };
+
 
 
         // Add constructor
@@ -47,38 +53,46 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             _kafkaConsumerService = kafkaConsumerService;
             _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-            _consumers = new List<(IConsumer<Ignore, string>, CancellationTokenSource)>();
+            _consumers = new List<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
         }
 
-        public void CreateAllConsumers()
+
+        private IServiceScope ClearRedisCache(string facility)
         {
             // clear Redis cache
-            using var scope = _serviceScopeFactory.CreateScope();
+            var scope = _serviceScopeFactory.CreateScope();
 
             var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
             foreach (var topic in kafkaTopics)
-            {             
-                {
-                    String key = topic.Item2;
-                    _cache.Remove(key);
-                }
-            }
-
-            // loop through the list of topics and create a consumer for each
-            foreach (var topic in kafkaTopics)
             {
-                if (topic.Item1 != "")
                 {
-                    CreateConsumer(topic.Item1, topic.Item2);
+                    String redisKey = topic.Item2 + delimitator + facility;
+                    _cache.Remove(redisKey);
                 }
-              
             }
-          
+            return scope;
         }
 
-        public void CreateConsumer(string groupId, string topic)
+
+        public void CreateAllConsumers(string facility)
+        {
+            //clear Redis cache for that facility
+            ClearRedisCache(facility);
+
+            // start consumers
+            foreach (var topic in kafkaTopics)
+            {
+                if (topic.Item2 != string.Empty)
+                {
+                    CreateConsumer(topic.Item1, topic.Item2, facility);
+                }
+            }
+        }
+
+
+        public void CreateConsumer(string groupId, string topic, string facility)
         {
             var cts = new CancellationTokenSource();
             var config = new ConsumerConfig
@@ -96,43 +110,47 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
-            var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
+            var consumer = new ConsumerBuilder<string, string>(config).Build();
 
             _consumers.Add((consumer, cts));
 
-            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, consumer, cts.Token));
+            Task.Run(() => _kafkaConsumerService.StartConsumer(groupId, topic, facility, consumer, cts.Token));
         }
 
-        public async Task StopAllConsumers()
-        {
 
-            foreach (var consumerTuple in _consumers)
-            {
-                consumerTuple.Item2.Cancel();
-            }
-
-            _consumers.Clear();
-
-        }
-
-        public Dictionary<string, string> readAllConsumers()
+        public Dictionary<string, string> readAllConsumers(string facility)
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
             using var scope = _serviceScopeFactory.CreateScope();
             var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-            // loop through the list of topics and get the correlation id for each
+            // loop through the redis keys for that facility and get the correlation id for each
             foreach (var topic in kafkaTopics)
             {
-                if (topic.Item2 != "")
+                if (topic.Item2 != string.Empty)
                 {
-                    string key = topic.Item2;
+                    string redisKey = topic.Item2 + delimitator + facility;
 
-                    correlationIds.Add(key, _cache.GetString(key));
-
+                    correlationIds.Add(topic.Item2, _cache.GetString(redisKey));
                 }
             }
             return correlationIds;
         }
+
+        public async Task StopAllConsumers(string facility)
+        {
+            // stop consumers
+            foreach (var consumerTuple in _consumers)
+            {
+                consumerTuple.Item2.Cancel();
+            }
+            _consumers.Clear();
+
+            //clear Redis cache for that facility
+            ClearRedisCache(facility);
+
+        }
     }
+
+
 }
