@@ -139,9 +139,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(facility.FacilityId);
             return Results.Ok(list);
         }
-        public async Task<Task> DeleteConsumersRequested(HttpContext context, Facility facility)
+        public Task DeleteConsumersRequested(HttpContext context, Facility facility)
         {
-            await _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
+            _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
             return Task.CompletedTask;
         }
 

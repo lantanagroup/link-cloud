@@ -137,7 +137,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             return correlationIds;
         }
 
-        public async Task StopAllConsumers(string facility)
+        public void StopAllConsumers(string facility)
         {
             // stop consumers
             foreach (var consumerTuple in _consumers)
