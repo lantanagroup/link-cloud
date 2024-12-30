@@ -4,75 +4,35 @@
 
 The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the [CQF framework](https://github.com/cqframework/cqf-ruler) to perform the measure evaluations.
 
-- **Technology**: .NET Core 8
+- **Technology**: Java
 - **Image Name**: link-measureeval
-- **Port**: 8080
+- **Port**: 8067
 - **Database**: Mongo
 
-## Environment Variables
+See [Measure Eval Functionality](../functionality/measure_eval.md) for more information on the role of the Measure Eval service in the Link Cloud ecosystem.
 
-| Name                                        | Secret? | Description                                                   |
-|---------------------------------------------|---------|---------------------------------------------------------------|
-| SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED | No      | Boolean value to enable or disable use of Azure App Config    |
-| AZURE_APP_CONFIG_ENDPOINT                   | No      | If App Config enabled, the URI to the ACA instance.           |
-| AZURE_CLIENT_ID                             | No      | The client id to use for authentication for ACA.              |
-| AZURE_CLIENT_SECRET                         | Yes     | The secret/password to use for ACA authentication.            |
-| AZURE_TENANT_ID                             | No      | The tenant id that the configured ACA instance is located in. |
-| LOKI_URL                                    | No      | The URL to Loki where logs should persisted.                  |
+## Common Configurations
 
-## App Settings
+* [Azure App Config](../config/java.md#azure-app-config)
+* [Telemetry](../config/java.md#telemetry)
+* [Swagger](../config/java.md#swagger)
+* [Mongo DB](../config/java.md#mongo-db)
+* [Kafka](../config/java.md#kafka)
+* [Service Authentication](../config/java.md#service-authentication)
 
-### Kafka Connection
+## Custom Configurations
 
-| Name                                | Value       | Secret? |
-|-------------------------------------|-------------|---------|
-| spring.kafka.bootstrap_servers      |             | No      |
-| spring.kafka.retry.max-attempts     | 3           | No      |
-| spring.kafka.retry.retry-backoff-ms | 3000        | No      |
-| spring.kafka.consumer.group-id      | measureeval | No      |
-| spring.kafka.producer.group-id      | measureeval | No      |
+| Property Name                | Description                                       | Type/Value                               | Secret? |
+|------------------------------|---------------------------------------------------|------------------------------------------|---------|
+| link.reportability-predicate | Predicate to determine if a patient is reportable | "...IsInInitialPopulation"<br/>(default) | No      |
 
-### Measure Evaluation Config
+### Reportability Predicates
 
-| Name                         | Value                                                                 | Secret? |
-|------------------------------|-----------------------------------------------------------------------|---------|
-| link.reportability-predicate | com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation | No      |
-| link.cql_debug               | false                                                                 | No      |
+The `link.reportability-predicate` property is used to determine if a patient is reportable. The default value is "com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation", whichi s a class that implements `Predicate<MeasureReport>`. Other predicate implementations may be built over time in the same package and should be listed here.
 
-### Database (Mongo)
+Package `com.lantanagroup.link.measureeval.reportability`:
 
-| Name                             | Value       | Secret? |
-|----------------------------------|-------------|---------|
-| spring.data.mongodb.host         |             | No      |
-| spring.data.mongodb.port         |             | No      |
-| spring.data.mongodb.database     | measureeval | No      |
-| TODO: Add authentication details |             | No      |
-
-
-### Authentication & Secrets
-
-| Name                            | Value                  | Secret? |
-|---------------------------------|------------------------|---------|
-| authentication.anonymous        | true                   | No      |
-| authentication.authority        | https://localhost:7004 | No      |
-| secret-management.key-vault-uri |                        | No      |
-
-### Logging & Telemetry
-
-| Name                        | Value                  | Secret? |
-|-----------------------------|------------------------|---------|
-| loki.enabled                | true                   | No      |
-| loki.url                    |                        | No      |
-| loki.app                    | link-dev               | No      |
-| telemetry.exporter-endpoint | http://localhost:55690 | No      |
-
-### Swagger
-
-| Name                         | Value | Secret? |
-|------------------------------|-------|---------|
-| springdoc.api-docs.enabled   | false | No      |
-| springdoc.swagger-ui.enabled | false | No      |
-
+* `IsInInitialPopulation`: Determines if a patient is reportable if they are in the initial population (a count of 1 or more for the "InitialPopulation" population of the patient's MeasureReport).
 
 ## Kafka Events/Topics
 
