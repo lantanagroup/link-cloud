@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+﻿using AngleSharp.Css.Values;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -11,10 +12,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         public string FacilityId { get; set; } = string.Empty;
 
         /// <summary>
+        /// The frequency to generate the report
+        /// </summary>
+        /// <example>Daily</example>
+        public Frequency Frequency { get; set; }
+
+        /// <summary>
         /// The type of measure report to be generated
         /// </summary>
-        /// <example>NHSNGlycemicControlHypoglycemicInitialPopulation</example>
-        public string ReportType { get; set; } = string.Empty;
+        public List<string> ReportTypes { get; set; } = new List<string>();
 
         /// <summary>
         /// The start date for the report period
@@ -23,26 +29,42 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         public DateTime? StartDate { get; set; }
 
         /// <summary>
-        /// The end date for the report period
+        /// The Delay for the report period
         /// </summary>
-        /// <example>2024-01-31T23:59:59Z</example>
-        public DateTime? EndDate { get; set; }
+        public string Delay { get; set; } = string.Empty;
+  
     }
 
     public class ReportScheduledMessage
     {
-        public List<KeyValuePair<string, object>>? Parameters { get; set; }
+        /// <summary>
+        /// List of report types to be generated
+        /// </summary>
+        public List<string> ReportTypes { get; set; } = new List<string>();
+
+        /// <summary>
+        /// The start date for the reporting period
+        /// </summary>
+        /// <example>2024-01-31T23:59:59Z</example>
+        public DateTime? StartDate { get; set; }
+
+        /// <summary>
+        /// The end date for the reporting period
+        /// </summary>
+        /// <example>2024-01-31T23:59:59Z</example>
+        public DateTime? EndDate { get; set; }
+
+        /// <summary>
+        /// The frequency to generate the report
+        /// </summary>
+        /// <example>Daily</example>
+        public string Frequency { get; set;}
     }
 
     public class ReportScheduledKey
     {
         public string? FacilityId { get; set; }
-        public string? ReportType { get; set; }
 
-        public static implicit operator string(ReportScheduledKey v)
-        {
-            throw new NotImplementedException();
-        }
     }
 
     public class ScheduledReport
@@ -51,7 +73,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The type of measure report to be generated
         /// </summary>
         /// <example>NHSNdQMAcuteCareHospitalInitialPopulation</example>
-        public string ReportType { get; set; } = string.Empty;
+        public List<string> ReportTypes { get; set; } = new List<string>();
 
         /// <summary>
         /// The start date for the reporting period
