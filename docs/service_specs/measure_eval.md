@@ -4,33 +4,35 @@
 
 The Measure Eval service is a Java based application that is primarily responsible for evaluating bundles of acquired patient resources against the measures that Link Cloud tenants are configured to evaluate with. The service utilizes the [CQF framework](https://github.com/cqframework/cqf-ruler) to perform the measure evaluations.
 
-- **Technology**: .NET Core 8
+- **Technology**: Java
 - **Image Name**: link-measureeval
-- **Port**: 8080
+- **Port**: 8067
 - **Database**: Mongo
 
-## Environment Variables
+See [Measure Eval Functionality](../functionality/measure_eval.md) for more information on the role of the Measure Eval service in the Link Cloud ecosystem.
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
+## Common Configurations
 
-## App Settings
+* [Azure App Config](../config/java.md#azure-app-config)
+* [Telemetry](../config/java.md#telemetry)
+* [Swagger](../config/java.md#swagger)
+* [Mongo DB](../config/java.md#mongo-db)
+* [Kafka](../config/java.md#kafka)
+* [Service Authentication](../config/java.md#service-authentication)
 
-### Kafka Connection
+## Custom Configurations
 
-| Name                                     | Value                     | Secret? |
-|------------------------------------------|---------------------------|---------|
-| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No      |
-| KafkaConnection__GroupId                 | measure-events            | No      |
+| Property Name                | Description                                       | Type/Value                               | Secret? |
+|------------------------------|---------------------------------------------------|------------------------------------------|---------|
+| link.reportability-predicate | Predicate to determine if a patient is reportable | "...IsInInitialPopulation"<br/>(default) | No      |
 
-### Measure Evaluation Config
+### Reportability Predicates
 
-| Name                                       | Value                                           | Secret? |
-|--------------------------------------------|-------------------------------------------------|---------|
-| MeasureEvalConfig__TerminologyServiceUrl   | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
-| MeasureEvalConfig__EvaluationServiceUrl    | `https://cqf-ruler.nhsnlink.org/fhir`           | No      |
+The `link.reportability-predicate` property is used to determine if a patient is reportable. The default value is "com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation", whichi s a class that implements `Predicate<MeasureReport>`. Other predicate implementations may be built over time in the same package and should be listed here.
+
+Package `com.lantanagroup.link.measureeval.reportability`:
+
+* `IsInInitialPopulation`: Determines if a patient is reportable if they are in the initial population (a count of 1 or more for the "InitialPopulation" population of the patient's MeasureReport).
 
 ## Kafka Events/Topics
 

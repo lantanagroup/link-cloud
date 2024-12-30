@@ -10,36 +10,28 @@
 - **Database**: NONE
 - **Scale**: 0-3
 
-## Environment Variables
+See [Admin UI Functionality](../functionality/admin_ui.md) for more information on the role of the BFF service in the Link Cloud ecosystem.
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
+## Common Configurations
+
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
 
 ## App Settings
 
-### Service Endpoints
-
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| GatewayConfig__KafkaBootstrapServers__0      | `<KafkaBootstrapServer>`       | No       |
-| GatewayConfig__AuditServiceApiUrl            | `<URL> (without /api)`         | No       |
-| GatewayConfig__NotificationServiceApiUrl     | `<URL> (without /api)`         | No       |
-| GatewayConfig__TenantServiceApiUrl           | `<URL> (without /api)`         | No       |
-| GatewayConfig__CensusServiceApiUrl           | `<URL> (without /api)`         | No       |
-| GatewayConfig__ReportServiceApiUrl           | `<URL> (without /api)`         | No       |
-| GatewayConfig__MeasureServiceApiUrl          | `<URL> (without /api)`         | No       |
-
-### Identity Provider
-
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| IdentityProviderConfig__Issuer               | ??                             | No       |
-| IdentityProviderConfig__Audience             | ??                             | No       |
-| IdentityProviderConfig__NameClaimType        | email                          | No       |
-| IdentityProviderConfig__RoleClaimType        | roles                          | No       |
-| IdentityProviderConfig__ValidTypes           | `[ "at+jwt", "JWT" ]`          | No       |
+| Name                                     | Value                     | Description                                                                       | Secret? |
+|------------------------------------------|---------------------------|-----------------------------------------------------------------------------------|---------|
+| SecretManagement__ManagerUri             | \<string>                 | URI to the Azure Key Vault                                                        | Yes     |
+| DataProtection__Enabled                  | true or false             | Whether data protection is enabled                                                | No      |
+| DataProtection__KeyRing                  | "Link"                    | Pass phrase to encrypt protected data. This should be changed from default value. | Yes     |
+| Cache__Enabled                           | true or false             | Whether caching (via Redis) is enabled                                            | No      |
+| Cache__Timeout                           | \<number>                 | Cache timeout in minutes                                                          | No      |
+| Redis__Password                          | \<string>                 | Redis password                                                                    | Yes     |
+| ConnectionStrings__Redis                 | `<RedisConnectionString>` | Connection string for Redis                                                       | Yes     |
 
 ## API Operations
 
