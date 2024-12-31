@@ -41,18 +41,18 @@
         </then>
     </if>
 
+    <logger name="com.lantanagroup.link" level="debug"/>
+
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
-            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
-            <root level="WARN">
+            <root level="info">
                 <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI"/>
             </root>
 
         </then>
         <else>
-            <logger name="com.lantanagroup.link.measureeval.services" level="WARN"/>
-            <root level="WARN">
+            <root level="info">
                 <appender-ref ref="STDOUT"/>
             </root>
         </else>

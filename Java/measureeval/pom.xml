@@ -190,7 +190,6 @@
             <id>cli</id>
             <properties>
                 <mainClass>com.lantanagroup.link.measureeval.FileSystemInvocation</mainClass>
-                <logback.configurationFile>src/main/resources/logback-cli.xml</logback.configurationFile>
             </properties>
             <build>
                 <finalName>measureeval-cli</finalName>
