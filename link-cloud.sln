@@ -69,6 +69,47 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\Repor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipelines", "{D88CD83D-09AC-4632-8066-4D7C36817749}"
+	ProjectSection(SolutionItems) = preProject
+		Azure_Pipelines\azure-pipelines.account.cd.yaml = Azure_Pipelines\azure-pipelines.account.cd.yaml
+		Azure_Pipelines\azure-pipelines.account.ci.yaml = Azure_Pipelines\azure-pipelines.account.ci.yaml
+		Azure_Pipelines\azure-pipelines.audit.cd.yaml = Azure_Pipelines\azure-pipelines.audit.cd.yaml
+		Azure_Pipelines\azure-pipelines.audit.ci.yaml = Azure_Pipelines\azure-pipelines.audit.ci.yaml
+		Azure_Pipelines\azure-pipelines.bff.cd.yaml = Azure_Pipelines\azure-pipelines.bff.cd.yaml
+		Azure_Pipelines\azure-pipelines.bff.ci.yaml = Azure_Pipelines\azure-pipelines.bff.ci.yaml
+		Azure_Pipelines\azure-pipelines.census.cd.yaml = Azure_Pipelines\azure-pipelines.census.cd.yaml
+		Azure_Pipelines\azure-pipelines.census.ci.yaml = Azure_Pipelines\azure-pipelines.census.ci.yaml
+		Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml
+		Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml
+		Azure_Pipelines\azure-pipelines.db-schema-creation.yaml = Azure_Pipelines\azure-pipelines.db-schema-creation.yaml
+		Azure_Pipelines\azure-pipelines.demo.cd.yaml = Azure_Pipelines\azure-pipelines.demo.cd.yaml
+		Azure_Pipelines\azure-pipelines.demo.ci.yaml = Azure_Pipelines\azure-pipelines.demo.ci.yaml
+		Azure_Pipelines\azure-pipelines.gateway.cd.yaml = Azure_Pipelines\azure-pipelines.gateway.cd.yaml
+		Azure_Pipelines\azure-pipelines.gateway.ci.yaml = Azure_Pipelines\azure-pipelines.gateway.ci.yaml
+		Azure_Pipelines\azure-pipelines.measureeval.cd.yaml = Azure_Pipelines\azure-pipelines.measureeval.cd.yaml
+		Azure_Pipelines\azure-pipelines.measureeval.ci.yaml = Azure_Pipelines\azure-pipelines.measureeval.ci.yaml
+		Azure_Pipelines\azure-pipelines.normalization.cd.yaml = Azure_Pipelines\azure-pipelines.normalization.cd.yaml
+		Azure_Pipelines\azure-pipelines.normalization.ci.yaml = Azure_Pipelines\azure-pipelines.normalization.ci.yaml
+		Azure_Pipelines\azure-pipelines.notification.cd.yaml = Azure_Pipelines\azure-pipelines.notification.cd.yaml
+		Azure_Pipelines\azure-pipelines.notification.ci.yaml = Azure_Pipelines\azure-pipelines.notification.ci.yaml
+		Azure_Pipelines\azure-pipelines.patientlist.cd.yaml = Azure_Pipelines\azure-pipelines.patientlist.cd.yaml
+		Azure_Pipelines\azure-pipelines.patientstoquery.cd.yaml = Azure_Pipelines\azure-pipelines.patientstoquery.cd.yaml
+		Azure_Pipelines\azure-pipelines.querydispatch.cd.yaml = Azure_Pipelines\azure-pipelines.querydispatch.cd.yaml
+		Azure_Pipelines\azure-pipelines.querydispatch.ci.yaml = Azure_Pipelines\azure-pipelines.querydispatch.ci.yaml
+		Azure_Pipelines\azure-pipelines.report.cd.yaml = Azure_Pipelines\azure-pipelines.report.cd.yaml
+		Azure_Pipelines\azure-pipelines.report.ci.yaml = Azure_Pipelines\azure-pipelines.report.ci.yaml
+		Azure_Pipelines\azure-pipelines.shared.cd.yml = Azure_Pipelines\azure-pipelines.shared.cd.yml
+		Azure_Pipelines\azure-pipelines.submission.cd.yaml = Azure_Pipelines\azure-pipelines.submission.cd.yaml
+		Azure_Pipelines\azure-pipelines.submission.ci.yaml = Azure_Pipelines\azure-pipelines.submission.ci.yaml
+		Azure_Pipelines\azure-pipelines.tenant.cd.yaml = Azure_Pipelines\azure-pipelines.tenant.cd.yaml
+		Azure_Pipelines\azure-pipelines.tenant.ci.yaml = Azure_Pipelines\azure-pipelines.tenant.ci.yaml
+		Azure_Pipelines\azure-pipelines.validation.cd.yaml = Azure_Pipelines\azure-pipelines.validation.cd.yaml
+		Azure_Pipelines\azure-pipelines.validation.ci.yaml = Azure_Pipelines\azure-pipelines.validation.ci.yaml
+		Azure_Pipelines\azure-pipelines.web.cd.yaml = Azure_Pipelines\azure-pipelines.web.cd.yaml
+		Azure_Pipelines\deploy_all_services.yaml = Azure_Pipelines\deploy_all_services.yaml
+		Azure_Pipelines\deploy_tags_all.yml = Azure_Pipelines\deploy_tags_all.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

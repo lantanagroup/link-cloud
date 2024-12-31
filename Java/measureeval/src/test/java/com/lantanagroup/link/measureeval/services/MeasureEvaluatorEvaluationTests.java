@@ -45,7 +45,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleCohortMeasureTrueTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleCohortMeasureTrue.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientOnlyBundle());
 
@@ -66,7 +66,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleCohortMeasureFalseTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleCohortMeasureFalse.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientOnlyBundle());
 
@@ -88,7 +88,7 @@ class MeasureEvaluatorEvaluationTests {
     void cohortMeasureWithValueSetTrueTest() {
         var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithValueSetTrue.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
 
@@ -117,7 +117,7 @@ class MeasureEvaluatorEvaluationTests {
     void cohortMeasureWithValueSetFalseTest() {
         var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithValueSetFalse.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
 
@@ -141,7 +141,7 @@ class MeasureEvaluatorEvaluationTests {
     void cohortMeasureWithSDETest() {
         var measurePackage = KnowledgeArtifactBuilder.CohortMeasureWithSDE.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientEncounterAndConditionBundle());
 
@@ -184,7 +184,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleProportionMeasureAllTrueNoExclusionTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleProportionMeasureAllTrueNoExclusion.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientOnlyBundle());
 
@@ -215,7 +215,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleProportionMeasureAllFalseTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleProportionMeasureAllFalse.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientOnlyBundle());
 
@@ -246,7 +246,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleRatioMeasureTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleRatioMeasure.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
 
@@ -281,7 +281,7 @@ class MeasureEvaluatorEvaluationTests {
     void simpleContinuousVariableMeasureTest() {
         var measurePackage = KnowledgeArtifactBuilder.SimpleContinuousVariableMeasure.bundle();
         validateMeasurePackage(measurePackage);
-        var evaluator = MeasureEvaluator.compile(fhirContext, KnowledgeArtifactBuilder.SimpleContinuousVariableMeasure.bundle());
+        var evaluator = MeasureEvaluator.compile(fhirContext, KnowledgeArtifactBuilder.SimpleContinuousVariableMeasure.bundle(), false);
         var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
                 new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientAndEncounterBundle());
 
