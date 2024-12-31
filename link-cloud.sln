@@ -73,17 +73,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 		Azure_Pipelines\azure-pipelines.account.ci.yaml = Azure_Pipelines\azure-pipelines.account.ci.yaml
 		Azure_Pipelines\azure-pipelines.audit.cd.yaml = Azure_Pipelines\azure-pipelines.audit.cd.yaml
 		Azure_Pipelines\azure-pipelines.audit.ci.yaml = Azure_Pipelines\azure-pipelines.audit.ci.yaml
-		Azure_Pipelines\azure-pipelines.bff.cd.yaml = Azure_Pipelines\azure-pipelines.bff.cd.yaml
-		Azure_Pipelines\azure-pipelines.bff.ci.yaml = Azure_Pipelines\azure-pipelines.bff.ci.yaml
 		Azure_Pipelines\azure-pipelines.census.cd.yaml = Azure_Pipelines\azure-pipelines.census.cd.yaml
 		Azure_Pipelines\azure-pipelines.census.ci.yaml = Azure_Pipelines\azure-pipelines.census.ci.yaml
 		Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml
 		Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml
 		Azure_Pipelines\azure-pipelines.db-schema-creation.yaml = Azure_Pipelines\azure-pipelines.db-schema-creation.yaml
-		Azure_Pipelines\azure-pipelines.demo.cd.yaml = Azure_Pipelines\azure-pipelines.demo.cd.yaml
-		Azure_Pipelines\azure-pipelines.demo.ci.yaml = Azure_Pipelines\azure-pipelines.demo.ci.yaml
-		Azure_Pipelines\azure-pipelines.gateway.cd.yaml = Azure_Pipelines\azure-pipelines.gateway.cd.yaml
-		Azure_Pipelines\azure-pipelines.gateway.ci.yaml = Azure_Pipelines\azure-pipelines.gateway.ci.yaml
 		Azure_Pipelines\azure-pipelines.measureeval.cd.yaml = Azure_Pipelines\azure-pipelines.measureeval.cd.yaml
 		Azure_Pipelines\azure-pipelines.measureeval.ci.yaml = Azure_Pipelines\azure-pipelines.measureeval.ci.yaml
 		Azure_Pipelines\azure-pipelines.normalization.cd.yaml = Azure_Pipelines\azure-pipelines.normalization.cd.yaml
@@ -106,6 +100,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 		Azure_Pipelines\azure-pipelines.web.cd.yaml = Azure_Pipelines\azure-pipelines.web.cd.yaml
 		Azure_Pipelines\deploy_all_services.yaml = Azure_Pipelines\deploy_all_services.yaml
 		Azure_Pipelines\deploy_tags_all.yml = Azure_Pipelines\deploy_tags_all.yml
+		Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml = Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml = Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml = Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml = Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml
 	EndProjectSection
 EndProject
 Global
