@@ -472,7 +472,7 @@ services:
       - "8063:8063"
     build:
       context: .
-      dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
+      dockerfile: DotNet/Admin.BFF/Dockerfile
     networks:
       - link-nw
     depends_on:
