@@ -44,6 +44,7 @@
   <ItemGroup>
     <Folder Include="Application\Factories\" />
     <Folder Include="Application\Interfaces\Factories\" />
+    <Folder Include="Application\Swagger\" />
   </ItemGroup>
 
   <ItemGroup>
