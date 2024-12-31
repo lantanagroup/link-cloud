@@ -61,7 +61,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinkAdmin.BFF", "DotNet\Lin
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Web", "Web", "{C98B4989-1078-4632-BC7D-9CE52A40B360}"
 EndProject
-Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DemoApp", "Web\DemoApp\DemoApp.esproj", "{472A561B-EF7F-467E-96ED-1FB130E43292}"
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "Admin.UI", "Web\Admin.UI\Admin.UI.esproj", "{472A561B-EF7F-467E-96ED-1FB130E43292}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj", "{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}"
 EndProject

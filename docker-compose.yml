@@ -18,7 +18,7 @@ version: '3.4'
 ## bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
-## demo-app: 8066
+## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
 ## notification: 8069
@@ -563,13 +563,13 @@ services:
       - mssql_init
       - loki
 
-  demo-app:
-    image: link-demo-app
-    container_name: link-demo-app
+  admin-ui:
+    image: link-admin-ui
+    container_name: link-admin-ui
     ports:
       - "8066:80"
     build:
-      context: Web/DemoApp
+      context: Web/Admin.UI
     networks:
       - link-nw
     depends_on:
