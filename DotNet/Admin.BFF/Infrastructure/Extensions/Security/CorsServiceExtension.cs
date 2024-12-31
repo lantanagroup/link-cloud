@@ -39,8 +39,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 }
 
-                cpb.WithMethods(corsServiceOptions.AllowedMethods is not null ? corsServiceOptions.AllowedMethods : corsServiceOptions.DefaultAllowedMethods);
-                cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders is not null ? corsServiceOptions.AllowedExposedHeaders : corsServiceOptions.DefaultAllowedExposedHeaders);
+                cpb.WithMethods(corsServiceOptions.AllowedMethods ?? corsServiceOptions.DefaultAllowedMethods);
+                cpb.WithExposedHeaders(corsServiceOptions.AllowedExposedHeaders ?? corsServiceOptions.DefaultAllowedExposedHeaders);
                 cpb.SetPreflightMaxAge(TimeSpan.FromSeconds(corsServiceOptions.MaxAge));
 
                 options.AddPolicy(CorsConfig.DefaultCorsPolicyName, cpb.Build());

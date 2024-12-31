@@ -11,19 +11,19 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "Shared/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "Link.Authorization/"]
-COPY ["DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj", "LinkAdmin.BFF/"]
-RUN dotnet restore "./LinkAdmin.BFF/./LinkAdmin.BFF.csproj"
+COPY ["DotNet/Admin.BFF/Admin.BFF.csproj", "Admin.BFF/"]
+RUN dotnet restore "./Admin.BFF/./Admin.BFF.csproj"
 
 COPY ["DotNet/Shared/", "Shared/"]
 COPY ["DotNet/Link.Authorization/", "Link.Authorization/"]
-COPY ["DotNet/LinkAdmin.BFF/", "LinkAdmin.BFF/"]
+COPY ["DotNet/Admin.BFF/", "Admin.BFF/"]
 
-RUN dotnet build "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/build
+RUN dotnet build "./Admin.BFF/Admin.BFF.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "./LinkAdmin.BFF/LinkAdmin.BFF.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./Admin.BFF/Admin.BFF.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "LinkAdmin.BFF.dll"]
+ENTRYPOINT ["dotnet", "Admin.BFF.dll"]

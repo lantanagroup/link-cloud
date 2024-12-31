@@ -54,6 +54,11 @@
         /// The allowed origins
         /// </summary>
         public string[]? AllowedOrigins { get; set; }
+        
+        /// <summary>
+        /// Allow all origins (ignore "AllowedOrigins")
+        /// </summary>
+        public bool AllowAllOrigins { get; set; } = false;
 
         /// <summary>
         /// The maximum age of the preflight request
