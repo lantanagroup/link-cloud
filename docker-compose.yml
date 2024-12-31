@@ -15,10 +15,10 @@ version: '3.4'
 ## schema-registry: 8081
 ## account: 8060
 ## audit: 8062
-## bff: 8063
+## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
-## demo-app: 8066
+## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
 ## notification: 8069
@@ -392,9 +392,9 @@ services:
       - kafka_init
       - mssql_init
       
-  bff:
-    image: link-bff
-    container_name: link-bff
+  admin-bff:
+    image: link-admin-bff
+    container_name: link-admin-bff
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
@@ -472,7 +472,7 @@ services:
       - "8063:8063"
     build:
       context: .
-      dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
+      dockerfile: DotNet/Admin.BFF/Dockerfile
     networks:
       - link-nw
     depends_on:
@@ -563,13 +563,13 @@ services:
       - mssql_init
       - loki
 
-  demo-app:
-    image: link-demo-app
-    container_name: link-demo-app
+  admin-ui:
+    image: link-admin-ui
+    container_name: link-admin-ui
     ports:
       - "8066:80"
     build:
-      context: Web/DemoApp
+      context: Web/Admin.UI
     networks:
       - link-nw
     depends_on:

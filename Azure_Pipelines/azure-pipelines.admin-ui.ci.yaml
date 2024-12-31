@@ -1,0 +1,52 @@
+trigger:
+  paths:
+    include:
+    - Web/Admin.UI/*
+    
+pr:
+  paths:
+    include:
+    - Web/Admin.UI/*
+
+name: Demo API Gateway CI
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: workingDir
+  value: 'Web/Admin.UI/'
+- name: serviceName
+  value: 'DemoApiGateway'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '16.x'
+    displayName: 'Install Node.js'
+ 
+  - task: Npm@1  
+    displayName: 'Angular CLI 13.2.5'  
+    inputs:  
+      command: custom  
+      verbose: false  
+      workingDir: $(workingDir)
+      customCommand: 'install -g @angular/cli'
+
+  - task: Npm@1  
+    displayName: 'npm install'  
+    inputs:
+      command: custom
+      workingDir: $(workingDir)
+      customCommand: 'install'
+      
+  - task: Npm@1  
+    displayName: Build  
+    inputs: 
+      command: custom  
+      verbose: false  
+      workingDir: $(workingDir)
+      customCommand: 'run build'        
+
+
