@@ -63,7 +63,7 @@ public class ServiceSpecAppender(
             tasks.Add(AddServiceSpec(swaggerDoc, GetDotNetSwaggerSpecUrl(serviceRegistry.Value.AccountServiceUrl)));
 
         if (!string.IsNullOrEmpty(serviceRegistry.Value.CensusServiceUrl))
-            tasks.Add(AddServiceSpec(swaggerDoc, GetJavaSwaggerSpecUrl(serviceRegistry.Value.CensusServiceUrl)));
+            tasks.Add(AddServiceSpec(swaggerDoc, GetDotNetSwaggerSpecUrl(serviceRegistry.Value.CensusServiceUrl)));
 
         if (!string.IsNullOrEmpty(serviceRegistry.Value.DataAcquisitionServiceUrl))
             tasks.Add(AddServiceSpec(swaggerDoc, GetDotNetSwaggerSpecUrl(serviceRegistry.Value.DataAcquisitionServiceUrl)));
@@ -90,7 +90,7 @@ public class ServiceSpecAppender(
             tasks.Add(AddServiceSpec(swaggerDoc, GetDotNetSwaggerSpecUrl(serviceRegistry.Value.TenantService.TenantServiceUrl)));
 
         if (!string.IsNullOrEmpty(serviceRegistry.Value.ValidationServiceUrl))
-            tasks.Add(AddServiceSpec(swaggerDoc, GetDotNetSwaggerSpecUrl(serviceRegistry.Value.ValidationServiceUrl)));
+            tasks.Add(AddServiceSpec(swaggerDoc, GetJavaSwaggerSpecUrl(serviceRegistry.Value.ValidationServiceUrl)));
 
         Task.WhenAll(tasks).GetAwaiter().GetResult();
     }
