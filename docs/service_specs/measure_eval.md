@@ -55,9 +55,10 @@ The **Measure Evaluation Service** provides REST endpoints to manage measure def
 - **PUT /api/measure-definition/{id}**: Creates or updates a measure definition with the specified ID.
 - **GET /api/measure-definition**: Retrieves a list of all measure definitions.
 
-### Measure Evaluation
+### Measure Evaluation & Testing
 
-- **POST /api/measure-definition/{id}/$evaluate**: Evaluates a measure against clinical data provided in the request body.
+- **POST /api/measure-definition/{id}/$evaluate**: Evaluates a measure against clinical data provided in the request body. May include a `debug` flag that indicates to create cql debug logs on the service during evaluation.
+- **GET /api/measure-definition/{id}/{library-id}/$cql**: Retrieves the CQL for a specific measure definition and library. May include a `range` parameter that represents the range of CQL that is reported via debug logs.
 
 ### Health Check
 

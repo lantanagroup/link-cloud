@@ -29,7 +29,7 @@ class MeasureEvaluatorInstantiationTests {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(new Measure());
         Assertions.assertThrows(IllegalArgumentException.class,
-                () -> MeasureEvaluator.compile(r5FhirContext, bundle),
+                () -> MeasureEvaluator.compile(r5FhirContext, bundle, false),
                 "Unsupported FHIR version!");
     }
 
@@ -40,7 +40,7 @@ class MeasureEvaluatorInstantiationTests {
     void newInstanceEmptyBundleTest() {
         Bundle emptyBundle = new Bundle();
         Assertions.assertThrows(IllegalArgumentException.class,
-                () -> MeasureEvaluator.compile(fhirContext, emptyBundle),
+                () -> MeasureEvaluator.compile(fhirContext, emptyBundle, false),
                 "Please provide the necessary artifacts (e.g. Measure and Library resources) in the Bundle entry!");
     }
 
@@ -52,7 +52,7 @@ class MeasureEvaluatorInstantiationTests {
     void newInstanceMeasureWithoutPrimaryLibraryReference() {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(false));
-        Assertions.assertThrows(IllegalArgumentException.class, () -> MeasureEvaluator.compile(fhirContext, bundle),
+        Assertions.assertThrows(IllegalArgumentException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Measure null does not have a primary library specified");
     }
 
@@ -64,7 +64,7 @@ class MeasureEvaluatorInstantiationTests {
     void newInstanceMeasureWithMissingPrimaryLibraryReference() {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(true));
-        Assertions.assertThrows(ResourceNotFoundException.class, () -> MeasureEvaluator.compile(fhirContext, bundle),
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Unable to find Library with url: https://example.com/Library/Nonexistent");
     }
 
@@ -77,7 +77,7 @@ class MeasureEvaluatorInstantiationTests {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(true));
         bundle.addEntry().setResource(createLibrary(false));
-        Assertions.assertThrows(IllegalStateException.class, () -> MeasureEvaluator.compile(fhirContext, bundle),
+        Assertions.assertThrows(IllegalStateException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Unable to load CQL/ELM for library: Nonexistent. Verify that the Library resource is available in your environment and has CQL/ELM content embedded.");
     }
 
@@ -89,7 +89,7 @@ class MeasureEvaluatorInstantiationTests {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(true));
         bundle.addEntry().setResource(createLibrary(true));
-        Assertions.assertDoesNotThrow(() -> MeasureEvaluator.compile(fhirContext, bundle));
+        Assertions.assertDoesNotThrow(() -> MeasureEvaluator.compile(fhirContext, bundle, false));
     }
 
     /**

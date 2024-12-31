@@ -1,7 +1,12 @@
 package com.lantanagroup.link.measureeval;
 
 import ca.uhn.fhir.context.FhirContext;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.core.joran.spi.JoranException;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
+import com.lantanagroup.link.measureeval.utils.CqlLogAppender;
+import com.lantanagroup.link.measureeval.utils.CqlUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -27,6 +32,15 @@ import java.util.List;
 public class FileSystemInvocation {
     private static final FhirContext fhirContext = FhirContext.forR4Cached();
     private static final Logger logger = LoggerFactory.getLogger(FileSystemInvocation.class);
+
+    private static void configureLogging(Bundle bundle) throws JoranException {
+        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        context.reset();
+        JoranConfigurator configurator = new JoranConfigurator();
+        configurator.setContext(context);
+        configurator.doConfigure(ClassLoader.getSystemResource("logback-cli.xml"));
+        CqlLogAppender.start(context, libraryId -> CqlUtils.getLibrary(bundle, libraryId));
+    }
 
     private static Bundle getBundle(String measureBundlePath) throws IOException {
         logger.info("Loading measure bundle from: {}", measureBundlePath);
@@ -138,7 +152,7 @@ public class FileSystemInvocation {
                 .orElseThrow(() -> new IllegalArgumentException("Patient resource not found in bundle"));
     }
 
-    private static void evaluatePatientBundle(String patientBundlePath, Bundle patientBundle, String start, String end, MeasureEvaluator evaluator) {
+    private static void evaluatePatientBundle(Bundle patientBundle, String start, String end, MeasureEvaluator evaluator, boolean isDebug) {
         Patient patient = findPatient(patientBundle);
         var report = evaluator.evaluate(
                 new DateTimeType(start),
@@ -162,6 +176,7 @@ public class FileSystemInvocation {
 
         try {
             Bundle measureBundle = getBundle(measureBundlePath);
+            configureLogging(measureBundle);
             MeasureEvaluator evaluator = MeasureEvaluator.compile(fhirContext, measureBundle, true);
 
             File patientBundleFile = new File(patientBundlePath);
@@ -171,11 +186,11 @@ public class FileSystemInvocation {
 
                 for (Bundle patientBundle : patientBundles) {
                     logger.info("\n===================================================");
-                    evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+                    evaluatePatientBundle(patientBundle, start, end, evaluator, true);
                 }
             } else {
                 Bundle patientBundle = getBundle(patientBundlePath);
-                evaluatePatientBundle(patientBundlePath, patientBundle, start, end, evaluator);
+                evaluatePatientBundle(patientBundle, start, end, evaluator, true);
             }
         } catch (Exception e) {
             System.err.println("Error occurred while evaluating measure: " + e.getMessage());
