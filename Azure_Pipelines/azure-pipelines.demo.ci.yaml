@@ -8,7 +8,7 @@ pr:
     include:
     - Web/DemoApp/*
 
-name: Demo API Gateway CI
+name: Admin UI CI
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -18,7 +18,7 @@ variables:
 - name: workingDir
   value: 'Web/DemoApp/'
 - name: serviceName
-  value: 'DemoApiGateway'
+  value: 'AdminUI'
 
 steps:
   - task: NodeTool@0
