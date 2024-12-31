@@ -90,8 +90,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                });
 
 
-            integrationEndpoints.MapPost("/start-consumers", (Delegate)CreateConsumersRequested)
+            integrationEndpoints.MapPost("/start-consumers", CreateConsumersRequested)
                .Produces<EventProducerResponse>(StatusCodes.Status200OK)
+               .Produces<ValidationFailureResponse>(StatusCodes.Status400BadRequest)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
                .WithOpenApi(x => new OpenApiOperation(x)
@@ -100,7 +101,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                    Description = "Integration Testing - Starts consumers"
                });
 
-            integrationEndpoints.MapGet("/read-consumers", (Delegate)ReadConsumersRequested)
+            integrationEndpoints.MapPost("/read-consumers", ReadConsumersRequested)
                .Produces<Dictionary<string, string>>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -111,7 +112,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
                });
 
 
-            integrationEndpoints.MapGet("/stop-consumers", (Delegate)DeleteConsumersRequested)
+            integrationEndpoints.MapPost("/stop-consumers", DeleteConsumersRequested)
                .Produces<object>(StatusCodes.Status200OK)
                .Produces(StatusCodes.Status401Unauthorized)
                .ProducesProblem(StatusCodes.Status500InternalServerError)
@@ -127,29 +128,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         }
 
-        public Task CreateConsumersRequested(HttpContext context)
+        public Task CreateConsumersRequested(HttpContext context, Facility facility)
         {
-            _kafkaConsumerManager.CreateAllConsumers();
+            _kafkaConsumerManager.CreateAllConsumers(facility.FacilityId);
             return Task.CompletedTask;
         }
 
-        public async Task<IResult> ReadConsumersRequested(HttpContext context)
+        public async Task<IResult> ReadConsumersRequested(HttpContext context, Facility facility)
         {
-            Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers();
-            // construct response
-            //ConsumerResponse response = new ConsumerResponse();
-            /*foreach (var item in list)
-            {
-                ConsumerResponseTopic resp = new ConsumerResponseTopic();
-                resp.topic = item.Key;
-                resp.correlationId = item.Value;
-                response.list.Add(resp);
-            }*/
+            Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(facility.FacilityId);
             return Results.Ok(list);
         }
-        public async Task<Task> DeleteConsumersRequested(HttpContext context)
+        public Task DeleteConsumersRequested(HttpContext context, Facility facility)
         {
-            await _kafkaConsumerManager.StopAllConsumers();
+            _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
             return Task.CompletedTask;
         }
 
