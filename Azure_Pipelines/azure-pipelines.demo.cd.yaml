@@ -11,7 +11,7 @@ trigger:
     - release/*
   paths:
     include:
-    - Web/DemoApp/*
+    - Web/Admin.UI/*
     exclude:
     - '*'
     
@@ -25,11 +25,11 @@ variables:
 - name: registry-repo-Name
   value: 'link-demo-app'
 - name: dockerPath
-  value: '**/Web/DemoApp/Dockerfile'
+  value: '**/Web/Admin.UI/Dockerfile'
 - name: workingDir
-  value: 'Web/DemoApp/'
+  value: 'Web/Admin.UI/'
 - name: serviceName
-  value: 'DemoApp'
+  value: 'Admin.UI'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 

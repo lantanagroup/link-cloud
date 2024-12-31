@@ -1,12 +1,12 @@
 trigger:
   paths:
     include:
-    - Web/DemoApp/*
+    - Web/Admin.UI/*
     
 pr:
   paths:
     include:
-    - Web/DemoApp/*
+    - Web/Admin.UI/*
 
 name: Demo API Gateway CI
 
@@ -16,7 +16,7 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: workingDir
-  value: 'Web/DemoApp/'
+  value: 'Web/Admin.UI/'
 - name: serviceName
   value: 'DemoApiGateway'
 
