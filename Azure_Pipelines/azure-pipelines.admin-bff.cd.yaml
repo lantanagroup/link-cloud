@@ -11,7 +11,7 @@ trigger:
     - release/*
   paths:
     include:
-    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Admin.BFF/*
     - DotNet/Shared/*
     - DotNet/Link.Authorization/*
     exclude:
@@ -25,11 +25,11 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: project
-  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
+  value: 'DotNet/Admin.BFF/Admin.BFF.csproj'
 - name: registryRepositoryName
   value: 'link-bff'
 - name: dockerPath
-  value: '**/DotNet/LinkAdmin.BFF/Dockerfile'
+  value: '**/DotNet/Admin.BFF/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 

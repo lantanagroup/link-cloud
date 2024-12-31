@@ -1,7 +1,7 @@
 trigger:
   paths:
     include:
-    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Admin.BFF/*
     - DotNet/Shared/*
     - DotNet/Link.Authorization/*
     exclude:
@@ -10,7 +10,7 @@ trigger:
 pr:
   paths:
     include:
-    - DotNet/LinkAdmin.BFF/*
+    - DotNet/Admin.BFF/*
     - DotNet/Shared/*
     - DotNet/Link.Authorization/*
 
@@ -22,7 +22,7 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: project
-  value: 'DotNet/LinkAdmin.BFF/LinkAdmin.BFF.csproj'
+  value: 'DotNet/Admin.BFF/Admin.BFF.csproj'
 
 steps:
   - task: DotNetCoreCLI@2
