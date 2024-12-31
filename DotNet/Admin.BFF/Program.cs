@@ -115,11 +115,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add commands
     builder.Services.AddTransient<ICreatePatientEvent, CreatePatientEvent>();
+    builder.Services.AddTransient<ICreatePatientAcquired, CreatePatientAcquired>();
     builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
     builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
     builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
+    builder.Services.AddTransient<KafkaConsumerManager>();
+    builder.Services.AddTransient<KafkaConsumerService>();
 
     //Add Redis
     if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
