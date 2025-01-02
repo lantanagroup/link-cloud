@@ -1,50 +1,73 @@
-<div class="content">
-  <mat-toolbar class="page-header-bar" color="primary">
-    <span>Link Integration Testing</span>
-  </mat-toolbar>
+<form [formGroup]="eventForm">
 
-  <mat-card class="resource-card">
-    <mat-card-content>
-      <form [formGroup]="eventForm">
+  <div class="content">
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>Link Integration Testing</span>
+    </mat-toolbar>
+
+    <mat-card class="resource-card">
+      <mat-card-content>
         <div class="input-container">
-          <mat-form-field class="form-select" appearance="outline">
-            <mat-label>Event</mat-label>
-            <mat-select formControlName="event">
-              <mat-option>None</mat-option>
-              <mat-option *ngFor="let event of events" [value]="event">
-                {{event}}
-              </mat-option>
-            </mat-select>
-            <mat-error *ngIf="eventControl.hasError('required')">
-              Event is <strong>required</strong>
+          <mat-form-field class="form-input" appearance="outline">
+            <mat-label>Enter Facility</mat-label>
+            <input matInput formControlName="facilityId" placeholder="Enter a facility" (blur)="readyToStart = facilityIdControl.value ? true: false">
+            <mat-error *ngIf="facilityIdControl.hasError('required')">
+              Facility is <strong>required</strong>
             </mat-error>
           </mat-form-field>
         </div>
-      </form>
+        <div *ngIf="isLoading; else buttonContent" class="spinner-container">
+          <mat-progress-spinner
+            color="primary"
+            mode="indeterminate"
+            diameter="50">
+          </mat-progress-spinner>
+        </div>
+        <ng-template #buttonContent>
+          <button mat-raised-button
+                  color="primary"
+                  (click)="onToggleTest()"
+                  [disabled]="isLoading || !readyToStart">
+            {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
+          </button>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
 
-      <!-- Event Forms -->
-      <app-report-scheduled-form (eventGenerated)="onEventGenerated($event)" *ngIf="showReportScheduledForm"></app-report-scheduled-form>
-      <app-patient-event-form (eventGenerated)="onEventGenerated($event)" *ngIf="showPatientEventForm"></app-patient-event-form>
-      <app-data-acquisition-reqeusted-form (eventGenerated)="onEventGenerated($event)" *ngIf="showDataAcquisitionRequestedForm"></app-data-acquisition-reqeusted-form>
 
-    </mat-card-content>
-  </mat-card>
+    <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
+      <mat-card-content>
+        <div class="table-container">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Correlation IDs</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let entry of consumersDataOutput | keyvalue ">
+              <td [style.color]="entry.key.includes('Error') ? 'red' : 'black'">{{ entry.key }}:</td>
+              <td>
+                <ul>
+                  <div *ngFor="let item of entry.value">{{ item }}</div>
+                </ul>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
 
-  <mat-card class="process-card" *ngIf="showProcessCard">
-    <mat-card-header>
-      Monitoring audit events for correlation id  '{{correlationId}}' &nbsp;&nbsp;<mat-spinner [diameter]="20" *ngIf="isMonitoring"></mat-spinner>
-      <button mat-mini-fab color="warn" (click)="stopPollingAuditEvents()" style="margin-left: auto;" title="Stop Monitoring">
-        <mat-icon>stop</mat-icon>
-      </button>
-    </mat-card-header>
-    <mat-card-content [@listAnimation]="auditEvents.length">
-      <mat-card class="process-card" *ngFor="let audit of auditEvents">
-        <mat-card-content>
-          <pre>{{ audit | json }}</pre>
-        </mat-card-content>
-      </mat-card>
 
-    </mat-card-content>
-  </mat-card>
+    <mat-card class="resource-card" *ngIf="isTestRunning &&  consumersDataOutput.size > 0">
+      <mat-card-content>
+        <!-- Event Forms -->
+        <app-report-scheduled-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showReportScheduledForm"></app-report-scheduled-form>
+        <app-patient-acquired-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showPatientsAcquiredForm"></app-patient-acquired-form>
+      </mat-card-content>
+    </mat-card>
 
-</div>
+  </div>
+</form>
