@@ -16,6 +16,7 @@ import { UserProfileService } from './services/user-profile.service';
 export class AppComponent implements OnInit, OnChanges {
   userProfile: UserProfile | undefined;
   showMenuText: boolean = true;
+  loginRequired = true;
 
   isHandset$: Observable<boolean> = this.breakpointObserver.observe(Breakpoints.Handset)
     .pipe(
@@ -27,7 +28,7 @@ export class AppComponent implements OnInit, OnChanges {
 
     this.profileService.userProfileUpdated.subscribe(profile => {
       this.userProfile = profile;
-    });    
+    });
 
   }
 
@@ -36,11 +37,10 @@ export class AppComponent implements OnInit, OnChanges {
   }
 
   async ngOnInit(): Promise<void>{
-
+    this.loginRequired = await this.authService.isLoginRequired();
     this.userProfile = await this.profileService.getProfile();
 
-
-    if (this.userProfile.email === '') {
+    if (this.userProfile.email === '' && this.loginRequired) {
       this.authService.login();
     }
 
@@ -51,11 +51,8 @@ export class AppComponent implements OnInit, OnChanges {
   }
 
   logout() {
-    this.authService.logout();
+    if (this.loginRequired) {
+      this.authService.logout();
+    }
   }
-
-  toggleMenuText() {
-    this.showMenuText = !this.showMenuText;
-  }
-
 }

@@ -176,6 +176,28 @@ static void RegisterServices(WebApplicationBuilder builder)
                 pb.RequireAssertion(_ => true);
             });
     }
+    
+    // Configure CORS regardless of anonymous access
+    var corsConfig = builder.Configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
+    if (corsConfig != null)
+    {
+        Log.Logger.Debug("Registering CORS settings");
+        builder.Services.AddCorsService(options =>
+        {
+            options.Environment = builder.Environment;
+            options.PolicyName = corsConfig.PolicyName;
+            options.AllowedHeaders = corsConfig.AllowedHeaders;
+            options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
+            options.AllowedMethods = corsConfig.AllowedMethods;
+            options.AllowAllOrigins = corsConfig.AllowAllOrigins;
+            options.AllowedOrigins = corsConfig.AllowedOrigins;
+            options.AllowCredentials = corsConfig.AllowCredentials;
+        }, Log.Logger);
+    }
+    else
+    {
+        Log.Logger.Warning("CORS settings not found.");
+    }
 
     // Add header forwarding
     Log.Logger.Information("Registering Header Forwarding for the Link Admin API.");
@@ -402,6 +424,3 @@ static void SetupMiddleware(WebApplication app)
 }
 
 #endregion
-
-
-

@@ -29,7 +29,7 @@
 </mat-toolbar>
 <mat-drawer-container class="sidenav-container" autosize  >
   <mat-drawer #drawer mode="side" opened>
-    <mat-nav-list *ngIf="userProfile?.email">
+    <mat-nav-list *ngIf="!loginRequired || userProfile?.email">
 
       <!-- Main Dashboard -->
       <a mat-list-item routerLink="" routerLinkActive="active">
