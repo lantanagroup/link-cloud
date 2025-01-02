@@ -51,23 +51,60 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QueryDispatchTests", "DotNe
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Link.Authorization", "DotNet\Link.Authorization\Link.Authorization.csproj", "{80D1E498-95DB-43E3-8444-55C762CEEDF3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DemoApiGateway", "DotNet\DemoApiGateway\DemoApiGateway.csproj", "{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NormalizationTests", "DotNet\NormalizationTests\NormalizationTests.csproj", "{538B399B-72CF-4160-A385-FCF0BAEC8FA4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateway", "Gateway", "{37C302AB-8C98-4CC8-828E-0647AF098586}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinkAdmin.BFF", "DotNet\LinkAdmin.BFF\LinkAdmin.BFF.csproj", "{C4070261-D248-4CA5-A532-6AAA71AACC35}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Admin.BFF", "DotNet\Admin.BFF\Admin.BFF.csproj", "{C4070261-D248-4CA5-A532-6AAA71AACC35}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Web", "Web", "{C98B4989-1078-4632-BC7D-9CE52A40B360}"
 EndProject
-Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "DemoApp", "Web\DemoApp\DemoApp.esproj", "{472A561B-EF7F-467E-96ED-1FB130E43292}"
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "Admin.UI", "Web\Admin.UI\Admin.UI.esproj", "{472A561B-EF7F-467E-96ED-1FB130E43292}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "DotNet\DataAcquisition.Domain\DataAcquisition.Domain.csproj", "{CEBB1A00-0629-4791-A2A3-35FC05D00F0B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipelines", "{D88CD83D-09AC-4632-8066-4D7C36817749}"
+	ProjectSection(SolutionItems) = preProject
+		Azure_Pipelines\azure-pipelines.account.cd.yaml = Azure_Pipelines\azure-pipelines.account.cd.yaml
+		Azure_Pipelines\azure-pipelines.account.ci.yaml = Azure_Pipelines\azure-pipelines.account.ci.yaml
+		Azure_Pipelines\azure-pipelines.audit.cd.yaml = Azure_Pipelines\azure-pipelines.audit.cd.yaml
+		Azure_Pipelines\azure-pipelines.audit.ci.yaml = Azure_Pipelines\azure-pipelines.audit.ci.yaml
+		Azure_Pipelines\azure-pipelines.census.cd.yaml = Azure_Pipelines\azure-pipelines.census.cd.yaml
+		Azure_Pipelines\azure-pipelines.census.ci.yaml = Azure_Pipelines\azure-pipelines.census.ci.yaml
+		Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.cd.yaml
+		Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml = Azure_Pipelines\azure-pipelines.dataacquisition.ci.yaml
+		Azure_Pipelines\azure-pipelines.db-schema-creation.yaml = Azure_Pipelines\azure-pipelines.db-schema-creation.yaml
+		Azure_Pipelines\azure-pipelines.measureeval.cd.yaml = Azure_Pipelines\azure-pipelines.measureeval.cd.yaml
+		Azure_Pipelines\azure-pipelines.measureeval.ci.yaml = Azure_Pipelines\azure-pipelines.measureeval.ci.yaml
+		Azure_Pipelines\azure-pipelines.normalization.cd.yaml = Azure_Pipelines\azure-pipelines.normalization.cd.yaml
+		Azure_Pipelines\azure-pipelines.normalization.ci.yaml = Azure_Pipelines\azure-pipelines.normalization.ci.yaml
+		Azure_Pipelines\azure-pipelines.notification.cd.yaml = Azure_Pipelines\azure-pipelines.notification.cd.yaml
+		Azure_Pipelines\azure-pipelines.notification.ci.yaml = Azure_Pipelines\azure-pipelines.notification.ci.yaml
+		Azure_Pipelines\azure-pipelines.patientlist.cd.yaml = Azure_Pipelines\azure-pipelines.patientlist.cd.yaml
+		Azure_Pipelines\azure-pipelines.patientstoquery.cd.yaml = Azure_Pipelines\azure-pipelines.patientstoquery.cd.yaml
+		Azure_Pipelines\azure-pipelines.querydispatch.cd.yaml = Azure_Pipelines\azure-pipelines.querydispatch.cd.yaml
+		Azure_Pipelines\azure-pipelines.querydispatch.ci.yaml = Azure_Pipelines\azure-pipelines.querydispatch.ci.yaml
+		Azure_Pipelines\azure-pipelines.report.cd.yaml = Azure_Pipelines\azure-pipelines.report.cd.yaml
+		Azure_Pipelines\azure-pipelines.report.ci.yaml = Azure_Pipelines\azure-pipelines.report.ci.yaml
+		Azure_Pipelines\azure-pipelines.shared.cd.yml = Azure_Pipelines\azure-pipelines.shared.cd.yml
+		Azure_Pipelines\azure-pipelines.submission.cd.yaml = Azure_Pipelines\azure-pipelines.submission.cd.yaml
+		Azure_Pipelines\azure-pipelines.submission.ci.yaml = Azure_Pipelines\azure-pipelines.submission.ci.yaml
+		Azure_Pipelines\azure-pipelines.tenant.cd.yaml = Azure_Pipelines\azure-pipelines.tenant.cd.yaml
+		Azure_Pipelines\azure-pipelines.tenant.ci.yaml = Azure_Pipelines\azure-pipelines.tenant.ci.yaml
+		Azure_Pipelines\azure-pipelines.validation.cd.yaml = Azure_Pipelines\azure-pipelines.validation.cd.yaml
+		Azure_Pipelines\azure-pipelines.validation.ci.yaml = Azure_Pipelines\azure-pipelines.validation.ci.yaml
+		Azure_Pipelines\azure-pipelines.web.cd.yaml = Azure_Pipelines\azure-pipelines.web.cd.yaml
+		Azure_Pipelines\deploy_all_services.yaml = Azure_Pipelines\deploy_all_services.yaml
+		Azure_Pipelines\deploy_tags_all.yml = Azure_Pipelines\deploy_tags_all.yml
+		Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml = Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml = Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml = Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml = Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -159,10 +196,6 @@ Global
 		{80D1E498-95DB-43E3-8444-55C762CEEDF3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{80D1E498-95DB-43E3-8444-55C762CEEDF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{80D1E498-95DB-43E3-8444-55C762CEEDF3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{538B399B-72CF-4160-A385-FCF0BAEC8FA4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{538B399B-72CF-4160-A385-FCF0BAEC8FA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{538B399B-72CF-4160-A385-FCF0BAEC8FA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -194,7 +227,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{FF846B98-2CB4-4D55-9EAE-0C62EBA3A2BC} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
 	EndGlobalSection

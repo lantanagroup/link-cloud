@@ -1,0 +1,106 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Deploy_All_Services
+    trigger: true
+
+trigger:
+  branches:
+    include:
+    - dev
+    - release/*
+  paths:
+    include:
+    - Web/Admin.UI/*
+    exclude:
+    - '*'
+    
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: registry-repo-Name
+  value: 'link-demo-app'
+- name: dockerPath
+  value: '**/Web/Admin.UI/Dockerfile'
+- name: workingDir
+  value: 'Web/Admin.UI/'
+- name: serviceName
+  value: 'Admin.UI'
+- name: containerRegistry
+  value: 'NHSNLink ACR Premium'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '16.x'
+    displayName: 'Install Node.js'
+
+  - task: GetRevision@1
+    displayName: 'Get Revision'
+    inputs:
+      VariableName: Revision
+
+  - task: Npm@1  
+    displayName: 'Angular CLI 13.2.5'  
+    inputs:  
+      command: custom  
+      verbose: false  
+      customCommand: 'install -g @angular/cli'
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: Npm@1  
+    displayName: 'npm install'  
+    inputs:
+      command: custom  
+      workingDir: $(workingDir)
+      customCommand: 'install'
+      
+  - task: Npm@1  
+    displayName: Build  
+    inputs: 
+      command: custom  
+      verbose: false 
+      workingDir: $(workingDir)
+      customCommand: 'run build'
+  
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+
+  - task: Docker@2
+    displayName: "Build & Push DemoApiGateway Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry)
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(MyTag)
+      buildContext: '$(workingDir)'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

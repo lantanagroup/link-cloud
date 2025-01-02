@@ -15,10 +15,10 @@ version: '3.4'
 ## schema-registry: 8081
 ## account: 8060
 ## audit: 8062
-## bff: 8063
+## admin-bff: 8063
 ## census: 8064
 ## dataacquisition: 8065
-## demo-app: 8066
+## admin-ui: 8066
 ## measureeval: 8067
 ## normalization: 8068
 ## notification: 8069
@@ -63,7 +63,7 @@ services:
       - mssql_data:/var/opt/mssql
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${LINK_DB_PASS} -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${LINK_DB_PASS} -Q 'SELECT 1' -C || exit 1"]
       interval: 10s
       retries: 10
       start_period: 10s
@@ -190,7 +190,7 @@ services:
        - KAFKA_CFG_NODE_ID=1
        - KAFKA_CFG_PROCESS_ROLES=broker,controller
        - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093 
-       - KAFKA_CFG_LISTENERS=SASL_PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+       - KAFKA_CFG_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093,EXTERNAL://127.0.0.1:9094
        - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SASL_PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
        - KAFKA_CFG_ADVERTISED_LISTENERS=SASL_PLAINTEXT://127.0.0.1:9092,EXTERNAL://kafka_b:9094
        - KAFKA_CLIENT_USERS=${KAFKA_SASL_CLIENT_USER}
@@ -392,10 +392,11 @@ services:
       - kafka_init
       - mssql_init
       
-  bff:
-    image: link-bff
-    container_name: link-bff
+  admin-bff:
+    image: link-admin-bff
+    container_name: link-admin-bff
     environment:
+      Serilog__MinimumLevel__Default: Debug
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__BootstrapServers__0: kafka_b:9094
       KafkaConnection__SaslProtocolEnabled: true
@@ -411,6 +412,7 @@ services:
       LinkTokenService__LinkAdminEmail:      
       LinkTokenService__TokenLifeSpan: 10    
       Authentication__EnableAnonymousAccess: true
+      CORS__AllowAllOrigins: true
       ServiceRegistry__TenantService__TenantServiceURL: http://tenant:8074
       ServiceRegistry__AccountServiceUrl: http://account:8060
       ServiceRegistry__AuditServiceUrl: http://audit:8062
@@ -472,7 +474,7 @@ services:
       - "8063:8063"
     build:
       context: .
-      dockerfile: DotNet/LinkAdmin.BFF/Dockerfile
+      dockerfile: DotNet/Admin.BFF/Dockerfile
     networks:
       - link-nw
     depends_on:
@@ -563,13 +565,13 @@ services:
       - mssql_init
       - loki
 
-  demo-app:
-    image: link-demo-app
-    container_name: link-demo-app
+  admin-ui:
+    image: link-admin-ui
+    container_name: link-admin-ui
     ports:
       - "8066:80"
     build:
-      context: Web/DemoApp
+      context: Web/Admin.UI
     networks:
       - link-nw
     depends_on:
