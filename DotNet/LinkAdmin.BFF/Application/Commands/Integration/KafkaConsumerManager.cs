@@ -3,8 +3,8 @@
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using System.Text;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     public class KafkaConsumerManager
     {
 
-        private List<(IConsumer<string, string>, CancellationTokenSource)> _consumers;
+        private ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> _consumers;
         private readonly KafkaConnection _kafkaConnection;
         private readonly KafkaConsumerService _kafkaConsumerService;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private readonly static string errorTopic = "-Error";
         public static readonly string delimiter = ":";
         public static readonly string consumers = "consumers";
-
+        private static readonly object _lock = new object();
 
         // construct a list of topics 
         private List<(string, string)> kafkaTopics = new List<(string, string)>
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         {
             _kafkaConsumerService = kafkaConsumerService;
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-            _consumers = new List<(IConsumer<string, string>, CancellationTokenSource)>();
+            _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
         }
 
@@ -77,6 +77,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             return scope.ServiceProvider.GetRequiredService<IDistributedCache>();
         }
 
+
+        private void RemoveConsumersBasedOnFacility(ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> bag, string facility)
+        {
+            lock (_lock)
+            {
+                var newBag = new ConcurrentBag < (IConsumer<string, string>, CancellationTokenSource) > ();
+                foreach (var item in bag)
+                {
+                    if (!item.Item1.Name.Contains(facility)) // Keep items that do not match the condition
+                    {
+                        newBag.Add(item);
+                    }
+                }
+
+                // Replace the old bag
+                while (bag.TryTake(out _)) { } // Clear the old bag
+                foreach (var item in newBag)
+                {
+                    bag.Add(item); // Add the filtered items back to the original bag
+                }
+            }
+        }
 
         public void CreateAllConsumers(string facility)
         {
@@ -156,7 +178,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             }
 
             // remove only consumers for that facility
-            _consumers.RemoveAll(c => c.Item1.Name.Contains(facility));
+            RemoveConsumersBasedOnFacility(_consumers, facility);
 
             //clear Redis cache for that facility
             ClearRedisCache(facility);
