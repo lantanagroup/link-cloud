@@ -15,7 +15,6 @@
     <Folder Include="src\app\components\dashboard\" />
     <Folder Include="src\app\components\account\" />
     <Folder Include="src\app\components\validators\" />
-    <Folder Include="src\app\interfaces\testing\" />
     <Folder Include="src\app\interfaces\tenant\" />
     <Folder Include="src\app\models\notification\" />
     <Folder Include="src\app\interceptors\" />

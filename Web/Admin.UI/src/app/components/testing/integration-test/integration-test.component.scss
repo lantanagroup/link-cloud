@@ -63,7 +63,45 @@
   margin-top: 2em;
 }
 
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 5px; /* Space above the table */
+}
+
+/* Styling table headers */
+.table th {
+  background-color: #f4f4f4;
+  padding: 10px;
+  text-align: left;
+  font-size: 16px;
+  border-bottom: 2px solid #ccc;
+}
+
+/* Styling table cells */
+.table td {
+  padding: 6px;
+  vertical-align: top;
+  border-bottom: 1px solid #ddd;
+}
+
 
 pre {
   white-space: pre-wrap;
 }
+
+.button-container {
+  display: flex;
+  justify-content: space-between; /* Aligns buttons with space in between */
+}
+
+.enter-test-data {
+  text-align: left;
+  margin: 20px 0;
+}
+
+.error {
+  color: red;
+}
+
+
