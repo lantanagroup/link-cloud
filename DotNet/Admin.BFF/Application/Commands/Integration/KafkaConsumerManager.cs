@@ -73,8 +73,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         private IDistributedCache getCache()
         {
-            IServiceScope scope = _serviceScopeFactory.CreateScope();
-            return scope.ServiceProvider.GetRequiredService<IDistributedCache>();
+            return _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDistributedCache>();
         }
 
 
