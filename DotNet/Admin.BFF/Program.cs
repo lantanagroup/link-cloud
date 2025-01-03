@@ -90,6 +90,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
+    builder.Services.Configure<ServiceSpecAppenderConfig>(builder.Configuration.GetSection(ServiceSpecAppenderConfig.ConfigSectionName));
 
     // Determine if anonymous access is allowed
     var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -223,8 +224,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
     }
-
-
+    
     // Add swagger generation
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
