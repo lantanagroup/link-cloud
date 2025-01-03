@@ -10,6 +10,8 @@ FHIR resources queried from EHR endpoints can vary from location to location. Th
 - **Database**: MSSQL
 - **Scale**: 0-3
 
+## Related Documentation
+
 See [Normalization Functionality](../functionality/normalization.md) for more information on the role of the Normalization service in the Link Cloud ecosystem.
 
 ## Common Configurations

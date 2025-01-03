@@ -10,7 +10,11 @@
 - **Database**: NONE
 - **Scale**: 0-3
 
+## Related Documentation
+
 See [Admin UI Functionality](../functionality/admin_ui.md) for more information on the role of the BFF service in the Link Cloud ecosystem.
+
+See [BFF](bff.md) for more information on the BFF pattern that is used to support this Admin UI.
 
 ## Common Configurations
 
@@ -32,6 +36,41 @@ See [Admin UI Functionality](../functionality/admin_ui.md) for more information 
 | Cache__Timeout                           | \<number>                 | Cache timeout in minutes                                                          | No      |
 | Redis__Password                          | \<string>                 | Redis password                                                                    | Yes     |
 | ConnectionStrings__Redis                 | `<RedisConnectionString>` | Connection string for Redis                                                       | Yes     |
+
+## Gateway/Routing
+
+The service is configured via `appsettings.json` to proxy (act as a gateway) for all the underlying micro services, so that the endpoints of the underlying micro services can be exposed to the user interface. This is the reason security _must_ be enabled for all micro services when deployed to a non-development environment.
+
+An example of the YARP configuration is as follows:
+
+```json
+{
+  "ReverseProxy": {
+    "Routes": {
+      "route1": {
+        "ClusterId": "AccountService",
+        "AuthorizationPolicy": "AuthenticatedUser",
+        "Match": {
+          "Path": "api/account/{**catch-all}"
+        }
+      }
+    },
+    "Clusters": {
+      "AccountService": {
+        "Destinations": {
+          "destination1": {
+            "Address": ""
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The `Address` property above is left blank as a hint that the actual address should be set at runtime via the deployment's configuration, such as an environment variable `ReverseProxy__Clusters__AccountService__Destinations__destination1_Address` set to the `https://XXX` address that the account service is deployed to.
+
+In the above configuration, if the `AccountService` is deployed to `https://account-service`, and the BFF is deployed to `https://bff.mycompany.com`, then requests to `https://bff.mycompany.com/api/account/**` will be proxied to `https://account-service/**`.
 
 ## API Operations
 

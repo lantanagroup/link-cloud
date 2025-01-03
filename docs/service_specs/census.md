@@ -10,6 +10,8 @@ The Census service is primarily responsible for maintaining a tenants admit and 
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
 
+## Related Documentation
+
 See [Census Functionality](../functionality/census_management.md) for more information on the role of the Census service in the Link Cloud ecosystem.
 
 ## Common Configurations

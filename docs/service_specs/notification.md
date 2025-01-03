@@ -10,6 +10,8 @@ The Notification service is responsible for emailing configured users when a not
 - **Database**: MSSQL
 - **Scale**: 0-3
 
+## Related Documentation
+
 See [Notification Functionality](../functionality/notifications.md) for more information on the role of the Notification service in the Link Cloud ecosystem.
 
 ## Common Configurations

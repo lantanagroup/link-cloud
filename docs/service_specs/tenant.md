@@ -10,6 +10,8 @@ The Tenant service is the entry point for configuring a tenant into Link Cloud. 
 - **Database**: MSSQL
 - **Scale**: 0-3
 
+## Related Documentation
+
 See [Tenant Functionality](../functionality/tenant_mgmt.md) for more information on the role of the Tenant service in the Link Cloud ecosystem.
 
 ## Common Configurations
