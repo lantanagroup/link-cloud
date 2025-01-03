@@ -72,6 +72,33 @@ The `Address` property above is left blank as a hint that the actual address sho
 
 In the above configuration, if the `AccountService` is deployed to `https://account-service`, and the BFF is deployed to `https://bff.mycompany.com`, then requests to `https://bff.mycompany.com/api/account/**` will be proxied to `https://account-service/**`.
 
+## Swagger Spec Generation
+
+The swagger spec that is generated for the BFF service is a combination of the BFF service's own endpoints and the endpoints of the underlying micro services that the BFF service proxies for. The swagger spec is generated at runtime by the BFF service, and is available at the `/swagger/v1/swagger.json` endpoint.
+
+```mermaid
+sequenceDiagram
+    participant BFF as BFF Swagger Generator
+    participant ServiceRegistry as Service Registry
+    participant ServiceA as Service A
+
+    loop Fetch and cache for each service
+        BFF->>ServiceRegistry: Retrieve service URL
+        
+        alt Spec is cached
+            BFF->>BFF: Return spec from cache
+        else Spec is not cached
+            BFF->>ServiceA: Fetch Specification
+            BFF->>BFF: Cache Spec
+            ServiceA-->>BFF: Return Spec
+        end
+        
+        BFF->>BFF: Merge Service Spec Schemas
+        BFF->>BFF: Add Prefix to Operation Tags
+        BFF->>BFF: Merge Service Spec Operations
+    end
+```
+
 ## API Operations
 
 The **BFF** service provides REST endpoints to support user authentication, session management, and integration testing. These endpoints serve as a bridge between the frontend and backend systems.
