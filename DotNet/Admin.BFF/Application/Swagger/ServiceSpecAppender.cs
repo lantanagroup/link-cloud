@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+﻿using System.Collections.Concurrent;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -14,7 +15,7 @@ public class ServiceSpecAppender(
     ILogger<ServiceSpecAppender> logger,
     IOptions<ServiceSpecAppenderConfig> config) : IDocumentFilter
 {
-    private static readonly Dictionary<string, string> _responseCache = new();
+    private static readonly ConcurrentDictionary<string, string> _responseCache = new();
 
     private async Task<OpenApiDocument> GetServiceSpec(string swaggerSpecUrl)
     {
@@ -26,16 +27,6 @@ public class ServiceSpecAppender(
 
         var openApiDocument = new OpenApiStringReader().Read(response, out var diagnostic);
         return openApiDocument;
-    }
-
-    private static string GetDotNetSwaggerSpecUrl(string serviceUrl)
-    {
-        return serviceUrl.TrimEnd('/') + "/swagger/v1/swagger.json";
-    }
-
-    private static string GetJavaSwaggerSpecUrl(string serviceUrl)
-    {
-        return serviceUrl.TrimEnd('/') + "/v3/api-docs";
     }
 
     private async Task AddServiceSpec(OpenApiDocument doc, string? serviceUrl, string? specUrl, string bffPrefix, string actualPrefix)
