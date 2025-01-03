@@ -21,6 +21,9 @@ import { DataAcquisitionReqeustedFormComponent } from '../data-acquisition-reqeu
 import { PatientEventFormComponent } from '../patient-event-form/patient-event-form.component';
 import { animate, query, stagger, style, transition, trigger } from '@angular/animations';
 import { ReportScheduledFormComponent } from '../report-scheduled-form/report-scheduled-form.component';
+import {PatientAcquiredFormComponent} from "../patient-acquired-form/patient-acquired-form.component";
+import {ReorderTopicsPipe} from "../../Pipes/ReorderTopicsPipe";
+
 
 const listAnimation = trigger('listAnimation', [
   transition('* <=> *', [
@@ -55,7 +58,9 @@ const listAnimation = trigger('listAnimation', [
     MatProgressSpinnerModule,
     PatientEventFormComponent,
     DataAcquisitionReqeustedFormComponent,
-    ReportScheduledFormComponent
+    ReportScheduledFormComponent,
+    PatientAcquiredFormComponent,
+    ReorderTopicsPipe
   ],
   templateUrl: './integration-test.component.html',
   styleUrls: ['./integration-test.component.scss'],
@@ -63,96 +68,135 @@ const listAnimation = trigger('listAnimation', [
 })
 export class IntegrationTestComponent implements OnInit, OnDestroy {
   eventForm!: FormGroup;
-  events: string[] = [EventType.REPORT_SCHEDULED, EventType.PATIENT_EVENT, EventType.DATA_ACQUISITION_REQUESTED];
+  events: string[] = [EventType.REPORT_SCHEDULED, EventType.PATIENT_ACQUIRED];
   showReportScheduledForm: boolean = false;
   showPatientEventForm: boolean = false;
   showDataAcquisitionRequestedForm: boolean = false;
+  showPatientsAcquiredForm: boolean = false;
 
   correlationId: string = '';
+  facilityId: string = '';
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
   intervalId!: NodeJS.Timer | null;
-  isMonitoring: boolean = false;
-  showProcessCard: boolean = false;
+
+  consumersData:  Map<string, string> = new Map();
+
+  consumersDataOutput :  Map<string, string> = new Map();
+
+  isTestRunning = false;
+
+  isLoading = false;
+
+  readyToStart = false;
 
   constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }
 
   ngOnDestroy(): void {
-    this.stopPollingAuditEvents();
+    this.stopPollingConsumerEvents();
   }
 
   ngOnInit(): void {
     this.eventForm = new FormGroup({
-      event: new FormControl('', Validators.required)
+      event: new FormControl('', Validators.required),
+      facilityId: new FormControl('', Validators.required)
     });
-
-    this.eventForm.get('event')?.valueChanges.subscribe(change => {
-      switch (change) {
-        case ('ReportScheduled'): {
-          this.showReportScheduledForm = true;
-          this.showPatientEventForm = false;
-          this.showDataAcquisitionRequestedForm = false;
-          break;
-        }
-        case ('PatientEvent'): {
-          this.showReportScheduledForm = false;
-          this.showPatientEventForm = true;
-          this.showDataAcquisitionRequestedForm = false;
-          break;
-        }
-        case ('DataAcquisitionRequested'): {
-          this.showReportScheduledForm = false;
-          this.showPatientEventForm = false;
-          this.showDataAcquisitionRequestedForm = true;
-          break;
-        }
-        default: {
-          this.showReportScheduledForm = false;
-          this.showPatientEventForm = false;
-          this.showDataAcquisitionRequestedForm = false;
-          break;
-        }
-      }
-    });
+    this.readyToStart = false;
   }
 
-  get eventControl(): FormControl {
-    return this.eventForm.get('event') as FormControl;
+  get facilityIdControl(): FormControl {
+    return this.eventForm.get('facilityId') as FormControl;
   }
 
   get currentCorrelationId(): string {
     return this.correlationId;
   }
 
-  onEventGenerated(id: string) {
-    this.correlationId = id;
-    this.showProcessCard = true;
-    this.startPollingAuditEvents();
+  onEventGenerated(facilityId: string) {
+    this.facilityId = facilityId;
+    if (this.showReportScheduledForm == true) {
+      this.showReportScheduledForm = false;
+      this.showPatientsAcquiredForm = true;
+    }
+    else if(this.showPatientsAcquiredForm == true){
+      this.showReportScheduledForm = false;
+      this.showPatientsAcquiredForm = false;
+    }
   }
 
-  startPollingAuditEvents() {
-    if (this.auditEvents && this.auditEvents.length > 0) {
-      this.auditEvents.splice(0, this.auditEvents.length);
-    }
-
-    this.isMonitoring = true;
-    this.intervalId = setInterval( this.pollAuditEvents.bind(this), 10000); // 10 seconds in milliseconds (1000 ms = 1 second)
-
-    this.snackBar.open('Start polling the audit event service.', '', {
-      duration: 3500,
-      panelClass: 'info-snackbar',
-      horizontalPosition: 'end',
-      verticalPosition: 'top'
+  createConsumers(facilityId:string) {
+    this.testService.startConsumers(facilityId).subscribe(response => {
+      console.log('Consumer created successfully:', response);
+      this.startPollingConsumerEvents(facilityId);
+    }, error => {
+      console.error('Error creating consumer:', error);
     });
   }
 
-  stopPollingAuditEvents() {
+  deleteConsumers(facilityId:string) {
+    this.testService.stopConsumers(facilityId).subscribe(response => {
+      this.showReportScheduledForm = false;
+      this.showPatientsAcquiredForm = false;
+      this.consumersDataOutput = new Map();
+      this.isLoading = false; // Hide spinner
+      this.isTestRunning = false; // Update test state
+      this.stopPollingConsumerEvents();
+    }, error => {
+      console.error('Error creating consumer:', error);
+    });
+  }
+
+  startTest(): void {
+    this.isLoading = true; // Show spinner
+    this.facilityId = this.facilityIdControl.value;
+    this.isTestRunning = true; // Update test state
+    this.createConsumers(this.facilityIdControl.value);
+    this.showReportScheduledForm = true;
+  }
+
+  stopTest(): void {
+    this.deleteConsumers(this.facilityIdControl.value);
+  }
+
+  onToggleTest(): void {
+    if (this.isTestRunning) {
+      // Stop the test
+      this.stopTest();
+    } else {
+      // Start the test
+      this.startTest();
+    }
+  }
+
+  startPollingConsumerEvents(facilityId:string) {
+    if(!this.intervalId) {
+      //this.intervalId = setInterval(this.pollConsumerEvents(facilityId).bind(this), 10000); // 10 seconds in milliseconds (1000 ms = 1 second)
+
+      this.intervalId = setInterval(() => {
+        this.pollConsumerEvents(facilityId);
+      }, 10000); // Poll every 10 seconds
+
+    }
+  }
+
+  pollConsumerEvents(facilityId:string){
+    this.testService.readConsumers(facilityId).subscribe(data => {
+        this.consumersData = new Map(Object.entries(data));
+        this.consumersData.forEach((value, key) => {
+          this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
+        });
+      //  this.consumersDataOutput = data;
+        this.isLoading = false
+      }
+    );
+  }
+
+  stopPollingConsumerEvents() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      this.isMonitoring = false;
-
-      this.snackBar.open('Stopped polling the audit event service.', '', {
+      this.consumersDataOutput.clear();
+      this.snackBar.open('Stopped polling consumer events', '', {
         duration: 3500,
         panelClass: 'info-snackbar',
         horizontalPosition: 'end',
@@ -161,29 +205,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  pollAuditEvents() {
-    this.auditService.list('', '', this.correlationId, '', '', '', '', 20, 1).subscribe(data => {
-      this.auditEvents = data.records;
-      this.paginationMetadata = data.metadata;
-
-      /** Testing Only */
-      //let testAudit: AuditModel = {
-      //  "id": this.correlationId,
-      //  "facilityId": 'FACILITY_ORG_10001',
-      //  "correlationId": this.correlationId,
-      //  "serviceName": "Some Service",
-      //  "eventDate": new Date().toUTCString(),
-      //  "user": "SystemUser",
-      //  "action": "Create",
-      //  "resource": "SomeEntity",
-      //  "propertyChanges": [],
-      //  "notes": "New notification (4c05b712-0b8b-4c9a-83ab-0999120a442e) created for ''."
-      //};
-
-      //this.auditEvents.push(testAudit);
-
-    });
-
+  getKeys(consumersData: { [key: string]: string }): string[] {
+    return Object.keys(consumersData);
   }
+
 
 }

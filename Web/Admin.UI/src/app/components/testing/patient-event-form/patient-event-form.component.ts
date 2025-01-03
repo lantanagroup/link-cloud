@@ -46,7 +46,7 @@ export class PatientEventFormComponent {
 
   ngOnInit(): void {
     this.patientForm = new FormGroup({
-      facilityId: new FormControl('', Validators.required),
+      facilityId: new FormControl('MyFacility', Validators.required),
       patientId: new FormControl('', Validators.required),
       eventType: new FormControl('', Validators.required)
     });

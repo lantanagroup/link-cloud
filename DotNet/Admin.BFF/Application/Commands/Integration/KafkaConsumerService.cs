@@ -54,7 +54,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }   
                             // read the list from Redis
 
-                            var redisKey = topic + KafkaConsumerManager.delimitator + facility;
+                            var redisKey = topic + KafkaConsumerManager.delimiter + facility;
                             string retrievedListJson = _cache.GetString(redisKey);
 
                             var retrievedList = new List<string>();

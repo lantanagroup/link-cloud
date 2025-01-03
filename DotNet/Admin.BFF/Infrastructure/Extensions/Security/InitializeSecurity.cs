@@ -224,27 +224,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                 builder.AddPolicy(PolicyNames.IsLinkAdmin, AuthorizationPolicies.IsLinkAdmin());
             });
 
-            // Configure CORS
-            var corsConfig = configuration.GetSection(LinkAdminConstants.AppSettingsSectionNames.CORS).Get<CorsConfig>();
-            if (corsConfig != null)
-            {
-                logger.Debug("Registering CORS settings.");
-                services.AddCorsService(options =>
-                {
-                    options.Environment = securityServiceOptions.Environment;
-                    options.PolicyName = corsConfig.PolicyName;
-                    options.AllowedHeaders = corsConfig.AllowedHeaders;
-                    options.AllowedExposedHeaders = corsConfig.AllowedExposedHeaders;
-                    options.AllowedMethods = corsConfig.AllowedMethods;
-                    options.AllowedOrigins = corsConfig.AllowedOrigins;
-                    options.AllowCredentials = corsConfig.AllowCredentials;
-                });
-            }
-            else
-            {
-                throw new NullReferenceException("CORS Configuration was null.");
-            }
-
             return services;
         
         }
