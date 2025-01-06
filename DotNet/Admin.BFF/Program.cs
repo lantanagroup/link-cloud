@@ -374,17 +374,9 @@ static void SetupMiddleware(WebApplication app)
     app.UseStatusCodePages();
 
     // Configure swagger
-    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
-    {
-        app.UseSwagger(opts => { opts.RouteTemplate = "api/swagger/{documentname}/swagger.json"; });
-        app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/api/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
-            opts.RoutePrefix = "api/swagger";
-        });
-    }
+    app.ConfigureSwagger();
 
     app.UseRouting();
-    var corsConfig = app.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS).Get<CorsSettings>();
     app.UseCors(CorsConfig.DefaultCorsPolicyName);
 
     //check for anonymous access

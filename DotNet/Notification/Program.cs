@@ -338,11 +338,7 @@ static void SetupMiddleware(WebApplication app)
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());
 
-    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
+    app.ConfigureSwagger();
 }
 
 #endregion
