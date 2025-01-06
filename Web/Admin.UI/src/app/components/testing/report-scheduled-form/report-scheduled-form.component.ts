@@ -46,7 +46,7 @@ export class ReportScheduledFormComponent implements OnInit {
   eventRequestedForm!: FormGroup;
   reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
   frequencies: string[] = [Frequency.MONTHLY, Frequency.DAILY, Frequency.WEEKLY];
-  delays: string[] = ["2", "5", "10", "15", "20", "25"];
+  delays: string[] = ["5", "10", "15", "20", "25"];
 
   constructor(private testService: TestService, private snackBar: MatSnackBar) { }
 
@@ -61,10 +61,6 @@ export class ReportScheduledFormComponent implements OnInit {
     });
   }
 
- /* get facilityIdControl(): FormControl {
-    return this.eventRequestedForm.get('facilityId') as FormControl;
-  }
-*/
   get reportTypeControl(): FormControl {
     return this.eventRequestedForm.get('selectedReportTypes') as FormControl;
   }
@@ -110,14 +106,6 @@ export class ReportScheduledFormComponent implements OnInit {
         }
       });
 
-      //*** Testing Only */
-      //this.eventGenerated.emit("33f0f120-9aa5-4d2d-91dc-c97b1ba68bc9");
-      //this.snackBar.open('Testing', '', {
-      //  duration: 3500,
-      //  panelClass: 'success-snackbar',
-      //  horizontalPosition: 'end',
-      //  verticalPosition: 'top'
-      //});
     }
     else {
       this.snackBar.open(`All required fields must be entered to create a report scheduled event.`, '', {
