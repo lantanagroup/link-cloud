@@ -65,3 +65,7 @@ The **Account** service provides REST endpoints for managing users, roles, and c
 
 ### Claims Management
 - **GET /api/account/claims**: Retrieve a list of all assignable claims.
+
+## Development Notes
+
+The service uses the "minimal endpoint" pattern. Endpoints are defined in the Presentation/Endpoints folder.

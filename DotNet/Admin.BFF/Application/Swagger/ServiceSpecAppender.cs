@@ -29,16 +29,31 @@ public class ServiceSpecAppender(
         return openApiDocument;
     }
 
-    private async Task AddServiceSpec(OpenApiDocument doc, string? serviceUrl, string? specUrl, string bffPrefix, string actualPrefix)
+    private async Task<(OpenApiDocument? spec, string specUrl, string bffPrefix, string actualPrefix)> GetServiceSpec(string? serviceUrl, string? specUrl, string bffPrefix,
+        string actualPrefix)
     {
-        if (serviceUrl == null || specUrl == null) return;
+        if (serviceUrl == null || specUrl == null) return (null, string.Empty, string.Empty, string.Empty);
         
         var fullSpecUrl = serviceUrl.TrimEnd('/') + "/" + specUrl.TrimStart('/');
-        
+
         try
         {
             logger.LogInformation("Adding service spec {fullSpecUrl} to swagger doc", fullSpecUrl);
             var spec = await GetServiceSpec(fullSpecUrl);
+            return (spec, fullSpecUrl, bffPrefix, actualPrefix);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning($"Failed to add service spec {fullSpecUrl} to swagger doc: {ex.Message}");
+            return (null, string.Empty, string.Empty, string.Empty);
+        }
+    }
+
+    private void AddServiceSpec(OpenApiDocument doc, OpenApiDocument spec, string specUrl, string bffPrefix, string actualPrefix)
+    {
+        try
+        {
+            logger.LogInformation($"Adding service spec {specUrl} to swagger doc");
 
             foreach (var schema in spec.Components.Schemas)
             {
@@ -65,15 +80,16 @@ public class ServiceSpecAppender(
                     ? path.Key.Replace(actualPrefix, bffPrefix)
                     : path.Key;
                 
-                logger.LogDebug($"Adding path {newPath} (originally {path.Key} from {serviceUrl}");
+                logger.LogDebug($"Adding path {newPath} (originally {path.Key} from {specUrl}");
 
                 // Assumes that the proxy path of the service is the same as the paths in the service spec
-                doc.Paths.Add(newPath, path.Value);
+                if (!doc.Paths.ContainsKey(newPath))
+                    doc.Paths.Add(newPath, path.Value);
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning($"Failed to add service spec {fullSpecUrl} to swagger doc: {ex.Message}");
+            logger.LogWarning($"Failed to add service spec {specUrl} to swagger doc: {ex.Message}");
         }
     }
 
@@ -183,22 +199,43 @@ public class ServiceSpecAppender(
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
-        var tasks = new List<Task>
+        // Update tags for already-existing operations to be prefixed with "BFF - "
+        foreach (var path in swaggerDoc.Paths)
         {
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.AccountServiceUrl, config.Value.AccountServiceSpecUrl, config.Value.AccountServiceBffPrefix, config.Value.AccountServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.AuditServiceUrl, config.Value.AuditServiceSpecUrl, config.Value.AuditServiceBffPrefix, config.Value.AuditServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.CensusServiceUrl, config.Value.CensusServiceSpecUrl, config.Value.CensusServiceBffPrefix, config.Value.CensusServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.DataAcquisitionServiceUrl, config.Value.DataAcquisitionServiceSpecUrl, config.Value.DataAcquisitionServiceBffPrefix, config.Value.DataAcquisitionServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.MeasureServiceUrl, config.Value.MeasureServiceSpecUrl, config.Value.MeasureServiceBffPrefix, config.Value.MeasureServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.NormalizationServiceUrl, config.Value.NormalizationServiceSpecUrl, config.Value.NormalizationServiceBffPrefix, config.Value.NormalizationServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.NotificationServiceUrl, config.Value.NotificationServiceSpecUrl, config.Value.NotificationServiceBffPrefix, config.Value.NotificationServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.QueryDispatchServiceUrl, config.Value.QueryDispatchServiceSpecUrl, config.Value.QueryDispatchServiceBffPrefix, config.Value.QueryDispatchServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.ReportServiceUrl, config.Value.ReportServiceSpecUrl, config.Value.ReportServiceBffPrefix, config.Value.ReportServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.SubmissionServiceUrl, config.Value.SubmissionServiceSpecUrl, config.Value.SubmissionServiceBffPrefix, config.Value.SubmissionServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.TenantService.TenantServiceUrl, config.Value.TenantServiceSpecUrl, config.Value.TenantServiceBffPrefix, config.Value.TenantServiceActualPrefix),
-            AddServiceSpec(swaggerDoc, serviceRegistry.Value.ValidationServiceUrl, config.Value.ValidationServiceSpecUrl, config.Value.ValidationServiceBffPrefix, config.Value.ValidationServiceActualPrefix)
+            foreach (var operation in path.Value.Operations)
+            {
+                foreach (var tag in operation.Value.Tags)
+                {
+                    if (!string.IsNullOrEmpty(tag.Name) && !tag.Name.StartsWith("Admin.BFF"))
+                        tag.Name = $"Admin.BFF - {tag.Name}";
+                    else if (string.IsNullOrEmpty(tag.Name))
+                        tag.Name = "Admin.BFF - General";
+                }
+            }
+        }
+        
+        var tasks = new List<Task<(OpenApiDocument? spec, string specUrl, string bffPrefix, string actualPrefix)>>
+        {
+            GetServiceSpec(serviceRegistry.Value.AccountServiceUrl, config.Value.AccountServiceSpecUrl, config.Value.AccountServiceBffPrefix, config.Value.AccountServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.AuditServiceUrl, config.Value.AuditServiceSpecUrl, config.Value.AuditServiceBffPrefix, config.Value.AuditServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.CensusServiceUrl, config.Value.CensusServiceSpecUrl, config.Value.CensusServiceBffPrefix, config.Value.CensusServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.DataAcquisitionServiceUrl, config.Value.DataAcquisitionServiceSpecUrl, config.Value.DataAcquisitionServiceBffPrefix, config.Value.DataAcquisitionServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.MeasureServiceUrl, config.Value.MeasureServiceSpecUrl, config.Value.MeasureServiceBffPrefix, config.Value.MeasureServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.NormalizationServiceUrl, config.Value.NormalizationServiceSpecUrl, config.Value.NormalizationServiceBffPrefix, config.Value.NormalizationServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.NotificationServiceUrl, config.Value.NotificationServiceSpecUrl, config.Value.NotificationServiceBffPrefix, config.Value.NotificationServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.QueryDispatchServiceUrl, config.Value.QueryDispatchServiceSpecUrl, config.Value.QueryDispatchServiceBffPrefix, config.Value.QueryDispatchServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.ReportServiceUrl, config.Value.ReportServiceSpecUrl, config.Value.ReportServiceBffPrefix, config.Value.ReportServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.SubmissionServiceUrl, config.Value.SubmissionServiceSpecUrl, config.Value.SubmissionServiceBffPrefix, config.Value.SubmissionServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.TenantService.TenantServiceUrl, config.Value.TenantServiceSpecUrl, config.Value.TenantServiceBffPrefix, config.Value.TenantServiceActualPrefix),
+            GetServiceSpec(serviceRegistry.Value.ValidationServiceUrl, config.Value.ValidationServiceSpecUrl, config.Value.ValidationServiceBffPrefix, config.Value.ValidationServiceActualPrefix)
         };
 
-        Task.WhenAll(tasks).GetAwaiter().GetResult();
+        var results = Task.WhenAll(tasks).GetAwaiter().GetResult();
+
+        foreach ((OpenApiDocument spec, string specUrl, string bffPrefix, string actualPrefix) in results)
+        {
+            if (spec == null) continue;
+            AddServiceSpec(swaggerDoc, spec, specUrl, bffPrefix, actualPrefix);
+        }
     }
 }
