@@ -10,9 +10,12 @@
         <div class="input-container">
           <mat-form-field class="form-input" appearance="outline">
             <mat-label>Enter Facility</mat-label>
-            <input matInput formControlName="facilityId" placeholder="Enter a facility" (blur)="readyToStart = facilityIdControl.value ? true: false">
+            <input matInput formControlName="facilityId" placeholder="Enter a facility">
             <mat-error *ngIf="facilityIdControl.hasError('required')">
               Facility is <strong>required</strong>
+            </mat-error>
+            <mat-error *ngIf="facilityIdControl.hasError('notFound')">
+              Facility does not exist
             </mat-error>
           </mat-form-field>
         </div>
@@ -27,7 +30,7 @@
           <button mat-raised-button
                   color="primary"
                   (click)="onToggleTest()"
-                  [disabled]="isLoading || !readyToStart">
+                  [disabled]="isLoading || eventForm.invalid">
             {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
           </button>
         </ng-template>

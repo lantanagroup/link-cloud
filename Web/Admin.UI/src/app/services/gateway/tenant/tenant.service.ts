@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { IFacilityConfigModel, IScheduledTaskModel, PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
-import { Observable, catchError, map, tap } from 'rxjs';
+import { Observable, catchError, map, tap, of } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { AppConfigService } from '../../app-config.service';
 
@@ -55,6 +55,15 @@ export class TenantService {
         catchError((error) => this.errorHandler.handleError(error))
       )
   }
+
+  checkFacility(facilityId: string): Observable<boolean> {
+    // Replace this URL with your API endpoint
+    return this.http.get<boolean>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
+      .pipe(
+        catchError(() => of(false)) // Return false if there's an error
+    );
+  }
+
 
   listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
     return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)

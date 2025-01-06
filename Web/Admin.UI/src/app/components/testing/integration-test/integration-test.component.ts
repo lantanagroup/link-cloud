@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuditService } from '../../../services/gateway/audit.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,6 +23,8 @@ import { animate, query, stagger, style, transition, trigger } from '@angular/an
 import { ReportScheduledFormComponent } from '../report-scheduled-form/report-scheduled-form.component';
 import {PatientAcquiredFormComponent} from "../patient-acquired-form/patient-acquired-form.component";
 import {ReorderTopicsPipe} from "../../Pipes/ReorderTopicsPipe";
+import {TenantService} from "../../../services/gateway/tenant/tenant.service";
+import {facilityExistsValidator} from "../../validators/FacilityValidator";
 
 
 const listAnimation = trigger('listAnimation', [
@@ -88,20 +90,19 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   isLoading = false;
 
-  readyToStart = false;
+  facilityDoesNotExist: boolean = false;
 
-  constructor(private auditService: AuditService, private testService: TestService, private snackBar: MatSnackBar) { }
+  constructor(private auditService: AuditService, private testService: TestService, private tenantService: TenantService, private fb: FormBuilder,  private snackBar: MatSnackBar) { }
 
   ngOnDestroy(): void {
     this.stopPollingConsumerEvents();
   }
 
   ngOnInit(): void {
-    this.eventForm = new FormGroup({
-      event: new FormControl('', Validators.required),
-      facilityId: new FormControl('', Validators.required)
+    this.eventForm = this.fb.group({
+      facilityId: [ "", [Validators.required], [facilityExistsValidator(this.tenantService)]
+      ]
     });
-    this.readyToStart = false;
   }
 
   get facilityIdControl(): FormControl {
@@ -150,11 +151,13 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     this.isLoading = true; // Show spinner
     this.facilityId = this.facilityIdControl.value;
     this.isTestRunning = true; // Update test state
+    this.consumersDataOutput.clear();
     this.createConsumers(this.facilityIdControl.value);
     this.showReportScheduledForm = true;
   }
 
   stopTest(): void {
+    this.consumersDataOutput.clear();
     this.deleteConsumers(this.facilityIdControl.value);
   }
 
@@ -170,8 +173,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   startPollingConsumerEvents(facilityId:string) {
     if(!this.intervalId) {
-      //this.intervalId = setInterval(this.pollConsumerEvents(facilityId).bind(this), 10000); // 10 seconds in milliseconds (1000 ms = 1 second)
-
       this.intervalId = setInterval(() => {
         this.pollConsumerEvents(facilityId);
       }, 10000); // Poll every 10 seconds
@@ -185,7 +186,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
         this.consumersData.forEach((value, key) => {
           this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
         });
-      //  this.consumersDataOutput = data;
         this.isLoading = false
       }
     );
@@ -195,7 +195,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      this.consumersDataOutput.clear();
+
       this.snackBar.open('Stopped polling consumer events', '', {
         duration: 3500,
         panelClass: 'info-snackbar',
@@ -208,6 +208,5 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   getKeys(consumersData: { [key: string]: string }): string[] {
     return Object.keys(consumersData);
   }
-
 
 }
