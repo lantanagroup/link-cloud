@@ -217,15 +217,15 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
    async getFacilities() {
 
-    try {
-        this.tenantService.listFacilities('', '').subscribe((facilities: PagedFacilityConfigModel) => {
-           this.facilities = facilities.records;
-        });
-     }
-     catch (error) {
-        console.error('Failed to fetch facilities:', error);
-        throw error;
-     }
+     this.tenantService.listFacilities('', '').subscribe({
+       next: (facilities: PagedFacilityConfigModel) => {
+         this.facilities = facilities.records;
+       },
+       error: (err) => {
+         console.error('Error fetching facilities:', err);
+         throw err;
+       },
+     });
   }
 
 }
