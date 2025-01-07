@@ -311,14 +311,7 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure swagger
-    if (app.Configuration.GetValue<bool>(ConfigurationConstants.AppSettings.EnableSwagger))
-    {
-        app.UseSwagger(opts => { opts.RouteTemplate = "api/account/swagger/{documentname}/swagger.json"; });
-        app.UseSwaggerUI(opts => {
-            opts.SwaggerEndpoint("/api/account/swagger/v1/swagger.json", $"{ServiceActivitySource.ServiceName} - {ServiceActivitySource.Version}");
-            opts.RoutePrefix = "api/account/swagger";
-        });
-    }
+    app.ConfigureSwagger();
 
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
