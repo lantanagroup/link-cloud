@@ -337,8 +337,6 @@ static void SetupMiddleware(WebApplication app)
     }).RequireCors("HealthCheckPolicy");
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());
-
-    app.ConfigureSwagger();
 }
 
 #endregion
