@@ -25,6 +25,10 @@ import {PatientAcquiredFormComponent} from "../patient-acquired-form/patient-acq
 import {ReorderTopicsPipe} from "../../Pipes/ReorderTopicsPipe";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {facilityExistsValidator} from "../../validators/FacilityValidator";
+import {
+  IFacilityConfigModel,
+  PagedFacilityConfigModel
+} from "../../../interfaces/tenant/facility-config-model.interface";
 
 
 const listAnimation = trigger('listAnimation', [
@@ -78,6 +82,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   correlationId: string = '';
   facilityId: string = '';
+  facilities: IFacilityConfigModel[] = [];
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
   intervalId!: NodeJS.Timer | null;
@@ -103,6 +108,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       facilityId: [ "", [Validators.required], [facilityExistsValidator(this.tenantService)]
       ]
     });
+    this.getFacilities();
   }
 
   get facilityIdControl(): FormControl {
@@ -207,6 +213,19 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   getKeys(consumersData: { [key: string]: string }): string[] {
     return Object.keys(consumersData);
+  }
+
+   async getFacilities() {
+
+     this.tenantService.listFacilities('', '').subscribe({
+       next: (facilities: PagedFacilityConfigModel) => {
+         this.facilities = facilities.records;
+       },
+       error: (err) => {
+         console.error('Error fetching facilities:', err);
+         throw err;
+       },
+     });
   }
 
 }
