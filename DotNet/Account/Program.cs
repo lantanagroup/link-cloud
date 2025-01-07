@@ -310,7 +310,7 @@ static void SetupMiddleware(WebApplication app)
         app.UseExceptionHandler();
     }
 
-    // Configure the HTTP request pipeline.
+    // Configure swagger
     app.ConfigureSwagger();
 
     app.UseRouting();
