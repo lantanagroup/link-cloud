@@ -1,3 +1,4 @@
+<script src="report-scheduled-form.component.ts"></script>
 <form [formGroup]="eventRequestedForm">
   <div class="enter-test-data">
     <b>Report scheduling</b>
@@ -26,7 +27,7 @@
         </mat-option>
       </mat-select>
       <mat-error *ngIf="frequencyControl.hasError('required')">
-        Report Type is <strong>required</strong>
+       Frequency is <strong>required</strong>
       </mat-error>
     </mat-form-field>
   </div>
@@ -44,11 +45,11 @@
   </div>
   <div class="input-container">
     <mat-form-field class="form-input" appearance="outline">
-      <mat-label>Delay (minutes)</mat-label>
+      <mat-label>Run Report In (Minutes)</mat-label>
       <mat-select formControlName="selectedDelay">
         <mat-option>None</mat-option>
         <mat-option *ngFor="let delay of delays" [value]="delay">
-          {{delay}}
+          {{ delay }} minute{{ delay > 1 ? 's' : '' }}
         </mat-option>
       </mat-select>
       <mat-error *ngIf="delayControl.hasError('required')">

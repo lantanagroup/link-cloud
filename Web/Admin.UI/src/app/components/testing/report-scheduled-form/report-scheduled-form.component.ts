@@ -46,7 +46,7 @@ export class ReportScheduledFormComponent implements OnInit {
   eventRequestedForm!: FormGroup;
   reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
   frequencies: string[] = [Frequency.MONTHLY, Frequency.DAILY, Frequency.WEEKLY];
-  delays: string[] = ["5", "10", "15", "20", "25"];
+  delays: number[] = [5, 10, 15, 20, 25];
 
   constructor(private testService: TestService, private snackBar: MatSnackBar) { }
 
@@ -91,7 +91,7 @@ export class ReportScheduledFormComponent implements OnInit {
       event.facilityId = this.facilityId; //this.facilityIdControl.value;
       event.reportTypes =   this.reportTypeControl.value;
       event.frequency = this.frequencyControl.value;
-      event.delay = this.delayControl.value;
+      event.delay = String(this.delayControl.value);
       this.testService.generateReportScheduledEvent(event.facilityId, event.reportTypes, event.frequency, event.startDate, event.delay).subscribe(data => {
         if (data) {
 
