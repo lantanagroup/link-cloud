@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+﻿
+using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -98,7 +99,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateQueryPlan(
-        string facilityId,
+        string facilityId, 
         [FromBody] QueryPlan? queryPlan,
         CancellationToken cancellationToken)
     {
