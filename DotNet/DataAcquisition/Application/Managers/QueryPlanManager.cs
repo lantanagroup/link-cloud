@@ -1,6 +1,8 @@
-﻿using DataAcquisition.Domain;
+﻿using AngleSharp.Dom;
+using DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
@@ -8,7 +10,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
 public interface IQueryPlanManager
 {
-    Task<QueryPlan> GetAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
     Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -26,14 +28,15 @@ public class QueryPlanManager : IQueryPlanManager
         _dbContext = database;
     }
 
+
     public async Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default)
     {
         return await _dbContext.QueryPlanRepository.FindAsync(predicate, cancellationToken);
     }
 
-    public async Task<QueryPlan> GetAsync(string facilityId, CancellationToken cancellationToken = default)
+    public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId, cancellationToken);
+        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type, cancellationToken);
     }
 
     public async Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default)
