@@ -8,7 +8,7 @@
     <mat-card class="resource-card">
       <mat-card-content>
         <div class="input-container">
-          <mat-form-field class="form-input" appearance="outline">
+          <!--<mat-form-field class="form-input" appearance="outline">
             <mat-label>Enter Facility</mat-label>
             <input matInput formControlName="facilityId" placeholder="Enter a facility">
             <mat-error *ngIf="facilityIdControl.hasError('required')">
@@ -17,7 +17,19 @@
             <mat-error *ngIf="facilityIdControl.hasError('notFound')">
               Facility does not exist
             </mat-error>
-          </mat-form-field>
+          </mat-form-field>-->
+            <mat-form-field class="form-select" appearance="outline">
+              <mat-label>Facility</mat-label>
+              <mat-select formControlName="facilityId">
+                <mat-option>None</mat-option>
+                <mat-option *ngFor="let facility of facilities" [value]="facility.facilityId">
+                  {{facility.facilityName}}
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="facilityIdControl.hasError('required')">
+                Facility is <strong>required</strong>
+              </mat-error>
+            </mat-form-field>
         </div>
         <div *ngIf="isLoading; else buttonContent" class="spinner-container">
           <mat-progress-spinner
