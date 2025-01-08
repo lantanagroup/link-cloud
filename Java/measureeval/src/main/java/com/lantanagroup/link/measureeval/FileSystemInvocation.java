@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,13 +34,23 @@ public class FileSystemInvocation {
     private static final FhirContext fhirContext = FhirContext.forR4Cached();
     private static final Logger logger = LoggerFactory.getLogger(FileSystemInvocation.class);
 
-    private static void configureLogging(Bundle bundle) throws JoranException {
-        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
-        context.reset();
-        JoranConfigurator configurator = new JoranConfigurator();
-        configurator.setContext(context);
-        configurator.doConfigure(ClassLoader.getSystemResource("logback-cli.xml"));
-        CqlLogAppender.start(context, libraryId -> CqlUtils.getLibrary(bundle, libraryId));
+    private static void configureLogging(Bundle bundle) {
+        try {
+            LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+            context.reset();
+            JoranConfigurator configurator = new JoranConfigurator();
+            configurator.setContext(context);
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            URL resource = classLoader.getResource("logback-cli.xml");
+            if (resource == null) {
+                logger.warn("logback-cli.xml not found in classpath");
+                return;
+            }
+            configurator.doConfigure(resource);
+            CqlLogAppender.start(context, libraryId -> CqlUtils.getLibrary(bundle, libraryId));
+        } catch (Exception e) {
+            logger.warn("Failed to configure logging", e);
+        }
     }
 
     private static Bundle getBundle(String measureBundlePath) throws IOException {
