@@ -184,7 +184,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateQueryPlan(
         string facilityId,
-        QueryPlan? queryPlan,
+        [FromBody] QueryPlan? queryPlan,
         CancellationToken cancellationToken)
     {
         try
