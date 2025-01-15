@@ -137,6 +137,8 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       this.startPollingConsumerEvents(facilityId);
     }, error => {
       console.error('Error creating consumer:', error);
+      this.isTestRunning = false; // Update test state
+      this.isLoading = false;
     });
   }
 

@@ -26,6 +26,7 @@ import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
 import { AuthenticationService } from './services/security/authentication.service';
+import {MatSnackBarModule} from "@angular/material/snack-bar";
 
 export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
@@ -52,6 +53,7 @@ export function initConfig(appConfig: AppConfigService) {
     MatNativeDateModule,
     LoadingIndicatorComponent,
     MatSelectModule,
+    MatSnackBarModule
   ],
   providers: [
     {

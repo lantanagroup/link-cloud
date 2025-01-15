@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
@@ -11,25 +9,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
     public class KafkaConsumerService
     {
-        private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
+        private readonly ICacheService _cache;
 
 
-
-        public KafkaConsumerService(IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
-        {
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+        public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger) { 
+        
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache;
         }
 
-        public void StartConsumer(string groupId, string topic, string facility, IConsumer<string, string> consumer, CancellationToken cancellationToken)
+        public void StartConsumer(string groupId, string topic, string facility,  IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
 
-            // get the Redis cache
+            // get the cache
             using var scope = _serviceScopeFactory.CreateScope();
-            var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
             using (consumer)
             {
@@ -40,7 +36,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
 
                         var consumeResult = consumer.Consume(cancellationToken);
-                        // get the correlation id from the message and store it in Redis
+                        // get the correlation id from the message and store it in Cache
                         string correlationId = string.Empty;
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
@@ -52,11 +48,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                  _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", facility, consumeResultFacility);
                                 continue;
                             }
-                            // read the list from Redis
+                            // read the list from cache
 
-                            var redisKey = topic + KafkaConsumerManager.delimiter + facility;
+                            var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
-                            string retrievedListJson = _cache.GetString(redisKey);
+                            string retrievedListJson = _cache.Get<string>(cacheKey);
 
                             var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<string>(): JsonConvert.DeserializeObject<List<string>>(retrievedListJson);
 
@@ -67,8 +63,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                                 string serializedList = JsonConvert.SerializeObject(retrievedList);
 
-                                // store the list back in Redis
-                                _cache.SetString(redisKey, serializedList);
+                                // store the list back in Cache
+                                _cache.Set(cacheKey, serializedList);
                             }
                         }                       
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);

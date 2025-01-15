@@ -52,7 +52,6 @@ export class ReportScheduledFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.eventRequestedForm = new FormGroup({
-     // facilityId: new FormControl('', Validators.required),
       selectedReportTypes: new FormControl([], Validators.required),
       selectedFrequency: new FormControl([], Validators.required),
       selectedDelay: new FormControl([], Validators.required),

@@ -18,12 +18,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Application\Interfaces\Factories\**" />
+    <Content Remove="Application\Interfaces\Factories\**" />
+    <EmbeddedResource Remove="Application\Interfaces\Factories\**" />
+    <None Remove="Application\Interfaces\Factories\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
     <PackageReference Include="Azure.Identity" Version="1.12.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.7" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.7" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" Version="8.7.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="8.0.0-preview" />
@@ -42,7 +50,6 @@
 
   <ItemGroup>
     <Folder Include="Application\Factories\" />
-    <Folder Include="Application\Interfaces\Factories\" />
   </ItemGroup>
 
   <ItemGroup>

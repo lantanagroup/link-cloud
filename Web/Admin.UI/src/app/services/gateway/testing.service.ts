@@ -9,12 +9,20 @@ import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/te
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
 import { AppConfigService } from '../app-config.service';
 import {IDataPatientAcquiredRequested} from "../../interfaces/testing/patient-acquired.interface";
+import {MatSnackBar} from '@angular/material/snack-bar';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TestService {
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+
+
+  constructor(private http: HttpClient,
+              private snackBar: MatSnackBar,
+              private errorHandler: ErrorHandlingService,
+              public appConfigService: AppConfigService) {
+    console.log(this.snackBar);
+  }
 
   generateReportScheduledEvent(facilityId: string, reportTypes: string[], frequency:string, startDate: Date, delay: string): Observable<IEntityCreatedResponse> {
     let event: IReportScheduled = {
@@ -31,7 +39,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -49,7 +57,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
     )
   }
 
@@ -63,7 +71,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -77,7 +85,7 @@ export class TestService {
         map((response) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -91,7 +99,7 @@ export class TestService {
         map((response: { [key: string]: string }) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -109,7 +117,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -126,11 +134,18 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
   private handleError(err: HttpErrorResponse) {
+    console.log('Error:' + err.message);
+    this.snackBar.open(err.message, '', {
+      duration: 3500,
+      panelClass: 'error-snackbar',
+      horizontalPosition: 'end',
+      verticalPosition: 'top'
+    });
     return this.errorHandler.handleError(err);
   }
 
