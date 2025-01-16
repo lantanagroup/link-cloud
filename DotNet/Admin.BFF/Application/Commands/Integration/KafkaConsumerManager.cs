@@ -70,9 +70,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
                 }
             }
-            catch(Exception ex)
+            catch (InvalidOperationException ex)
             {
-                _logger.LogInformation($"Error during cache clear: {ex.Message}");
+                _logger.LogError(ex, "Failed to clear cache for facility {facility} due to invalid operation", facility);
+            }
+
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while clearing cache for facility {facility}", facility);
             }
         }
 

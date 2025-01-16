@@ -34,6 +34,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching
 
         public void Remove(string key)
         {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
             _cache.Remove(key);
         }
     }
