@@ -9,7 +9,6 @@ import { IDataAcquisitionRequested, IScheduledReport } from '../../interfaces/te
 import { IReportScheduled } from '../../interfaces/testing/report-scheduled.interface';
 import { AppConfigService } from '../app-config.service';
 import {IDataPatientAcquiredRequested} from "../../interfaces/testing/patient-acquired.interface";
-import {MatSnackBar} from '@angular/material/snack-bar';
 
 @Injectable({
   providedIn: 'root'
@@ -18,10 +17,9 @@ export class TestService {
 
 
   constructor(private http: HttpClient,
-              private snackBar: MatSnackBar,
               private errorHandler: ErrorHandlingService,
               public appConfigService: AppConfigService) {
-    console.log(this.snackBar);
+
   }
 
   generateReportScheduledEvent(facilityId: string, reportTypes: string[], frequency:string, startDate: Date, delay: string): Observable<IEntityCreatedResponse> {
