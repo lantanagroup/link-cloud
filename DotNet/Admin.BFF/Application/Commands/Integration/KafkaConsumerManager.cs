@@ -60,14 +60,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         private void ClearCache(string facility)
         {
-            foreach (var topic in kafkaTopics)
+            try
             {
+                foreach (var topic in kafkaTopics)
                 {
-                    String cacheKey = topic.Item2 + delimiter + facility;
-                    _cache.Remove(cacheKey);
+                    {
+                        String cacheKey = topic.Item2 + delimiter + facility;
+                        _cache.Remove(cacheKey);
+                    }
                 }
             }
-
+            catch(Exception ex)
+            {
+                _logger.LogInformation($"Error during cache clear: {ex.Message}");
+            }
         }
 
 
@@ -151,6 +157,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     string facilityKey = topic.Item2 + delimiter + facility;
 
                     correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
+  
                 }
             }
             return correlationIds;

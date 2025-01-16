@@ -139,13 +139,6 @@ export class TestService {
   }
 
   private handleError(err: HttpErrorResponse) {
-    console.log('Error:' + err.message);
-    this.snackBar.open(err.message, '', {
-      duration: 3500,
-      panelClass: 'error-snackbar',
-      horizontalPosition: 'end',
-      verticalPosition: 'top'
-    });
     return this.errorHandler.handleError(err);
   }
 

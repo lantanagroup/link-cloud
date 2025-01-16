@@ -1,26 +1,26 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {CommonModule} from '@angular/common';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { AuditService } from '../../../services/gateway/audit.service';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatSelectModule } from '@angular/material/select';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TestService } from '../../../services/gateway/testing.service';
-import { AuditModel } from '../../../models/audit/audit-model.model';
-import { PaginationMetadata } from '../../../models/pagination-metadata.model';
-import { EventType } from '../../../models/testing/EventType.enum';
-import { DataAcquisitionReqeustedFormComponent } from '../data-acquisition-reqeusted-form/data-acquisition-reqeusted-form.component';
-import { PatientEventFormComponent } from '../patient-event-form/patient-event-form.component';
-import { animate, query, stagger, style, transition, trigger } from '@angular/animations';
-import { ReportScheduledFormComponent } from '../report-scheduled-form/report-scheduled-form.component';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {AuditService} from '../../../services/gateway/audit.service';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {MatCardModule} from '@angular/material/card';
+import {MatButtonModule} from '@angular/material/button';
+import {MatIconModule} from '@angular/material/icon';
+import {MatExpansionModule} from '@angular/material/expansion';
+import {MatTabsModule} from '@angular/material/tabs';
+import {MatSelectModule} from '@angular/material/select';
+import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {TestService} from '../../../services/gateway/testing.service';
+import {AuditModel} from '../../../models/audit/audit-model.model';
+import {PaginationMetadata} from '../../../models/pagination-metadata.model';
+import {EventType} from '../../../models/testing/EventType.enum';
+import {DataAcquisitionReqeustedFormComponent} from '../data-acquisition-reqeusted-form/data-acquisition-reqeusted-form.component';
+import {PatientEventFormComponent} from '../patient-event-form/patient-event-form.component';
+import {animate, query, stagger, style, transition, trigger} from '@angular/animations';
+import {ReportScheduledFormComponent} from '../report-scheduled-form/report-scheduled-form.component';
 import {PatientAcquiredFormComponent} from "../patient-acquired-form/patient-acquired-form.component";
 import {ReorderTopicsPipe} from "../../Pipes/ReorderTopicsPipe";
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
@@ -29,17 +29,18 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
+import {throwError} from "rxjs";
 
 
 const listAnimation = trigger('listAnimation', [
   transition('* <=> *', [
     query(':enter',
-      [style({ opacity: 0 }), stagger('60ms', animate('600ms ease-out', style({ opacity: 1 })))],
-      { optional: true }
+      [style({opacity: 0}), stagger('60ms', animate('600ms ease-out', style({opacity: 1})))],
+      {optional: true}
     ),
     query(':leave',
-      animate('200ms', style({ opacity: 0 })),
-      { optional: true }
+      animate('200ms', style({opacity: 0})),
+      {optional: true}
     )
   ])
 ]);
@@ -87,9 +88,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
   intervalId!: NodeJS.Timer | null;
 
-  consumersData:  Map<string, string> = new Map();
+  consumersData: Map<string, string> = new Map();
 
-  consumersDataOutput :  Map<string, string> = new Map();
+  consumersDataOutput: Map<string, string> = new Map();
 
   isTestRunning = false;
 
@@ -97,7 +98,8 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   facilityDoesNotExist: boolean = false;
 
-  constructor(private auditService: AuditService, private testService: TestService, private tenantService: TenantService, private fb: FormBuilder,  private snackBar: MatSnackBar) { }
+  constructor(private auditService: AuditService, private testService: TestService, private tenantService: TenantService, private fb: FormBuilder, private snackBar: MatSnackBar) {
+  }
 
   ngOnDestroy(): void {
     this.stopPollingConsumerEvents();
@@ -105,7 +107,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.eventForm = this.fb.group({
-      facilityId: [ "", [Validators.required], [facilityExistsValidator(this.tenantService)]
+      facilityId: ["", [Validators.required], [facilityExistsValidator(this.tenantService)]
       ]
     });
     this.getFacilities();
@@ -124,25 +126,22 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     if (this.showReportScheduledForm == true) {
       this.showReportScheduledForm = false;
       this.showPatientsAcquiredForm = true;
-    }
-    else if(this.showPatientsAcquiredForm == true){
+    } else if (this.showPatientsAcquiredForm == true) {
       this.showReportScheduledForm = false;
       this.showPatientsAcquiredForm = false;
     }
   }
 
-  createConsumers(facilityId:string) {
+  createConsumers(facilityId: string) {
     this.testService.startConsumers(facilityId).subscribe(response => {
       console.log('Consumer created successfully:', response);
       this.startPollingConsumerEvents(facilityId);
     }, error => {
       console.error('Error creating consumer:', error);
-      this.isTestRunning = false; // Update test state
-      this.isLoading = false;
     });
   }
 
-  deleteConsumers(facilityId:string) {
+  deleteConsumers(facilityId: string) {
     this.testService.stopConsumers(facilityId).subscribe(response => {
       this.showReportScheduledForm = false;
       this.showPatientsAcquiredForm = false;
@@ -152,6 +151,8 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       this.stopPollingConsumerEvents();
     }, error => {
       console.error('Error creating consumer:', error);
+      this.isTestRunning = false;
+      this.isLoading = false;
     });
   }
 
@@ -179,31 +180,45 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     }
   }
 
-  startPollingConsumerEvents(facilityId:string) {
-    if(!this.intervalId) {
+  startPollingConsumerEvents(facilityId: string) {
+    if (!this.intervalId) {
       this.intervalId = setInterval(() => {
         this.pollConsumerEvents(facilityId);
       }, 10000); // Poll every 10 seconds
-
     }
   }
 
-  pollConsumerEvents(facilityId:string){
+  pollConsumerEvents(facilityId: string) {
     this.testService.readConsumers(facilityId).subscribe(data => {
-        this.consumersData = new Map(Object.entries(data));
-        this.consumersData.forEach((value, key) => {
-          this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
-        });
-        this.isLoading = false
+      this.consumersData = new Map(Object.entries(data));
+      this.consumersData.forEach((value, key) => {
+        this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
+      });
+      this.isLoading = false
+    }, error => {
+      console.error('Error creating consumer:', error);
+      this.isTestRunning = false;
+      this.isLoading = false;
+      // Clear the interval directly here
+      if (this.intervalId) {
+        clearInterval(this.intervalId);
+        this.intervalId = null; // Ensure it's reset to prevent reuse
       }
-    );
+
+      this.snackBar.open(error.message, '', {
+        duration: 3500,
+        panelClass: 'error-snackbar',
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    });
+
   }
 
   stopPollingConsumerEvents() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-
       this.snackBar.open('Stopped polling consumer events', '', {
         duration: 3500,
         panelClass: 'info-snackbar',
@@ -217,17 +232,17 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
     return Object.keys(consumersData);
   }
 
-   async getFacilities() {
+  async getFacilities() {
 
-     this.tenantService.listFacilities('', '').subscribe({
-       next: (facilities: PagedFacilityConfigModel) => {
-         this.facilities = facilities.records;
-       },
-       error: (err) => {
-         console.error('Error fetching facilities:', err);
-         throw err;
-       },
-     });
+    this.tenantService.listFacilities('', '').subscribe({
+      next: (facilities: PagedFacilityConfigModel) => {
+        this.facilities = facilities.records;
+      },
+      error: (err) => {
+        console.error('Error fetching facilities:', err);
+        throw err;
+      },
+    });
   }
 
 }

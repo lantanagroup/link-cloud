@@ -8,6 +8,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
@@ -24,6 +25,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         private readonly KafkaConsumerManager _kafkaConsumerManager;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
 
+        private const string ANONYMOUS_ACCESS_CONFIG_KEY = "Authentication:EnableAnonymousAccess";
         public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreatePatientEvent createPatientEvent, KafkaConsumerManager kafkaConsumerManager, ICreateReportScheduled createReportScheduled, ICreateDataAcquisitionRequested createDataAcquisitionRequested, ICreatePatientAcquired createPatientAcquired)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -38,16 +40,20 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
 
         public void RegisterEndpoints(WebApplication app)
         {
+            bool enableAnonymousAccess = app.Configuration.GetValue<bool>(ANONYMOUS_ACCESS_CONFIG_KEY);
+            _logger.LogInformation("Anonymous access is {state}", enableAnonymousAccess ? "enabled" : "disabled");
+
+
             var integrationEndpoints = app.MapGroup("/api/integration").WithOpenApi(x => new OpenApiOperation(x)
             {
-                Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
+                Tags = new List<OpenApiTag> { new() { Name = "Integration" } },
+                Description = enableAnonymousAccess ?
+                        "This endpoint allows anonymous access in the current configuration." :
+                        "This endpoint requires authentication."
             });
-
-            bool enableAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+            
             if (!enableAnonymousAccess) {
-               integrationEndpoints.RequireAuthorization([
-                    LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName,
-                    PolicyNames.IsLinkAdmin]);
+               integrationEndpoints.RequireAuthorization([LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, PolicyNames.IsLinkAdmin]);
             };
               
             integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)                

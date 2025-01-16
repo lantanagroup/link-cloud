@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                                 string serializedList = JsonConvert.SerializeObject(retrievedList);
 
                                 // store the list back in Cache
-                                _cache.Set(cacheKey, serializedList);
+                                _cache.Set(cacheKey, serializedList, TimeSpan.FromMinutes(30));
                             }
                         }                       
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
