@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Options;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
@@ -11,25 +9,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
     public class KafkaConsumerService
     {
-        private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<KafkaConsumerService> _logger;
+        private readonly ICacheService _cache;
 
 
-
-        public KafkaConsumerService(IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerService(ICacheService cache, IServiceScopeFactory serviceScopeFactory, ILogger<KafkaConsumerService> logger)
         {
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache;
         }
 
         public void StartConsumer(string groupId, string topic, string facility, IConsumer<string, string> consumer, CancellationToken cancellationToken)
         {
 
-            // get the Redis cache
+            // get the cache
             using var scope = _serviceScopeFactory.CreateScope();
-            var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
 
             using (consumer)
             {
@@ -40,7 +37,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     {
 
                         var consumeResult = consumer.Consume(cancellationToken);
-                        // get the correlation id from the message and store it in Redis
+                        // get the correlation id from the message and store it in Cache
                         string correlationId = string.Empty;
                         if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                         {
@@ -49,16 +46,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                             if (facility != consumeResultFacility)
                             {
-                                 _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", facility, consumeResultFacility);
+                                _logger.LogInformation("Searched Facility ID {facility} does not match message facility {consumeResultFacility}. Skipping message.", facility, consumeResultFacility);
                                 continue;
                             }
-                            // read the list from Redis
+                            // read the list from cache
+                            var cacheKey = topic + KafkaConsumerManager.delimiter + facility;
 
-                            var redisKey = topic + KafkaConsumerManager.delimiter + facility;
+                            string retrievedListJson;
+                            try 
+                            {
+                               retrievedListJson = _cache.Get<string>(cacheKey);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Failed to retrieve correlation IDs from cache for key {key}", cacheKey);
+                                retrievedListJson = null;
+                            }
 
-                            string retrievedListJson = _cache.GetString(redisKey);
-
-                            var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<string>(): JsonConvert.DeserializeObject<List<string>>(retrievedListJson);
+                            var retrievedList = string.IsNullOrEmpty(retrievedListJson) ? new List<string>() : JsonConvert.DeserializeObject<List<string>>(retrievedListJson);
 
                             // append the new correlation id to the existing list
                             if (!retrievedList.Contains(correlationId))
@@ -67,10 +72,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                                 string serializedList = JsonConvert.SerializeObject(retrievedList);
 
-                                // store the list back in Redis
-                                _cache.SetString(redisKey, serializedList);
+                                // store the list back in Cache
+                                _cache.Set(cacheKey, serializedList, TimeSpan.FromMinutes(30));
                             }
-                        }                       
+                        }
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
                     }
                 }
@@ -78,7 +83,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     if (e.ConsumerRecord != null)
                     {
-                        _logger.LogError(e,"Error occurred during consumption. Topic: {Topic}, Partition: {Partition}, Offset: {Offset}, Reason: {Reason}", e.ConsumerRecord.Topic, e.ConsumerRecord.Partition.Value, e.ConsumerRecord.Offset.Value, e.Error.Reason);
+                        _logger.LogError(e, "Error occurred during consumption. Topic: {Topic}, Partition: {Partition}, Offset: {Offset}, Reason: {Reason}", e.ConsumerRecord.Topic, e.ConsumerRecord.Partition.Value, e.ConsumerRecord.Offset.Value, e.Error.Reason);
                     }
                     else
                     {

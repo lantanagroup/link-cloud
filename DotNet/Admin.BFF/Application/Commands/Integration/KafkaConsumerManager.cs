@@ -1,11 +1,8 @@
 ﻿using Confluent.Kafka;
-
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
-using System.Text;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -24,6 +21,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private static readonly object _lock = new object();
 
         private readonly ILogger<KafkaConsumerService> _logger;
+        private readonly ICacheService _cache;
 
         // construct a list of topics 
         private List<(string, string)> kafkaTopics = new List<(string, string)>
@@ -49,34 +47,38 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Add constructor
-        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache, IServiceScopeFactory serviceScopeFactory, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
         {
             _kafkaConsumerService = kafkaConsumerService;
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
+            _cache = cache;
             _logger = logger;
         }
 
 
-        private void ClearRedisCache(string facility)
+        private void ClearCache(string facility)
         {
-            // clear Redis cache
-            var _cache = getCache();
-
-            foreach (var topic in kafkaTopics)
+            try
             {
+                foreach (var topic in kafkaTopics)
                 {
-                    String redisKey = topic.Item2 + delimiter + facility;
-                    _cache.Remove(redisKey);
+                    {
+                        String cacheKey = topic.Item2 + delimiter + facility;
+                        _cache.Remove(cacheKey);
+                    }
                 }
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "Failed to clear cache for facility {facility} due to invalid operation", facility);
+            }
 
-        }
-
-        private IDistributedCache getCache()
-        {
-            return _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDistributedCache>();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while clearing cache for facility {facility}", facility);
+            }
         }
 
 
@@ -105,8 +107,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public void CreateAllConsumers(string facility)
         {
-            //clear Redis cache for that facility
-            ClearRedisCache(facility);
+            //clear  cache for that facility
+            ClearCache(facility);
 
             // create consumers
 
@@ -152,15 +154,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
-            var _cache = getCache();
-            // loop through the redis keys for that facility and get the correlation id for each
+            // loop through the  keys for that facility and get the correlation id for each
             foreach (var topic in kafkaTopics)
             {
                 if (topic.Item2 != string.Empty)
                 {
                     string facilityKey = topic.Item2 + delimiter + facility;
 
-                    correlationIds.Add(topic.Item2, _cache.GetString(facilityKey));
+                    correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
+  
                 }
             }
             return correlationIds;
@@ -168,9 +170,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public void StopAllConsumers(string facility)
         {
-
-            //clear Redis cache for that facility
-            ClearRedisCache(facility);
+            //clear  cache for that facility
+            ClearCache(facility);
 
             // stop consumers for that facility
             foreach (var consumer in _consumers)

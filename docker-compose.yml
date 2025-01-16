@@ -404,7 +404,7 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
       ConnectionStrings__Redis: redis_cache:6379
-      Cache__Enabled: true
+      Cache__Type: Redis
       EnableIntegrationFeature: true
       ProblemDetails__IncludeExceptionDetails: false
       LinkTokenService__EnableTokenGenerationEndpoint: false

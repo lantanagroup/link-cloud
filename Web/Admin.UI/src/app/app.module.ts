@@ -51,7 +51,7 @@ export function initConfig(appConfig: AppConfigService) {
     MatExpansionModule,
     MatNativeDateModule,
     LoadingIndicatorComponent,
-    MatSelectModule,
+    MatSelectModule
   ],
   providers: [
     {

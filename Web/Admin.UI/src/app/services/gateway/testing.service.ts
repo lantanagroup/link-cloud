@@ -14,7 +14,13 @@ import {IDataPatientAcquiredRequested} from "../../interfaces/testing/patient-ac
   providedIn: 'root'
 })
 export class TestService {
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+
+
+  constructor(private http: HttpClient,
+              private errorHandler: ErrorHandlingService,
+              public appConfigService: AppConfigService) {
+
+  }
 
   generateReportScheduledEvent(facilityId: string, reportTypes: string[], frequency:string, startDate: Date, delay: string): Observable<IEntityCreatedResponse> {
     let event: IReportScheduled = {
@@ -31,7 +37,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -49,7 +55,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
     )
   }
 
@@ -63,7 +69,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -77,7 +83,7 @@ export class TestService {
         map((response) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -91,7 +97,7 @@ export class TestService {
         map((response: { [key: string]: string }) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -109,7 +115,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
@@ -126,7 +132,7 @@ export class TestService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 
