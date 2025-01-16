@@ -35,10 +35,15 @@ export class AuthenticationService {
     return new Promise((resolve, reject) => {
       const testUrl = pathJoin(this.appConfigService.config?.baseApiUrl || '/api', 'login');
       // If options was successful, the /api/login endpoint is available and must be used
-      this.http.options(testUrl).subscribe(() => {
+      this.http.get(testUrl).subscribe(() => {
         resolve(true);
       }, (error) => {
-        resolve(false);
+        if(error.status == 404) {
+          resolve(false);
+        }
+        else{
+          resolve(true);
+        }
       });
     });
   }
