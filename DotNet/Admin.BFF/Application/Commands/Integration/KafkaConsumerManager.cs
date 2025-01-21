@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 GroupId = groupId + delimiter + facility,
                 ClientId = facility,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
-                AutoOffsetReset = AutoOffsetReset.Earliest
+                AutoOffsetReset = AutoOffsetReset.Latest
             };
  
             if (_kafkaConnection.SaslProtocolEnabled)
