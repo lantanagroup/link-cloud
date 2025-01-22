@@ -46,16 +46,37 @@ namespace DataAcquisition.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "kafkaRetryTbl",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ServiceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Topic = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Headers = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ScheduledTrigger = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    RetryCount = table.Column<int>(type: "int", nullable: false),
+                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_kafkaRetryTbl", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "queriedFhirResource",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    QueryType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ResourceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ResourceId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    QueryType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ResourceType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ResourceId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     IsSuccessful = table.Column<bool>(type: "bit", nullable: false),
                     CreateDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true)
@@ -111,6 +132,9 @@ namespace DataAcquisition.Domain.Migrations
 
             migrationBuilder.DropTable(
                 name: "fhirQueryConfiguration");
+
+            migrationBuilder.DropTable(
+                name: "kafkaRetryTbl");
 
             migrationBuilder.DropTable(
                 name: "queriedFhirResource");
