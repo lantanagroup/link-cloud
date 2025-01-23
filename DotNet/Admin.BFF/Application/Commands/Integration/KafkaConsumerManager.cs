@@ -13,7 +13,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> _consumers;
         private readonly KafkaConnection _kafkaConnection;
         private readonly KafkaConsumerService _kafkaConsumerService;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly static string errorTopic = "-Error";
         public static readonly string delimiter = ":";
@@ -47,10 +46,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
         // Add constructor
-        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache, IServiceScopeFactory serviceScopeFactory, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache,  KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
         {
             _kafkaConsumerService = kafkaConsumerService;
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
             _cache = cache;

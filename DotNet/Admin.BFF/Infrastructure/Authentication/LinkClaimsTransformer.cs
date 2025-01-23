@@ -19,17 +19,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
         private readonly IGetLinkAccount _getLinkAccount;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionOptions;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly ICacheService _cache;
 
-        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, ICacheService cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions, IServiceScopeFactory serviceScopeFactory, IOptions<CacheSettings> cacheSettings)
+        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, ICacheService cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionOptions = dataProtectionOptions ?? throw new ArgumentNullException(nameof(dataProtectionOptions));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _cache = cache;
         }
 
