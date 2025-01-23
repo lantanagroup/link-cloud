@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
@@ -19,17 +21,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
         private readonly IGetLinkAccount _getLinkAccount;
         private readonly IDataProtectionProvider _dataProtectionProvider;
         private readonly IOptions<DataProtectionSettings> _dataProtectionOptions;
-        private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions, IServiceScopeFactory serviceScopeFactory, IOptions<CacheSettings> cacheSettings)
+        private readonly ICacheService _cache;
+
+        public LinkClaimsTransformer(ILogger<LinkClaimsTransformer> logger, IGetLinkAccount getLinkAccount, ICacheService cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionOptions, IServiceScopeFactory serviceScopeFactory, IOptions<CacheSettings> cacheSettings)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionOptions = dataProtectionOptions ?? throw new ArgumentNullException(nameof(dataProtectionOptions));
             _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
+            _cache = cache;
         }
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -43,15 +46,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             Account? account;
 
             //if no cache providers have been registered, get the account from the account service
-            if (!_cacheSettings.Value.Enabled)
             {
-                account = await _getLinkAccount.ExecuteAsync(principal, CancellationToken.None);
-            }
-            else
-            {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-
                 var userKey = "user:" + accountId;
 
                 //check if account is in cache, if not get it from the account service
@@ -60,7 +55,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
                 try
                 {
-                    cacheAccount = _cache.GetString(userKey);
+                    cacheAccount = _cache.Get<string>(userKey);
                 }
                 catch (Exception ex)
                 {
@@ -98,11 +93,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                     {
                         if (_dataProtectionOptions.Value.Enabled)
                         {
-                            _cache.SetString(userKey, protector.Protect(JsonConvert.SerializeObject(account)), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                            _cache.Set<string>(userKey, protector.Protect(JsonConvert.SerializeObject(account)), TimeSpan.FromMinutes(5));
                         }
                         else
                         {
-                            _cache.SetString(userKey, JsonConvert.SerializeObject(account), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+                            _cache.Set<string>(userKey, JsonConvert.SerializeObject(account), TimeSpan.FromMinutes(5));
                         }
                     }
                     catch (Exception ex)

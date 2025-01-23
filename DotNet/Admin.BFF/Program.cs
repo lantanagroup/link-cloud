@@ -32,6 +32,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -145,7 +146,6 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ConnectionString = redisConnection;
             options.Password = builder.Configuration.GetValue<string>("Redis:Password");
 
-            options.Enabled = builder.Configuration.GetValue<string>("Cache:Type") == "Redis";
             if (builder.Configuration.GetValue<int>("Cache:Timeout") > 0)
             {
                 options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
@@ -255,7 +255,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddCheck<TenantServiceHealthCheck>("Tenant Service");
     }
 
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
         healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
     }
