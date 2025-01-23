@@ -8,6 +8,7 @@ using Org.BouncyCastle.Security;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
 
@@ -45,7 +46,7 @@ public class EpicAuth : IAuth
 
             if (responseJson != null)
             {
-                var accessToken = responseJson.RootElement.GetProperty("access_token").GetString();
+                var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
                     _logger.LogInformation($"Bearer Information Acquired.");
@@ -59,6 +60,12 @@ public class EpicAuth : IAuth
         }
 
         return (false, null);
+    }
+
+    private string Sanitize(string input)
+    {
+        var sanitizedInput = Regex.Replace(input, @"\t|\n|\r", string.Empty, RegexOptions.Compiled).Trim();
+        return sanitizedInput;
     }
 
     private string GetJwt(AuthenticationConfiguration authSettings)
