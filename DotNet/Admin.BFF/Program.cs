@@ -31,8 +31,8 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
