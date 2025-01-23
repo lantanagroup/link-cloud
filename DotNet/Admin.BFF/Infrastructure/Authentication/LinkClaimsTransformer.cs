@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
             _getLinkAccount = getLinkAccount ?? throw new ArgumentNullException(nameof(getLinkAccount));
             _dataProtectionProvider = dataProtectionProvider ?? throw new ArgumentNullException(nameof(dataProtectionProvider));
             _dataProtectionOptions = dataProtectionOptions ?? throw new ArgumentNullException(nameof(dataProtectionOptions));
-            _cache = cache;
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
