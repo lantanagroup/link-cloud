@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
