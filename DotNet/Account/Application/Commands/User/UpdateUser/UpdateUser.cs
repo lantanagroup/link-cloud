@@ -24,7 +24,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly IAccountServiceMetrics _metrics;
         private readonly ICreateAuditEvent _createAuditEvent;
         private readonly IRoleRepository _roleRepository;
-      //  private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly ICacheService _cache;    
         private readonly IServiceScopeFactory _serviceScopeFactory;
 

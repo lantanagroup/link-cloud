@@ -121,7 +121,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    var cacheType = builder.Configuration.GetValue<string>("Cache:Type");
     var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory"; 
     var supportedCacheTypes = new[] { "Redis", "InMemory" }; 
     if (!supportedCacheTypes.Contains(cacheType)) 
