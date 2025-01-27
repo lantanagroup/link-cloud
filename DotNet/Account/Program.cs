@@ -122,6 +122,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     var cacheType = builder.Configuration.GetValue<string>("Cache:Type");
+    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory"; 
+    var supportedCacheTypes = new[] { "Redis", "InMemory" }; 
+    if (!supportedCacheTypes.Contains(cacheType)) 
+    { 
+        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType); 
+        cacheType = "InMemory";
+    }
     if (cacheType == "Redis")
     {
         builder.Services.AddRedisCache(options =>
