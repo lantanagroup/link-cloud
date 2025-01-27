@@ -1,8 +1,7 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching
+namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 {
     public class InMemoryCacheService : ICacheService
     {

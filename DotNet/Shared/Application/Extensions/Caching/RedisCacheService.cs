@@ -1,10 +1,8 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Options;
-using StackExchange.Redis;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching
+ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
 {
     public class RedisCacheService : ICacheService
     {

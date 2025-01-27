@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services
+namespace LantanaGroup.Link.Shared.Application.Interfaces
 {
     public interface ICacheService
     {

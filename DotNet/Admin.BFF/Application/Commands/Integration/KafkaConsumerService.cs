@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
