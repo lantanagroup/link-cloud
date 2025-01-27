@@ -19,9 +19,11 @@ using LantanaGroup.Link.Account.Presentation.Endpoints.Role;
 using LantanaGroup.Link.Account.Presentation.Endpoints.User;
 using LantanaGroup.Link.Account.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -119,8 +121,14 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.KeyRing = builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link";
     });
 
-    //Add Redis
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory"; 
+    var supportedCacheTypes = new[] { "Redis", "InMemory" }; 
+    if (!supportedCacheTypes.Contains(cacheType)) 
+    { 
+        Log.Logger.Warning("Unsupported cache type '{CacheType}'. Defaulting to InMemory cache.", cacheType); 
+        cacheType = "InMemory";
+    }
+    if (cacheType == "Redis")
     {
         builder.Services.AddRedisCache(options =>
         {
@@ -134,7 +142,16 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ConnectionString = redisConnection;
             options.Password = builder.Configuration.GetValue<string>("Redis:Password");
         });
-    }    
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+    }
+    else // defaults to InMemory cache
+    {
+        Log.Logger.Warning("InMemory Cache is enabled.");
+        builder.Services.AddMemoryCache();
+
+        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+    }
+
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))

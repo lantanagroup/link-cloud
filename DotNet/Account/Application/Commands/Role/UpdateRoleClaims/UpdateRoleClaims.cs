@@ -4,11 +4,11 @@ using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -24,16 +24,16 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
         private readonly ICreateAuditEvent _createAuditEvent;
         private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ICacheService _cache;
 
-        public UpdateRoleClaims(ILogger<UpdateRoleClaims> logger, IRoleRepository roleRepository, IUserRepository userRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
+        public UpdateRoleClaims(ILogger<UpdateRoleClaims> logger, IRoleRepository roleRepository, ICacheService cache, IUserRepository userRepository, ILinkRoleModelFactory roleModelFactory, ICreateAuditEvent createAuditEvent, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleRepository = roleRepository ?? throw new ArgumentNullException(nameof(roleRepository));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _roleModelFactory = roleModelFactory ?? throw new ArgumentNullException(nameof(roleModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid roleId, List<string> claims, CancellationToken cancellationToken = default)
@@ -108,19 +108,16 @@ namespace LantanaGroup.Link.Account.Application.Commands.Role
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 //clear user cache for any user with the role that has changed
-                if (_cacheSettings.Value.Enabled && !string.IsNullOrEmpty(role.Name))
+                if (!string.IsNullOrEmpty(role.Name))
                 {
                     var users = await _userRepository.GetRoleUsersAsync(role.Name, cancellationToken);
 
                     if (users.Any())
                     {
-                        using var scope = _serviceScopeFactory.CreateScope();
-                        var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-
                         foreach (var user in users)
                         {
                             var userKey = $"user:{user.Email}";
-                            await _cache.RemoveAsync(userKey, cancellationToken);
+                            _cache.Remove(userKey);
                         }
                     }                                                          
                 }            
