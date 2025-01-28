@@ -1,0 +1,42 @@
+trigger:
+  paths:
+    include:
+    - DotNet/Admin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
+    exclude:
+    - '*'
+    
+pr:
+  paths:
+    include:
+    - DotNet/Admin.BFF/*
+    - DotNet/Shared/*
+    - DotNet/Link.Authorization/*
+
+name: Admin Backend-for-Frontend
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/Admin.BFF/Admin.BFF.csproj'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+      verbosityRestore: Diagnostic
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+
+

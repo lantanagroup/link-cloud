@@ -1,0 +1,60 @@
+# dependabot.yml file with customized commit messages and reviewers.
+# This will check for security and version updates at a certain interval,
+# and open pull requests for us to review and integrate into the dev branch.
+#
+# For more information, see:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+#
+# Update Strategy:
+# - Weekly checks on Tuesdays
+# - Security updates and version updates are grouped
+# - Managed by @lantanagroup/link-security-team
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "Web/Admin.UI/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    reviewers:
+      - "@lantanagroup/link-security-team"
+    assignees:
+      - "sdmcgeown"
+    # Group minor and patch security and version updates into a PR
+    # so we don't get overwhelmed
+    groups:
+      security_updates:
+        applies-to: security-updates
+        update-types: ["patch", "minor"]
+      version_updates:
+        applies-to: version-updates
+        update-types: ["patch", "minor"]
+    labels:
+      - "link-security"
+    commit-message:
+      prefix: "[npm update]: "
+
+  # Repeat for docker
+  - package-ecosystem: "docker"
+    directory: "Web/Admin.UI/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    reviewers:
+      - "@lantanagroup/link-security-team"
+    assignees:
+      - "sdmcgeown"
+    # Group minor and patch security and version updates into a PR
+    # so we don't get overwhelmed
+    groups:
+      security_updates:
+        applies-to: security-updates
+        update-types: ["patch", "minor"]
+      version_updates:
+        applies-to: version-updates
+        update-types: ["patch", "minor"]
+    labels:
+      - "link-security"
+    commit-message:
+      prefix: "[docker update]: "

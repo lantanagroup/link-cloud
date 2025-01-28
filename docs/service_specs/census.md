@@ -10,36 +10,19 @@ The Census service is primarily responsible for maintaining a tenants admit and 
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
 
-## Environment Variables
+See [Census Functionality](../functionality/census_management.md) for more information on the role of the Census service in the Link Cloud ecosystem.
 
-| Name                                       | Value                         | Secret? |
-|--------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource   | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration   | `<AzureAppConfigEndpoint>`    | Yes     |
+## Common Configurations
 
-## App Settings
-
-### Kafka Connection
-
-| Name                                    | Value                    | Secret?  |
-|-----------------------------------------|--------------------------|----------|
-| KafkaConnection__BootstrapServers__0    | `<KafkaBootstrapServer>` | No       |
-| KafkaConnection__GroupId                | census-events            | No       |
-| KafkaConnection__ClientId               | census-events            | No       |
-
-### Tenant API Settings
-
-| Name                                         | Value                  | Secret? |
-|----------------------------------------------|------------------------|---------|
-| TenantApiSettings__TenantServiceBaseEndpoint | `<TenantApiUrl>/api`   | No      |
-
-### Database Settings (MSSQL)
-
-| Name                      | Value                | Secret? |
-|---------------------------|----------------------|---------|
-| MongoDB__ConnectionString | `<ConnectionString>` | Yes     |
-| MongoDb__DatabaseName     | `<DatabaseName>`     | No      |
-| MongoDb__CollectionName   | `census`             | No      |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
 ## Kafka Events/Topics
 

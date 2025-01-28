@@ -10,36 +10,17 @@ The Query Dispatch service is primarily responsible for applying a lag period pr
 - **Database**: MSSQL (previously Mongo)
 - **Scale**: 0-3
 
-## Environment Variables
+## Common Configurations
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-
-## App Settings
-
-### Kafka Connection
-
-| Name                                     | Value                     | Secret? |
-|------------------------------------------|---------------------------|---------|
-| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No      |
-| KafkaConnection__GroupId                 | query-dispatch-events     | No      |
-| KafkaConnection__ClientId                | query-dispatch-events     | No      |
-
-### Database Settings (MSSQL)
-
-| Name                      | Value                | Secret?  |
-|---------------------------|----------------------|----------|
-| MongoDB__ConnectionString | `<ConnectionString>` | Yes      |
-| MongoDB__DatabaseName     | `<DatabaseName>`     | No       |
-| MongoDB__CollectionName   | `<CollectionName>`   | No       |
-
-### Additional Settings
-
-| Name          | Value                           | Secret? |
-|---------------|---------------------------------|---------|
-| EnableSwagger | true (DEV and TEST)             | No      |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
 ## Kafka Events/Topics
 

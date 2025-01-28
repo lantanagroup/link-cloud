@@ -8,15 +8,9 @@
         </layout>
     </appender>
 
-    <logger name="com.lantanagroup.link" level="info" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
+    <logger name="com.lantanagroup.link" level="debug"/>
 
-    <logger name="org.opencds.cqf" level="debug" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
-
-    <root level="error">
+    <root level="info">
         <appender-ref ref="CONSOLE"/>
     </root>
 

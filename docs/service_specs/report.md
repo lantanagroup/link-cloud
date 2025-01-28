@@ -7,38 +7,19 @@ The Report service is responsible for persisting the Measure Reports and FHIR re
 - **Technology**: .NET Core
 - **Image Name**: link-report
 - **Port**: 8080
-- **Database**: MSSQL (previously Mongo)
+- **Database**: MongoDB
 
-## Environment Variables
+## Common Configurations
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
-
-## App Settings
-
-### Kafka
-
-| Name                                          | Value                          | Secret? |
-|-----------------------------------------------|--------------------------------|---------|
-| KafkaConnection__BootstrapServers__0          | `<KafkaBootstrapServer>`       | No      |
-| KafkaConnection__GroupId                      | report-events                  | No      |
-| KafkaConnection__ClientId                     | report-events                  | No      |
-
-### Database
-
-| Name                                          | Value                          | Secret? |
-|-----------------------------------------------|--------------------------------|---------|
-| MongoDB__ConnectionString                     | `<ConnectionString>`           | Yes     |
-| MongoDB__DatabaseName                         | `<DatabaseName>`               | No      |
-| MongoDB__CollectionName                       | report                         | No      |
-
-### Service Endpoints
-
-| Name                                          | Value                          | Secret? |
-|-----------------------------------------------|--------------------------------|---------|
-| TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantApiUrl>/api`           | No      |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [Mongo Database](../config/csharp.md#mongo-database)
 
 ## Kafka Events/Topics
 

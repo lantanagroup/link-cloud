@@ -7,23 +7,21 @@ The Data Acquisition service is responsible for connecting and querying a tenant
 - **Technology**: .NET Core
 - **Image Name**: link-dataacquisition
 - **Port**: 8080
-- **Database**: MSSQL (previously Mongo)
+- **Database**: MSSQL
 
-## Environment Variables
+See [Data Acquisition Functionality](../functionality/data_acquisition.md) for more information on the role of the Data Acquisition service in the Link Cloud ecosystem.
 
-| Name                                        | Value                         | Secret? |
-|---------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource    | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration    | `<AzureAppConfigEndpoint>`    | Yes     |
+## Common Configurations
 
-## App Settings
-
-### Kafka Connection
-
-| Name                                     | Value                     | Secret?  |
-|------------------------------------------|---------------------------|----------|
-| KafkaConnection__BootstrapServers__0     | `<KafkaBootstrapServer>`  | No       |
-| KafkaConnection__GroupId                 | data-acquisition-events   | No       |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
 ## Kafka Events/Topics
 

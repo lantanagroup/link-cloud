@@ -69,7 +69,12 @@ public class QueryListController : Controller
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
-            return BadRequest();
+            return BadRequest("No facility id provided.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FhirBaseServerUrl) || !Uri.IsWellFormedUriString(fhirListConfiguration.FhirBaseServerUrl, UriKind.Absolute))
+        {
+            return BadRequest("Invalid FHIR Base Server URL.");
         }
 
         try
@@ -108,7 +113,12 @@ public class QueryListController : Controller
     {
         if (string.IsNullOrWhiteSpace(fhirListConfiguration.FacilityId))
         {
-            return BadRequest();
+            return BadRequest("No facility id provided.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fhirListConfiguration.FhirBaseServerUrl) || !Uri.IsWellFormedUriString(fhirListConfiguration.FhirBaseServerUrl, UriKind.Absolute))
+        {
+            return BadRequest("Invalid FHIR Base Server URL.");
         }
 
         try

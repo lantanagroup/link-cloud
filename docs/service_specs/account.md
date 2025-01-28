@@ -7,42 +7,24 @@ The Account service is responsible for maintaining roles and permissions for Lin
 - **Technology**: .NET Core
 - **Image Name**: link-account
 - **Port**: 8080
-- **Database**: MSSQL (previously Postgres)
+- **Database**: MSSQL
 
-## Environment Variables
+## Common Configurations
 
-| Name                                     | Value                           | Secret? |
-|------------------------------------------|---------------------------------|---------|
-| ExternalConfigurationSource              | AzureAppConfiguration           | No      |
-| ConnectionStrings__AzureAppConfiguration | `<AzureAppConfigEndpoint>`      | Yes     |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
-## App Config
+## Account-Specific Configurations
 
-### Kafka Connection
-
-| Name                                 | Value                     | Secret?  |
-|--------------------------------------|---------------------------|----------|
-| KafkaConnection__BootstrapServers__0 | `<KafkaBootstrapServer>`  | No       |
-| KafkaConnection__GroupId             | Account                   | No       |
-
-### Redis
-
-| Name                     | Value                     | Secret? |
-|--------------------------|---------------------------|--------|
-| ConnectionStrings__Redis | `<RedisConnectionString>` | Yes    |
-| Cache__Enabled           | true/false                | No     |
-
-### Database Settings (MSSQL)
-
-| Name                                  | Value                 | Secret?  |
-|---------------------------------------|-----------------------|----------|
-| ConnectionStrings__DatabaseConnection | `<ConnectionString>`  | Yes      |
-
-### Tenant API Settings
-
-| Name                                          | Value                               | Secret? |
-|-----------------------------------------------|-------------------------------------|---------|
-| TenantApiSettings__TenantServiceBaseEndpoint  | `<TenantServiceUrl>/api`            | No      |
+| Name                                          | Description                      | Required | Default Value | Secret? |
+|-----------------------------------------------|----------------------------------|----------|---------------|---------|
+| UserManagement__EnableAutomaticUserActivation | Enable automatic user activation | No       | true          | No      |
 
 ## Kafka Events/Topics
 
