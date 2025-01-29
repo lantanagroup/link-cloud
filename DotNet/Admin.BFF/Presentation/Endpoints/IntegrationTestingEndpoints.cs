@@ -8,7 +8,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
@@ -153,10 +152,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(facility.FacilityId);
             return Results.Ok(list);
         }
-        public Task DeleteConsumersRequested(HttpContext context, Facility facility)
+        public async Task<IResult> DeleteConsumersRequested(HttpContext context, Facility facility)
         {
-            _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
-            return Task.CompletedTask;
+            // Stop consumers asynchronously
+            try {
+                await _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
+                var response = new { message = "Consumers stopped successfully.", facilityId = facility.FacilityId};
+                return Results.Ok(response); // This returns a 200 OK status along with the messag
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop consumers for facility {FacilityId}", facility.FacilityId);
+                return Results.Problem("Error stopping consumers.", statusCode: StatusCodes.Status500InternalServerError);
+            }
         }
 
         public async Task<IResult> CreatePatientAcquired(HttpContext context, PatientAcquired model)
