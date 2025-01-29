@@ -29,9 +29,9 @@ namespace LantanaGroup.Link.Submission.Application.Services
         }
 
         public Counter<long> MedicationCodeCounter { get; private set; }
-        public void IncrementMedicationCounter(int resourceTypeCount, List<KeyValuePair<string, object?>> tags)
+        public void IncrementMedicationCounter(int medicationCount, List<KeyValuePair<string, object?>> tags)
         {
-            MedicationCodeCounter.Add(resourceTypeCount, tags.ToArray());
+            MedicationCodeCounter.Add(medicationCount, tags.ToArray());
         }
     }
 }
