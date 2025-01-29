@@ -4,11 +4,11 @@ using LantanaGroup.Link.Account.Application.Interfaces.Persistence;
 using LantanaGroup.Link.Account.Domain.Entities;
 using LantanaGroup.Link.Account.Infrastructure;
 using LantanaGroup.Link.Account.Infrastructure.Logging;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Link.Authorization.Infrastructure;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -23,15 +23,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
         private readonly ICreateAuditEvent _createAuditEvent;
         private readonly IOptions<CacheSettings> _cacheSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ICacheService _cache;
 
-        public UpdateUserClaims(ILogger<UpdateUserClaims> logger, IUserRepository userRepository, ILinkUserModelFactory userModelFactory, ICreateAuditEvent createAuditEvent, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
+        public UpdateUserClaims(ILogger<UpdateUserClaims> logger, IUserRepository userRepository, ICacheService cache, ILinkUserModelFactory userModelFactory, ICreateAuditEvent createAuditEvent)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _userModelFactory = userModelFactory ?? throw new ArgumentNullException(nameof(userModelFactory));
             _createAuditEvent = createAuditEvent ?? throw new ArgumentNullException(nameof(createAuditEvent));
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<bool> Execute(ClaimsPrincipal? requestor, Guid userId, List<string> claims, CancellationToken cancellationToken = default)
@@ -100,22 +100,17 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 _ = Task.Run(() => _createAuditEvent.Execute(auditMessage, cancellationToken));
 
                 //clear user cache if cache is enabled
-                if (_cacheSettings.Value.Enabled)
+
+                var userKey = $"user:{user.Email}";
+                try
                 {
-                    var userKey = $"user:{user.Email}";
-                    try
-                    {
-                        using var scope = _serviceScopeFactory.CreateScope();
-                        var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-
-                        await _cache.RemoveAsync(userKey, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogCacheException(userKey, ex.Message);
-                    }
+                   _cache.Remove(userKey);
                 }
-
+                catch (Exception ex)
+                {
+                    _logger.LogCacheException(userKey, ex.Message);
+                }
+                
                 return true;
             }
             catch (Exception)
