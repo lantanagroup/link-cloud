@@ -172,7 +172,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
                                 #region Census Admitted Patient List
-                                string censusRequestUrl = $"http://localhost:5234/api/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
+                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
 
                                 //TODO: add method to get key that includes looking at redis for future use case
                                 if (_linkTokenServiceConfig.Value.SigningKey is null)
@@ -481,13 +481,13 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
 
             //Medication Codes
-            foreach (var resType in resourceTypes)
+            foreach (var medication in medicationCodes)
             {
-                _submissionServiceMetrics.IncrementMedicationCounter(resType.Value,
+                _submissionServiceMetrics.IncrementMedicationCounter(medication.Value,
                     new List<KeyValuePair<string, object?>>()
                     {
                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, resType.Key),
+                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, medication.Key),
                         new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
                         new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
                     });
@@ -542,7 +542,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}"; st:5110/api/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
             try
             {

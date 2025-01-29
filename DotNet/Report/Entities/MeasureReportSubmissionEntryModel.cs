@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Report.Entities
         public MeasureReport? MeasureReport { get; set; }
 
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.NotEvaluated;
-        public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
+        public List<ContainedResource> ContainedResources { get; set; } = new();
 
         public class ContainedResource
         {
