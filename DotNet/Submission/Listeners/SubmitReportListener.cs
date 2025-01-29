@@ -300,7 +300,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 var batchSize = _submissionConfig.PatientBundleBatchSize;
 
-                                List<string> patientFilesWritten = new List<string>();
+                                ConcurrentBag<string> patientFilesWritten = new ConcurrentBag<string>();
 
                                 while (patientIds.Any())
                                 {
@@ -357,7 +357,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
                                 //Generate Metrics
-                                GenerateSubmissionMetrics(otherResourcesBundle,  patientFilesWritten, facilityId, key.StartDate, key.EndDate);
+                                GenerateSubmissionMetrics(otherResourcesBundle,  patientFilesWritten.ToList(), facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
                             }
@@ -417,7 +417,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
         }
 
-        protected void GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<string>? patientFilesWritten, string facilityId, System.DateTime startDate, System.DateTime endDate )
+        protected void GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<string>? patientFilesWritten, string facilityId, DateTime startDate, DateTime endDate )
         {
             if(otherResourcesBundle == null) { return; }    
             if (patientFilesWritten == null || patientFilesWritten.Count == 0) { return; }
@@ -542,7 +542,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}"; st:5110/api/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
             try
             {
