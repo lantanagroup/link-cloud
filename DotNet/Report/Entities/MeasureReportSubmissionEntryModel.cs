@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.Report.Entities
         public MeasureReport? MeasureReport { get; set; }
 
         public PatientSubmissionStatus Status { get; set; } = PatientSubmissionStatus.NotEvaluated;
-        public List<ContainedResource> ContainedResources { get; set; } = new();
+        public List<ContainedResource> ContainedResources { get; private set; } = new List<ContainedResource>();
 
         public class ContainedResource
         {
@@ -42,13 +42,13 @@ namespace LantanaGroup.Link.Report.Entities
 
         public void AddMeasureReport(MeasureReport measureReport)
         {
-            MeasureReport =  measureReport;
+            MeasureReport = measureReport;
 
             foreach (var evaluatedResource in measureReport.EvaluatedResource)
             {
                 //If the resource is already in the list, skip it
                 if (ContainedResources.Any(x => x.Reference() == evaluatedResource.Reference))
-                { 
+                {
                     continue;
                 }
 
