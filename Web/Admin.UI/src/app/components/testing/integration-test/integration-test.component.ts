@@ -167,7 +167,6 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   stopTest(): void {
     this.isLoading = true; // Show spinner
-    this.isTestRunning = true; // Update test state
     this.consumersDataOutput.clear();
     this.stopPollingConsumerEvents();
     this.deleteConsumers(this.facilityIdControl.value);
