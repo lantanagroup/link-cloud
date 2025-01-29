@@ -1,9 +1,9 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+using Confluent.Kafka.Admin;
 
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
@@ -78,6 +78,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                             }
                         }
                         _logger.LogInformation("Consumed message '{MessageValue}' from topic {Topic}, partition {Partition}, offset {Offset}, correlation {CorrelationId}", consumeResult.Message.Value, consumeResult.Topic, consumeResult.Partition, consumeResult.Offset, correlationId);
+
                     }
                 }
                 catch (ConsumeException e)
@@ -97,6 +98,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 }
             }
         }
+
+     
 
         public string extractFacility(string kafkaKey)
         {
