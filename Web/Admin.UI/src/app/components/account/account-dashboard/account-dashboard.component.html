@@ -1,1 +1,64 @@
-<p>account-dashboard works!</p>
+<div class="content">
+
+  <p>
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>User Accounts</span>
+      <button mat-mini-fab aria-label="Create a new facility dialog" matTooltip="Create Facility" >
+        <mat-icon>add</mat-icon>
+      </button>
+    </mat-toolbar>
+  </p>
+
+  <div class="tenant-table-container" *ngIf="users.length > 0;else no_user_found">
+
+    <table mat-table [dataSource]="users">
+
+      <!-- FUsername -->
+      <ng-container matColumnDef="Username">
+        <th mat-header-cell *matHeaderCellDef> Username </th>
+        <td mat-cell *matCellDef="let user"> {{user.username}} </td>
+      </ng-container>
+
+      <!-- First Name Column -->
+      <ng-container matColumnDef="FirstName">
+        <th mat-header-cell *matHeaderCellDef> FirstName </th>
+        <td mat-cell *matCellDef="let user"> {{user.firstName}} </td>
+      </ng-container>
+
+      <!-- Last Name Column -->
+      <ng-container matColumnDef="LastName">
+        <th mat-header-cell *matHeaderCellDef> LastName </th>
+        <td mat-cell *matCellDef="let user"> {{user.lastName}} </td>
+      </ng-container>
+
+      <!-- Email Column -->
+      <ng-container matColumnDef="Email">
+        <th mat-header-cell *matHeaderCellDef> Email </th>
+        <td mat-cell *matCellDef="let user"> {{user.email}} </td>
+      </ng-container>
+
+      <!--<ng-container matColumnDef="Email">
+        <th mat-header-cell *matHeaderCellDef> Email </th>
+        <td mat-cell *matCellDef="let user"> {{user.email}} </td>
+      </ng-container>-->
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    </table>
+    <!--<mat-paginator [length]="paginationMetadata.totalCount"
+                 [pageIndex]="paginationMetadata.pageNumber"
+                 [pageSize]="paginationMetadata.pageSize"
+                 [pageSizeOptions]="[5, 10, 20]"
+                 (page)="pagedEvent($event)"
+                 showFirstLastButtons
+                 aria-label="Select page of facilities">
+  </mat-paginator>-->
+  </div>
+  <ng-template #no_user_found>
+    <div class="no-results-found-container">
+      <span>No users found.</span>
+    </div>
+  </ng-template>
+
+</div>
