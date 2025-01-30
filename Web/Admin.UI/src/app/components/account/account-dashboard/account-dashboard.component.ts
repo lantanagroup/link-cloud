@@ -41,7 +41,7 @@ import {MatToolbarModule} from "@angular/material/toolbar";
     MatToolbarModule
   ],
   templateUrl: './account-dashboard.component.html',
-  styleUrls: ['./account-dashboard.component.css']
+  styleUrls: ['./account-dashboard.component.scss']
 })
 export class AccountDashboardComponent {
   private initPageSize: number = 10;
@@ -60,7 +60,7 @@ export class AccountDashboardComponent {
   sortBy: string = '';
 
 
-  displayedColumns: string[] = [ "Username", 'FirstName', 'LastName' , 'Email'];
+  displayedColumns: string[] = [ 'FirstName', 'LastName' , 'Role', 'Email', 'Actions'];
   dataSource = new MatTableDataSource<UserModel>(this.users);
 
 
@@ -77,6 +77,12 @@ export class AccountDashboardComponent {
       this.users = data.records;
       this.paginationMetadata = data.metadata;
     });
+  }
+
+  onEdit(row: UserModel) {
+  }
+
+  onDelete(row: UserModel) {
   }
 
   /*showCreateFacilityDialog(): void {
