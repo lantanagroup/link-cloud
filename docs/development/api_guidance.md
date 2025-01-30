@@ -1,7 +1,5 @@
 # API Guidance
 
-Draft
-
 Our APIs should be built with the Representational State Transfer (REST) architectural style using HTTP as the application protocol.
 
 Each API should strive to:
