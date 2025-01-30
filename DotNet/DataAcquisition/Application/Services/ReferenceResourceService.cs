@@ -124,6 +124,7 @@ public class ReferenceResourceService : IReferenceResourceService
             referenceQueryFactoryResult
             ?.ReferenceIds
             ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
+            .DistinctBy(x => x.Url.ToString())
             .ToList();
 
         var existingReferenceResources =
