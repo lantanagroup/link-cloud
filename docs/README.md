@@ -36,6 +36,13 @@ This page and its references include documentation for Link's services and the f
 * [Tenant](service_specs/tenant.md)
 * [Validation](service_specs/validation.md)
 
+### Development
+
+The following documentation is specific to development practices and tools used in the Link project.
+
+* [Authorization Policies](development/authorization_policies.md)
+* [API Guidance](development/api_guidance.md)
+
 ### Service Swagger Specifications
 
 When deployed, each service provides a Swagger UI for exploring its API. The Swagger UI is available at the `/swagger` endpoint for most of the services. For example, the Swagger UI for the **Account** service is available at `https://link-account/swagger`. However, the endpoint for swagger specifications varies between .NET and Java.
