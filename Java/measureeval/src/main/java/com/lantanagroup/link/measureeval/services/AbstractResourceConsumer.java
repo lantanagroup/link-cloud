@@ -136,7 +136,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
 
         // add the resource in the PatientReportingEvaluationStatus only if does not exist already
-        PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
+        PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources() == null ? null : patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
 
         if (existingResource == null) {
             PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
