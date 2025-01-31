@@ -394,6 +394,73 @@ namespace LantanaGroup.Link.DemoApiGateway.Controllers
 }
 ```
 
+### Route Guidelines
+
+**1\. Remove component name from route**
+
+To simplify route definitions, the URL within the request should be a sufficient indicator on which Link Cloud component is being accessed.
+
+| **Incorrect**                            | **Correct**                     |
+|------------------------------------------|---------------------------------|
+| `/api/census/config`                     | `/config`                       |
+| `/api/data/{facilityId}/{queryPlanType}` | `/{facilityId}/{queryPlanType}` |
+
+External requests to the Link Admin service will still need to contain the service as part of the request route in order for the service to able to redirect the request to the correct service.
+
+![](../images/yarp_routing.png)
+
+For example, the Census service route to update a facility config is:
+
+External request: `/api/census/configs/facilities/{facilityId}`
+
+Internal service route: `/configs/facilities/{facilityId}`
+
+The following Link Admin (BFF) appSettings includes the following to create this route proxy:
+
+```json
+"route3": {
+  "ClusterId": "CensusService",
+  "AuthorizationPolicy": "AuthenticatedUser",
+  "Match": {
+    "Path": "api/census/{**catch-all}"
+  },
+  "Transforms": [
+    { "PathPattern": "/{**catch-all}" }
+  ]
+},
+```
+
+**2\. Plural nouns**
+
+Unless they are singleton resources, nouns in the API route should be plural.
+
+| **Incorrect**                     | **Correct**                            |
+|-----------------------------------|----------------------------------------|
+| `/api/census/config/{facilityId}` | `/api/configs/facilities/{facilityId}` |
+
+**3\. Lower case route**
+
+API routes are case-sensitive. Because of this, routes should be lower case to remove any confusion.
+
+| **Incorrect**              | **Correct**                     |
+|----------------------------|---------------------------------|
+| `/api/ReportConfig/Create` | `/api/reportconfig/create`<br/> |
+
+**4\. Hyphenate to separate words rather than using spaces/camel case/pascal case**
+
+This practice improves readability and ensures compatibility across different systems and platforms.
+
+| **Incorrect**                                   | **Correct**                                       |
+|-------------------------------------------------|---------------------------------------------------|
+| `/api/data/{facilityId}/fhirQueryConfiguration` | `/api/data/{facilityId}/fhir-query-configuration` |
+
+**5. When applicable, service configurations should be capable of making requests with both the identifier of the record and Facility Id**
+
+Often services support configuration related requests either by identifier or facility. When applicable, a service should be capable of updating with either identifier. For example, the following PUT requests can be made to update a census config:
+
+- `/configs/facilities/{facilityId}`
+- `/configs/{Id}`
+
 ## Additional Resources
 
 * [Authorization Policies](./authorization_policies.md)
