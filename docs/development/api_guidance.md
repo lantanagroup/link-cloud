@@ -464,5 +464,5 @@ Often services support configuration related requests either by identifier or fa
 ## Additional Resources
 
 * [Authorization Policies](./authorization_policies.md)
-* [Logging and Error Handling (TODO)](./logging_error_handling.md)
-* [Telemetry (TODO)](./telemetry.md)
+* [Logging and Error Handling](./logging_error_handling.md)
+* [Open Telemetry](./otel.md)

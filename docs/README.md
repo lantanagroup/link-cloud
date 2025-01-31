@@ -43,6 +43,7 @@ The following documentation is specific to development practices and tools used 
 * [Authorization Policies](development/authorization_policies.md)
 * [API Guidance](development/api_guidance.md)
 * [Logging and Error Handling](development/logging_error_handling.md)
+* [Open Telemetry](./development/otel.md)
 
 ### Service Swagger Specifications
 
