@@ -183,6 +183,36 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return result;
     }
 
+    public virtual void StartTransaction()
+    {
+        _dbContext.Database.BeginTransaction();
+    }
+
+    public virtual async Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.BeginTransactionAsync();
+    }
+
+    public virtual void CommitTransaction()
+    {
+        _dbContext.Database.CommitTransaction();
+    }
+
+    public virtual async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.CommitTransactionAsync();
+    }
+
+    public virtual void RollbackTransaction()
+    {
+        _dbContext.Database.RollbackTransaction();
+    }
+
+    public virtual async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.RollbackTransactionAsync();
+    }
+
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
         var sortKey = sortBy?.ToLower() ?? "";
