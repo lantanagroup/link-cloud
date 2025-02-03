@@ -108,6 +108,11 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         throw new OperationCanceledException(e.Error.Reason, e);
                     }
 
+                    if (consumeResult is null)
+                    {
+                        throw new OperationCanceledException(e.Error.Reason, e);
+                    }
+
                     var facilityId = ExtractFacilityId(consumeResult);
 
                     DeadLetterConsumerHandler.HandleConsumeException(e, facilityId);
