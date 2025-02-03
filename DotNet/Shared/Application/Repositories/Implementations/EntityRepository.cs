@@ -190,7 +190,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task StartTransactionAsync(CancellationToken cancellationToken = default)
     {
-        await _dbContext.Database.BeginTransactionAsync();
+        await _dbContext.Database.BeginTransactionAsync(cancellationToken);
     }
 
     public virtual void CommitTransaction()
@@ -200,7 +200,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
     {
-        await _dbContext.Database.CommitTransactionAsync();
+        await _dbContext.Database.CommitTransactionAsync(cancellationToken);
     }
 
     public virtual void RollbackTransaction()
@@ -210,7 +210,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
     {
-        await _dbContext.Database.RollbackTransactionAsync();
+        await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
     }
 
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
