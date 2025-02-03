@@ -1,16 +1,8 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  IFacilityConfigModel,
-  PagedFacilityConfigModel
-} from "../../../interfaces/tenant/facility-config-model.interface";
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
-import {MatDialog} from "@angular/material/dialog";
-import {MatSnackBar} from "@angular/material/snack-bar";
-import {FacilityConfigDialogComponent} from "../../tenant/facility-config-dialog/facility-config-dialog.component";
 import {UserService} from "../../../services/gateway/account/user.service";
-import {PagedUserModel} from "../../../models/user/paged-user-model.model";
 import {UserModel} from "../../../models/user/user-model.model";
 import {MatPaginatorModule} from "@angular/material/paginator";
 import {MatExpansionModule} from "@angular/material/expansion";
