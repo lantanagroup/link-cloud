@@ -114,6 +114,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
                                     var frequency = value.Frequency.ToString();
+                                    var reportTrackingId = value.ReportTrackingId;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 
@@ -123,12 +124,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 										
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 

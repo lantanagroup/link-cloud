@@ -13,5 +13,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
         public DateTime StartDate { get; set; }
         [DataMember]
         public DateTime EndDate { get; set; }
+        [DataMember]
+        public string ReportTrackingId { get; set; }
     }
 }

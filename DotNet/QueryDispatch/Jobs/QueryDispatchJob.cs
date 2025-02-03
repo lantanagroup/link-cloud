@@ -65,7 +65,8 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                         ReportTypes = scheduledReportPeriod.ReportTypes,
                         Frequency = scheduledReportPeriod.Frequency,
                         StartDate = scheduledReportPeriod.StartDate,
-                        EndDate = scheduledReportPeriod.EndDate
+                        EndDate = scheduledReportPeriod.EndDate,
+                        ReportTrackingId = scheduledReportPeriod.ReportTrackingId
                     });
                 }
 
