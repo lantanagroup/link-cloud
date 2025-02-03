@@ -48,7 +48,7 @@ namespace QueryDispatch.Domain.Managers
 
                 var headers = new Headers
                         {
-                            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].CorrelationId) }
+                            { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].ReportTrackingId) }
                         };
 
                 var auditMessage = new AuditEventMessage
@@ -107,7 +107,6 @@ namespace QueryDispatch.Domain.Managers
                     existingReportPeriod.EndDate = newReportPeriod.EndDate;
                     existingReportPeriod.Frequency = newReportPeriod.Frequency;
                     existingReportPeriod.ReportTypes = newReportPeriod.ReportTypes;
-                    existingReportPeriod.CorrelationId = newReportPeriod.CorrelationId;
                     existingReportPeriod.ReportTrackingId = newReportPeriod.ReportTrackingId;
                     existingReportPeriod.ModifyDate = DateTime.UtcNow;
                 }
@@ -121,7 +120,6 @@ namespace QueryDispatch.Domain.Managers
                         Frequency = newReportPeriod.Frequency,
                         CreateDate = DateTime.UtcNow,
                         ModifyDate = DateTime.UtcNow,
-                        CorrelationId = newReportPeriod.CorrelationId,
                         ReportTrackingId = newReportPeriod.ReportTrackingId
                     });
 
@@ -133,7 +131,7 @@ namespace QueryDispatch.Domain.Managers
 
                 var headers = new Headers
                     {
-                        { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.CorrelationId) }
+                        { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.ReportTrackingId) }
                     };
 
                 var auditMessage = new AuditEventMessage

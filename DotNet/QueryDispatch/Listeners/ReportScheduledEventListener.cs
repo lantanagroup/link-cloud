@@ -124,12 +124,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 										
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId, reportTrackingId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId, reportTrackingId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 
