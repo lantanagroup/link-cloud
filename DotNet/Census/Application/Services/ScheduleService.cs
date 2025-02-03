@@ -53,7 +53,14 @@ public class ScheduleService : BackgroundService
 
             foreach (CensusConfigEntity facility in facilities)
             {
-                censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
+                try
+                {
+                    censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {1}.", facility.FacilityID);
+                }
             }
 
             await Scheduler.Start(cancellationToken);
