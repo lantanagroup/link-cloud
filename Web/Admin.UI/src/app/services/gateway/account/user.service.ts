@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import { Observable, catchError, map, tap, of } from 'rxjs';
 import { AppConfigService } from '../../app-config.service';
 import {PagedUserModel} from "../../../models/user/paged-user-model.model";
@@ -19,7 +19,18 @@ export class UserService {
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
 
-    return this.http.get<PagedUserModel>(`${this.baseApiPath}/account/users?searchText=${searchText}&filterFacilityBy=${filterFacilityBy}&filterRoleBy=${filterRoleBy}&filterClaimBy=${filterClaimBy}&includeDeactivatedUsers=${includeDeactivatedUsers}&includeDeletedUsers=${includeDeletedUsers}&sortBy=${sortBy}&pageSize=${pageSize}&pageNumber=${pageNumber}`)
+    const params = new HttpParams()
+      .set('searchText', searchText)
+      .set('filterFacilityBy', filterFacilityBy)
+      .set('filterRoleBy', filterRoleBy)
+      .set('filterClaimBy', filterClaimBy)
+      .set('includeDeactivatedUsers', includeDeactivatedUsers)
+      .set('includeDeletedUsers', includeDeletedUsers)
+      .set('sortBy', sortBy)
+      .set('pageSize', pageSize)
+      .set('pageNumber', pageNumber);
+
+    return this.http.get<PagedUserModel>(`${this.baseApiPath}/account/users`, { params })
       .pipe(
         tap(_ => console.log(`fetched user logs.`)),
         map((response: PagedUserModel) => {
@@ -27,7 +38,7 @@ export class UserService {
           response.metadata.pageNumber--;
           return response;
         }),
-        catchError(this.handleError)
+        catchError(this.handleError.bind(this))
       )
   }
 

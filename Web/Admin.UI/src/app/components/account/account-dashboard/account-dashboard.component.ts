@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {Component} from '@angular/core';
+import {CommonModule} from '@angular/common';
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {UserService} from "../../../services/gateway/account/user.service";
@@ -42,6 +42,8 @@ export class AccountDashboardComponent {
   users: UserModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
+  dataSource!: MatTableDataSource<UserModel>;
+
   //search parameters
   searchText: string = '';
   filterFacilityBy: string = '';
@@ -52,22 +54,46 @@ export class AccountDashboardComponent {
   sortBy: string = '';
 
 
-  displayedColumns: string[] = [ 'FirstName', 'LastName' , 'Role', 'Email', 'Actions'];
-  dataSource = new MatTableDataSource<UserModel>(this.users);
+  displayedColumns: string[] = ['FirstName', 'LastName', 'Role', 'Email', 'Actions'];
 
+  loading = false;
+  error: string | null = null;
 
-  constructor(private userService: UserService) { }
+  constructor(private userService: UserService) {
+  }
 
   ngOnInit(): void {
+    this.dataSource = new MatTableDataSource<UserModel>();
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
     this.getUsers();
   }
 
   getUsers() {
-    this.userService.list(this.searchText, this.filterFacilityBy, this.filterRoleBy, this.filterClaimBy, this.includeDeactivatedUsers, this.includeDeletedUsers, this.sortBy, this.paginationMetadata.pageSize, this.paginationMetadata.pageNumber).subscribe(data => {
-      this.users = data.records;
-      this.paginationMetadata = data.metadata;
+    this.loading = true;
+    this.error = null;
+    this.userService.list(
+      this.searchText,
+      this.filterFacilityBy,
+      this.filterRoleBy,
+      this.filterClaimBy,
+      this.includeDeactivatedUsers,
+      this.includeDeletedUsers,
+      this.sortBy,
+      this.paginationMetadata.pageSize,
+      this.paginationMetadata.pageNumber
+    ).subscribe({
+      next: (data) => {
+        this.users = data.records;
+        this.dataSource.data = this.users;
+        this.paginationMetadata = data.metadata;
+        this.loading = false;
+      },
+      error: (error) => {
+        this.error = 'Failed to load users. Please try again.';
+        this.loading = false;
+        console.error('Error loading users:', error);
+      }
     });
   }
 
@@ -76,23 +102,5 @@ export class AccountDashboardComponent {
 
   onDelete(row: UserModel) {
   }
-
-  /*showCreateFacilityDialog(): void {
-    this.dialog.open(FacilityConfigDialogComponent,
-      {
-        width: '75%',
-        data: { dialogTitle: 'Create a facility configuration', viewOnly: false, facilityConfig: null }
-      }).afterClosed().subscribe(res => {
-      console.log(res)
-      if (res) {
-        this.getUsers();
-        this.snackBar.open(`${res}`, '', {
-          duration: 3500,
-          panelClass: 'success-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
-      }
-    });
-  }*/
+  
 }

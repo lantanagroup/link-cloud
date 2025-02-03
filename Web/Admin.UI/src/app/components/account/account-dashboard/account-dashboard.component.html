@@ -3,13 +3,13 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       <span>User Accounts</span>
-      <button mat-mini-fab aria-label="Create a new facility dialog" matTooltip="Create User" >
+      <button mat-mini-fab aria-label="Create a new user " matTooltip="Create User" >
         <mat-icon>add</mat-icon>
       </button>
     </mat-toolbar>
   </p>
 
-  <div class="tenant-table-container" *ngIf="users.length > 0;else no_user_found">
+  <div class="account-table-container" *ngIf="users.length > 0;else no_user_found">
 
     <table mat-table [dataSource]="users">
 
