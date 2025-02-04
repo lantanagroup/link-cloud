@@ -58,7 +58,7 @@ namespace QueryDispatch.Domain.Managers
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
                     Resource = typeof(ScheduledReportEntity).Name,
-                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId} "
+                    Notes = $"Created schedule report {scheduledReport.Id} for facility {scheduledReport.FacilityId}. "
                 };
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
