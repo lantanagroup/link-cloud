@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.models;
+package com.lantanagroup.link.measureeval.entities;
 
 public enum ReportableEvent {
   DISCHARGE,

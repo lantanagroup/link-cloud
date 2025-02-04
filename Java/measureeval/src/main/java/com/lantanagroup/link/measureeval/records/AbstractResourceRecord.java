@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.measureeval.entities.QueryType;
-import com.lantanagroup.link.measureeval.models.ReportableEvent;
+import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
