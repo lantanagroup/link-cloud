@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             LocationCounter = meter.CreateCounter<long>("link_submission_service.locations_submitted.count");
             DiagnosticsCounter = meter.CreateCounter<long>("link_submission_service.diagnostics_submitted.count");
             MedicationRequestCounter = meter.CreateCounter<long>("link_submission_service.medication_requests_submitted.count");
-            ObservatonCounter = meter.CreateCounter<long>("link_submission_service.observations_submitted.count");
+            ObservationCounter = meter.CreateCounter<long>("link_submission_service.observations_submitted.count");
             SpecimenCounter = meter.CreateCounter<long>("link_submission_service.specimens_submitted.count");
             ServiceRequestCounter = meter.CreateCounter<long>("link_submission_service.service_requests_submitted.count");
         }
@@ -72,10 +72,10 @@ namespace LantanaGroup.Link.Submission.Application.Services
             MedicationRequestCounter.Add(count, tags.ToArray());
         }
 
-        public Counter<long> ObservatonCounter { get; private set; }
+        public Counter<long> ObservationCounter { get; private set; }
         public void IncrementObservationCounter(int count, List<KeyValuePair<string, object?>> tags)
         {
-            ObservatonCounter.Add(count, tags.ToArray());
+            ObservationCounter.Add(count, tags.ToArray());
         }
 
         public Counter<long> SpecimenCounter { get; private set; }
