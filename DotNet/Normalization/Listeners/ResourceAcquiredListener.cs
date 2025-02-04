@@ -374,7 +374,7 @@ public class ResourceAcquiredListener : BackgroundService
             {
                 if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                 {
-                    new OperationCanceledException(ex.Error.Reason, ex);
+                    throw new OperationCanceledException(ex.Error.Reason, ex);
                 }
 
                 string facilityId = Encoding.UTF8.GetString(ex.ConsumerRecord?.Message?.Key ?? []);
