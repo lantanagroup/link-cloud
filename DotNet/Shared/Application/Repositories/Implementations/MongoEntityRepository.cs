@@ -200,4 +200,34 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     {
         throw new NotImplementedException();
     }
+
+    public void StartTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void CommitTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RollbackTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }

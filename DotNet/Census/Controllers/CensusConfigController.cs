@@ -5,6 +5,7 @@ using LantanaGroup.Link.Census.Domain.Managers;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 
 namespace Census.Controllers;
 
@@ -45,6 +46,11 @@ public class CensusConfigController : Controller
         if (string.IsNullOrWhiteSpace(censusConfig.ScheduledTrigger))
         {
             return BadRequest("ScheduledTrigger is required.");
+        }
+
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+           return BadRequest("ScheduledTrigger is not a valid cron expression.");
         }
 
         try
@@ -128,6 +134,10 @@ public class CensusConfigController : Controller
         if (string.IsNullOrWhiteSpace(censusConfig.ScheduledTrigger))
         {
             return BadRequest("ScheduledTrigger is required.");
+        } 
+        else if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
         }
 
         if (!string.Equals(facilityId, censusConfig.FacilityId, StringComparison.OrdinalIgnoreCase))
