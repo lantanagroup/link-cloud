@@ -14,6 +14,27 @@ namespace LantanaGroup.Link.Submission.Application.Services
             ResourcesSubmittedCounter = meter.CreateCounter<long>("link_submission_service.resources_submitted.count");
             ResourceTypeCounter = meter.CreateCounter<long>("link_submission_service.resource_type_submitted.count");
             MedicationCodeCounter = meter.CreateCounter<long>("link_submission_service.medication_code_submitted.count");
+            ReportSubmittedCounter = meter.CreateCounter<long>("link_submission_service.reports_submitted.count");
+            EncounterCounter = meter.CreateCounter<long>("link_submission_service.encounters_submitted.count");
+            LocationCounter = meter.CreateCounter<long>("link_submission_service.locations_submitted.count");
+        }
+
+        public Counter<long> LocationCounter { get; private set; }
+        public void IncrementLocationCounter(int locationCounter, List<KeyValuePair<string, object?>> tags)
+        {
+            EncounterCounter.Add(locationCounter, tags.ToArray());
+        }
+
+        public Counter<long> EncounterCounter { get; private set; }
+        public void IncrementEncounterCounter(int encounterCounter, List<KeyValuePair<string, object?>> tags)
+        {
+            EncounterCounter.Add(encounterCounter, tags.ToArray());
+        }
+
+        public Counter<long> ReportSubmittedCounter { get; private set; }
+        public void IncrementReportSubmittedCounter(int reportsSubmitted, List<KeyValuePair<string, object?>> tags)
+        {
+            ReportSubmittedCounter.Add(reportsSubmitted, tags.ToArray());
         }
 
         public Counter<long> ResourcesSubmittedCounter { get; private set; }

@@ -5,6 +5,7 @@
         //Diagnostic tag names
         public const string Service = "service";
         public const string CorrelationId = "correlation.id";
+        public const string ReportId = "report.id";
         public const string FacilityId = "facility.id";
         public const string PatientId = "patient.id";
         public const string PatientEvent = "patient.event";
@@ -25,6 +26,9 @@
         public const string UserName = "user.name";
         public const string Email = "email";
         public const string Role = "role";
+        public const string EncounterClass = "encounter.class";
+        public const string EncounterType = "encounter.type";
+        public const string LocationType = "location.type";
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";
