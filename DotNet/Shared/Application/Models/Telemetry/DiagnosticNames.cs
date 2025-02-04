@@ -30,7 +30,7 @@
         public const string EncounterType = "encounter.type";
         public const string LocationType = "location.type";
         public const string DiagnosticReportCode = "diagnostic.report.code";
-        public const string MeedicationCode = "medication.code";
+        public const string MedicationCode = "medication.code";
         public const string MedicationRequestReasonCode = "medication.request.reason.code";
         public const string MedicationRequestCategory = "medicaton.request.category";
         public const string ObservationCode = "observation.code";

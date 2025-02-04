@@ -16,9 +16,7 @@ using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
@@ -618,7 +616,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             new List<KeyValuePair<string, object?>>()
                             {
                             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                            new KeyValuePair<string, object?>(DiagnosticNames.MeedicationCode, medCode),
+                            new KeyValuePair<string, object?>(DiagnosticNames.MedicationCode, medCode),
                             new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
                             new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
                             });
