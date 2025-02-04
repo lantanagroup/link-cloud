@@ -29,6 +29,13 @@
         public const string EncounterClass = "encounter.class";
         public const string EncounterType = "encounter.type";
         public const string LocationType = "location.type";
+        public const string DiagnosticReportCode = "diagnostic.report.code";
+        public const string MeedicationCode = "medication.code";
+        public const string MedicationRequestReasonCode = "medication.request.reason.code";
+        public const string MedicationRequestCategory = "medicaton.request.category";
+        public const string ObservationCode = "observation.code";
+        public const string SpecimenType = "specimen.type";
+        public const string ServiceRequestCategory = "service.request.category";
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";

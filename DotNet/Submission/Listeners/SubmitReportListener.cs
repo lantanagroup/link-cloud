@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics)
         {
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
-            
+
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
 
             _submissionServiceMetrics = submissionServiceMetrics;
@@ -359,7 +359,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
                                 //Generate Metrics
-                                await GenerateSubmissionMetrics(otherResourcesBundle,  patientFilesWritten.ToList(), key.ReportScheduleId, facilityId, key.StartDate, key.EndDate);
+                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), key.ReportScheduleId, facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
                             }
@@ -373,7 +373,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message,  ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
@@ -397,7 +397,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                       string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
 
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
@@ -419,9 +419,9 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
         }
 
-        protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate )
+        protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate)
         {
-            if(otherResourcesBundle == null) { return; }    
+            if (otherResourcesBundle == null) { return; }
             if (patientFilesWritten == null || patientFilesWritten.Count == 0) { return; }
 
             //Log metrics for "Other Resources"
@@ -439,7 +439,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 var tasks = new List<Task>();
 
-                for (int subIndex = startIndex;  subIndex > endIndex; subIndex--)
+                for (int subIndex = startIndex; subIndex > endIndex; subIndex--)
                 {
                     tasks.Add(Task.Run(async () =>
                     {
@@ -452,19 +452,13 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 patientFilesWritten.RemoveRange(endIndex, Math.Max(1, startIndex - endIndex));
             }
-
-            _submissionServiceMetrics.IncrementResourcesSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
-                    new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
-                });
         }
 
         /// <summary>
         /// Gets Bundle Data from File, and then calls ProcessMetricsForBundle to process metrics for it.
         /// </summary>
         /// <param name="patientFile"></param>
+        /// <param name="reportId"></param>
         /// <param name="facilityId"></param>
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
@@ -484,46 +478,50 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// Generate and Publish metrics for the provided bundle.
         /// </summary>
         /// <param name="bundle"></param>
-        /// <param name="patientId"></param>
+        /// <param name="reportId"></param>
         /// <param name="facilityId"></param>
         /// <param name="startDate"></param>
         /// <param name="endDate"></param>
+        /// <param name="patientId"></param>
         public void ProcessMetricsForBundle(Bundle bundle, string reportId, string facilityId, DateTime startDate, DateTime endDate, string patientId = "")
         {
-            var resources = bundle.GetResources();
-
-            if (resources == null)
-                return;
-
-            resources.AsParallel().ForAll(resource =>
+            try
             {
-                _submissionServiceMetrics.IncrementResourcesSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
+                var resources = bundle.GetResources();
+
+                if (resources == null)
+                    return;
+
+                resources.AsParallel().ForAll(resource =>
+                {
+                    _submissionServiceMetrics.IncrementResourcesSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
                     new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
-                });
+                    });
 
-                var resType = resource.TypeName;
+                    var resType = resource.TypeName;
 
-                _submissionServiceMetrics.IncrementResourceTypeCounter(1,
-                new List<KeyValuePair<string, object?>>()
-                {
+                    _submissionServiceMetrics.IncrementResourceTypeCounter(1,
+                    new List<KeyValuePair<string, object?>>()
+                    {
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
                     new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
                     new KeyValuePair<string, object?>(DiagnosticNames.Resource, resType)
-                });
+                    });
 
-                if(resource is Encounter)
-                {
-                    var enc = (Encounter)resource;
-                    var cls = enc.Class.Code;
-                    var type = enc.Type.FirstOrDefault()?.Coding.FirstOrDefault()?.Code;
-                    DateTime.TryParse(enc.Period.Start, out DateTime sd);
-                    DateTime.TryParse(enc.Period.End, out DateTime ed);
-
-                    _submissionServiceMetrics.IncrementEncounterCounter(1,
-                    new List<KeyValuePair<string, object?>>()
+                    if (resource is Encounter)
                     {
+                        var enc = (Encounter)resource;
+                        var cls = enc.Class.Code;
+                        var type = enc.Type.FirstOrDefault()?.Coding.FirstOrDefault()?.Code;
+                        _ = DateTime.TryParse(enc.Period.Start, out DateTime sd);
+                        _ = DateTime.TryParse(enc.Period.End, out DateTime ed);
+
+                        _submissionServiceMetrics.IncrementEncounterCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
                         new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
                         new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
@@ -531,41 +529,107 @@ namespace LantanaGroup.Link.Submission.Listeners
                         new KeyValuePair<string, object?>(DiagnosticNames.EncounterClass, cls),
                         new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart,  sd == DateTime.MinValue ? null : sd),
                         new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, ed == DateTime.MinValue ? null : ed)
-                    });
-                }
-                else if (resource is Location)
-                {
-                    var loc = (Location)resource;
-                    
-                    foreach(var lType in loc.Type)
+                        });
+                    }
+                    else if (resource is DiagnosticReport)
                     {
-                        _submissionServiceMetrics.IncrementLocationCounter(1,
+                        var diag = (DiagnosticReport)resource;
+
+                        _submissionServiceMetrics.IncrementDiagnosticCounter(1,
                         new List<KeyValuePair<string, object?>>()
                         {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.DiagnosticReportCode, diag.Code),
+                        });
+
+                    }
+                    else if (resource is Location)
+                    {
+                        var loc = (Location)resource;
+
+                        foreach (var lType in loc.Type)
+                        {
+                            _submissionServiceMetrics.IncrementLocationCounter(1,
+                            new List<KeyValuePair<string, object?>>()
+                            {
                             new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
                             new KeyValuePair<string, object?>(DiagnosticNames.LocationType, lType.Coding.FirstOrDefault()?.Code),
-                        });
+                            });
+                        }
                     }
-                }
-                else if (resource is Medication)
-                {
-                    var med = (Medication)resource;
-                    var code = med.Code?.Coding?.FirstOrDefault();
-                    if (code != null)
+                    else if (resource is Specimen)
                     {
-                        string medCode = $"{code.Code}|{code.System}";
+                        var obs = (Specimen)resource;
 
-                        _submissionServiceMetrics.IncrementMedicationCounter(1,
+                        _submissionServiceMetrics.IncrementSpecimenCounter(1,
                         new List<KeyValuePair<string, object?>>()
                         {
-                            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                            new KeyValuePair<string, object?>(DiagnosticNames.Resource, medCode),
-                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.SpecimenType, obs.Type.Coding.FirstOrDefault()?.Code)
                         });
                     }
-                }
-            });
+                    else if (resource is Observation)
+                    {
+                        var obs = (Observation)resource;
+
+                        _submissionServiceMetrics.IncrementObservationCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.ObservationCode, obs.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is ServiceRequest)
+                    {
+                        var servReq = (ServiceRequest)resource;
+
+                        _submissionServiceMetrics.IncrementServiceRequestCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.ServiceRequestCategory, servReq.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is MedicationRequest)
+                    {
+                        var medRequest = (MedicationRequest)resource;
+
+                        _submissionServiceMetrics.IncrementMedicationRequestCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.MedicationRequestReasonCode, medRequest.ReasonCode.FirstOrDefault()?.Coding.FirstOrDefault()?.Code),
+                        new KeyValuePair<string, object?>(DiagnosticNames.MedicationRequestCategory, medRequest.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is Medication)
+                    {
+                        var med = (Medication)resource;
+                        var code = med.Code?.Coding?.FirstOrDefault();
+                        if (code != null)
+                        {
+                            string medCode = $"{code.Code}|{code.System}";
+
+                            _submissionServiceMetrics.IncrementMedicationCounter(1,
+                            new List<KeyValuePair<string, object?>>()
+                            {
+                            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                            new KeyValuePair<string, object?>(DiagnosticNames.MeedicationCode, medCode),
+                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                            });
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error Generating Metrics for Bundle");
+            }
         }
 
         protected static string GetFacilityIdFromHeader(Headers headers)
@@ -600,7 +664,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <param name="endDate"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken )
+        private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
         {
             var returnModel = new CreatePatientBundleResult();
 
