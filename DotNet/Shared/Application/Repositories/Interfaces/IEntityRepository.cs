@@ -28,5 +28,10 @@ public interface IEntityRepository<T>
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default);
     Task<HealthCheckResult> HealthCheck(int eventId);
-
+    void StartTransaction();
+    void CommitTransaction();
+    void RollbackTransaction();
+    Task StartTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 }

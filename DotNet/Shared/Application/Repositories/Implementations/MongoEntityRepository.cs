@@ -11,6 +11,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
@@ -197,6 +198,36 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     }
 
     Task<(List<T>, PaginationMetadata)> IEntityRepository<T>.SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual void StartTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual void CommitTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual void RollbackTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }
