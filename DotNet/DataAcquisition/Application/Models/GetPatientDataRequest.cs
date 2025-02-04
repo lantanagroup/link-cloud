@@ -8,7 +8,6 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Models
         public string FacilityId { get; set; }
         public ConsumeResult<string, DataAcquisitionRequested> ConsumeResult { get; set; }
         public string CorrelationId { get; set; }
-        public string ReportTrackingId { get; set; }
         public QueryPlanType QueryPlanType { get; set; }
     }
 }

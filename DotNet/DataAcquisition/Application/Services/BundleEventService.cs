@@ -9,7 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public record ResourceAcquiredMessageGenerationRequest(string facilityId, string patientId, string queryType, string correlationId, string reportTrackingId, ReportableEvent ReportableEvent, List<ScheduledReport> scheduledReports);
+public record ResourceAcquiredMessageGenerationRequest(string facilityId, string patientId, string queryType, string correlationId, ReportableEvent ReportableEvent, List<ScheduledReport> scheduledReports);
 
 public interface IBundleEventService<EventKey, EventValue, EventRequest>
 {
@@ -40,8 +40,7 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
                         Key = request.facilityId,
                         Headers = new Headers
                         {
-                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.correlationId)),
-                            new Header(DataAcquisitionConstants.HeaderNames.ReportId, Encoding.UTF8.GetBytes(request.reportTrackingId ?? string.Empty))
+                            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(request.correlationId))
                         },
                         Value = new ResourceAcquired
                         {

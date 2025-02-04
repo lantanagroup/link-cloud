@@ -107,7 +107,5 @@ public class PatientCensusScheduledListener : BaseListener<PatientCensusSchedule
         var correlationId = Encoding.UTF8.GetString(cIBytes);
         return correlationId;
     }
-
-    protected override string ExtractReportTrackingId(ConsumeResult<string, PatientCensusScheduled> consumeResult) => string.Empty;
 }
 

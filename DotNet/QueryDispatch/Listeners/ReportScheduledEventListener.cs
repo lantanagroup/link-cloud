@@ -99,6 +99,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
 
                                     string correlationId = string.Empty;
+                                    string reportTrackingId = string.Empty;
 
                                     if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
@@ -109,12 +110,20 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Correlation Id missing");
                                     }
 
+                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Report-Tracking-Id", out headerValue))
+                                    {
+                                        reportTrackingId = Encoding.UTF8.GetString(headerValue);
+                                    }
+                                    else
+                                    {
+                                        throw new DeadLetterException("Report Tracking Id missing");
+                                    }
+
                                     string key = consumeResult.Message.Key;
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
                                     var frequency = value.Frequency.ToString();
-                                    var reportTrackingId = value.ReportTrackingId;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 

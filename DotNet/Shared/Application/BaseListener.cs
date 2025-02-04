@@ -7,7 +7,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application;
 public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
@@ -150,6 +149,5 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     protected abstract ConsumerConfig CreateConsumerConfig();
     protected abstract string ExtractFacilityId(ConsumeResult<ConsumeKeyType, ConsumeValueType> consumeResult);
     protected abstract string ExtractCorrelationId(ConsumeResult<ConsumeKeyType, ConsumeValueType> consumeResult);
-    protected abstract string ExtractReportTrackingId(ConsumeResult<ConsumeKeyType, ConsumeValueType> consumeResult);
     protected abstract Task ExecuteListenerAsync(ConsumeResult<ConsumeKeyType, ConsumeValueType> consumeResult, CancellationToken cancellationToken = default);
 }

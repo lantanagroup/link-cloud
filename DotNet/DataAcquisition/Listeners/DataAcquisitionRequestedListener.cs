@@ -46,16 +46,6 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
         try
         {
-            reportTrackingId = ExtractReportTrackingId(consumeResult);
-        }
-        catch (ArgumentNullException ex)
-        {
-            Logger.LogError(ex, "ReportTrackingId is missing from the message headers (X-Report-Tracking-Id).");
-            throw new DeadLetterException("ReportTrackingId is missing from the message headers.", ex);
-        }
-
-        try
-        {
             facilityId = ExtractFacilityId(consumeResult);
 
             if (string.IsNullOrWhiteSpace(facilityId))
@@ -75,8 +65,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId
+            CorrelationId = correlationId
         }, cancellationToken);
     }
 
@@ -110,20 +99,6 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
 
         var correlationId = Encoding.UTF8.GetString(cIBytes);
         return correlationId;
-    }
-
-    protected override string ExtractReportTrackingId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
-    {
-        var cIBytes = consumeResult.Headers
-            .FirstOrDefault(x => x.Key.ToLower() == DataAcquisitionConstants.HeaderNames.ReportId.ToLower())
-            ?.GetValueBytes();
-
-        if (cIBytes == null || cIBytes.Length == 0)
-            throw new ArgumentNullException("Report ID is missing from the message headers.");
-
-
-        var reportId = Encoding.UTF8.GetString(cIBytes);
-        return reportId;
     }
 
 }
