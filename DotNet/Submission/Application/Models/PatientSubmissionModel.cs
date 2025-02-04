@@ -1,8 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Converters;
-using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Domain.Entities;
-using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Submission.Application.Models
