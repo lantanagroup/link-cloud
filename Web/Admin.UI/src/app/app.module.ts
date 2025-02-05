@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { OAuthModule } from 'angular-oauth2-oidc';
 import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule } from "@angular/common/http";
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -31,39 +31,33 @@ export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
 }
 
-@NgModule({
-  declarations: [
-    AppComponent
-  ],
-  imports: [
-    BrowserModule,
-    HttpClientModule,
-    BrowserAnimationsModule,
-    AppRoutingModule,
-    LayoutModule,
-    MatToolbarModule,
-    MatButtonModule,
-    MatSidenavModule,
-    MatIconModule,
-    MatListModule,
-    ThemePickerComponent,
-    MatMenuModule,
-    MatExpansionModule,
-    MatNativeDateModule,
-    LoadingIndicatorComponent,
-    MatSelectModule
-  ],
-  providers: [
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initConfig,
-      deps: [AppConfigService],
-      multi: true,
-    },
-    StyleManagerService,
-    HttpInterceptorProviders,
-    AuthenticationService
-  ],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        BrowserAnimationsModule,
+        AppRoutingModule,
+        LayoutModule,
+        MatToolbarModule,
+        MatButtonModule,
+        MatSidenavModule,
+        MatIconModule,
+        MatListModule,
+        ThemePickerComponent,
+        MatMenuModule,
+        MatExpansionModule,
+        MatNativeDateModule,
+        LoadingIndicatorComponent,
+        MatSelectModule], providers: [
+        {
+            provide: APP_INITIALIZER,
+            useFactory: initConfig,
+            deps: [AppConfigService],
+            multi: true,
+        },
+        StyleManagerService,
+        HttpInterceptorProviders,
+        AuthenticationService,
+        provideHttpClient(withInterceptorsFromDi())
+    ] })
 export class AppModule { }

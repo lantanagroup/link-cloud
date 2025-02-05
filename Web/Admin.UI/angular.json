@@ -24,27 +24,6 @@
             ],
             "styles": [
               "src/styles.scss",
-              //"src/styles/base.scss",
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/pink-bluegrey.scss",
-              //  "bundleName": "pink-bluegrey"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/deeppurple-amber.scss",
-              //  "bundleName": "deeppurple-amber"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/indigo-pink.scss",
-              //  "bundleName": "indigo-pink"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/purple-green.scss",
-              //  "bundleName": "purple-green"
-              //},
               {
                 "inject": false,
                 "input": "src/styles/custom-themes/zelda-blue-theme.scss",
