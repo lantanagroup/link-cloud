@@ -206,6 +206,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 #endregion
 
                                 Bundle otherResourcesBundle = new Bundle();
+                                otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
                                 string measureShortNames = value.MeasureIds
                                     .Select(GetMeasureShortName)
