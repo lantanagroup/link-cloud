@@ -212,7 +212,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     var allReady = entries.All(x => x.Status == PatientSubmissionStatus.ReadyForSubmission);
 
-                                    if (allReady)
+                                    if (allReady && schedule.SubmitReportDateTime == null)
                                     {
                                         var patientIds = entries.Select(s => s.PatientId).ToList();
 

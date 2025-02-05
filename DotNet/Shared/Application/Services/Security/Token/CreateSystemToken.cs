@@ -52,8 +52,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security.Token
 
                 var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
-                _logger.LogInformation("Link token created for a system request.");
-
                 if (_linkTokenServiceConfig.Value.LogToken)
                 {
                     Activity.Current?.AddEvent(new("Token generated.", tags: [
