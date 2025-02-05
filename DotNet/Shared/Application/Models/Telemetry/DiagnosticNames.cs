@@ -36,6 +36,7 @@
         public const string ObservationCode = "observation.code";
         public const string SpecimenType = "specimen.type";
         public const string ServiceRequestCategory = "service.request.category";
+        public const string Measures = "report.measures";
 
         //Diagnostic tags Searching
         public const string SearchText = "search.text";

@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Report.Core
                 schedule.Id == e.ReportScheduleId);
 
             Bundle patientResources = CreateNewBundle();
-            Bundle otherResources = CreateNewBundle();  
+            Bundle otherResources = CreateNewBundle();
             foreach (var entry in entries)
             {
                 if (entry.MeasureReport == null) 

@@ -21,6 +21,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using static LantanaGroup.Link.Submission.Listeners.SubmitReportListener;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -450,6 +451,13 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 patientFilesWritten.RemoveRange(endIndex, Math.Max(1, startIndex - endIndex));
             }
+
+            _submissionServiceMetrics.IncrementReportSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                    });
         }
 
         /// <summary>
