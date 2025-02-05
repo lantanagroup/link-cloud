@@ -523,8 +523,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                         var enc = (Encounter)resource;
                         var cls = enc.Class.Code;
                         var type = enc.Type.FirstOrDefault()?.Coding.FirstOrDefault()?.Code;
-                        _ = DateTime.TryParse(enc.Period.Start, out DateTime sd);
-                        _ = DateTime.TryParse(enc.Period.End, out DateTime ed);
+                        _ = DateTime.TryParse(enc.Period?.Start ?? "", out DateTime sd);
+                        _ = DateTime.TryParse(enc.Period?.End ?? "", out DateTime ed);
 
                         _submissionServiceMetrics.IncrementEncounterCounter(1,
                         new List<KeyValuePair<string, object?>>()
