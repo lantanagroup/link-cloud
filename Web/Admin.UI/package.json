@@ -18,7 +18,7 @@
     "@angular/core": "^18.2.13",
     "@angular/forms": "^18.2.13",
     "@angular/material": "^17.3.10",
-    "@angular/platform-browser": "^18.2.13",
+    "@angular/platform-browser": "^19.1.4",
     "@angular/platform-browser-dynamic": "^18.2.13",
     "@angular/router": "^18.2.13",
     "@fireflysemantics/join": "^1.0.14",
