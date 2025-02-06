@@ -1,5 +1,4 @@
 import { NgModule } from '@angular/core';
-import { OAuthModule } from 'angular-oauth2-oidc';
 import { BrowserModule } from '@angular/platform-browser';
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -26,6 +25,10 @@ import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
 import { AuthenticationService } from './services/security/authentication.service';
+import { MatInputModule } from '@angular/material/input';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatCardModule } from '@angular/material/card';
+import { ReactiveFormsModule } from '@angular/forms';
 
 export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
@@ -48,7 +51,11 @@ export function initConfig(appConfig: AppConfigService) {
         MatExpansionModule,
         MatNativeDateModule,
         LoadingIndicatorComponent,
-        MatSelectModule], providers: [
+        MatSelectModule,
+        MatInputModule,
+        MatRadioModule,
+        MatCardModule,
+        ReactiveFormsModule], providers: [
         {
             provide: APP_INITIALIZER,
             useFactory: initConfig,
