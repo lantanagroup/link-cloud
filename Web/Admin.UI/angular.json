@@ -24,27 +24,6 @@
             ],
             "styles": [
               "src/styles.scss",
-              //"src/styles/base.scss",
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/pink-bluegrey.scss",
-              //  "bundleName": "pink-bluegrey"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/deeppurple-amber.scss",
-              //  "bundleName": "deeppurple-amber"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/indigo-pink.scss",
-              //  "bundleName": "indigo-pink"
-              //},
-              //{
-              //  "inject": false,
-              //  "input": "src/styles/custom-themes/purple-green.scss",
-              //  "bundleName": "purple-green"
-              //},
               {
                 "inject": false,
                 "input": "src/styles/custom-themes/zelda-blue-theme.scss",
@@ -92,16 +71,16 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "proxy-for-angular:build",
             "proxyConfig": "proxy.conf.js",
-            "port": 4200
+            "port": 4200,
+            "buildTarget": "proxy-for-angular:build"
           },
           "configurations": {
             "production": {
-              "browserTarget": "AdminUI:build:production"
+              "buildTarget": "AdminUI:build:production"
             },
             "development": {
-              "browserTarget": "AdminUI:build:development"
+              "buildTarget": "AdminUI:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -109,7 +88,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "AdminUI:build"
+            "buildTarget": "AdminUI:build"
           }
         },
         "test": {
