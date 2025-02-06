@@ -36,9 +36,9 @@ export class ThemePickerComponent implements OnInit, OnDestroy {
     {
       primary: '#3F51B5',
       accent: '#E91E63',
-      displayName: 'Indigo & Pink',
-      name: 'indigo-pink',
-      isDark: false      
+      displayName: 'Blue & Rose',
+      name: 'blue-rose',
+      isDark: false
     },
     //{
     //  primary: '#E91E63',
@@ -128,7 +128,7 @@ export class ThemePickerComponent implements OnInit, OnDestroy {
     const body = document.getElementsByTagName('body')[0];
     if (prevThemeName) {
       body.classList.remove(prevThemeName);
-    }    
+    }
     body.classList.add(this.currentTheme.name);
 
 
