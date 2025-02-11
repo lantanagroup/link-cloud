@@ -195,6 +195,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                             report.setFrequency(scheduledReport.getFrequency());
                             report.setStartDate(scheduledReport.getStartDate());
                             report.setEndDate(scheduledReport.getEndDate());
+                            report.setReportTrackingId(scheduledReport.getReportTrackingId());
                             return report;
                         })
                 ).collect(Collectors.toList()));
@@ -378,6 +379,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         value.setResource(resource);
         value.setReportType(report.getReportType());
         value.setIsReportable(report.getReportable());
+        value.setReportTrackingId(report.getReportTrackingId());
 
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
@@ -404,6 +406,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             scheduledReportDa.setStartDate(scheduledReport.getStartDate());
             scheduledReportDa.setEndDate(scheduledReport.getEndDate());
             scheduledReportDa.setFrequency(scheduledReport.getFrequency());
+            scheduledReportDa.setReportTrackingId(scheduledReport.getReportTrackingId());
             valueDa.getScheduledReports().add(scheduledReportDa);
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
