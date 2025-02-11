@@ -406,6 +406,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             scheduledReportDa.setStartDate(scheduledReport.getStartDate());
             scheduledReportDa.setEndDate(scheduledReport.getEndDate());
             scheduledReportDa.setFrequency(scheduledReport.getFrequency());
+            scheduledReportDa.setReportTrackingId(scheduledReport.getReportTrackingId());
             valueDa.getScheduledReports().add(scheduledReportDa);
         });
         org.apache.kafka.common.header.Headers headers = new RecordHeaders().add(Headers.CORRELATION_ID, Headers.getBytes(patientStatus.getCorrelationId()));
