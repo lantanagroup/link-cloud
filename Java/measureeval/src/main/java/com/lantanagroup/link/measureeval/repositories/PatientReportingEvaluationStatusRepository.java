@@ -5,6 +5,7 @@ import org.springframework.data.domain.Example;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -18,5 +19,15 @@ public interface PatientReportingEvaluationStatusRepository
         probe.setResources(null);
 
         return findOne(Example.of(probe));
+    }
+
+    default List<PatientReportingEvaluationStatus> findByFacilityIdAndReportTrackingId(String facilityId, String reportTrackingID) {
+        PatientReportingEvaluationStatus probe = new PatientReportingEvaluationStatus();
+        probe.setFacilityId(facilityId);
+        PatientReportingEvaluationStatus.Report reportProbe = new PatientReportingEvaluationStatus.Report();
+        reportProbe.setReportTrackingId(reportTrackingID);
+        probe.setReports(List.of(reportProbe));
+
+        return findAll(Example.of(probe));
     }
 }
