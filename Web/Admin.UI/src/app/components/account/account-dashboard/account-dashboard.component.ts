@@ -14,6 +14,7 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatButtonModule} from "@angular/material/button";
 import {MatTooltipModule} from "@angular/material/tooltip";
 import {MatToolbarModule} from "@angular/material/toolbar";
+import {MatChipsModule} from "@angular/material/chips";
 
 @Component({
   selector: 'app-account-dashboard',
@@ -30,7 +31,8 @@ import {MatToolbarModule} from "@angular/material/toolbar";
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
-    MatToolbarModule
+    MatToolbarModule,
+    MatChipsModule
   ],
   templateUrl: './account-dashboard.component.html',
   styleUrls: ['./account-dashboard.component.scss']
@@ -54,7 +56,7 @@ export class AccountDashboardComponent {
   sortBy: string = '';
 
 
-  displayedColumns: string[] = ['FirstName', 'LastName', 'Role', 'Email', 'Actions'];
+  displayedColumns: string[] = ['FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
   loading = false;
   error: string | null = null;
@@ -102,5 +104,5 @@ export class AccountDashboardComponent {
 
   onDelete(row: UserModel) {
   }
-  
+
 }

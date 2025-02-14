@@ -25,9 +25,15 @@
         <td mat-cell *matCellDef="let user"> {{user.lastName}} </td>
       </ng-container>
 
-      <ng-container matColumnDef="Role">
-        <th mat-header-cell *matHeaderCellDef> Role </th>
-        <td mat-cell *matCellDef="let user"> LinkAdmin </td>
+      <ng-container matColumnDef="Roles">
+        <th mat-header-cell *matHeaderCellDef> Roles </th>
+        <td mat-cell *matCellDef="let user">
+          <mat-chip-grid>
+            <mat-chip *ngFor="let role of user.roles" color="primary" selected>
+              {{ role }}
+            </mat-chip>
+          </mat-chip-grid>
+        </td>
       </ng-container>
 
       <!-- Email Column -->
