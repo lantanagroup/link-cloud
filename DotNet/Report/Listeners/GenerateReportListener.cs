@@ -33,16 +33,17 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IDeadLetterExceptionHandler<string, GenerateReportValue> _deadLetterExceptionHandler;
         private readonly ServiceRegistry _serviceRegistry;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        
+
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
 
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
+        private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
 
         private string Name => this.GetType().Name;
 
-        public GenerateReportListener(ILogger<GenerateReportListener> logger, 
+        public GenerateReportListener(ILogger<GenerateReportListener> logger,
             IKafkaConsumerFactory<string, GenerateReportValue> kafkaConsumerFactory,
             ITransientExceptionHandler<string, GenerateReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<string, GenerateReportValue> deadLetterExceptionHandler,
@@ -51,7 +52,8 @@ namespace LantanaGroup.Link.Report.Listeners
             IOptions<LinkTokenServiceSettings> linkTokenService,
             ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
-            IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer)
+            IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
+            IProducer<string, EvaluationRequestedValue> evaluationProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -73,6 +75,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _createSystemToken = createSystemToken;
             _serviceRegistry = serviceRegistry.Value;
             _dataAcqProducer = dataAcqProducer;
+            _evaluationProducer = evaluationProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -144,7 +147,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
-                                    if(existing == null)
+                                    if (existing == null)
                                     {
                                         throw new DeadLetterException("No ReportSchedule found for the provided ID: " + HtmlInputSanitizer.Sanitize(value.ReportId));
                                     }
@@ -169,7 +172,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         throw new DeadLetterException("End date must be after start date.");
                                     }
-                                    
+
                                 }
 
                                 // Create ReportSchedule for AdHoc Report
@@ -188,36 +191,59 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 await measureReportScheduledManager.AddAsync(reportSchedule, cancellationToken);
 
-                                // Get Patient List if none was provided or we are re-running an existing report
-                                if (value.PatientIds == null || value.PatientIds.Count == 0)
-                                {
-                                    value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
-                                }
+                                var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
 
-                                foreach (var patient in value.PatientIds)
+                                if (value.ReportId != null)
                                 {
-                                    //For each patient and report type, Create Submission Entries for each Patient and Report Type
-                                    foreach (var reportType in reportTypes)
+                                    var pids = (await submissionEntryManager.FindAsync(p => p.ReportScheduleId == value.ReportId, cancellationToken)).Select(p => p.PatientId);
+
+                                    pids.AsParallel().ForAll(async p =>
                                     {
-                                        var submissionEntryManager =
-                                            scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-
-                                        await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                        await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
                                         {
-                                            PatientId = patient,
-                                            Status = PatientSubmissionStatus.NotEvaluated,
-                                            ReportScheduleId = newReportId,
-                                            FacilityId = facilityId,
-                                            ReportType = reportType,
-                                        }, cancellationToken);
+                                            Key = facilityId,
+                                            Value = new EvaluationRequestedValue
+                                            {
+                                                PreviousReportId = value.ReportId,
+                                                PatientId = p,
+                                            },
+                                            Headers = new Headers
+                                            {
+                                                { "X-Report-Tracking-Id", Encoding.ASCII.GetBytes(newReportId) },
+                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
+                                            }
+                                        });
+                                    });
+                                }
+                                else
+                                {
+                                    // Get Patient List if none was provided
+                                    if (value.PatientIds == null || value.PatientIds.Count == 0)
+                                    {
+                                        value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                                    //Submit a Data Acquisition Request for each patient
-                                    var darValue = new DataAcquisitionRequestedValue()
+                                    value.PatientIds.AsParallel().ForAll(async patient =>
                                     {
-                                        PatientId = patient,
-                                        ReportableEvent = "AdHoc",
-                                        ScheduledReports = new List<ScheduledReport>()
+                                        //For each patient and report type, Create Submission Entries for each Patient and Report Type
+                                        foreach (var reportType in reportTypes)
+                                        {
+                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            {
+                                                PatientId = patient,
+                                                Status = PatientSubmissionStatus.NotEvaluated,
+                                                ReportScheduleId = newReportId,
+                                                FacilityId = facilityId,
+                                                ReportType = reportType,
+                                            }, cancellationToken);
+                                        }
+
+                                        //Submit a Data Acquisition Request for each patient
+                                        var darValue = new DataAcquisitionRequestedValue()
+                                        {
+                                            PatientId = patient,
+                                            ReportableEvent = "AdHoc",
+                                            ScheduledReports = new List<ScheduledReport>()
                                             {
                                                 new ()
                                                 {
@@ -227,17 +253,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     ReportTypes = reportTypes
                                                 }
                                             },
-                                        QueryType = QueryType.Initial.ToString(),
-                                    };
+                                            QueryType = QueryType.Initial.ToString(),
+                                        };
 
-                                    _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
-                                    {
-                                        Key = facilityId,
-                                        Value = darValue,
-                                        Headers = result.Message.Headers
+                                        await _dataAcqProducer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
+                                        {
+                                            Key = facilityId,
+                                            Value = darValue,
+                                            Headers = result.Message.Headers
+                                        });
+
+                                        _dataAcqProducer.Flush(cancellationToken);
                                     });
-
-                                    _dataAcqProducer.Flush(cancellationToken);
                                 }
                             }
                             catch (DeadLetterException ex)
