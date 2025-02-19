@@ -217,7 +217,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
-                                    // Get Patient List if none was provided or we are re-running an existing report
+                                    // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
                                     {
                                         value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
