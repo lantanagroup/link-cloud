@@ -30,12 +30,12 @@ public class CodeGroupCacheService(
             _cacheKeys.Add(key);
     }
 
-    public CodeGroup GetCodeGroupById(CodeGroup.CodeGroupTypes type, string id, string? version = null)
+    public CodeGroup? GetCodeGroupById(CodeGroup.CodeGroupTypes type, string id, string? version = null)
     {
         CacheKey? key = null;
         
         if (version == null)
-            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderBy(k => k.Version).FirstOrDefault();
+            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version).FirstOrDefault();
         else
             key = _cacheKeys.FirstOrDefault(k => k.Type == type && k.Id == id && string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
 
@@ -46,12 +46,12 @@ public class CodeGroupCacheService(
         return codeGroup;
     }
 
-    public CodeGroup GetCodeGroup(CodeGroup.CodeGroupTypes type, string url, string? version = null)
+    public CodeGroup? GetCodeGroup(CodeGroup.CodeGroupTypes type, string url, string? version = null)
     {
         CacheKey? key = null;
         
         if (version == null)
-            key = _cacheKeys.Where(k => k.Type == type && string.Equals(k.Url, url, StringComparison.CurrentCultureIgnoreCase)).OrderBy(k => k.Version).FirstOrDefault();
+            key = _cacheKeys.Where(k => k.Type == type && string.Equals(k.Url, url, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(k => k.Version).FirstOrDefault();
         else
             key = _cacheKeys.FirstOrDefault(k => k.Type == type && string.Equals(k.Url, url, StringComparison.CurrentCultureIgnoreCase) && string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
         
@@ -60,6 +60,23 @@ public class CodeGroupCacheService(
         
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
+    }
+    
+    public List<CodeGroup> GetAllCodeGroups(CodeGroup.CodeGroupTypes type)
+    {
+        List<CodeGroup> codeGroups = _cacheKeys
+            .Where(k => k.Type == type)
+            .Select(k => cache.Get<CodeGroup>(k.Key))
+            .Where(cg => cg != null)
+            .OrderByDescending(cg => cg.Version)
+            .ToList()!;
+        
+        // Remove all but the first duplicate by id (returning only the HEAD/latest version)
+        codeGroups = codeGroups.GroupBy(cg => cg.Id)
+            .Select(g => g.First())
+            .ToList();
+
+        return codeGroups;
     }
 
     public void ClearCache()
@@ -181,6 +198,8 @@ public class CodeGroupCacheService(
             var jsonFilePaths = Directory.GetFiles(directory, "*.json");
             var csvFilePaths = Directory.GetFiles(directory, "*.csv");
             
+            logger.LogInformation("Loading code group from {Directory}", directory);
+            
             if (jsonFilePaths.Length == 0 || csvFilePaths.Length == 0)
             {
                 logger.LogWarning("Directory {Directory} does not contain a JSON or CSV file", directory);
@@ -201,9 +220,11 @@ public class CodeGroupCacheService(
                     switch (codeGroup.Type)
                     {
                         case CodeGroup.CodeGroupTypes.CodeSystem:
+                            logger.LogInformation("Processing code system CSV for {CodeSystem}", codeGroup.Id);
                             this.ProcessCodeSystemCsv(codeGroup, csv);
                             break;
                         case CodeGroup.CodeGroupTypes.ValueSet:
+                            logger.LogInformation("Processing value set CSV for {ValueSet}", codeGroup.Id);
                             this.ProcessValueSetCsv(codeGroup, csv);
                             break;
                         default:
