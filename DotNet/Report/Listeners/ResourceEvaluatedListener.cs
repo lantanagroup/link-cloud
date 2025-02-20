@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
 
-        private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly PatientReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
 
         private string Name => this.GetType().Name;
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
-            MeasureReportSubmissionBundler bundler,
+            PatientReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
             IServiceScopeFactory serviceScopeFactory, 
             IProducer<SubmissionReportKey, SubmissionReportValue> submissionReportProducer)
