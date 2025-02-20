@@ -1,11 +1,9 @@
 using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using LantanaGroup.Link.Report.Domain.Managers;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
