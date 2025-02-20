@@ -13,7 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
 
+@Service
 public class ResourceEvaluatedProducer {
     private static final Logger logger = LoggerFactory.getLogger(ResourceEvaluatedProducer.class);
     private final MeasureReportNormalizer measureReportNormalizer;
@@ -68,6 +70,10 @@ public class ResourceEvaluatedProducer {
             PatientReportingEvaluationStatus.Report report,
             String measureReportId,
             Resource resource) {
+
+        if (patientStatus == null || report == null || measureReportId == null || resource == null) {
+            throw new IllegalArgumentException("All parameters are required");
+        }
 
         if (logger.isTraceEnabled()) {
             logger.trace(
