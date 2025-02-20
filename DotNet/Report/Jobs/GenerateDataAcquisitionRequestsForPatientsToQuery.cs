@@ -22,14 +22,14 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly IProducer<SubmissionReportKey, SubmissionReportValue> _submissionReportProducer;
         private readonly ISchedulerFactory _schedulerFactory;
 
-        private readonly MeasureReportSubmissionBundler _bundler;
+        private readonly PatientReportSubmissionBundler _bundler;
         private readonly MeasureReportAggregator _aggregator;
         private readonly IDatabase _database;
 
         public GenerateDataAcquisitionRequestsForPatientsToQuery(
             ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> logger,
             ISchedulerFactory schedulerFactory,
-            MeasureReportSubmissionBundler bundler,
+            PatientReportSubmissionBundler bundler,
             MeasureReportAggregator aggregator,
             IDatabase database,
             IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
