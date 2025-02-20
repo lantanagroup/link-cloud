@@ -21,13 +21,16 @@ public interface PatientReportingEvaluationStatusRepository
         return findOne(Example.of(probe));
     }
 
-    default List<PatientReportingEvaluationStatus> findByFacilityIdAndReportTrackingId(String facilityId, String reportTrackingID) {
+    default Optional<PatientReportingEvaluationStatus> findOne(String facilityId, String patientId, String reportTrackingID) {
         PatientReportingEvaluationStatus probe = new PatientReportingEvaluationStatus();
         probe.setFacilityId(facilityId);
+        probe.setPatientId(patientId);
         PatientReportingEvaluationStatus.Report reportProbe = new PatientReportingEvaluationStatus.Report();
         reportProbe.setReportTrackingId(reportTrackingID);
         probe.setReports(List.of(reportProbe));
+        probe.setResources(null);
+        probe.setCorrelationId(null);
 
-        return findAll(Example.of(probe));
+        return findOne(Example.of(probe));
     }
 }

@@ -6,5 +6,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class EvaluationRequested {
-    private String reportId;
+    private String PreviousReportId;
+    private String PatientId;
 }

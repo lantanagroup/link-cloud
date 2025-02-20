@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.measureeval.exceptions.ValidationException;
 import com.lantanagroup.link.measureeval.kafka.Headers;
 import com.lantanagroup.link.measureeval.kafka.Topics;
 import com.lantanagroup.link.measureeval.models.ReportableEvent;
@@ -24,9 +25,7 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
@@ -57,6 +56,7 @@ public class EvaluationRequestedConsumer {
 
     @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
     public void consume(@Header(Headers.REPORT_TRACKING_ID) String reportTrackingID,
+                        @Header(Headers.CORRELATION_ID) String correlationId,
                         ConsumerRecord<String, EvaluationRequested> record) {
 
         Span currentSpan = Span.current();
@@ -67,38 +67,45 @@ public class EvaluationRequestedConsumer {
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
-        var patientReportStatuses = patientStatusRepository.findByFacilityIdAndReportTrackingId(facilityId, record.value().getReportId());
+        var patientReportStatus = patientStatusRepository.findOne(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
 
-        for (PatientReportingEvaluationStatus status: patientReportStatuses) {
-            var bundle = patientStatusBundler.createBundle(status);
-            evaluateMeasures(reportTrackingID, record.value(), status, bundle);
+        if (patientReportStatus.isPresent()) {
+            var bundle = patientStatusBundler.createBundle(patientReportStatus.get());
+            evaluateMeasures(reportTrackingID, correlationId, record.value(), patientReportStatus.get(), bundle);
+        } else {
+            logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
         }
     }
 
-    private void evaluateMeasures (String reportTrackingId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+    private void evaluateMeasures (String reportTrackingId, String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
-        for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports().stream().filter(r -> Objects.equals(r.getReportTrackingId(), value.getReportId())).toList()) {
 
-            //create new PatientReportingEvaluationStatus and save it
-            var newPatientStatus = new PatientReportingEvaluationStatus();
-            newPatientStatus.setFacilityId(patientStatus.getFacilityId());
-            newPatientStatus.setPatientId(patientStatus.getPatientId());
-            newPatientStatus.setCorrelationId(UUID.randomUUID().toString());
-            newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
-            report.setReportTrackingId(reportTrackingId);
-            var reports = patientStatus.getReports();
-            reports.clear();
-            reports.add(report);
-            newPatientStatus.setReports(reports);
-            newPatientStatus.setResources(patientStatus.getResources());
+        //get valid report in array
+        var reports = patientStatus.getReports().stream().filter(r -> Objects.equals(r.getReportTrackingId(), value.getPreviousReportId())).toList();
 
-            patientStatusRepository.save(patientStatus);
-
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, report, bundle);
-            this.resourceEvaluatedProducer.produceResourceEvaluatedRecords(patientStatus, report, measureReport);
+        if(reports.size() > 1){
+            var message = String.format("Multiple reports found with the same reportTrackingId: %s", value.getPreviousReportId());
+            throw new ValidationException(message);
         }
+
+        //create new PatientReportingEvaluationStatus and save it
+        reports.forEach(r -> r.setReportTrackingId(reportTrackingId));
+        var newPatientStatus = new PatientReportingEvaluationStatus();
+        newPatientStatus.setFacilityId(patientStatus.getFacilityId());
+        newPatientStatus.setPatientId(patientStatus.getPatientId());
+        newPatientStatus.setCorrelationId(correlationId);
+        newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
+        newPatientStatus.setReports(reports);
+        newPatientStatus.setResources(patientStatus.getResources());
+
+        patientStatusRepository.save(patientStatus);
+
+        reports.forEach(r -> {
+            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
+            this.resourceEvaluatedProducer.produceResourceEvaluatedRecords(patientStatus, r, measureReport);
+        });
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
         // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
