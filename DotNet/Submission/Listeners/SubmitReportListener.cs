@@ -15,13 +15,12 @@ using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
-using static LantanaGroup.Link.Submission.Listeners.SubmitReportListener;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -41,6 +40,9 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ICreateSystemToken _createSystemToken;
 
         private readonly ISubmissionServiceMetrics _submissionServiceMetrics;
+
+        private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+        private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
 
         private string Name => this.GetType().Name;
 
@@ -192,10 +194,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 List? admittedPatients;
                                 try
                                 {
-                                    admittedPatients =
-                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                            censusContent,
-                                            new JsonSerializerOptions().ForFhir());
+                                    admittedPatients = await _fhirJsonParser.ParseAsync<List>(censusContent);   
                                 }
                                 catch (Exception ex)
                                 {
@@ -220,7 +219,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 string fileName;
                                 string contents;
-                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -249,7 +247,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     fileName = "sending-device.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(device);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -259,7 +257,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Organization
 
                                     fileName = "sending-organization.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -269,7 +267,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Patient List
 
                                     fileName = "patient-list.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -282,7 +280,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     {
                                         string measureShortName = this.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
-                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
+                                        contents = await _fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                             consumeCancellationToken);
@@ -354,7 +352,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
+                                contents = await _fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
@@ -473,7 +471,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         public async Task GetBundleAndGenerateMetrics(PatientFile patientFile, string reportId, string facilityId, DateTime startDate, DateTime endDate)
         {
             string contents = await File.ReadAllTextAsync(patientFile.FilePath);
-            var bundle = JsonSerializer.Deserialize<Bundle>(contents, new JsonSerializerOptions().ForFhir());
+            var bundle = await _fhirJsonParser.ParseAsync<Bundle>(contents);                
 
             if (bundle == null)
                 return;
@@ -675,8 +673,6 @@ namespace LantanaGroup.Link.Submission.Listeners
         {
             var returnModel = new CreatePatientBundleResult();
 
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
             var httpClient = _httpClient.CreateClient();
 
             //TODO: add method to get key that includes looking at redis for future use case
@@ -699,7 +695,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (PatientSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientSubmissionModel), cancellationToken);
+                var strContent = await response.Content.ReadAsStringAsync();
+                var patientSubmissionBundle = JsonConvert.DeserializeObject<PatientSubmissionModel>(strContent);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
@@ -710,11 +707,14 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
 
-                returnModel.OtherResources = patientSubmissionBundle.OtherResources;
+                returnModel.OtherResources = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.OtherResources);
+                
+                //Deserialize to verify that the bundle is properly constructed - discard the result.
+                //Consider removing for performance reasons after we are sure this ser/des logic is stable.
+                _ = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.PatientResources);
 
-                patientSubmissionBundle.PatientResources.Type = Bundle.BundleType.Collection;
                 string fileName = $"patient-{patientId}.json";
-                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
+                string contents = patientSubmissionBundle.PatientResources;
 
                 returnModel.PatientFile.PatientId = patientId;
                 returnModel.PatientFile.FilePath = submissionDirectory + "/" + fileName;
