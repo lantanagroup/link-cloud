@@ -13,7 +13,6 @@ namespace LantanaGroup.Link.Report.Domain
         IEntityRepository<MeasureReportScheduleModel> ReportScheduledRepository { get; set; }
         IEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         IEntityRepository<MeasureReportConfigModel> ReportConfigRepository { get; set; }
-        IEntityRepository<MeasureReportSubmissionModel> ReportSubmissionRepository { get; set; }
     }
 
     public class Database : IDatabase
@@ -25,15 +24,13 @@ namespace LantanaGroup.Link.Report.Domain
         public IEntityRepository<MeasureReportScheduleModel> ReportScheduledRepository { get; set; }
         public IEntityRepository<MeasureReportSubmissionEntryModel> SubmissionEntryRepository { get; set; }
         public IEntityRepository<MeasureReportConfigModel> ReportConfigRepository { get; set; }
-        public IEntityRepository<MeasureReportSubmissionModel> ReportSubmissionRepository { get; set; }
 
         public Database(IOptions<MongoConnection> mongoSettings,
             IEntityRepository<PatientResourceModel> patientResourceRepository,
             IEntityRepository<SharedResourceModel> sharedResourceRepository,
             IEntityRepository<MeasureReportScheduleModel> reportScheduledRepository,
             IEntityRepository<MeasureReportSubmissionEntryModel> submissionEntryRepository,
-            IEntityRepository<MeasureReportConfigModel> reportConfigRepository,
-            IEntityRepository<MeasureReportSubmissionModel> reportSubmissionRepository)
+            IEntityRepository<MeasureReportConfigModel> reportConfigRepository)
         {
             var client = new MongoClient(mongoSettings.Value.ConnectionString);
             DbContext = client.GetDatabase(mongoSettings.Value.DatabaseName);
@@ -43,7 +40,6 @@ namespace LantanaGroup.Link.Report.Domain
             ReportScheduledRepository = reportScheduledRepository;
             SubmissionEntryRepository = submissionEntryRepository;
             ReportConfigRepository = reportConfigRepository;
-            ReportSubmissionRepository = reportSubmissionRepository;
         }
     }
 }

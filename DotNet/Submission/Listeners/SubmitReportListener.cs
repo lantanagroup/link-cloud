@@ -8,19 +8,18 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
-using StackExchange.Redis;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
-using static Confluent.Kafka.ConfigPropertyNames;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -177,6 +176,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
                                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+                                var fhirJsonParser = new FhirJsonParser();
+                                var fhirSerializer = new FhirJsonSerializer();
 
                                 _logger.LogDebug("Requesting census from Census service: " + censusRequestUrl);
                                 var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
@@ -188,10 +189,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 List? admittedPatients;
                                 try
                                 {
-                                    admittedPatients =
-                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                            censusContent,
-                                            new JsonSerializerOptions().ForFhir());
+                                    admittedPatients = fhirJsonParser.Parse<List>(censusContent);
                                 }
                                 catch (Exception ex)
                                 {
@@ -215,7 +213,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 string fileName;
                                 string contents;
-                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -441,11 +438,8 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <param name="endDate"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate,
-            DateTime endDate, CancellationToken cancellationToken)
+        private async Task<Bundle> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
         {
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
-
             var httpClient = _httpClient.CreateClient();
 
             //TODO: add method to get key that includes looking at redis for future use case
@@ -458,7 +452,8 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ssZ";
 
-            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            //string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            string requestUrl = $"https://localhost:7110/api/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
 
             try
             {
@@ -470,23 +465,16 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (MeasureReportSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(MeasureReportSubmissionModel), cancellationToken);
+                var strContents = await response.Content.ReadAsStringAsync();
 
-                if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
-                {
-                    throw new Exception(
-                        @$"One or More Required Objects are null: 
-                                        patientSubmissionBundle: {patientSubmissionBundle == null}
-                                        patientSubmissionBundle.PatientResources: {patientSubmissionBundle?.PatientResources == null}
-                                        patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
-                }
+                var patientSubmissionBundle = JsonConvert.DeserializeObject<MeasureReportSubmissionModel>(strContents);
 
-                var otherResources = patientSubmissionBundle.OtherResources;
+                var parser = new FhirJsonParser();
+                var otherResources = parser.Parse<Bundle>(patientSubmissionBundle.OtherResources);
+                var patientResources = parser.Parse<Bundle>(patientSubmissionBundle.PatientResources);
 
                 string fileName = $"patient-{patientId}.json";
-                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
-
-                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, cancellationToken);
+                await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, patientSubmissionBundle.PatientResources, cancellationToken);
 
                 return otherResources;
             }

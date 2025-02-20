@@ -1,11 +1,12 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -41,7 +42,7 @@ namespace LantanaGroup.Link.Report.Core
         }
 
 
-        public async Task<PatientSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate)
+        public async Task<MeasureReportSubmissionModel> GenerateBundle(string facilityId, string patientId, DateTime startDate, DateTime endDate)
         {
             if (string.IsNullOrEmpty(facilityId))
                 throw new Exception($"GenerateBundle: no facilityId supplied");
@@ -136,14 +137,11 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
-            PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
+            var serializer = new FhirJsonSerializer();
+            var patientSubmissionModel = new MeasureReportSubmissionModel()
             {
-                FacilityId = facilityId,
-                PatientId = patientId,
-                StartDate = startDate,
-                EndDate = endDate,
-                PatientResources = patientResources,
-                OtherResources = otherResources
+                PatientResources = serializer.SerializeToString(patientResources),
+                OtherResources = serializer.SerializeToString(otherResources)
             };
 
             return patientSubmissionModel;
@@ -184,6 +182,53 @@ namespace LantanaGroup.Link.Report.Core
 
 
         #region Common Methods
+
+        public Organization CreateOrganization(String facilityId)
+        {
+            Organization org = new Organization();
+            org.Meta = new Meta
+            {
+                Profile = new string[] { ReportConstants.BundleSettings.SubmittingOrganizationProfile }
+            };
+            org.Active = true;
+            org.Id = Guid.NewGuid().ToString(); // or National Provider Identifier (NPI) from config?
+            org.Type = new List<CodeableConcept>
+            {
+                new CodeableConcept(ReportConstants.BundleSettings.OrganizationTypeSystem, "prov", "Healthcare Provider", null)
+            };
+
+            //TODO: Replace this placeholder code?
+            org.Name = "EHR Test On Prem"; // should be org name from config?
+
+            org.Identifier.Add(new Identifier
+            {
+                System = ReportConstants.BundleSettings.CdcOrgIdSystem,
+                Value = facilityId // CDC org ID from config
+            });
+
+            // TODO: should phone and email be in config?
+            // if phone and email not configured add data absent extension
+            org.Telecom = new List<ContactPoint>
+            {
+                new ContactPoint
+                {
+                    Extension = new List<Extension>{ new Extension(ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, new Code(ReportConstants.BundleSettings.DataAbsentReasonUnknownCode) ) }
+                }
+            };
+
+            // TODO: should be only if address is in config?
+            // if no address configured add data absent extension
+            org.Address = new List<Address>
+            {
+                new Address
+                {
+                    Extension = new List<Extension>{ new Extension(ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, new Code(ReportConstants.BundleSettings.DataAbsentReasonUnknownCode) ) }
+                }
+            };
+
+
+            return org;
+        }
 
         protected Bundle CreateNewBundle()
         {
