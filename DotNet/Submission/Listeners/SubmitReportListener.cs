@@ -42,6 +42,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ISubmissionServiceMetrics _submissionServiceMetrics;
 
         private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+        private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
 
         private string Name => this.GetType().Name;
 
@@ -218,7 +219,6 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 string fileName;
                                 string contents;
-                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -247,7 +247,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     fileName = "sending-device.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(device);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -257,7 +257,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Organization
 
                                     fileName = "sending-organization.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -267,7 +267,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Patient List
 
                                     fileName = "patient-list.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -280,7 +280,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     {
                                         string measureShortName = this.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
-                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
+                                        contents = await _fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                             consumeCancellationToken);
@@ -352,7 +352,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
+                                contents = await _fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
