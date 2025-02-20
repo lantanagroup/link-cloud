@@ -85,7 +85,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.WebHost.ConfigureKestrel(options =>
     {
-        options.Limits.MaxRequestBodySize = 100 * 1024 * 1024; // Set limit to 50 MB
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
 
     // Add service information
