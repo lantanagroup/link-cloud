@@ -452,8 +452,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             string dtFormat = "yyyy-MM-ddTHH:mm:ssZ";
 
-            //string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
-            string requestUrl = $"https://localhost:7110/api/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
+            string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&StartDate={startDate.ToString(dtFormat)}&EndDate={endDate.ToString(dtFormat)}";
 
             try
             {
