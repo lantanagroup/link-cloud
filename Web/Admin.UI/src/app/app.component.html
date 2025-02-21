@@ -91,6 +91,19 @@
         </mat-expansion-panel>
       </mat-accordion>
 
+      <!-- Validation Config Menu -->
+      <mat-accordion>
+        <mat-expansion-panel style="box-shadow: none">
+          <mat-expansion-panel-header style="margin-left: -8px">
+            <mat-panel-title> <mat-icon>bug_report</mat-icon>&nbsp;Validation Config </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a mat-list-item routerLink="validation-config" routerLinkActive="active">
+            <mat-icon matListItemIcon>validation_config</mat-icon>
+            <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Validation Config</div>
+          </a>
+        </mat-expansion-panel>
+      </mat-accordion>
+
       <a mat-list-item routerLink="themes" routerLinkActive="active">
         <mat-icon matListItemIcon [ngClass]="{'close-menu-icon' : !showMenuText}">palette</mat-icon>
         <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Themes</div>

@@ -1,0 +1,17 @@
+<p><a [routerLink]="['/tenant']">Tenants</a> > <a [routerLink]="['/tenant/facility/', facilityId]">Viewing {{facilityId}}</a> > Viewing Report {{reportId}}</p>
+
+<mat-card appearance="outlined">
+  <mat-card-content>
+    <p><strong>Report Id:</strong> {{reportInfo.reportId}}</p>
+    <p><strong>Reporting Period:</strong> {{reportInfo.reportingPeriodStart}} - {{reportInfo.reportingPeriodEnd}}</p>
+    <p><strong>Measures:</strong>&nbsp;<mat-chip *ngFor="let m of reportInfo.measures">{{m.shortName}}</mat-chip></p>
+  </mat-card-content>
+</mat-card>
+<mat-card appearance="outlined">
+  <mat-card-title>
+    Validation Results
+  </mat-card-title>
+  <mat-card-content>
+    <app-validation-results></app-validation-results>
+  </mat-card-content>
+</mat-card>
