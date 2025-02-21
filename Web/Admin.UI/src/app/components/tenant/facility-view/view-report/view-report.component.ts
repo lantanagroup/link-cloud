@@ -43,6 +43,4 @@ export class ViewReportComponent {
       // TODO: Get information about the report from the API
     });
   }
-
-  protected readonly F = F;
 }

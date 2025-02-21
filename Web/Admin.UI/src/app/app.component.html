@@ -22,12 +22,12 @@
       </button>
     </mat-menu>
     <span class="profile-name">
-      {{ userProfile?.firstName }} {{ userProfile?.lastName}}
+      {{ userProfile?.firstName }} {{ userProfile?.lastName }}
     </span>
   </span>
 
 </mat-toolbar>
-<mat-drawer-container class="sidenav-container" autosize  >
+<mat-drawer-container class="sidenav-container" autosize>
   <mat-drawer #drawer mode="side" opened>
     <mat-nav-list *ngIf="!loginRequired || userProfile?.email">
 
@@ -53,7 +53,9 @@
       <mat-accordion>
         <mat-expansion-panel style="box-shadow: none">
           <mat-expansion-panel-header style="margin-left: -8px">
-            <mat-panel-title> <mat-icon>email</mat-icon>&nbsp;Notification </mat-panel-title>
+            <mat-panel-title>
+              <mat-icon>email</mat-icon>&nbsp;Notification
+            </mat-panel-title>
           </mat-expansion-panel-header>
           <a mat-list-item routerLink="notification-configuration" routerLinkActive="active">
             <mat-icon matListItemIcon>settings</mat-icon>
@@ -82,7 +84,9 @@
       <mat-accordion>
         <mat-expansion-panel style="box-shadow: none">
           <mat-expansion-panel-header style="margin-left: -8px">
-            <mat-panel-title> <mat-icon>bug_report</mat-icon>&nbsp;Testing </mat-panel-title>
+            <mat-panel-title>
+              <mat-icon>bug_report</mat-icon>&nbsp;Testing
+            </mat-panel-title>
           </mat-expansion-panel-header>
           <a mat-list-item routerLink="integration-test" routerLinkActive="active">
             <mat-icon matListItemIcon>integration_instructions</mat-icon>
@@ -92,17 +96,10 @@
       </mat-accordion>
 
       <!-- Validation Config Menu -->
-      <mat-accordion>
-        <mat-expansion-panel style="box-shadow: none">
-          <mat-expansion-panel-header style="margin-left: -8px">
-            <mat-panel-title> <mat-icon>bug_report</mat-icon>&nbsp;Validation Config </mat-panel-title>
-          </mat-expansion-panel-header>
-          <a mat-list-item routerLink="validation-config" routerLinkActive="active">
-            <mat-icon matListItemIcon>validation_config</mat-icon>
-            <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Validation Config</div>
-          </a>
-        </mat-expansion-panel>
-      </mat-accordion>
+      <a mat-list-item routerLink="validation-config" routerLinkActive="active">
+        <mat-icon matListItemIcon [ngClass]="{'close-menu-icon' : !showMenuText}">done_all</mat-icon>
+        <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Validation Config</div>
+      </a>
 
       <a mat-list-item routerLink="themes" routerLinkActive="active">
         <mat-icon matListItemIcon [ngClass]="{'close-menu-icon' : !showMenuText}">palette</mat-icon>
