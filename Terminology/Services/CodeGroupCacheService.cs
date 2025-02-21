@@ -156,6 +156,7 @@ public class CodeGroupCacheService(
         }
                     
         SetCodeGroup(codeGroup);
+        logger.LogInformation("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
 
     private void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
@@ -179,6 +180,7 @@ public class CodeGroupCacheService(
         }
             
         SetCodeGroup(codeGroup);
+        logger.LogInformation("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
 
     public async void LoadCache()
