@@ -35,7 +35,7 @@
           </mat-option>
         </mat-select>
         <mat-error *ngIf="rolesControl.hasError('required')">
-          Report Type is <strong>required</strong>
+          Roles is <strong>required</strong>
         </mat-error>
       </mat-form-field>
     </div>
@@ -44,7 +44,7 @@
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Email</mat-label>
         <input matInput formControlName="email" [readonly]="viewOnly">
-        <button *ngIf="lastName.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
+        <button *ngIf="email.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear">
           <mat-icon>close</mat-icon>
         </button>
         <mat-error *ngIf="email.hasError('required')">

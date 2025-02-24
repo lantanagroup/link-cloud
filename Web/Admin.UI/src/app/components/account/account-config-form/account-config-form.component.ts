@@ -1,7 +1,7 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
-import {FormBuilder, FormControl, ReactiveFormsModule, Validators} from '@angular/forms';
+import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatSelectModule} from '@angular/material/select';
 import {MatChipsModule} from '@angular/material/chips';
@@ -63,7 +63,7 @@ export class AccountConfigFormComponent {
 
   @Output() submittedConfiguration = new EventEmitter<IApiResponse>();
 
-  accountForm!: any;
+  accountForm!: FormGroup;
 
   roles: string[] = [];
 
@@ -145,7 +145,7 @@ export class AccountConfigFormComponent {
             }
           },
           error: (err) => {
-            if (err.status = 409) {
+            if (err.status === 409) {
               console.error('Error occurred:', err); // Log the error or display it to the user
               this.submittedConfiguration.emit({success: false, message: `Another account with same email exists.`});
             }
@@ -160,7 +160,7 @@ export class AccountConfigFormComponent {
               this.submittedConfiguration.emit({success: true, message: ""});
             },
             error: (err) => {
-              if (err.status = 409) {
+              if (err.status === 409) {
                 console.error('Error occurred:', err); // Log the error or display it to the user
                 this.submittedConfiguration.emit({success: false, message: `Another account with same email exists.`});
               }

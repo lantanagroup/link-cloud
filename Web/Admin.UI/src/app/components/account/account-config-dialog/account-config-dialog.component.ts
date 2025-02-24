@@ -11,7 +11,7 @@ import {RoleModel} from "../../../models/role/role-model.model";
 import {IApiResponse} from "../../../interfaces/api-response.interface";
 
 @Component({
-  selector: 'app-report-config-dialog',
+  selector: 'app-account-config-dialog',
   standalone: true,
   templateUrl: './account-config-dialog.component.html',
   styleUrls: ['./account-config-dialog.component.scss'],
@@ -71,6 +71,13 @@ export class AccountConfigDialogComponent implements OnInit {
   }
 
   submitConfiguration() {
+    if (!this.accountConfigForm) {
+       this.snackBar.open('Form not initialized', '', {
+         duration: 3500,
+         panelClass: 'error-snackbar'
+       });
+       return;
+    }
     this.accountConfigForm.submitConfiguration();
   }
 
