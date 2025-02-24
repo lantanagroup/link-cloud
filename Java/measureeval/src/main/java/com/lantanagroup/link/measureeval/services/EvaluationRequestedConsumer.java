@@ -10,6 +10,7 @@ import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -38,6 +39,7 @@ public class EvaluationRequestedConsumer {
     private final PatientStatusBundler patientStatusBundler;
     private final ResourceEvaluatedProducer resourceEvaluatedProducer;
     private final EvaluateMeasureService evaluateMeasureService;
+    private final PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository;
 
     EvaluationRequestedConsumer(AbstractResourceRepository resourceRepository,
                                 PatientReportingEvaluationStatusRepository patientStatusRepository,
@@ -46,12 +48,17 @@ public class EvaluationRequestedConsumer {
                                 KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
                                 @Qualifier("compressedKafkaTemplate")
                                 KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
-                                MeasureEvalMetrics measureEvalMetrics, PatientStatusBundler patientStatusBundler, ResourceEvaluatedProducer resourceEvaluatedProducer, EvaluateMeasureService evaluateMeasureService) {
+                                MeasureEvalMetrics measureEvalMetrics,
+                                PatientStatusBundler patientStatusBundler,
+                                ResourceEvaluatedProducer resourceEvaluatedProducer,
+                                EvaluateMeasureService evaluateMeasureService,
+                                PatientReportingEvaluationStatusTemplateRepository patientReportingEvaluationStatusTemplateRepository) {
         this.patientStatusRepository = patientStatusRepository;
         this.measureEvalMetrics = measureEvalMetrics;
         this.patientStatusBundler = patientStatusBundler;
         this.resourceEvaluatedProducer = resourceEvaluatedProducer;
         this.evaluateMeasureService = evaluateMeasureService;
+        this.patientReportingEvaluationStatusTemplateRepository = patientReportingEvaluationStatusTemplateRepository;
     }
 
     @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
@@ -67,11 +74,11 @@ public class EvaluationRequestedConsumer {
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
-        var patientReportStatus = patientStatusRepository.findOne(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
+        var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
 
-        if (patientReportStatus.isPresent()) {
-            var bundle = patientStatusBundler.createBundle(patientReportStatus.get());
-            evaluateMeasures(reportTrackingID, correlationId, record.value(), patientReportStatus.get(), bundle);
+        if (patientReportStatus != null) {
+            var bundle = patientStatusBundler.createBundle(patientReportStatus);
+            evaluateMeasures(reportTrackingID, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
         }
@@ -99,8 +106,7 @@ public class EvaluationRequestedConsumer {
         newPatientStatus.setReportableEvent(ReportableEvent.ADHOC.name());
         newPatientStatus.setReports(reports);
         newPatientStatus.setResources(patientStatus.getResources());
-
-        patientStatusRepository.save(patientStatus);
+        patientStatusRepository.insert(newPatientStatus);
 
         reports.forEach(r -> {
             MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
