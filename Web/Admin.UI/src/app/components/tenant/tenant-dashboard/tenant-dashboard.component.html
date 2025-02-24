@@ -3,7 +3,7 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       <span>Tenant Dashboard</span>
-      <button mat-mini-fab aria-label="Create a new facility dialog" matTooltip="Create Facility" (click)="showCreateFacilityDialog()">
+      <button mat-mini-fab aria-label="Create a new facility dialog" title="Create tenant" matTooltip="Create Facility" (click)="showCreateFacilityDialog()">
         <mat-icon>add</mat-icon>
       </button>
     </mat-toolbar>
@@ -17,7 +17,7 @@
       <ng-container matColumnDef="facilityId">
         <th mat-header-cell *matHeaderCellDef> Id </th>
         <td mat-cell *matCellDef="let facility">
-          <a [routerLink]="['/tenant/facility', facility.facilityId]">{{facility.facilityId}}</a>          
+          <a [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">{{facility.facilityId}}</a>
         </td>
       </ng-container>
 
@@ -30,7 +30,23 @@
       <!-- Scheduled Tasks Column -->
       <ng-container matColumnDef="scheduledTasks">
         <th mat-header-cell *matHeaderCellDef> Tasks </th>
-        <td mat-cell *matCellDef="let facility"> {{facility.scheduledTasks.length}} </td>
+        <td mat-cell *matCellDef="let facility"> {{facility.scheduledTasks?.length}} </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let facility">
+          <button mat-mini-fab aria-label="Edit facility" title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
+            Edit
+          </button>
+          <button mat-mini-fab aria-label="Delete facility" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
+            Delete
+          </button>
+          <button mat-mini-fab aria-label="View facility" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
+            View
+          </button>
+        </td>
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

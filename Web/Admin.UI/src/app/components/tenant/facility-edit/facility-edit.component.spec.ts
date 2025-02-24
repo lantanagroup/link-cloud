@@ -1,16 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { FacilityViewComponent } from './facility-view.component';
+import { FacilityEditComponent } from './facility-edit.component';
 
 describe('FacilityViewComponent', () => {
-  let component: FacilityViewComponent;
-  let fixture: ComponentFixture<FacilityViewComponent>;
+  let component: FacilityEditComponent;
+  let fixture: ComponentFixture<FacilityEditComponent>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [FacilityViewComponent]
+      imports: [FacilityEditComponent]
     });
-    fixture = TestBed.createComponent(FacilityViewComponent);
+    fixture = TestBed.createComponent(FacilityEditComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

@@ -1,156 +1,38 @@
-<div class="content">
-  <p>
-    <mat-toolbar class="page-header-bar" color="primary">
-      <span *ngIf="facilityConfig">Facility: {{facilityConfig.facilityId}}</span>
-      <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard" [routerLink]="['/tenant']">
-        <mat-icon>arrow_back</mat-icon> Back
-      </button>
-    </mat-toolbar>
-  </p>
+<p><a [routerLink]="['/tenant']">Tenants</a> > Viewing {{facilityId}}</p>
 
-  <mat-card *ngIf="facilityConfig">
-    <mat-card-content>
-      <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>
-      <mat-card-actions align="end">
-        <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-card-actions>
-    </mat-card-content>
-  </mat-card>
+<mat-card appearance="outlined">
+  <mat-card-content>
+    <p><strong>Facility Id:</strong> {{facilityId}}</p>
+    <p><strong>NHSN Org Id:</strong> {{nhsnOrgId}}</p>
+  </mat-card-content>
+</mat-card>
 
-  <!-- <p>
-      {{facilityConfig | json}}
-  </p>     -->
+<h3>Reports</h3>
+<div class="report-table-container">
+  <table mat-table [dataSource]="reports">
 
-  <div class="example-action-buttons">
-    <button mat-button (click)="accordion.openAll()">Expand All</button>
-    <button mat-button (click)="accordion.closeAll()">Collapse All</button>
-  </div>
-  <mat-accordion class="example-headers-align" multi>
-    <mat-expansion-panel id="censusPanel" (opened)="loadCensusConfig()">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Census Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage" *ngIf="showNoCensusConfigAlert"></app-link-alert>
-      <app-census-config-form [item]="censusConfig" [viewOnly]="true"></app-census-config-form>
-      <mat-action-row>
-        <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration" (click)="showCensusDialog()" *ngIf="showNoCensusConfigAlert">
-          <mat-icon>add</mat-icon>
-        </button>
-        <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration" (click)="showCensusDialog()" *ngIf="!showNoCensusConfigAlert">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </mat-action-row>
-    </mat-expansion-panel>
+    <!-- Report ID Column -->
+    <ng-container matColumnDef="reportId">
+      <th mat-header-cell *matHeaderCellDef> Report ID </th>
+      <td mat-cell *matCellDef="let report">
+        <a [routerLink]="['/tenant/facility', facilityId, 'report', report.reportId]">{{report.reportId}}</a>
+      </td>
+    </ng-container>
 
-    <mat-expansion-panel id="dataacqPanel" (opened)="loadDataAcquisitionConfig()">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Data Acquisition Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
+    <!-- Reporting Period Column -->
+    <ng-container matColumnDef="reportingPeriod">
+      <th mat-header-cell *matHeaderCellDef> Reporting Period </th>
+      <td mat-cell *matCellDef="let report"> {{report.reportingPeriod}} </td>
+    </ng-container>
 
-      <mat-tab-group>
-        <mat-tab label="Fhir Query" id="fhirQueryTab" (opened)="loadFhirQueryConfig()">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage" *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
-          <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig" [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
-          <mat-action-row>
-            <button mat-mini-fab aria-label="Add Fhir Resource Query configuration" matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="showNoCensusConfigAlert">
-              <mat-icon>add</mat-icon>
-            </button>
-            <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration" matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="!showNoCensusConfigAlert">
-              <mat-icon>edit</mat-icon>
-            </button>
-          </mat-action-row>
-        </mat-tab>
-        <mat-tab label="Fhir List" (opened)="loadFhirListConfig()">
-         <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage" *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
-         <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig" [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
-         <mat-action-row>
-          <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="showNoCensusConfigAlert">
-            <mat-icon>add</mat-icon>
-          </button>
-          <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="!showNoCensusConfigAlert">
-            <mat-icon>edit</mat-icon>
-          </button>
-        </mat-action-row>
-        </mat-tab>
-        <mat-tab label="Query Plan">
-          -- Query Plan Configuration
-        </mat-tab>
-        <mat-tab label="Authentication">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"> </app-link-alert>
-          <app-data-acquisition-authentication-config-form [queryAuthConfig]="dataAcqAuthQueryConfig" [queryListAuthConfig]="dataAcqAuthQueryListConfig" [facilityId]="facilityId" [viewOnly]="true"></app-data-acquisition-authentication-config-form>
-        </mat-tab>
-      </mat-tab-group>
-     </mat-expansion-panel>
+    <!-- Measures Column -->
+    <ng-container matColumnDef="measures">
+      <th mat-header-cell *matHeaderCellDef> Measures </th>
+      <td mat-cell *matCellDef="let report"> {{report.measures}} </td>
+    </ng-container>
 
-      <mat-expansion-panel>
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-            Normalization Configuration
-          </mat-panel-title>
-          <mat-panel-description>
-          </mat-panel-description>
-        </mat-expansion-panel-header>
-        -- stuff here
-      </mat-expansion-panel>
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Measure Evaluation Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      -- stuff here
-    </mat-expansion-panel>
-
-    <mat-expansion-panel id="reportPanel" (opened)="displayReportDashboard = true" (closed)="displayReportDashboard = false">
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Report Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-report-dashboard [facilityId]="facilityId" [displayReportDashboard]="displayReportDashboard" *ngIf="displayReportDashboard"></app-report-dashboard>
-    </mat-expansion-panel>
-
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Validation Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-
-    </mat-expansion-panel>
-
-    <mat-expansion-panel>
-      <mat-expansion-panel-header>
-        <mat-panel-title>
-          Submission Configuration
-        </mat-panel-title>
-        <mat-panel-description>
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      -- stuff here
-    </mat-expansion-panel>
-
-
-</mat-accordion>
-
-
+  </table>
 </div>
-
-
