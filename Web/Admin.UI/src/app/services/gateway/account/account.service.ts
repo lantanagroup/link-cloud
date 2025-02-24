@@ -7,7 +7,7 @@ import {PagedUserModel} from "../../../models/user/paged-user-model.model";
 import {RoleModel} from "../../../models/role/role-model.model";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
 import {UserModel} from "../../../models/user/user-model.model";
-import {IApiResponse} from "../../../interfaces/response.interface";
+import {IApiResponse} from "../../../interfaces/api-response.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -79,6 +79,7 @@ export class AccountService {
         catchError(this.handleError.bind(this))
       )
   }
+  
 
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);
