@@ -3,7 +3,7 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       <span>User Accounts</span>
-      <button mat-mini-fab aria-label="Create a new user " matTooltip="Create User" >
+      <button mat-mini-fab aria-label="Create a new user " matTooltip="Create Account" (click)="onAdd()">
         <mat-icon>add</mat-icon>
       </button>
     </mat-toolbar>
@@ -12,6 +12,12 @@
   <div class="account-table-container" *ngIf="users.length > 0;else no_user_found">
 
     <table mat-table [dataSource]="users">
+
+      <!-- User Name Column -->
+      <ng-container matColumnDef="UserName">
+        <th mat-header-cell *matHeaderCellDef> Username </th>
+        <td mat-cell *matCellDef="let user"> {{user.username}} </td>
+      </ng-container>
 
       <!-- First Name Column -->
       <ng-container matColumnDef="FirstName">
@@ -28,7 +34,7 @@
       <ng-container matColumnDef="Roles">
         <th mat-header-cell *matHeaderCellDef> Roles </th>
         <td mat-cell *matCellDef="let user">
-          <mat-chip-grid>
+          <mat-chip-grid  #chipGrid aria-label="Role selection">
             <mat-chip *ngFor="let role of user.roles" color="primary" selected>
               {{ role }}
             </mat-chip>
@@ -47,16 +53,15 @@
         <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let row">
           <div class="actions">
-            <button mat-icon-button color="primary" (click)="onEdit(row)" matTooltip="Edit User">
+            <button mat-icon-button color="primary"  class="mat-elevation-z2" (click)="onEdit(row)" matTooltip="Edit Account">
               <mat-icon>edit</mat-icon>
             </button>
-            <button mat-icon-button color="warn" (click)="onDelete(row)" matTooltip="Delete User">
+            <button mat-icon-button color="warn"  class="mat-elevation-z2" (click)="onDelete(row)" matTooltip="Delete Account">
               <mat-icon>delete</mat-icon>
             </button>
           </div>
         </td>
       </ng-container>
-
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
