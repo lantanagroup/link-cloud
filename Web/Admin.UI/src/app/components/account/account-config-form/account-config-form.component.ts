@@ -48,6 +48,7 @@ export class AccountConfigFormComponent {
 
   private _viewOnly: boolean = false;
 
+
   @Input()
   set viewOnly(v: boolean) {
     if (v) this._viewOnly = v;
@@ -123,19 +124,16 @@ export class AccountConfigFormComponent {
   }
 
 
+
   submitConfiguration(): void {
     let user = {
       ...this.item,
       firstName: this.firstName.value,
       lastName: this.lastName.value,
       email: this.email.value,
-      roles: this.rolesControl.value
+      roles: this.rolesControl.value,
+      username: this.firstName.value + '.' + this.lastName.value
     };
-    user.firstName = this.firstName.value;
-    user.lastName = this.lastName.value;
-    user.email = this.email.value;
-    user.roles = this.rolesControl.value;
-    user.username = this.firstName.value + '.' + this.lastName.value;
     if (this.accountForm.status == 'VALID') {
       if (this.formMode == FormMode.Create) {
         this.accountService.createUser(user).subscribe({
