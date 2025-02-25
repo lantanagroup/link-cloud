@@ -17,7 +17,6 @@ import { StyleManagerService } from './services/style-manager-service';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatNativeDateModule } from '@angular/material/core';
-import { MatSelectModule } from '@angular/material/select';
 
 import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
 
@@ -25,46 +24,38 @@ import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
 import { AuthenticationService } from './services/security/authentication.service';
-import { MatInputModule } from '@angular/material/input';
-import { MatRadioModule } from '@angular/material/radio';
-import { MatCardModule } from '@angular/material/card';
-import { ReactiveFormsModule } from '@angular/forms';
+
 
 export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
 }
 
 @NgModule({ declarations: [
-        AppComponent
-    ],
-    bootstrap: [AppComponent], imports: [BrowserModule,
-        BrowserAnimationsModule,
-        AppRoutingModule,
-        LayoutModule,
-        MatToolbarModule,
-        MatButtonModule,
-        MatSidenavModule,
-        MatIconModule,
-        MatListModule,
-        ThemePickerComponent,
-        MatMenuModule,
-        MatExpansionModule,
-        MatNativeDateModule,
-        LoadingIndicatorComponent,
-        MatSelectModule,
-        MatInputModule,
-        MatRadioModule,
-        MatCardModule,
-        ReactiveFormsModule], providers: [
-        {
-            provide: APP_INITIALIZER,
-            useFactory: initConfig,
-            deps: [AppConfigService],
-            multi: true,
-        },
-        StyleManagerService,
-        HttpInterceptorProviders,
-        AuthenticationService,
-        provideHttpClient(withInterceptorsFromDi())
-    ] })
+    AppComponent
+  ],
+  bootstrap: [AppComponent], imports: [BrowserModule,
+    BrowserAnimationsModule,
+    AppRoutingModule,
+    LayoutModule,
+    MatToolbarModule,
+    MatButtonModule,
+    MatSidenavModule,
+    MatIconModule,
+    MatListModule,
+    ThemePickerComponent,
+    MatMenuModule,
+    MatExpansionModule,
+    MatNativeDateModule,
+    LoadingIndicatorComponent], providers: [
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initConfig,
+      deps: [AppConfigService],
+      multi: true,
+    },
+    StyleManagerService,
+    HttpInterceptorProviders,
+    AuthenticationService,
+    provideHttpClient(withInterceptorsFromDi())
+  ] })
 export class AppModule { }

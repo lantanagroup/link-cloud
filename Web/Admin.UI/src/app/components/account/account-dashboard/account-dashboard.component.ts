@@ -2,7 +2,6 @@ import {Component} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
-import {UserService} from "../../../services/gateway/account/user.service";
 import {UserModel} from "../../../models/user/user-model.model";
 import {MatPaginatorModule} from "@angular/material/paginator";
 import {MatExpansionModule} from "@angular/material/expansion";
@@ -15,6 +14,14 @@ import {MatButtonModule} from "@angular/material/button";
 import {MatTooltipModule} from "@angular/material/tooltip";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {MatChipsModule} from "@angular/material/chips";
+import {MatDialog} from "@angular/material/dialog";
+import {AccountConfigDialogComponent} from "../account-config-dialog/account-config-dialog.component";
+import {FormMode} from "../../../models/FormMode.enum";
+import {IAccountConfigModel} from "../../../interfaces/account/account-config-model.interface";
+import {RoleModel} from "../../../models/role/role-model.model";
+import {AccountService} from "../../../services/gateway/account/account.service";
+import {MatSnackBar} from "@angular/material/snack-bar";
+
 
 @Component({
   selector: 'app-account-dashboard',
@@ -42,6 +49,7 @@ export class AccountDashboardComponent {
   private initPageNumber: number = 0;
 
   users: UserModel[] = [];
+  allRoles: RoleModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   dataSource!: MatTableDataSource<UserModel>;
@@ -55,13 +63,12 @@ export class AccountDashboardComponent {
   includeDeletedUsers: boolean = false;
   sortBy: string = '';
 
-
-  displayedColumns: string[] = ['FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
+  displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
   loading = false;
   error: string | null = null;
 
-  constructor(private userService: UserService) {
+  constructor(private accountService: AccountService, private dialog: MatDialog, private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -69,12 +76,13 @@ export class AccountDashboardComponent {
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
     this.getUsers();
+    this.getAllRoles();
   }
 
   getUsers() {
     this.loading = true;
     this.error = null;
-    this.userService.list(
+    this.accountService.getUsers(
       this.searchText,
       this.filterFacilityBy,
       this.filterRoleBy,
@@ -99,10 +107,70 @@ export class AccountDashboardComponent {
     });
   }
 
-  onEdit(row: UserModel) {
+  getAllRoles() {
+    this.loading = true;
+    this.error = null;
+    this.accountService.getAllRoles().subscribe({
+      next: (data) => {
+        this.allRoles = data;
+      },
+      error: (error) => {
+        this.error = 'Failed to load roles. Please try again.';
+        this.loading = false;
+        console.error('Error loading roles:', error);
+      }
+    });
   }
 
-  onDelete(row: UserModel) {
+
+  onEdit(row: IAccountConfigModel): void {
+    this.dialog.open(AccountConfigDialogComponent, {
+      width: '75%',
+      data: {
+        dialogTitle: 'Edit Account Configuration',
+        formMode: FormMode.Edit,
+        viewOnly: false,
+        accountConfig: {...row},
+        allRoles: this.allRoles // Pass all the roles
+      }
+    }).afterClosed().subscribe(res => {
+      if (res) {
+        this.getUsers();
+        this.snackBar.open(`Account Updated`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  onDelete(row: IAccountConfigModel): void {
+  }
+
+  onAdd(): void {
+    this.dialog.open(AccountConfigDialogComponent,
+      {
+        width: '75%',
+        data: {
+          dialogTitle: 'Account Configuration',
+          formMode: FormMode.Create,
+          viewOnly: false,
+          accountConfig: {},
+          allRoles: this.allRoles
+        }
+      }).afterClosed().subscribe(res => {
+      if (res) {
+        this.getUsers();
+        this.snackBar.open(`Account Created`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
   }
 
 }
