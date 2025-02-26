@@ -16,7 +16,9 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 MiddleName = user.MiddleName ?? string.Empty,
-                Roles = user.UserRoles.Select(x => x.Role.Name).ToList()
+                isActive = user.IsActive,
+                isDeleted = user.IsDeleted,
+                Roles = user.UserRoles.Select(x => x.Role.Name).ToList(),
             };
 
             return model;

@@ -9,5 +9,8 @@
         public string LastName { get; set; } = string.Empty;
         public string MiddleName { get; set; } = string.Empty;
         public List<string> Roles { get; set; } = new List<string>();
+        public bool isDeleted { get; set; } = false;
+        public bool isActive { get; set; } = false;
+
     }
 }

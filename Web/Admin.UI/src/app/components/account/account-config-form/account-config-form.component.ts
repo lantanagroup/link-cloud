@@ -132,7 +132,9 @@ export class AccountConfigFormComponent {
       lastName: this.lastName.value,
       email: this.email.value,
       roles: this.rolesControl.value,
-      username: this.firstName.value + '.' + this.lastName.value
+      username: this.firstName.value + '.' + this.lastName.value,
+      isActive: true,
+      isDeleted: false
     };
     if (this.accountForm.status == 'VALID') {
       if (this.formMode == FormMode.Create) {
