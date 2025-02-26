@@ -82,9 +82,9 @@ export class AccountService {
   }
 
   recoverUser(userId: string): Observable<IApiResponse> {
-    return this.http.post<IApiResponse>(`${this.baseApiPath}/account/user/${userId}/recover`, userId)
+    return this.http.post<IApiResponse>(`${this.baseApiPath}/account/user/${userId}/recover`, {})
       .pipe(
-        tap(_ => console.log(`delete user.`)),
+        tap(_ => console.log(`recover user.`)),
         map((response) => {
           return response;
         }),

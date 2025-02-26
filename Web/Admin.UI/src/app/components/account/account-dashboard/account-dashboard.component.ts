@@ -193,10 +193,26 @@ export class AccountDashboardComponent {
     });
   }
 
-   onRestore(row: IAccountConfigModel) : void {
-   // let user = <UserModel>{ ...row, isDeleted : false, isActive:true }
-    this.accountService.recoverUser(row.id).subscribe(res => {
-      this.getAccounts();
+  onRestore(row: IAccountConfigModel): void {
+    this.accountService.recoverUser(row.id).subscribe({
+      next: () => {
+        this.getAccounts();
+        this.snackBar.open('Account restored successfully!', '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      },
+      error: (error) => {
+        console.error('Error restoring account:', error);
+        this.snackBar.open('Failed to restore account. Please try again.', '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
     });
   }
 
@@ -213,7 +229,6 @@ export class AccountDashboardComponent {
       this.getAccounts();
     });
   }
-
 
 
 }
