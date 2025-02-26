@@ -279,13 +279,6 @@ static void SetupMiddleware(WebApplication app)
     // Auto migrate database
     app.AutoMigrateEF<AuditDbContext>();
     
-    // Ensure database created (temporary), not for production
-    using (var scope = app.Services.CreateScope())
-    {
-        var context = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        context.Database.EnsureCreated();
-    }
-
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
     app.UseAuthentication();

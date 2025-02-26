@@ -18,6 +18,4 @@ public interface ICensusSchedulingRepository : IDisposable
     IJobDetail CreateJob(CensusConfigEntity facility);
 
     ITrigger CreateTrigger(string ScheduledTrigger, JobKey jobKey);
-
-    void GetAllJobs(IScheduler scheduler);
 }

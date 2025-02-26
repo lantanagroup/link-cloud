@@ -1,5 +1,4 @@
-﻿
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
+﻿using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
@@ -50,18 +49,18 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("configuration/facility/{facilityid}")]
-        public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId, CancellationToken cancellationToken) 
+        public async Task<ActionResult<string>> GetFacilityConfiguration(string facilityId, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(facilityId)) 
-            { 
-                return BadRequest("No facility id provided."); 
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("No facility id provided.");
             }
 
             try
-            {        
+            {
                 var config = await _queryDispatchConfigurationManager.GetConfigEntity(facilityId, cancellationToken);
 
-                if (config == null) 
+                if (config == null)
                 {
                     return NotFound();
                 }
@@ -92,9 +91,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         public async Task<ActionResult<RequestResponse>> CreateQueryDispatchConfigurationAsync(QueryDispatchConfiguration model, CancellationToken cancellationToken)
         {
             //validate config values
-            if (model == null) 
-            { 
-                return BadRequest("No query dispatch configuration provided."); 
+            if (model == null)
+            {
+                return BadRequest("No query dispatch configuration provided.");
             }
 
             if (string.IsNullOrWhiteSpace(model.FacilityId))
@@ -156,9 +155,9 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
         [HttpDelete("configuration/facility/{facilityId}")]
         public async Task<ActionResult<RequestResponse>> DeleteQueryDispatchConfiguration(string facilityId, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(facilityId)) 
-            { 
-                return BadRequest("No facility id provided."); 
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("No facility id provided.");
             }
 
             try
@@ -226,7 +225,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
                 if (existingConfig == null)
                 {
-                    var config =  _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
+                    var config = _configurationFactory.CreateQueryDispatchConfiguration(facilityId, model.DispatchSchedules);
                     await _queryDispatchConfigurationManager.AddConfigEntity(config, cancellationToken);
 
                     return Created(config.Id, config);
@@ -251,7 +250,8 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
             {
                 System.Xml.XmlConvert.ToTimeSpan(duration);
             }
-            catch             {
+            catch
+            {
                 return false;
             }
 
