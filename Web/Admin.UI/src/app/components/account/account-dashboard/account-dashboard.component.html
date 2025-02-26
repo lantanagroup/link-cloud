@@ -9,7 +9,7 @@
     </mat-toolbar>
   </p>
 
-  <div class="account-table-container" *ngIf="users.length > 0;else no_user_found">
+  <div class="account-table-container" *ngIf="users.length > 0;else no_account_found">
 
     <table mat-table [dataSource]="users">
 
@@ -34,11 +34,11 @@
       <ng-container matColumnDef="Roles">
         <th mat-header-cell *matHeaderCellDef> Roles </th>
         <td mat-cell *matCellDef="let user">
-          <mat-chip-grid  #chipGrid aria-label="Role selection">
-            <mat-chip *ngFor="let role of user.roles" color="primary" selected>
+          <div class="d-flex flex-wrap gap-2">
+            <span *ngFor="let role of user.roles" class="badge bg-primary text-white">
               {{ role }}
-            </mat-chip>
-          </mat-chip-grid>
+            </span>
+          </div>
         </td>
       </ng-container>
 
@@ -53,10 +53,10 @@
         <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let row">
           <div class="actions">
-            <button mat-icon-button color="primary"  class="mat-elevation-z2" (click)="onEdit(row)" matTooltip="Edit Account">
+            <button mat-icon-button color="primary" class="mat-elevation-z2" (click)="onEdit(row)" matTooltip="Edit Account">
               <mat-icon>edit</mat-icon>
             </button>
-            <button mat-icon-button color="warn"  class="mat-elevation-z2" (click)="onDelete(row)" matTooltip="Delete Account">
+            <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onDelete(row)" matTooltip="Delete Account">
               <mat-icon>delete</mat-icon>
             </button>
           </div>
@@ -67,11 +67,18 @@
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
     </table>
-
+    <mat-paginator [length]="paginationMetadata.totalCount"
+                   [pageIndex]="paginationMetadata.pageNumber"
+                   [pageSize]="paginationMetadata.pageSize"
+                   [pageSizeOptions]="[5, 10, 20]"
+                   (page)="pagedEvent($event)"
+                   showFirstLastButtons
+                   aria-label="Select page of account logs">
+    </mat-paginator>
   </div>
-  <ng-template #no_user_found>
+  <ng-template #no_account_found>
     <div class="no-results-found-container">
-      <span>No users found.</span>
+      <span>No accounts found.</span>
     </div>
   </ng-template>
 
