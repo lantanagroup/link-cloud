@@ -125,6 +125,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
         PatientReportingEvaluationStatus patientStatus = Objects.requireNonNullElseGet(retrievePatientStatus(facilityId, correlationId), () -> createPatientStatus(facilityId, correlationId, value));
 
+        // set the patientId in the PatientReportingEvaluationStatus if not set
         if (patientStatus.getPatientId() == null) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Patient Id is set to : {}", value.getPatientId());
@@ -132,15 +133,24 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             patientStatus.setPatientId(value.getPatientId());
         }
 
-        PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
-        statusResource.setResourceType(value.getResourceType());
-        statusResource.setResourceId(value.getResourceId());
-        statusResource.setQueryType(value.getQueryType());
-        statusResource.setIsPatientResource(value.isPatientResource());
-        statusResource.setNormalizationStatus(getNormalizationStatus());
-        patientStatus.getResources().add(statusResource);
+        // add the resource in the PatientReportingEvaluationStatus only if does not exist already and raise Validation Error if duplicate resource
+        PatientReportingEvaluationStatus.Resource existingResource = patientStatus.getResources() == null ? null : patientStatus.getResources().stream().filter(res -> res.getResourceType() == value.getResourceType() && Objects.equals(res.getResourceId(), value.getResourceId())).findFirst().orElse(null);
 
-        patientStatusRepository.save(patientStatus);
+        if (existingResource == null) {
+            PatientReportingEvaluationStatus.Resource statusResource = new PatientReportingEvaluationStatus.Resource();
+            statusResource.setResourceType(value.getResourceType());
+            statusResource.setResourceId(value.getResourceId());
+            statusResource.setQueryType(value.getQueryType());
+            statusResource.setIsPatientResource(value.isPatientResource());
+            statusResource.setNormalizationStatus(getNormalizationStatus());
+            patientStatus.getResources().add(statusResource);
+            patientStatusRepository.save(patientStatus);
+        }
+        else {
+            String resourceKey =  value.getResourceType() + ":" + value.getResourceId();
+            logger.error("Duplicate resource: {}", resourceKey);
+            throw new ValidationException("Duplicate resource: " + resourceKey);
+        }
 
     }
 
