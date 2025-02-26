@@ -62,8 +62,8 @@ export class AccountDashboardComponent {
   filterClaimBy: string = '';
   includeDeactivatedUsers: boolean = false;
   includeDeletedUsers: boolean = true;
-  sortBy: string = 'username';
-  sortOrder: number = 0;
+  sortBy: string = 'UserName';
+  sortOrder: number = 1;
 
   displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
