@@ -3,7 +3,7 @@ import {CommonModule} from '@angular/common';
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {UserModel} from "../../../models/user/user-model.model";
-import {MatPaginatorModule} from "@angular/material/paginator";
+import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {FormsModule} from "@angular/forms";
 import {MatFormFieldModule} from "@angular/material/form-field";
@@ -75,11 +75,11 @@ export class AccountDashboardComponent {
     this.dataSource = new MatTableDataSource<UserModel>();
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
-    this.getUsers();
+    this.getAccounts();
     this.getAllRoles();
   }
 
-  getUsers() {
+  getAccounts() {
     this.loading = true;
     this.error = null;
     this.accountService.getUsers(
@@ -122,6 +122,11 @@ export class AccountDashboardComponent {
     });
   }
 
+  pagedEvent(event: PageEvent) {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.getAccounts();
+  }
 
   onEdit(row: IAccountConfigModel): void {
     this.dialog.open(AccountConfigDialogComponent, {
@@ -135,7 +140,7 @@ export class AccountDashboardComponent {
       }
     }).afterClosed().subscribe(res => {
       if (res) {
-        this.getUsers();
+        this.getAccounts();
         this.snackBar.open(`Account Updated`, '', {
           duration: 3500,
           panelClass: 'success-snackbar',
@@ -148,6 +153,7 @@ export class AccountDashboardComponent {
 
   onDelete(row: IAccountConfigModel): void {
   }
+
 
   onAdd(): void {
     this.dialog.open(AccountConfigDialogComponent,
@@ -162,7 +168,7 @@ export class AccountDashboardComponent {
         }
       }).afterClosed().subscribe(res => {
       if (res) {
-        this.getUsers();
+        this.getAccounts();
         this.snackBar.open(`Account Created`, '', {
           duration: 3500,
           panelClass: 'success-snackbar',
