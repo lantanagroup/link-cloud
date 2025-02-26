@@ -63,7 +63,7 @@ export class AccountDashboardComponent {
   includeDeactivatedUsers: boolean = false;
   includeDeletedUsers: boolean = true;
   sortBy: string = 'UserName';
-  sortOrder: number = 1;
+  sortOrder: number = 0;
 
   displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
