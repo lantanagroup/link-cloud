@@ -51,13 +51,16 @@
       <!-- Actions Column -->
       <ng-container matColumnDef="Actions">
         <th mat-header-cell *matHeaderCellDef> Actions </th>
-        <td mat-cell *matCellDef="let row">
-          <div class="actions">
-            <button mat-icon-button color="primary" class="mat-elevation-z2" (click)="onEdit(row)" matTooltip="Edit Account">
+        <td mat-cell *matCellDef="let user" >
+          <div class="actions" >
+            <button mat-icon-button color="primary" class="mat-elevation-z2" (click)="onEdit(user)" *ngIf = "user.isDeleted === false" matTooltip="Edit Account">
               <mat-icon>edit</mat-icon>
             </button>
-            <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onDelete(row)" matTooltip="Delete Account">
+            <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onDelete(user)"   *ngIf = "user.isDeleted === false" matTooltip="Delete Account">
               <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" class="mat-elevation-z2" (click)="onRestore(user)"  *ngIf = "user.isDeleted === true"  matTooltip="Undelete Account">
+              <mat-icon>restore</mat-icon>
             </button>
           </div>
         </td>

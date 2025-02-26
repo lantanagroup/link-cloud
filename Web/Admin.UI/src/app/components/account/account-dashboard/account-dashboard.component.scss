@@ -1,5 +1,8 @@
 @use '../../../../styles/core.scss';
 
+
+$primary: #398eb4;
+
 .filter-fields {
   display: flex;
   align-items: flex-start;
@@ -16,4 +19,13 @@ button[color="primary"] {
 
 button[color="warn"] {
   color: #e53935; // Custom red
+}
+
+.badge {
+  background-color: $primary;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 16px;
+  margin-right: 5px;
+  display: inline-block;
 }
