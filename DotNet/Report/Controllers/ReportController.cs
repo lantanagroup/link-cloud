@@ -1,5 +1,6 @@
 using System.Net;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Responses;

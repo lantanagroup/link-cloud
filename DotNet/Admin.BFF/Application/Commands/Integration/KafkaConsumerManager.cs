@@ -1,11 +1,9 @@
 ﻿using Confluent.Kafka;
-
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
-using System.Text;
+using System.Runtime.InteropServices;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -16,7 +14,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)> _consumers;
         private readonly KafkaConnection _kafkaConnection;
         private readonly KafkaConsumerService _kafkaConsumerService;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly static string errorTopic = "-Error";
         public static readonly string delimiter = ":";
@@ -24,59 +21,63 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         private static readonly object _lock = new object();
 
         private readonly ILogger<KafkaConsumerService> _logger;
+        private readonly ICacheService _cache;
 
         // construct a list of topics 
         private List<(string, string)> kafkaTopics = new List<(string, string)>
           {
-            ("ReportScheduledDyn", KafkaTopic.ReportScheduled.ToString()),
-            ("ReportScheduledDyn", KafkaTopic.ReportScheduled.ToString() + errorTopic),
-            ("CensusDyn", KafkaTopic.PatientIDsAcquired.ToString()),
-            ("CensusDyn", KafkaTopic.PatientIDsAcquired.ToString() + errorTopic),
-            ("QueryDispatchDyn", KafkaTopic.PatientEvent.ToString()),
-            ("QueryDispatchDyn", KafkaTopic.PatientEvent.ToString() + errorTopic),
-            ("DataAcquisitionDyn", KafkaTopic.DataAcquisitionRequested.ToString()),
-            ("DataAcquisitionDyn", KafkaTopic.DataAcquisitionRequested.ToString() + errorTopic),
-            ("AcquiredDyn", KafkaTopic.ResourceAcquired.ToString()),
-            ("AcquiredDyn", KafkaTopic.ResourceAcquired.ToString() + errorTopic),
-            ("NormalizationDyn", KafkaTopic.ResourceNormalized.ToString()),
-            ("NormalizationDyn", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
-            ("ResourceEvaluatedDyn", KafkaTopic.ResourceEvaluated.ToString()),
-            ("ResourceEvaluatedDyn", KafkaTopic.ResourceEvaluated.ToString() + errorTopic),
-            ("ReportDyn", KafkaTopic.SubmitReport.ToString()),
-            ("ReportDyn", KafkaTopic.SubmitReport.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ReportScheduled.ToString()),
+            ("Dynamic", KafkaTopic.ReportScheduled.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString()),
+            ("Dynamic", KafkaTopic.PatientIDsAcquired.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.PatientEvent.ToString()),
+            ("Dynamic", KafkaTopic.PatientEvent.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString()),
+            ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ResourceAcquired.ToString()),
+            ("Dynamic", KafkaTopic.ResourceAcquired.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ResourceNormalized.ToString()),
+            ("Dynamic", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ResourceEvaluated.ToString()),
+            ("Dynamic", KafkaTopic.ResourceEvaluated.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.SubmitReport.ToString()),
+            ("Dynamic", KafkaTopic.SubmitReport.ToString() + errorTopic),
           };
 
 
 
         // Add constructor
-        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory, KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
+        public KafkaConsumerManager(KafkaConsumerService kafkaConsumerService, ICacheService cache,  KafkaConnection kafkaConnection, ILogger<KafkaConsumerService> logger)
         {
             _kafkaConsumerService = kafkaConsumerService;
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
             _consumers = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
             _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(_kafkaConnection));
+            _cache = cache;
             _logger = logger;
         }
 
 
-        private void ClearRedisCache(string facility)
+        private void ClearCache(string facility)
         {
-            // clear Redis cache
-            var _cache = getCache();
-
-            foreach (var topic in kafkaTopics)
+            try
             {
+                foreach (var topic in kafkaTopics)
                 {
-                    String redisKey = topic.Item2 + delimiter + facility;
-                    _cache.Remove(redisKey);
+                    {
+                        String cacheKey = topic.Item2 + delimiter + facility;
+                        _cache.Remove(cacheKey);
+                    }
                 }
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "Failed to clear cache for facility {facility} due to invalid operation", facility);
+            }
 
-        }
-
-        private IDistributedCache getCache()
-        {
-            return _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDistributedCache>();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while clearing cache for facility {facility}", facility);
+            }
         }
 
 
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         {
             lock (_lock)
             {
-                var newBag = new ConcurrentBag < (IConsumer<string, string>, CancellationTokenSource) > ();
+                var newBag = new ConcurrentBag<(IConsumer<string, string>, CancellationTokenSource)>();
                 foreach (var item in bag)
                 {
                     if (!item.Item1.Name.Contains(facility)) // Keep items that do not match the condition
@@ -105,8 +106,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
         public void CreateAllConsumers(string facility)
         {
-            //clear Redis cache for that facility
-            ClearRedisCache(facility);
+            //clear  cache for that facility
+            ClearCache(facility);
 
             // create consumers
 
@@ -128,7 +129,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 GroupId = groupId + delimiter + facility,
                 ClientId = facility,
                 BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers),
-                AutoOffsetReset = AutoOffsetReset.Earliest
+                AutoOffsetReset = AutoOffsetReset.Latest
             };
  
             if (_kafkaConnection.SaslProtocolEnabled)
@@ -152,25 +153,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
         {
             Dictionary<string, string> correlationIds = new Dictionary<string, string>();
 
-            var _cache = getCache();
-            // loop through the redis keys for that facility and get the correlation id for each
+            // loop through the  keys for that facility and get the correlation id for each
             foreach (var topic in kafkaTopics)
             {
                 if (topic.Item2 != string.Empty)
                 {
                     string facilityKey = topic.Item2 + delimiter + facility;
 
-                    correlationIds.Add(topic.Item2, _cache.GetString(facilityKey));
+                    correlationIds.Add(topic.Item2, _cache.Get<string>(facilityKey));
+  
                 }
             }
             return correlationIds;
         }
 
-        public void StopAllConsumers(string facility)
+        public async Task StopAllConsumers(string facility)
         {
-
-            //clear Redis cache for that facility
-            ClearRedisCache(facility);
+            //clear  cache for that facility
+            ClearCache(facility);
 
             // stop consumers for that facility
             foreach (var consumer in _consumers)
@@ -202,6 +202,79 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             // remove only consumers for that facility
             RemoveConsumersBasedOnFacility(_consumers, facility);
 
+            await DeleteConsumerGroupAsync(string.Join(", ", _kafkaConnection.BootstrapServers), "Dynamic:" + facility);
+
+            _logger.LogInformation("All Groups have been deleted");
+
+        }
+
+
+        public async Task<bool> DeleteConsumerGroupAsync(string bootstrapServers, string groupId, int maxWaitTimeInSeconds = 60, int pollingIntervalInSeconds = 3)
+        {
+            var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
+
+            using (var adminClient = new AdminClientBuilder(config).Build())
+            {
+                try
+                {
+                    // Polling to check if the group is empty (no active consumers)
+                    DateTime startTime = DateTime.UtcNow;
+                    bool isGroupActive = false;
+
+                    while ((DateTime.UtcNow - startTime).TotalSeconds < maxWaitTimeInSeconds)
+                    {
+                        // Check the current state of the consumer group
+                        var groupDescription = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
+
+                        // If the group is empty, exit the loop
+                        isGroupActive = groupDescription.ConsumerGroupDescriptions.All(g => g.State == ConsumerGroupState.Stable && g.Members.Count > 0);
+
+                        if (!isGroupActive)
+                        {
+                            break; // The group is empty, exit the loop
+                        }
+
+                        // Log and wait for a while before checking again
+                       // _logger.LogInformation($"Consumer group {groupId} still has active consumers. Retrying in {pollingIntervalInSeconds} seconds...");
+                        await Task.Delay(pollingIntervalInSeconds * 1000); // Delay before rechecking
+                    }
+
+                    if (isGroupActive)
+                    {
+                       // _logger.LogWarning($"Timed out waiting for consumer group {groupId} to become empty.");
+                        return false; // Timeout exceeded, group is not empty
+                    }
+
+                    // Proceed to delete the group if it's empty
+                    _logger.LogInformation($"Attempting to delete consumer group: {groupId}");
+
+                    var result = await adminClient.DescribeConsumerGroupsAsync(new List<string> { groupId });
+                    // Check if the group exists
+                    var group = result.ConsumerGroupDescriptions.FirstOrDefault(g => g.GroupId == groupId);
+                    if (group != null) { 
+                        await adminClient.DeleteGroupsAsync(new List<string> { groupId });
+                       _logger.LogInformation($"Consumer group {groupId} deleted successfully.");
+                    }
+                    return true;
+                }
+                catch (KafkaException kafkaEx)
+                {
+                    _logger.LogError($"Kafka error occurred while deleting consumer group {groupId}: {kafkaEx.Message}");
+                    _logger.LogError(kafkaEx.StackTrace);
+                }
+                catch (TimeoutException timeoutEx)
+                {
+                    _logger.LogError($"Timeout occurred while deleting consumer group {groupId}: {timeoutEx.Message}");
+                    _logger.LogError(timeoutEx.StackTrace);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Unexpected error occurred while deleting consumer group {groupId}: {ex.Message}");
+                    _logger.LogError(ex.StackTrace);
+                }
+            }
+
+            return false; // In case of failure, return false
         }
 
     }

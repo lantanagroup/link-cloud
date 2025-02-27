@@ -183,6 +183,48 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return result;
     }
 
+    public virtual void StartTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction != null)
+            throw new InvalidOperationException("A transaction is already in progress.");
+        _dbContext.Database.BeginTransaction();
+    }
+
+    public virtual async Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction != null)
+            throw new InvalidOperationException("A transaction is already in progress.");
+        await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    public virtual void CommitTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        _dbContext.Database.CommitTransaction();
+    }
+
+    public virtual async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        await _dbContext.Database.CommitTransactionAsync(cancellationToken);
+    }
+
+    public virtual void RollbackTransaction()
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        _dbContext.Database.RollbackTransaction();
+    }
+
+    public virtual async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("No transaction is in progress.");
+        await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
+    }
+
     private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
     {
         var sortKey = sortBy?.ToLower() ?? "";

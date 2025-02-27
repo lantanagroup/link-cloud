@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
+﻿using AngleSharp.Dom;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.Serialization;
@@ -17,4 +18,18 @@ public class FhirListConfiguration : BaseEntityExtended
     public AuthenticationConfiguration? Authentication { get; set; }
     [DataMember]
     public List<EhrPatientList> EHRPatientLists { get; set; }
+
+    public bool Validate()
+    {
+        if (string.IsNullOrWhiteSpace(FacilityId) || string.IsNullOrWhiteSpace(FhirBaseServerUrl))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(FhirBaseServerUrl) || !Uri.IsWellFormedUriString(FhirBaseServerUrl, UriKind.Absolute))
+            return false;
+        
+
+        return true;
+    }
 }

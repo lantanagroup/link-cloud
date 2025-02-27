@@ -2,11 +2,13 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Filters;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Services;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Responses;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using Link.Authorization.Infrastructure;
 using Link.Authorization.Policies;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 
@@ -20,8 +22,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
         private readonly ICreateReportScheduled _createReportScheduled;
         private readonly ICreateDataAcquisitionRequested _createDataAcquisitionRequested;
         private readonly KafkaConsumerManager _kafkaConsumerManager;
+        private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
 
-        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, ICreatePatientEvent createPatientEvent, KafkaConsumerManager kafkaConsumerManager, ICreateReportScheduled createReportScheduled, ICreateDataAcquisitionRequested createDataAcquisitionRequested, ICreatePatientAcquired createPatientAcquired)
+        private const string ANONYMOUS_ACCESS_CONFIG_KEY = "Authentication:EnableAnonymousAccess";
+        public IntegrationTestingEndpoints(ILogger<IntegrationTestingEndpoints> logger, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreatePatientEvent createPatientEvent, KafkaConsumerManager kafkaConsumerManager, ICreateReportScheduled createReportScheduled, ICreateDataAcquisitionRequested createDataAcquisitionRequested, ICreatePatientAcquired createPatientAcquired)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _createPatientEvent = createPatientEvent ?? throw new ArgumentNullException(nameof(createPatientEvent));
@@ -29,19 +33,28 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             _createDataAcquisitionRequested = createDataAcquisitionRequested ?? throw new ArgumentNullException(nameof(createDataAcquisitionRequested));
             _createPatientAcquired = createPatientAcquired ?? throw new ArgumentNullException(nameof(createPatientAcquired));
             _kafkaConsumerManager = kafkaConsumerManager ?? throw new ArgumentNullException(nameof(kafkaConsumerManager));
+            _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
+ 
         }
 
         public void RegisterEndpoints(WebApplication app)
         {
-            var integrationEndpoints = app.MapGroup("/api/integration")
-                .RequireAuthorization([
-                    LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName,
-                    PolicyNames.IsLinkAdmin])
-                .WithOpenApi(x => new OpenApiOperation(x)
-                {
-                    Tags = new List<OpenApiTag> { new() { Name = "Integration" } }
-                });
+            bool enableAnonymousAccess = app.Configuration.GetValue<bool>(ANONYMOUS_ACCESS_CONFIG_KEY);
+            _logger.LogInformation("Anonymous access is {state}", enableAnonymousAccess ? "enabled" : "disabled");
 
+
+            var integrationEndpoints = app.MapGroup("/api/integration").WithOpenApi(x => new OpenApiOperation(x)
+            {
+                Tags = new List<OpenApiTag> { new() { Name = "Integration" } },
+                Description = enableAnonymousAccess ?
+                        "This endpoint allows anonymous access in the current configuration." :
+                        "This endpoint requires authentication."
+            });
+            
+            if (!enableAnonymousAccess) {
+               integrationEndpoints.RequireAuthorization([LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName, PolicyNames.IsLinkAdmin]);
+            };
+              
             integrationEndpoints.MapPost("/patient-event", CreatePatientEvent)                
                 .AddEndpointFilter<ValidationFilter<PatientEvent>>()
                 .Produces<EventProducerResponse>(StatusCodes.Status200OK)
@@ -139,10 +152,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints
             Dictionary<string, string> list  =  _kafkaConsumerManager.readAllConsumers(facility.FacilityId);
             return Results.Ok(list);
         }
-        public Task DeleteConsumersRequested(HttpContext context, Facility facility)
+        public async Task<IResult> DeleteConsumersRequested(HttpContext context, Facility facility)
         {
-            _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
-            return Task.CompletedTask;
+            // Stop consumers asynchronously
+            try {
+                await _kafkaConsumerManager.StopAllConsumers(facility.FacilityId);
+                var response = new { message = "Consumers stopped successfully.", facilityId = facility.FacilityId};
+                return Results.Ok(response); // This returns a 200 OK status along with the messag
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop consumers for facility {FacilityId}", facility.FacilityId);
+                return Results.Problem("Error stopping consumers.", statusCode: StatusCodes.Status500InternalServerError);
+            }
         }
 
         public async Task<IResult> CreatePatientAcquired(HttpContext context, PatientAcquired model)

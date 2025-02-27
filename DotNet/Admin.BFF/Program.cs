@@ -31,6 +31,8 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,12 +75,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Initialize activity source
     var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version); 
+    ServiceActivitySource.Initialize(version);
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
     {
-        options.Environment = builder.Environment;  
+        options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
         options.IncludeExceptionDetails = builder.Configuration.GetValue<bool>("ProblemDetails:IncludeExceptionDetails");
     });
@@ -117,14 +119,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ICreatePatientAcquired, CreatePatientAcquired>();
     builder.Services.AddTransient<ICreateReportScheduled, CreateReportScheduled>();
     builder.Services.AddTransient<ICreateDataAcquisitionRequested, CreateDataAcquisitionRequested>();
-    builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
-    builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     builder.Services.AddTransient<IGetLinkAccount, GetLinkAccount>();
+    if (!allowAnonymousAccess) { 
+        builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
+        builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
+    }
+
+   
     builder.Services.AddTransient<KafkaConsumerManager>();
     builder.Services.AddTransient<KafkaConsumerService>();
 
     //Add Redis   
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    var cacheType = builder.Configuration.GetValue<string>("Cache:Type");
+    if (cacheType == "Redis")
     {
         Log.Logger.Information("Registering Redis Cache for the Link Admin API.");
         builder.Services.AddRedisCache(options =>
@@ -144,7 +151,15 @@ static void RegisterServices(WebApplicationBuilder builder)
                 options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
             }
         });
-    }    
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+    }
+    else // defaults to InMemory cache
+    {
+        Log.Logger.Warning("InMemory Cache is enabled.");
+        builder.Services.AddMemoryCache();
+
+        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+    }
 
     // Add Secret Manager
     if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
@@ -240,7 +255,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddCheck<TenantServiceHealthCheck>("Tenant Service");
     }
 
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
         healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
     }
