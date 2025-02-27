@@ -61,9 +61,11 @@ export class AccountDashboardComponent {
   filterRoleBy: string = '';
   filterClaimBy: string = '';
   includeDeactivatedUsers: boolean = false;
-  includeDeletedUsers: boolean = true;
+
   sortBy: string = 'UserName';
   sortOrder: number = 1;
+
+  showDeletedAccounts: boolean = false;
 
   displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
@@ -82,15 +84,17 @@ export class AccountDashboardComponent {
   }
 
   getAccounts() {
+
     this.loading = true;
     this.error = null;
+
     this.accountService.getUsers(
       this.searchText,
       this.filterFacilityBy,
       this.filterRoleBy,
       this.filterClaimBy,
       this.includeDeactivatedUsers,
-      this.includeDeletedUsers,
+      this.showDeletedAccounts,
       this.sortBy,
       this.sortOrder,
       this.paginationMetadata.pageSize,
@@ -111,6 +115,7 @@ export class AccountDashboardComponent {
   }
 
   getAllRoles() {
+
     this.loading = true;
     this.error = null;
     this.accountService.getAllRoles().subscribe({
@@ -229,6 +234,5 @@ export class AccountDashboardComponent {
       this.getAccounts();
     });
   }
-
 
 }
