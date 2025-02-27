@@ -9,6 +9,13 @@
     </mat-toolbar>
   </p>
 
+  <div>
+    <label>
+      <input type="checkbox" [(ngModel)]="showDeletedAccounts" (change)="getAccounts()" />
+      Show Deleted Accounts
+    </label>
+  </div>
+
   <div class="account-table-container" *ngIf="users.length > 0;else no_account_found">
 
     <table mat-table [dataSource]="users">
