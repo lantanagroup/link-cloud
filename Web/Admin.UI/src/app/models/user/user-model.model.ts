@@ -5,4 +5,6 @@ export class UserModel {
     firstName!: string;
     lastName!: string;
     middleName!: string;
+    isActive!: boolean;
+    isDeleted!: boolean;
 }

@@ -19,7 +19,7 @@ export class AccountService {
   baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}`;
 
   getUsers(searchText: string, filterFacilityBy: string, filterRoleBy: string, filterClaimBy: string,
-           includeDeactivatedUsers: boolean, includeDeletedUsers: boolean, sortBy: string, pageSize: number, pageNumber: number): Observable<PagedUserModel> {
+           includeDeactivatedUsers: boolean, includeDeletedUsers: boolean, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedUserModel> {
 
     //java based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
@@ -32,6 +32,7 @@ export class AccountService {
       .set('includeDeactivatedUsers', includeDeactivatedUsers)
       .set('includeDeletedUsers', includeDeletedUsers)
       .set('sortBy', sortBy)
+      .set('sortOrder', sortOrder)
       .set('pageSize', pageSize)
       .set('pageNumber', pageNumber);
 
@@ -79,7 +80,28 @@ export class AccountService {
         catchError(this.handleError.bind(this))
       )
   }
-  
+
+  recoverUser(userId: string): Observable<IApiResponse> {
+    return this.http.post<IApiResponse>(`${this.baseApiPath}/account/user/${userId}/recover`, {})
+      .pipe(
+        tap(_ => console.log(`recover user.`)),
+        map((response) => {
+          return response;
+        }),
+        catchError(this.handleError.bind(this))
+      )
+  }
+
+  deleteUser(userId: string): Observable<IApiResponse> {
+    return this.http.delete<IApiResponse>(`${this.baseApiPath}/account/user/${userId}`)
+      .pipe(
+        tap(_ => console.log(`delete user.`)),
+        map((response) => {
+          return response;
+        }),
+        catchError(this.handleError.bind(this))
+      )
+  }
 
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);

@@ -21,8 +21,6 @@ import { CensusConfigFormComponent } from "../../census/census-config-form/censu
 import { LinkAlertComponent } from "../../core/link-alert/link-alert.component";
 import { LinkAlertType } from '../../core/link-alert/link-alert-type.enum';
 import { FormMode } from 'src/app/models/FormMode.enum';
-import { ReportConfigFormComponent } from '../../report/report-config-form/report-config-form.component';
-import { ReportDashboardComponent } from '../../report/report-dashboard/report-dashboard.component';
 import { DataAcquisitionConfigFormComponent } from '../../data-acquisition/data-acquisition-config-form/data-acquisition-config-form.component';
 import { IDataAcquisitionQueryConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-config-model.interface';
 import { IDataAcquisitionFhirListConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
@@ -56,9 +54,7 @@ import { DataAcquisitionAuthenticationConfigFormComponent } from '../../data-acq
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
     DataAcquisitionFhirListConfigDialogComponent,
-    DataAcquisitionAuthenticationConfigFormComponent,
-    ReportConfigFormComponent,
-    ReportDashboardComponent
+    DataAcquisitionAuthenticationConfigFormComponent
   ]
 })
 export class FacilityEditComponent implements OnInit {
