@@ -62,10 +62,10 @@ export class AccountDashboardComponent {
   filterClaimBy: string = '';
   includeDeactivatedUsers: boolean = false;
 
-  sortBy: string = 'UserName';
-  sortOrder: number = 1;
-
   showDeletedAccounts: boolean = false;
+
+  sortBy: string = 'UserName';
+  sortOrder: number = 0;
 
   displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
@@ -234,5 +234,4 @@ export class AccountDashboardComponent {
       this.getAccounts();
     });
   }
-
 }
