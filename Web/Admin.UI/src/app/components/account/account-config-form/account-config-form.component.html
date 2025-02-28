@@ -29,7 +29,6 @@
       <mat-form-field class="form-select" appearance="outline">
         <mat-label>Roles</mat-label>
         <mat-select formControlName="selectedRoles" [compareWith]="compareRoles"  multiple>
-          <mat-option>None</mat-option>
           <mat-option *ngFor="let role of roles" [value]="role">
             {{role}}
           </mat-option>
@@ -56,14 +55,5 @@
       </mat-form-field>
     </div>
 
-
-    <!--    <div class="action-row" *ngIf="viewOnly">
-          <button mat-mini-fab aria-label="Delete report configuration" matTooltip="Delete report configuration" (click)="deleteReportConfiguration()">
-            <mat-icon>delete</mat-icon>
-          </button>
-          <button mat-mini-fab aria-label="Edit report configuration" matTooltip="Edit report configuration" (click)="editReportDialog()">
-            <mat-icon>edit</mat-icon>
-          </button>
-        </div>-->
   </form>
 </div>
