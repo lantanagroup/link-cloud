@@ -27,7 +27,7 @@ variables:
 - name: project
   value: 'DotNet/Admin.BFF/Admin.BFF.csproj'
 - name: registryRepositoryName
-  value: 'link-bff'
+  value: 'link-admin'
 - name: dockerPath
   value: '**/DotNet/Admin.BFF/Dockerfile'
 - name: containerRegistry
@@ -39,11 +39,6 @@ steps:
     inputs:
       command: restore
       projects: '$(project)'
-
-  - task: GetRevision@1
-    displayName: 'Get Revision'
-    inputs:
-      VariableName: Revision
 
   - task: Bash@3
     inputs:
@@ -64,14 +59,13 @@ steps:
       targetType: 'inline'
       script: |
         if ("$(Build.SourceBranch)" -like "*release/*") {
-        $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         else { 
-        $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
-        Write-Host "Set MyTag to: $myTag1"
-  
+        Write-Host "Set MyTag to: $myTag1"  
   - task: Docker@2
     displayName: "Build & Push Docker Image"
     condition: always()
