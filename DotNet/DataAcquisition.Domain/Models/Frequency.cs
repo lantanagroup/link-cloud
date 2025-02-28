@@ -13,5 +13,7 @@ public enum Frequency
     [StringValue("Weekly")]
     Weekly = 2,
     [StringValue("Monthly")]
-    Monthly = 3
+    Monthly = 3,
+    [StringValue("Adhoc")]
+    Adhoc = 4
 }

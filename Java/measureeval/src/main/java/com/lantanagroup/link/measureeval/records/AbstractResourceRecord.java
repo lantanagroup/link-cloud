@@ -56,5 +56,6 @@ public abstract class AbstractResourceRecord {
         private Date startDate;
         private Date endDate;
         private String frequency;
+        private String reportTrackingId;
     }
 }

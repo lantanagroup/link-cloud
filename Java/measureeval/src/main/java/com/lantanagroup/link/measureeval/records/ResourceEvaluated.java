@@ -23,6 +23,8 @@ public class ResourceEvaluated {
 
     private IBaseResource resource;
 
+    private String reportTrackingId;
+
     @Getter
     @Setter
     public static class Key {

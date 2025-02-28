@@ -1,5 +1,9 @@
+using System.Net;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -14,11 +18,13 @@ namespace LantanaGroup.Link.Report.Controllers
     {
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
+        private readonly IDatabase _database;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
+            _database = database;
         }
 
         /// <summary>
@@ -27,8 +33,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="patientId"></param>
-        /// <param name="startDate"></param>
-        /// <param name="endDate"></param>
+        /// <param name="reportScheduleId"></param>
         [HttpGet("Bundle/Patient")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PatientSubmissionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -39,17 +44,17 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 if (string.IsNullOrWhiteSpace(facilityId))
                 {
-                    BadRequest("Parameter facilityId is null or whitespace");
+                    return BadRequest("Parameter facilityId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(patientId))
                 {
-                    BadRequest("Parameter patientId is null or whitespace");
+                    return BadRequest("Parameter patientId is null or whitespace");
                 }
 
                 if (string.IsNullOrWhiteSpace(reportScheduleId))
                 {
-                    BadRequest("Parameter reportScheduleId is null or whitespace");
+                    return BadRequest("Parameter reportScheduleId is null or whitespace");
                 }
 
                 var submission = await _patientReportSubmissionBundler.GenerateBundle(facilityId, patientId, reportScheduleId);
@@ -59,8 +64,57 @@ namespace LantanaGroup.Link.Report.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception in ReportController.GetSubmissionBundleForPatient for facility '{FacilityId}' and patient '{PatientId}'",HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.Sanitize(patientId));
+                _logger.LogError(ex, "Exception in ReportController.GetSubmissionBundleForPatient for facility '{FacilityId}' and patient '{PatientId}'", HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.Sanitize(patientId));
                 return Problem(ex.Message, statusCode: 500);
+            }
+        }
+
+        /// <summary>
+        /// Returns a summary of a ReportSchedule based on the provided facilityId and reportScheduleId
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportScheduleId"></param>
+        /// <returns></returns>
+        [HttpGet("Schedule")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportScheduleSummaryModel))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ReportScheduleSummaryModel>> GetReportScheduleSummary(string facilityId, string reportScheduleId)
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                return BadRequest("Parameter facilityId is null or whitespace");
+            }
+
+            if (string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                return BadRequest("Parameter reportScheduleId is null or whitespace");
+            }
+
+            try
+            {
+
+                var model = (await _database.ReportScheduledRepository.FindAsync(r => r.FacilityId == facilityId && r.Id == reportScheduleId)).SingleOrDefault();
+
+                if (model == null)
+                {
+                    return Problem(detail: "No Report Schedule found for the provided FacilityId and ReportId", statusCode: (int)HttpStatusCode.NotFound);
+                }
+
+                return Ok(new ReportScheduleSummaryModel
+                {
+                    FacilityId = facilityId,
+                    ReportId = reportScheduleId,
+                    StartDate = model.ReportStartDate,
+                    EndDate = model.ReportEndDate,
+                    SubmitReportDateTime = model.SubmitReportDateTime
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportScheduleSummary for facility '{FacilityId}' and report '{ReportId}'", HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.Sanitize(reportScheduleId));
+                return Problem("An error occurred while retrieving the report schedule.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
     }
