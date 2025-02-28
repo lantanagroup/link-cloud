@@ -4,6 +4,7 @@ public enum ReportableEvent {
   DISCHARGE,
   EOM,
   EOW,
-  EOD
+  EOD,
+  ADHOC
 
 }
