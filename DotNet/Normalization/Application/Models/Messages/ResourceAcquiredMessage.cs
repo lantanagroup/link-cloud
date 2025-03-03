@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Model;
-
-namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
+﻿namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
 
 public class ResourceAcquiredMessage
 {

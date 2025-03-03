@@ -132,7 +132,9 @@ export class AccountConfigFormComponent {
       lastName: this.lastName.value,
       email: this.email.value,
       roles: this.rolesControl.value,
-      username: this.firstName.value + '.' + this.lastName.value
+      username: this.firstName.value + '.' + this.lastName.value,
+      isActive: true,
+      isDeleted: false
     };
     if (this.accountForm.status == 'VALID') {
       if (this.formMode == FormMode.Create) {
@@ -143,13 +145,7 @@ export class AccountConfigFormComponent {
             }
           },
           error: (err) => {
-            if (err.status === 409) {
-              console.error('Error occurred:', err); // Log the error or display it to the user
-              this.submittedConfiguration.emit({success: false, message: `Another account with same email exists.`});
-            }
-            else {
-              this.submittedConfiguration.emit({success: false, message: err.message});
-            }
+            this.ValidateAccountExists(err);
           }
         });
       } else if (this.formMode == FormMode.Edit) {
@@ -158,13 +154,7 @@ export class AccountConfigFormComponent {
               this.submittedConfiguration.emit({success: true, message: ""});
             },
             error: (err) => {
-              if (err.status === 409) {
-                console.error('Error occurred:', err); // Log the error or display it to the user
-                this.submittedConfiguration.emit({success: false, message: `Another account with same email exists.`});
-              }
-              else {
-                this.submittedConfiguration.emit({success: false, message: err.message});
-              }
+              this.ValidateAccountExists(err);
             }
           });
         } else {
@@ -175,6 +165,15 @@ export class AccountConfigFormComponent {
             verticalPosition: 'top'
           });
         }
+    }
+  }
+
+  private ValidateAccountExists(err: any) {
+    if (err.status === 409) {
+      console.error('Error occurred:', err); // Log the error or display it to the user
+      this.submittedConfiguration.emit({success: false, message: `Another account with same email exists.`});
+    } else {
+      this.submittedConfiguration.emit({success: false, message: err.message});
     }
   }
 }

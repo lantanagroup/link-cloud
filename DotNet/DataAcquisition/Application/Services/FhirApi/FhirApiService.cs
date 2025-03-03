@@ -324,7 +324,7 @@ public class FhirApiService : IFhirApiService
             if (resultBundle != null)
             {
                 if (generateMessages)
-                    await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
+                    await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceAcquiredMessageGenerationRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
 
                 foreach (var entry in resultBundle.Entry)
                 {
@@ -383,7 +383,7 @@ public class FhirApiService : IFhirApiService
                             newResultBundle.Entry.AddRange(resultBundle.Entry);
                         
                         if(generateMessages)
-                            await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
+                            await _bundleResourceAcquiredEventService.GenerateEventAsync(resultBundle, new ResourceAcquiredMessageGenerationRequest(facilityId, patientId, queryType, correlationId, reportableEvent, reports), cancellationToken);
 
                         foreach (var entry in resultBundle.Entry)
                         {
@@ -499,7 +499,7 @@ public class FhirApiService : IFhirApiService
         if (readResource != null)
         {
             if (generateMessages)
-                await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = readResource } } }, new ResourceRequiredMessageRequest(facilityId, patientId, queryType, correlationId, reportableEvent, new List<ScheduledReport> { report }), cancellationToken);
+                await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = readResource } } }, new ResourceAcquiredMessageGenerationRequest(facilityId, patientId, queryType, correlationId, reportableEvent, new List<ScheduledReport> { report }), cancellationToken);
 
             if (readResource is not OperationOutcome)
             {
@@ -707,7 +707,7 @@ public class FhirApiService : IFhirApiService
 
             var resource = await ReadFhirEndpointAsync(fhirClient, config.ResourceType, resourceId, request.ConsumeResult.Value.PatientId, request.CorrelationId, request.FacilityId, queryType, request.ConsumeResult.Value.ReportableEvent);
             
-            await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, new ResourceRequiredMessageRequest(request.FacilityId, request.ConsumeResult.Value.PatientId, queryType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
+            await _bundleResourceAcquiredEventService.GenerateEventAsync(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, new ResourceAcquiredMessageGenerationRequest(request.FacilityId, request.ConsumeResult.Value.PatientId, queryType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
 
             references.AddRange(ReferenceResourceBundleExtractor.Extract(new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = resource } } }, resourceTypes));
         }
@@ -804,7 +804,7 @@ public class FhirApiService : IFhirApiService
 
             await _bundleResourceAcquiredEventService.GenerateEventAsync(
                 new Bundle { Entry = new List<Bundle.EntryComponent> { new Bundle.EntryComponent { Resource = result } } }, 
-                new ResourceRequiredMessageRequest(request.FacilityId, request.ConsumeResult.Value.PatientId?.SplitReference(), queryPlanType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
+                new ResourceAcquiredMessageGenerationRequest(request.FacilityId, request.ConsumeResult.Value.PatientId?.SplitReference(), queryPlanType, request.CorrelationId, request.ConsumeResult.Value.ReportableEvent, request.ConsumeResult.Value.ScheduledReports));
         }
         else
         {

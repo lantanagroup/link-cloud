@@ -3,7 +3,7 @@ import {CommonModule} from '@angular/common';
 import {PaginationMetadata} from "../../../models/pagination-metadata.model";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {UserModel} from "../../../models/user/user-model.model";
-import {MatPaginatorModule} from "@angular/material/paginator";
+import {MatPaginatorModule, PageEvent} from "@angular/material/paginator";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {FormsModule} from "@angular/forms";
 import {MatFormFieldModule} from "@angular/material/form-field";
@@ -21,6 +21,7 @@ import {IAccountConfigModel} from "../../../interfaces/account/account-config-mo
 import {RoleModel} from "../../../models/role/role-model.model";
 import {AccountService} from "../../../services/gateway/account/account.service";
 import {MatSnackBar} from "@angular/material/snack-bar";
+import {DeleteConfirmationDialogComponent} from "../../delete-confirmation-dialog/delete-confirmation-dialog.component";
 
 
 @Component({
@@ -60,8 +61,11 @@ export class AccountDashboardComponent {
   filterRoleBy: string = '';
   filterClaimBy: string = '';
   includeDeactivatedUsers: boolean = false;
-  includeDeletedUsers: boolean = false;
-  sortBy: string = '';
+
+  showDeletedAccounts: boolean = false;
+
+  sortBy: string = 'UserName';
+  sortOrder: number = 0;
 
   displayedColumns: string[] = ['UserName', 'FirstName', 'LastName', 'Roles', 'Email', 'Actions'];
 
@@ -75,21 +79,24 @@ export class AccountDashboardComponent {
     this.dataSource = new MatTableDataSource<UserModel>();
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
-    this.getUsers();
+    this.getAccounts();
     this.getAllRoles();
   }
 
-  getUsers() {
+  getAccounts() {
+
     this.loading = true;
     this.error = null;
+
     this.accountService.getUsers(
       this.searchText,
       this.filterFacilityBy,
       this.filterRoleBy,
       this.filterClaimBy,
       this.includeDeactivatedUsers,
-      this.includeDeletedUsers,
+      this.showDeletedAccounts,
       this.sortBy,
+      this.sortOrder,
       this.paginationMetadata.pageSize,
       this.paginationMetadata.pageNumber
     ).subscribe({
@@ -108,6 +115,7 @@ export class AccountDashboardComponent {
   }
 
   getAllRoles() {
+
     this.loading = true;
     this.error = null;
     this.accountService.getAllRoles().subscribe({
@@ -122,6 +130,11 @@ export class AccountDashboardComponent {
     });
   }
 
+  pagedEvent(event: PageEvent) {
+    this.paginationMetadata.pageSize = event.pageSize;
+    this.paginationMetadata.pageNumber = event.pageIndex;
+    this.getAccounts();
+  }
 
   onEdit(row: IAccountConfigModel): void {
     this.dialog.open(AccountConfigDialogComponent, {
@@ -135,7 +148,7 @@ export class AccountDashboardComponent {
       }
     }).afterClosed().subscribe(res => {
       if (res) {
-        this.getUsers();
+        this.getAccounts();
         this.snackBar.open(`Account Updated`, '', {
           duration: 3500,
           panelClass: 'success-snackbar',
@@ -147,7 +160,19 @@ export class AccountDashboardComponent {
   }
 
   onDelete(row: IAccountConfigModel): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this account configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.deleteAccountConfig(row);
+      }
+    });
   }
+
 
   onAdd(): void {
     this.dialog.open(AccountConfigDialogComponent,
@@ -162,7 +187,7 @@ export class AccountDashboardComponent {
         }
       }).afterClosed().subscribe(res => {
       if (res) {
-        this.getUsers();
+        this.getAccounts();
         this.snackBar.open(`Account Created`, '', {
           duration: 3500,
           panelClass: 'success-snackbar',
@@ -173,4 +198,40 @@ export class AccountDashboardComponent {
     });
   }
 
+  onRestore(row: IAccountConfigModel): void {
+    this.accountService.recoverUser(row.id).subscribe({
+      next: () => {
+        this.getAccounts();
+        this.snackBar.open('Account restored successfully!', '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      },
+      error: (error) => {
+        console.error('Error restoring account:', error);
+        this.snackBar.open('Failed to restore account. Please try again.', '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+
+  private deleteAccountConfig(row: IAccountConfigModel): void {
+    console.log(`Deleted Account Config: ${JSON.stringify(row)}`);
+    this.accountService.deleteUser(row.id).subscribe(() => {
+      this.snackBar.open('Account configuration deleted successfully!', '', {
+        duration: 3500,
+        panelClass: 'success-snackbar',
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+      this.getAccounts();
+    });
+  }
 }

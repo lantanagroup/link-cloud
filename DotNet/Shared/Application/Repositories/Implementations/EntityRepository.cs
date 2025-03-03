@@ -24,7 +24,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 

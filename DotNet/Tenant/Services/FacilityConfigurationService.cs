@@ -1,10 +1,14 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Interfaces.Sql;
 using LantanaGroup.Link.Tenant.Utils;
@@ -13,13 +17,7 @@ using OpenTelemetry.Trace;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models.Responses;
-using System.Linq.Expressions;
-using Confluent.Kafka;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
-using LantanaGroup.Link.Tenant.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services.Security;
 
 
 namespace LantanaGroup.Link.Tenant.Services
@@ -100,7 +98,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return await _facilityConfigurationRepo.GetAsync(id, cancellationToken);
         }
 
-        public async Task<FacilityConfigModel> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
+        public async Task<FacilityConfigModel?> GetFacilityByFacilityId(string facilityId, CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Facility Id Query");
 
@@ -335,11 +333,9 @@ namespace LantanaGroup.Link.Tenant.Services
             {
                 await MeasureDefinitionExists(reportType);
             }
-
-            return;
         }
 
-        private async Task MeasureDefinitionExists(String reportType)
+        public async Task MeasureDefinitionExists(String reportType)
         {
             if (_measureConfig.Value.CheckIfMeasureExists)
             {

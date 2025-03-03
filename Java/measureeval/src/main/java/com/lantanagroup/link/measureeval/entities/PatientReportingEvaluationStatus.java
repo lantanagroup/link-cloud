@@ -55,6 +55,7 @@ public class PatientReportingEvaluationStatus {
         private Date endDate;
         private Boolean reportable;
         private String frequency;
+        private String reportTrackingId;
     }
 
     @Getter

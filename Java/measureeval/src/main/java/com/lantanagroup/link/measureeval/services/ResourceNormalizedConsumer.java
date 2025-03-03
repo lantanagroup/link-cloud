@@ -24,22 +24,26 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
   public ResourceNormalizedConsumer (
           AbstractResourceRepository resourceRepository,
           PatientReportingEvaluationStatusRepository patientStatusRepository,
-          MeasureEvaluatorCache measureEvaluatorCache,
           MeasureReportNormalizer measureReportNormalizer,
           Predicate<MeasureReport> reportabilityPredicate,
           KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
           @Qualifier("compressedKafkaTemplate")
           KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
-          MeasureEvalMetrics measureEvalMetrics) {
+          MeasureEvalMetrics measureEvalMetrics,
+          EvaluateMeasureService evaluateMeasureService,
+          PatientStatusBundler patientStatusBundler,
+          ResourceEvaluatedProducer resourceEvaluatedProducer){
     super(
             resourceRepository,
             patientStatusRepository,
-            measureEvaluatorCache,
             measureReportNormalizer,
             reportabilityPredicate,
             dataAcquisitionRequestedTemplate,
             resourceEvaluatedTemplate,
-            measureEvalMetrics);
+            measureEvalMetrics,
+            evaluateMeasureService,
+            patientStatusBundler,
+            resourceEvaluatedProducer);
   }
 
   @Override
