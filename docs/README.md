@@ -18,6 +18,7 @@ This page and its references include documentation for Link's services and the f
 * [Submission Folder Structure](functionality/submission_folder.md)
 * [Telemetry](functionality/telemetry.md)
 * [Tenant/Facility Management](functionality/tenant_mgmt.md)
+* [Validation](functionality/validation.md)
 
 ## Service Specifications
 
