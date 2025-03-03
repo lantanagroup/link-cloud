@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.kafka;
+package com.lantanagroup.link.shared.kafka;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.kafka;
+package com.lantanagroup.link.shared.kafka;
 
 import jakarta.annotation.Nonnull;
 import org.apache.kafka.clients.consumer.Consumer;
