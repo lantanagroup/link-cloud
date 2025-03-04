@@ -16,6 +16,10 @@ springdoc:
 spring:
   application:
     name: ValidationService
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
   mvc:
     problemdetails:
       enabled: true
@@ -32,7 +36,6 @@ spring:
     bootstrap-servers: ''
     consumer:
       group-id: validation
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
       client-id: validation-service
     #properties:
@@ -50,3 +53,14 @@ secret-management:
 authentication:
   anonymous: false
   authority: ''
+
+link:
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-bundle:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}

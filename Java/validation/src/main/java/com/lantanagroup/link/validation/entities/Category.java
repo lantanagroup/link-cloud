@@ -41,7 +41,7 @@ public class Category {
     @Column(length = 1000, nullable = false)
     private String guidance;
 
-    @OneToMany(mappedBy = "category")
+    @OneToMany(fetch = FetchType.EAGER, mappedBy = "category")
     @JsonIgnore
     private List<CategoryRule> rules;
 

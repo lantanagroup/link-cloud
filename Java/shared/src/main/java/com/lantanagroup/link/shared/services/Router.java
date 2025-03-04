@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.services;
+package com.lantanagroup.link.shared.services;
 
 import lombok.Getter;
 import lombok.Setter;
