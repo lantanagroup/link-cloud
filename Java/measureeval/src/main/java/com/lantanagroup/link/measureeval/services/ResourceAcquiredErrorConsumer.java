@@ -1,8 +1,8 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.kafka.Headers;
-import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.models.NormalizationStatus;
+import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceAcquired;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;

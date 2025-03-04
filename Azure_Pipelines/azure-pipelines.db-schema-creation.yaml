@@ -6,7 +6,7 @@ trigger:
   paths:
     include:
     - DotNet/*/Migrations
-    - Java/validation/resources/database
+    - Java/validation/src/main/resources/database/migrations
     exclude:
     - '*'
     
@@ -70,7 +70,7 @@ stages:
             Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
             
             # Validation - Return $true if path has changed files
-            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/" -AllMatches).Matches.Count -gt 0) 
+            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/migrations/" -AllMatches).Matches.Count -gt 0)
             Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
@@ -297,15 +297,15 @@ stages:
     displayName: "Build Validation"
     dependsOn: getChangedFiles 
     variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
+      changed: $[ dependencies.getChangedFiles.outputs['setVariables.validationChanged'] ]
     condition: eq(variables.changed, 'True')
     steps:
     - task: CopyFiles@2
-      displayName: Copy Validation SQL Script to Artifact Staging Directory
+      displayName: Copy Validation SQL Scripts to Artifact Staging Directory
       inputs:
-       SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/'
+       SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: $(Build.ArtifactStagingDirectory)/DatabaseScripts
-       Contents: '**/validationDb.sql'
+       Contents: '*.sql'
     - task: PublishBuildArtifacts@1
       inputs:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
