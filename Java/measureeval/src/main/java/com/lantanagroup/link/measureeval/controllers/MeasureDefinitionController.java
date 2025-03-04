@@ -69,6 +69,7 @@ public class MeasureDefinitionController {
     }
 
     @GetMapping("/{id}")
+    @JsonView(Views.Detail.class)
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
 

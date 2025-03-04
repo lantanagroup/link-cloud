@@ -19,6 +19,7 @@ public class MeasureDefinition {
     @JsonView(Views.Summary.class)
     private String id;
 
+    @JsonView(Views.Detail.class)
     private Bundle bundle;
 
     @Version

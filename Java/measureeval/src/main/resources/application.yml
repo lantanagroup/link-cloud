@@ -34,7 +34,6 @@ spring:
     mapper:
       accept-case-insensitive-enums: true
       accept-case-insensitive-properties: true
-      default-view-inclusion: false
 
   kafka:
     bootstrap-servers: localhost:9092
