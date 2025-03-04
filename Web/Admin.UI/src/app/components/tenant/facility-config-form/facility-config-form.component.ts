@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { IFacilityConfigModel, IScheduledTaskModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import { IFacilityConfigModel, IScheduledReportModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -75,7 +75,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityNameControl.setValue(this.item.facilityName);     
       this.facilityNameControl.updateValueAndValidity();
 
-      this.loadScheduledTasks(this.item.scheduledTasks);
+      //this.loadScheduledTasks(this.item.scheduledTasks);
       this.scheduledTasks.updateValueAndValidity();
     }
     else {
@@ -97,8 +97,8 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityNameControl.setValue(this.item.facilityName);     
       this.facilityNameControl.updateValueAndValidity();
 
-      this.loadScheduledTasks(this.item.scheduledTasks);
-      this.scheduledTasks.updateValueAndValidity();     
+      // this.loadScheduledTasks(this.item.scheduledTasks);
+      // this.scheduledTasks.updateValueAndValidity();     
     }
   }
 
@@ -202,16 +202,16 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
       if(this.formMode == FormMode.Create) {
-        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
-        this.tenantService.createFacility(this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
-        });
+        //let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
+        // this.tenantService.createFacility(this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
+        //   this.submittedConfiguration.emit(response);
+        // });
       }
       else if(this.formMode == FormMode.Edit) {
-        let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
-        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
-        });
+        //let scheduledTasks: IScheduledTaskModel[] = this.mapScheduledTasks();
+        // this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value ?? '', this.facilityNameControl.value, scheduledTasks).subscribe((response: IEntityCreatedResponse) => {
+        //   this.submittedConfiguration.emit(response);
+        // });
       }
     }
     else {
@@ -224,44 +224,44 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     }
   }
 
-  private mapScheduledTasks(): IScheduledTaskModel[] {
-    return this.scheduledTasks.value.map((task: any) => {
-      return {
-        kafkaTopic: task.kafkaTopic,
-        reportTypeSchedules: task.reportTypeSchedules.map((schedule: any) => {
-          return {
-            reportType: schedule.reportType,
-            scheduledTriggers: schedule.scheduledTriggers.map((trigger: any) => {
-              return trigger.trigger;
-            })
-          }
-        })
-      }
-    });
-  }
+  // private mapScheduledTasks(): IScheduledTaskModel[] {
+  //   return this.scheduledTasks.value.map((task: any) => {
+  //     return {
+  //       kafkaTopic: task.kafkaTopic,
+  //       reportTypeSchedules: task.reportTypeSchedules.map((schedule: any) => {
+  //         return {
+  //           reportType: schedule.reportType,
+  //           scheduledTriggers: schedule.scheduledTriggers.map((trigger: any) => {
+  //             return trigger.trigger;
+  //           })
+  //         }
+  //       })
+  //     }
+  //   });
+  // }
 
-  private loadScheduledTasks(scheduledTasks: IScheduledTaskModel[]): void {
+  // private loadScheduledTasks(scheduledTasks: IScheduledTaskModel[]): void {
 
-    this.scheduledTasks.clear();
-    this.scheduledTasks.updateValueAndValidity();
+  //   this.scheduledTasks.clear();
+  //   this.scheduledTasks.updateValueAndValidity();
 
-    scheduledTasks.forEach((task: IScheduledTaskModel) => {
-      this.scheduledTasks.push(new FormGroup({
-        kafkaTopic: new FormControl(task.kafkaTopic, Validators.required),
-        reportTypeSchedules: new FormArray(
-          task.reportTypeSchedules.map((schedule: any) => {
-            return new FormGroup({
-              reportType: new FormControl(schedule.reportType, Validators.required),
-              scheduledTriggers: new FormArray(
-                schedule.scheduledTriggers.map((trigger: any) => {
-                  return new FormGroup({ trigger: new FormControl(trigger, Validators.required) });
-                })
-              )
-            })
-          })
-        )
-      }));
-    });
-  }
+  //   scheduledTasks.forEach((task: IScheduledTaskModel) => {
+  //     this.scheduledTasks.push(new FormGroup({
+  //       kafkaTopic: new FormControl(task.kafkaTopic, Validators.required),
+  //       reportTypeSchedules: new FormArray(
+  //         task.reportTypeSchedules.map((schedule: any) => {
+  //           return new FormGroup({
+  //             reportType: new FormControl(schedule.reportType, Validators.required),
+  //             scheduledTriggers: new FormArray(
+  //               schedule.scheduledTriggers.map((trigger: any) => {
+  //                 return new FormGroup({ trigger: new FormControl(trigger, Validators.required) });
+  //               })
+  //             )
+  //           })
+  //         })
+  //       )
+  //     }));
+  //   });
+  // }
 
 }

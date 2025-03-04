@@ -4,12 +4,14 @@ export interface IFacilityConfigModel {
   id?: string;
   facilityId: string;
   facilityName: string;
-  scheduledTasks: IScheduledTaskModel[];
+  timezone?: string;
+  scheduledReports: IScheduledReportModel;
 }
 
-export interface IScheduledTaskModel {
-  kafkaTopic: string;
-  reportTypeSchedules: IReportTypeScheduleModel[];
+export interface IScheduledReportModel {
+  daily: string[];
+  weekly: string[];
+  monthly: string[];
 }
 
 export interface IReportTypeScheduleModel {
