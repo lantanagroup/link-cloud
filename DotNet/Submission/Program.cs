@@ -77,6 +77,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
+    });
+
     // Add service information
     var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)

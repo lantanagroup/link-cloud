@@ -1,7 +1,6 @@
 import { NgModule } from '@angular/core';
-import { OAuthModule } from 'angular-oauth2-oidc';
 import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule } from "@angular/common/http";
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -18,7 +17,6 @@ import { StyleManagerService } from './services/style-manager-service';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatNativeDateModule } from '@angular/material/core';
-import { MatSelectModule } from '@angular/material/select';
 
 import { LoadingIndicatorComponent } from './components/core/loading-indicator/loading-indicator.component';
 
@@ -27,17 +25,15 @@ import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
 import { AuthenticationService } from './services/security/authentication.service';
 
+
 export function initConfig(appConfig: AppConfigService) {
   return () => appConfig.loadConfig();
 }
 
-@NgModule({
-  declarations: [
+@NgModule({ declarations: [
     AppComponent
   ],
-  imports: [
-    BrowserModule,
-    HttpClientModule,
+  bootstrap: [AppComponent], imports: [BrowserModule,
     BrowserAnimationsModule,
     AppRoutingModule,
     LayoutModule,
@@ -50,10 +46,7 @@ export function initConfig(appConfig: AppConfigService) {
     MatMenuModule,
     MatExpansionModule,
     MatNativeDateModule,
-    LoadingIndicatorComponent,
-    MatSelectModule
-  ],
-  providers: [
+    LoadingIndicatorComponent], providers: [
     {
       provide: APP_INITIALIZER,
       useFactory: initConfig,
@@ -62,8 +55,7 @@ export function initConfig(appConfig: AppConfigService) {
     },
     StyleManagerService,
     HttpInterceptorProviders,
-    AuthenticationService
-  ],
-  bootstrap: [AppComponent]
-})
+    AuthenticationService,
+    provideHttpClient(withInterceptorsFromDi())
+  ] })
 export class AppModule { }

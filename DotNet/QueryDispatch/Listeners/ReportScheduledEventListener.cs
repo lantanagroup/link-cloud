@@ -99,6 +99,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     }
 
                                     string correlationId = string.Empty;
+                                    string reportTrackingId = string.Empty;
 
                                     if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
@@ -107,6 +108,15 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     else
                                     {
                                         throw new DeadLetterException("Correlation Id missing");
+                                    }
+
+                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Report-Tracking-Id", out headerValue))
+                                    {
+                                        reportTrackingId = Encoding.UTF8.GetString(headerValue);
+                                    }
+                                    else
+                                    {
+                                        throw new DeadLetterException("Report Tracking Id missing");
                                     }
 
                                     string key = consumeResult.Message.Key;
@@ -123,12 +133,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 										
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
                                     }
                                     else
                                     {
-                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, correlationId);
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
                                         await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
                                     }
 

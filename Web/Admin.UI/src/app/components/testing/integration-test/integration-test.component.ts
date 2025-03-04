@@ -86,7 +86,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   facilities: IFacilityConfigModel[] = [];
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  intervalId!: NodeJS.Timer | null;
+  //intervalId!: NodeJS.Timer | null;
+
+  intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
 
   consumersData: Map<string, string> = new Map();
 

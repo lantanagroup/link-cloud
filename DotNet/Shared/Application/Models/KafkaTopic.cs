@@ -58,6 +58,9 @@ public enum KafkaTopic
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
     MeasureEvaluated,
+    GenerateReportRequested,
+    EvaluationRequested,
+    MeasureEvaluated,
     ReadyForValidation,
     ValidationComplete
 }

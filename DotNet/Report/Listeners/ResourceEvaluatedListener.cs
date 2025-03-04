@@ -201,7 +201,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var allReady = submissionEntries.All(x => x.Status == PatientSubmissionStatus.ReadyForValidation);
 
-                                if (allReady)
+                                if (allReady && schedule.SubmitReportDateTime == null)
                                 {
                                     _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                                         new Message<ReadyForValidationKey, ReadyForValidationValue>

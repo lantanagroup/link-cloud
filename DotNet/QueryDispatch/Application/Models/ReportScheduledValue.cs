@@ -15,10 +15,12 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
         public DateTimeOffset StartDate { get; set; }
         [DataMember]
         public DateTimeOffset EndDate { get; set; }
+        [DataMember]
+        public string ReportTrackingId { get; set; }
 
         public bool IsValid()
         {
-            if (ReportTypes == null || ReportTypes.Count <= 0 || StartDate == default || EndDate == default)
+            if (ReportTypes == null || ReportTypes.Count <= 0 || StartDate == default || EndDate == default || string.IsNullOrEmpty(ReportTrackingId))
             {
                 return false;
             }

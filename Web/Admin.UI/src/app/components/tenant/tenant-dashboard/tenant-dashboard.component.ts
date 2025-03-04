@@ -37,7 +37,7 @@ export class TenantDashboardComponent implements OnInit {
   facilities: IFacilityConfigModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
-  displayedColumns: string[] = [ "facilityId", 'facilityName', 'scheduledTasks' ];
+  displayedColumns: string[] = [ 'facilityId', 'facilityName', 'scheduledTasks', 'actions' ];
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
 
    //search parameters
@@ -72,5 +72,9 @@ export class TenantDashboardComponent implements OnInit {
           });
         }
       });
+  }
+
+  deleteTenant() {
+    alert('TODO');
   }
 }
