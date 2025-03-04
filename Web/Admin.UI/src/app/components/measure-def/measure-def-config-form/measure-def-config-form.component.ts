@@ -115,7 +115,7 @@ export class MeasureDefinitionFormComponent implements OnInit {
       this.measureDefinitionService.updateMeasureDefinitionConfiguration(createMeasureConfig).subscribe((response: IEntityCreatedResponse) => {
           this.snackBar.open(`Successfully uploaded measure definition`, '', {
             duration: 3500,
-            panelClass: 'error-snackbar',
+            panelClass: 'success-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
           });
