@@ -34,7 +34,6 @@ spring:
     mapper:
       accept-case-insensitive-enums: true
       accept-case-insensitive-properties: true
-      default-view-inclusion: false
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -51,10 +50,11 @@ spring:
 
 link:
   reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
+  cql-debug: false
 
 secret-management:
   key-vault-uri: ''
 
 authentication:
-  anonymous: true
+  anonymous: false
   authority: 'https://localhost:7004'

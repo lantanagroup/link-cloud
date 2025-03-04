@@ -9,15 +9,16 @@ import com.lantanagroup.link.validation.repositories.CategoryRepository;
 import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.annotation.RequestScope;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
 @Service
-@RequestScope
+@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class CategorizationService {
     private static final Logger logger = LoggerFactory.getLogger(CategorizationService.class);
 

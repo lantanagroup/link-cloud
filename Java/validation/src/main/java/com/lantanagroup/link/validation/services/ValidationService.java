@@ -10,15 +10,16 @@ import com.lantanagroup.link.validation.entities.Result;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.annotation.RequestScope;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
 @Service
-@RequestScope
+@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class ValidationService {
     private final FhirValidator fhirValidator;
 

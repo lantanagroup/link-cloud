@@ -73,7 +73,7 @@ steps:
         Write-Host "Set MyTag to: $myTag1"
 
   - task: Docker@2
-    displayName: "Build & Push Audit Docker Image"
+    displayName: "Build & Push MeasureEval Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry)
@@ -89,3 +89,16 @@ steps:
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'manifest'
+
+  - task: Maven@2
+    displayName: Package CLI
+    inputs:
+      mavenPomFile: 'Java/pom.xml'
+      goals: 'clean package'
+      options: '-P cli -pl measureeval -am'
+      
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish MeasureEval CLI Jar'
+    inputs:
+      targetPath: 'Java/measureeval/target/measureeval-cli.jar'
+      artifact: 'measureeval-cli-jar'

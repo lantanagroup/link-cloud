@@ -1,0 +1,78 @@
+<form [formGroup]="eventForm">
+
+  <div class="content">
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>Link Integration Testing</span>
+    </mat-toolbar>
+
+    <mat-card class="resource-card">
+      <mat-card-content>
+        <div class="input-container">
+            <mat-form-field class="form-select" appearance="outline">
+              <mat-label>Facility</mat-label>
+              <mat-select formControlName="facilityId">
+                <mat-option>None</mat-option>
+                <mat-option *ngFor="let facility of facilities" [value]="facility.facilityId">
+                  {{facility.facilityName}}
+                </mat-option>
+              </mat-select>
+              <mat-error *ngIf="facilityIdControl.hasError('required')">
+                Facility is <strong>required</strong>
+              </mat-error>
+            </mat-form-field>
+        </div>
+        <div *ngIf="isLoading; else buttonContent" class="spinner-container">
+          <mat-progress-spinner
+            color="primary"
+            mode="indeterminate"
+            diameter="50">
+          </mat-progress-spinner>
+        </div>
+        <ng-template #buttonContent>
+          <button mat-raised-button
+                  color="primary"
+                  (click)="onToggleTest()"
+                  [disabled]="isLoading || eventForm.invalid">
+            {{ isTestRunning ? 'Stop Test' : 'Start Test' }}
+          </button>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
+
+
+    <mat-card class="resource-card" *ngIf="isTestRunning && consumersDataOutput.size > 0">
+      <mat-card-content>
+        <div class="table-container">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Correlation IDs</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let entry of consumersDataOutput | keyvalue ">
+              <td [style.color]="entry.key.includes('Error') ? 'red' : 'black'">{{ entry.key }}:</td>
+              <td>
+                <ul>
+                  <div *ngFor="let item of entry.value">{{ item }}</div>
+                </ul>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+
+    <mat-card class="resource-card" *ngIf="isTestRunning &&  consumersDataOutput.size > 0">
+      <mat-card-content>
+        <!-- Event Forms -->
+        <app-report-scheduled-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showReportScheduledForm"></app-report-scheduled-form>
+        <app-patient-acquired-form [facilityId]="facilityId" (eventGenerated)="onEventGenerated($event)"  *ngIf="showPatientsAcquiredForm"></app-patient-acquired-form>
+      </mat-card-content>
+    </mat-card>
+
+  </div>
+</form>

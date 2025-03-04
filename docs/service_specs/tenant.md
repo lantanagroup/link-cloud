@@ -7,44 +7,27 @@ The Tenant service is the entry point for configuring a tenant into Link Cloud. 
 - **Technology**: .NET Core
 - **Image Name**: link-tenant
 - **Port**: 8080
-- **Database**: MSSQL (previously Mongo)
+- **Database**: MSSQL
 - **Scale**: 0-3
 
-## Environment Variables
+See [Tenant Functionality](../functionality/tenant_mgmt.md) for more information on the role of the Tenant service in the Link Cloud ecosystem.
 
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| Link__Audit__ExternalConfigurationSource     | AzureAppConfiguration          | No       |
-| ConnectionStrings__AzureAppConfiguration     | `<AzureAppConfigEndpoint>`     | Yes      |
+## Common Configurations
 
-## App Settings
-
-### Kafka
-
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| KafkaConnection__BootstrapServers__0         | `<KafkaBootstrapServer>`       | No       |
-| KafkaConnection__GroupId                     | tenant-events                  | No       |
-
-### Database
-
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| MongoDB__ConnectionString                    | `<ConnectionString>`           | Yes      |
-| MongoDB__DatabaseName                        | `<DatabaseName>`               | No       |
-| MongoDB__CollectionName                      | tenant                         | No       |
-
-### Service Endpoints
-
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| MeasureServiceRegistry__MeasureServiceApiUrl | `<MeasureServiceUrl>`          | No       |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database](../config/csharp.md#sql-server-database)
 
 ### Additional Settings
 
-| Name                                         | Value                          | Secret?  |
-|----------------------------------------------|--------------------------------|----------|
-| EnableSwagger                                | true (DEV and TEST)            | No       |
+| Name                                | Value         | Secret? |
+|-------------------------------------|---------------|---------|
+| MeasureConfig__CheckIfMeasureExists | true or false | No      |
 
 ## Kafka Events/Topics
 

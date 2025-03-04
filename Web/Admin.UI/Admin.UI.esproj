@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/0.5.74-alpha">
+  <PropertyGroup>
+    <StartupCommand>npm start</StartupCommand>
+    <JavaScriptTestFramework>Jasmine</JavaScriptTestFramework>
+    <!-- Command to run on project build -->
+    <BuildCommand>
+    </BuildCommand>
+    <!-- Command to create an optimized build of the project that's ready for publishing -->
+    <ProductionBuildCommand>npm run build</ProductionBuildCommand>
+    <!-- Folder where production build objects will be placed -->
+    <BuildOutputFolder>$(MSBuildProjectDirectory)\dist\admin-ui</BuildOutputFolder>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="src\app\components\core\theme-picker\theme-storage\" />
+    <Folder Include="src\app\components\dashboard\" />
+    <Folder Include="src\app\components\account\" />
+    <Folder Include="src\app\components\validators\" />
+    <Folder Include="src\app\interfaces\tenant\" />
+    <Folder Include="src\app\models\notification\" />
+    <Folder Include="src\app\interceptors\" />
+    <Folder Include="src\app\services\security\" />
+    <Folder Include="src\assets\img\" />
+  </ItemGroup>
+</Project>

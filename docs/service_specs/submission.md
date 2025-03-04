@@ -18,44 +18,32 @@ An example of the submission package can be found at `\link-cloud\Submission Exa
 - **Technology**: .NET Core
 - **Image Name**: link-submission
 - **Port**: 8080
-- **Database**: MSSQL (previously Mongo)
+- **Database**: MongoDB
 - **Volumes**: Azure Storage Account File Share mounted at `/Link/Submission`
 
-## Environment Variables
+See [Submission Functionality](../functionality/submission_folder.md) for more information on the role of the Submission service in the Link Cloud ecosystem.
 
-| Name                                         | Value                                                | Secret?  |
-|----------------------------------------------|------------------------------------------------------|----------|
-| Link__Audit__ExternalConfigurationSource     | AzureAppConfiguration                                | No       |
-| ConnectionStrings__AzureAppConfiguration     | `<AzureAppConfigEndpoint>`                           | Yes      |
+## Common Configurations
 
-## App Settings
-
-### Kafka
-
-| Name                                         | Value                                                | Secret?  |
-|----------------------------------------------|------------------------------------------------------|----------|
-| KafkaConnection__BootstrapServers__0         | `<KafkaBootstrapServer>`                             | No       |
-| KafkaConnection__GroupId                     | submission-events                                    | No       |
-| KafkaConnection__ClientId                    | submission-events                                    | No       |
-
-### Database
-| Name                                         | Value                                                | Secret?  |
-|----------------------------------------------|------------------------------------------------------|----------|
-| MongoDB__ConnectionString                    | `<ConnectionString>`                                 | Yes      |
-| MongoDb__DatabaseName                        | `<DatabaseName>`                                     | No       |
-
-### Service Endpoints
-
-| Name                                         | Value                                                | Secret?  |
-|----------------------------------------------|------------------------------------------------------|----------|
-| SubmissionServiceConfig__ReportServiceUrl    | `<ReportServiceUrl>/api/Report/GetSubmissionBundle`  | No       |
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Kafka Consumer Retry Configuration](../config/csharp.md#kafka-consumer-settings)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [Mongo Database](../config/csharp.md#mongo-database)
 
 ### Additional Settings
 
-| Name                                         | Value                                                | Secret?  |
-|----------------------------------------------|------------------------------------------------------|----------|
-| FileSystemConfig__FilePath                   | `/data/Submission`                                   | No       |
-| EnableSwagger                                | true (DEV and TEST)                                  | No       |
+| Name                                                | Value     | Description                                                                                                  | Secret? |
+|-----------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------|---------|
+| SubmissionServiceConfig__SubmissionDirectory        | \<string> | The location of where to store submission files until they are ready to be submitted. i.e. `/data/Submission` | No      |
+| SubmissionServiceConfig__PatientBundleBatchSize     | 1         | The number of patients to process during submission in parallel (as seperate threads)                        | No      |
+| SubmissionServiceConfig__MeasureNames__0__Url       | \<string> | URL of measure                                                                                               | No      |
+| SubmissionServiceConfig__MeasureNames__0__MeasureId | \<string> | ID of measure                                                                                                | No      |
+| SubmissionServiceConfig__MeasureNames__0__ShortName | \<string> | Short name of the measure (used in building submission file name)                                            | No      |
 
 ## Kafka Events/Topics
 

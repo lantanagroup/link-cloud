@@ -1,0 +1,46 @@
+<form [formGroup]="patientForm">
+  <div class="input-container">
+    <mat-form-field class="form-select" appearance="outline">
+      <mat-label>Facility</mat-label>
+      <!--<mat-select formControlName="facilityId">
+        <mat-option>None</mat-option>
+        <mat-option *ngFor="let facility of facilities" [value]="facility">
+          {{facility}}
+        </mat-option>
+      </mat-select>-->
+      <input matInput formControlName="facilityId">
+      <mat-error *ngIf="facilityIdControl.hasError('required')">
+        Facility is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
+  <div class="input-container">
+    <mat-form-field appearance="outline" class="form-input">
+      <mat-label>Patient Id</mat-label>
+      <input matInput formControlName="patientId">
+      <mat-error *ngIf="patientIdControl.hasError('required')">
+        A Patient Id is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
+  <div class="input-container">
+    <mat-form-field class="form-select" appearance="outline">
+      <mat-label>Event Type</mat-label>
+      <mat-select formControlName="eventType">
+        <mat-option>None</mat-option>
+        <mat-option *ngFor="let type of eventTypes" [value]="type">
+          {{type}}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="eventTypeControl.hasError('required')">
+        Event Type is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
+</form>
+<div class="form-bar">
+  <button mat-raised-button color="primary" [disabled]="patientForm.invalid" (click)="generateEvent()">
+    <mat-icon>event</mat-icon>
+    Generate Event
+  </button>
+</div>

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
-import com.lantanagroup.link.validation.serdes.Views;
+import com.lantanagroup.link.shared.serdes.Views;
 import com.lantanagroup.link.validation.services.ArtifactService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

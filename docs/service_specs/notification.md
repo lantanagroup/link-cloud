@@ -10,46 +10,41 @@ The Notification service is responsible for emailing configured users when a not
 - **Database**: MSSQL
 - **Scale**: 0-3
 
-## Environment Variables
+See [Notification Functionality](../functionality/notifications.md) for more information on the role of the Notification service in the Link Cloud ecosystem.
 
-| Name                                                     | Value                         | Secret? |
-|----------------------------------------------------------|-------------------------------|---------|
-| Link__Audit__ExternalConfigurationSource                 | AzureAppConfiguration         | No      |
-| ConnectionStrings__AzureAppConfiguration                 | `<AzureAppConfigEndpoint>`    | Yes     |
+## Common Configurations
 
-## App Settings
+* [Swagger](../config/csharp.md#swagger)
+* [Azure App Configuration](../config/csharp.md#azure-app-config-environment-variables)
+* [Kafka Configuration](../config/csharp.md#kafka)
+* [Service Registry Configuration](../config/csharp.md#service-registry)
+* [CORS Configuration](../config/csharp.md#cors)
+* [Token Service Configuration](../config/csharp.md#token-service-settings)
+* [Service Authentication](../config/csharp.md#service-authentication)
+* [SQL Server Database Configuration](../config/csharp.md#sql-server-database)
 
-### Service Endpoints
-
-| Name                                                        | Value                         | Secret? |
-|-------------------------------------------------------------|-------------------------------|---------|
-| Link__Notification__ServiceRegistry__TenantServiceApiUrl    | `<TenantServiceUrl>`          | No      |
-
-### Kafka
-
-| Name                                                        | Value                         | Secret? |
-|-------------------------------------------------------------|-------------------------------|---------|
-| Link__Notification__KafkaConnection__BootstrapServers__0    | `<KafkaBootstrapServer>`      | No      |
-| Link__Notification__KafkaConnection__GroupId                | notification-events           | No      |
-| Link__Notification__KafkaConnection__ClientId               | notification-events           | No      |
+## Custom Configurations
 
 ### SMTP
 
-| Name                                                        | Value                         | Secret? |
-|-------------------------------------------------------------|-------------------------------|---------|
-| Link__Notification__SmtpConnection__Host                    |                               | No      |
-| Link__Notification__SmtpConnection__Port                    |                               | No      |
-| Link__Notification__SmtpConnection__EmailFrom               |                               | No      |
-| Link__Notification__SmtpConnection__UseBasicAuth            | false or true                 | No      |
-| Link__Notification__SmtpConnection__Username                |                               | No      |
-| Link__Notification__SmtpConnection__Password                |                               | Yes     |
-| Link__Notification__SmtpConnection__UseOAuth2               | false or true                 | No      |
+| Name                         | Value         | Secret? |
+|------------------------------|---------------|---------|
+| SmtpConnection__Host         |               | No      |
+| SmtpConnection__Port         |               | No      |
+| SmtpConnection__EmailFrom    |               | No      |
+| SmtpConnection__UseBasicAuth | false or true | No      |
+| SmtpConnection__Username     |               | No      |
+| SmtpConnection__Password     |               | Yes     |
+| SmtpConnection__UseOAuth2    | false or true | No      |
 
-### Additional Settings
+### Channels
 
-| Name                                                        | Value                         | Secret? |
-|-------------------------------------------------------------|-------------------------------|---------|
-| Link__Notification__EnableSwagger                           | true (DEV and TEST)           | No      |
+| Name                         | Value         | Description                                                                                                        | Secret? |
+|------------------------------|---------------|--------------------------------------------------------------------------------------------------------------------|---------|
+| Channels__Email              | true or false | Whether or not to use the email channel for notifications                                                          | No      |
+| Channels__IncludeTestMessage | true or false | If true, overrides the body and subject of the message with the values from `TestMessage` and `SubjectTestMessage` | No      |
+| Channels__TestMessage        | \<string>     | The body of the email to send when configured for testing                                                          | No      |
+| Channels__SubjectTestMessage | \<string>     | The subject of the email to send when configured for testing                                                       | No      |
 
 ## Kafka Events/Topics
 

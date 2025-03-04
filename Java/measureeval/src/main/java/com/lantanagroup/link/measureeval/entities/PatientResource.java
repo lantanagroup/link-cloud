@@ -1,7 +1,7 @@
 package com.lantanagroup.link.measureeval.entities;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
+import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
 

@@ -3,8 +3,10 @@ package com.lantanagroup.link.measureeval.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
+import com.lantanagroup.link.measureeval.repositories.LinkInMemoryFhirRepository;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
+import lombok.Getter;
 import org.cqframework.cql.cql2elm.LibraryBuilder;
 import org.hl7.fhir.r4.model.*;
 import org.opencds.cqf.fhir.api.Repository;
@@ -14,7 +16,6 @@ import org.opencds.cqf.fhir.cql.engine.terminology.TerminologySettings;
 import org.opencds.cqf.fhir.cr.measure.MeasureEvaluationOptions;
 import org.opencds.cqf.fhir.cr.measure.r4.R4MeasureService;
 import org.opencds.cqf.fhir.utility.monad.Eithers;
-import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ public class MeasureEvaluator {
 
     private final FhirContext fhirContext;
     private final MeasureEvaluationOptions options;
+    @Getter
     private final Bundle bundle;
     private final Measure measure;
 
@@ -74,10 +76,6 @@ public class MeasureEvaluator {
         }
     }
 
-    public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle) {
-        return compile(fhirContext, bundle, false);
-    }
-
     public static MeasureEvaluator compile(FhirContext fhirContext, Bundle bundle, boolean isDebug) {
         MeasureEvaluator instance = new MeasureEvaluator(fhirContext, bundle, isDebug);
         instance.compile();
@@ -94,12 +92,21 @@ public class MeasureEvaluator {
         doEvaluate(null, null, new StringType(subject), additionalData);
     }
 
+    public static MeasureReport compileAndEvaluate(FhirContext fhirContext, Bundle bundle, Parameters parameters, boolean isDebug) {
+        MeasureEvaluator evaluator = new MeasureEvaluator(fhirContext, bundle, isDebug);
+        DateTimeType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateTimeType.class);
+        DateTimeType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateTimeType.class);
+        StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
+        Bundle additionalData = ParametersUtils.getResource(parameters, "additionalData", Bundle.class);
+        return evaluator.doEvaluate(periodStart, periodEnd, subject, additionalData);
+    }
+
     private MeasureReport doEvaluate(
             DateTimeType periodStart,
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        Repository repository = new InMemoryFhirRepository(fhirContext, bundle);
+        Repository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
         R4MeasureService measureService = new R4MeasureService(repository, options);
         return measureService.evaluate(
                 Eithers.forRight3(measure),
@@ -117,24 +124,6 @@ public class MeasureEvaluator {
                 null);
     }
 
-    public MeasureReport evaluate(
-            DateTimeType periodStart,
-            DateTimeType periodEnd,
-            StringType subject,
-            Bundle additionalData) {
-        List<Bundle.BundleEntryComponent> entries = additionalData.getEntry();
-        logger.debug(
-                "Evaluating measure: MEASURE=[{}] START=[{}] END=[{}] SUBJECT=[{}] RESOURCES=[{}]",
-                measure.getUrl(), periodStart.asStringValue(), periodEnd.asStringValue(), subject, entries.size());
-        if (logger.isTraceEnabled()) {
-            for (int entryIndex = 0; entryIndex < entries.size(); entryIndex++) {
-                Resource resource = entries.get(entryIndex).getResource();
-                logger.trace("Resource {}: {}/{}", entryIndex, resource.getResourceType(), resource.getIdPart());
-            }
-        }
-        return doEvaluate(periodStart, periodEnd, subject, additionalData);
-    }
-
     public MeasureReport evaluate(Date periodStart, Date periodEnd, String patientId, Bundle additionalData) {
         TimeZone utc = TimeZone.getTimeZone(ZoneOffset.UTC);
         return evaluate(
@@ -150,5 +139,35 @@ public class MeasureEvaluator {
         StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
         Bundle additionalData = ParametersUtils.getResource(parameters, "additionalData", Bundle.class);
         return evaluate(periodStart, periodEnd, subject, additionalData);
+    }
+
+    public MeasureReport evaluate(
+            DateTimeType periodStart,
+            DateTimeType periodEnd,
+            StringType subject,
+            Bundle additionalData) {
+        List<Bundle.BundleEntryComponent> entries = additionalData.getEntry();
+
+        logger.debug(
+                "Evaluating measure: MEASURE=[{}] START=[{}] END=[{}] SUBJECT=[{}] RESOURCES=[{}]",
+                measure.getUrl(), periodStart.asStringValue(), periodEnd.asStringValue(), subject, entries.size());
+
+        // Output debug/trace information about the results of the evaluation
+        if (logger.isTraceEnabled()) {
+            // Output the group/population counts
+            for (MeasureReport.MeasureReportGroupComponent group : doEvaluate(periodStart, periodEnd, subject, additionalData).getGroup()) {
+                logger.trace("Group {}: {}", group.getId(), group.getPopulation().size());
+                for (MeasureReport.MeasureReportGroupPopulationComponent population : group.getPopulation()) {
+                    logger.trace("Population {}: {}", population.getCode().getCodingFirstRep().getDisplay(), population.getCount());
+                }
+            }
+
+            // Output each resource in the bundle
+            for (int entryIndex = 0; entryIndex < entries.size(); entryIndex++) {
+                Resource resource = entries.get(entryIndex).getResource();
+                logger.trace("Resource {}: {}/{}", entryIndex, resource.getResourceType(), resource.getIdPart());
+            }
+        }
+        return doEvaluate(periodStart, periodEnd, subject, additionalData);
     }
 }

@@ -39,23 +39,37 @@ public class ScheduleService : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-
-        Scheduler.JobFactory = _jobFactory;
-
-        var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
-
-        List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
-
-        using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
-
-        foreach (CensusConfigEntity facility in facilities)
+        try
         {
-            censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
-        }
+            Scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-        await Scheduler.Start(cancellationToken);
-        _logger.LogInformation("Scheduler started.");
+            Scheduler.JobFactory = _jobFactory;
+
+            var configRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusConfigManager>();
+
+            List<CensusConfigEntity> facilities = (await configRepo.GetAllFacilities(cancellationToken)).ToList();
+
+            using var censusSchedulingRepo = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICensusSchedulingRepository>();
+
+            foreach (CensusConfigEntity facility in facilities)
+            {
+                try
+                {
+                    censusSchedulingRepo.CreateJobAndTrigger(facility, Scheduler);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Something went wrong scheduling a Census job for facility: {1}.", facility.FacilityID);
+                }
+            }
+
+            await Scheduler.Start(cancellationToken);
+            _logger.LogInformation("Scheduler started.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Something went wrong scheduling a Census job: {1}.", ex.Message);
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)

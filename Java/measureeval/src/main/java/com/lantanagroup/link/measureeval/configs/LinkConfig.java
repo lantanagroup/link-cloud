@@ -16,6 +16,8 @@ import java.util.function.Predicate;
 public class LinkConfig {
     private String reportabilityPredicate;
 
+    private boolean cqlDebug = false;
+
     @Bean
     @SuppressWarnings("unchecked")
     public Predicate<MeasureReport> reportabilityPredicate() throws Exception {
