@@ -2,12 +2,11 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
-import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
-import com.lantanagroup.link.measureeval.kafka.Topics;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
+import com.lantanagroup.link.shared.kafka.ErrorHandler;
+import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;
-import com.lantanagroup.link.shared.config.TelemetryConfig;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;

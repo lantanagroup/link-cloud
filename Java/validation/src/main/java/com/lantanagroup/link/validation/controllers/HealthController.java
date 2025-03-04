@@ -8,14 +8,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/health")
 public class HealthController {
-    @Operation(
-            summary = "Health check",
-            description = "Health check endpoint for the validation service",
-            tags = {"Health"},
-            operationId = "health"
-    )
+    @Operation(summary = "Checks service health")
     @GetMapping
-    public String health() {
+    public String checkHealth() {
         return "OK";
     }
 }

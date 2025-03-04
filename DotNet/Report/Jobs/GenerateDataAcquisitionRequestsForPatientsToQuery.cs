@@ -21,6 +21,7 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> _logger;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
         private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
         private readonly ISchedulerFactory _schedulerFactory;
 
         private readonly MeasureReportAggregator _aggregator;
@@ -32,7 +33,8 @@ namespace LantanaGroup.Link.Report.Jobs
             MeasureReportAggregator aggregator,
             IDatabase database,
             IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer,
+            IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
@@ -40,6 +42,7 @@ namespace LantanaGroup.Link.Report.Jobs
             _database = database;
             _dataAcqProducer = dataAcqProducer;
             _submissionReportProducer = submissionReportProducer;
+            _readyForValidationProducer = readyForValidationProducer;
         }
 
 
@@ -63,8 +66,8 @@ namespace LantanaGroup.Link.Report.Jobs
                     $"Executing GenerateDataAcquisitionRequestsForPatientsToQuery for MeasureReportScheduleModel {schedule.Id}");
 
                 var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(e => e.ReportScheduleId == schedule.Id);
-                var patientsToEvaluate = submissionEntries.Where(x => x.Status == PatientSubmissionStatus.NotEvaluated).Select(x => x.PatientId).Distinct().ToList();
-
+                var patientsToEvaluate = submissionEntries.Where(x => x.Status == PatientSubmissionStatus.PendingEvaluation).Select(x => x.PatientId).Distinct().ToList();
+                var needValidation = submissionEntries.Where(x => x.ValidationStatus == ValidationStatus.Pending).Select(p => p.PatientId).ToList();
                 if (patientsToEvaluate.Any())
                 {
                     foreach (string patientId in patientsToEvaluate)
@@ -116,17 +119,18 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     _logger.LogInformation($"DataAcquisitionRequested topics published for {patientsToEvaluate} patients for {schedule.FacilityId} for Report Types: {string.Join(", ", schedule.ReportTypes)} for Report Dates: {schedule.ReportStartDate:G} - {schedule.ReportEndDate:G}");
                 }
-                else
+                else if (!needValidation.Any())//There are no patients that need evaluation, or submission entries that need to be validated, so skip to Submission
                 {
                     var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null)
                         .ToList();
 
-                    var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ReadyForSubmission).Select(s => s.PatientId).ToList();
+                    var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ReadyForValidation).Select(s => s.PatientId).ToList();
 
                     var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
                                                                             ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                    
                     _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
                         new Message<SubmitReportKey, SubmitReportValue>
                         {
@@ -150,7 +154,7 @@ namespace LantanaGroup.Link.Report.Jobs
                         });
 
                     _submissionReportProducer.Flush();
-                
+
                 }
 
                 // remove the job from the scheduler

@@ -231,7 +231,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
                                             {
                                                 PatientId = patient,
-                                                Status = PatientSubmissionStatus.NotEvaluated,
+                                                Status = PatientSubmissionStatus.PendingEvaluation,
                                                 ReportScheduleId = newReportId,
                                                 FacilityId = facilityId,
                                                 ReportType = reportType,

@@ -11,7 +11,7 @@ telemetry:
 loki:
   enabled: true
   url: http://localhost:3100
-  app: link-dev
+  app: link-cloud
 
 springdoc:
   api-docs:
@@ -34,7 +34,6 @@ spring:
     mapper:
       accept-case-insensitive-enums: true
       accept-case-insensitive-properties: true
-      default-view-inclusion: false
 
   kafka:
     bootstrap-servers: localhost:9092

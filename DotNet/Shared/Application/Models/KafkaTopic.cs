@@ -59,5 +59,7 @@ public enum KafkaTopic
     ReportScheduledRetry,
     MeasureEvaluated,
     GenerateReportRequested,
-    EvaluationRequested
+    EvaluationRequested,
+    ReadyForValidation,
+    ValidationComplete
 }
