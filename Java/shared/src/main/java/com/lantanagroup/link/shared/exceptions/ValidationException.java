@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.exceptions;
+package com.lantanagroup.link.shared.exceptions;
 
 import lombok.Getter;
 

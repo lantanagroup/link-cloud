@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.utils;
+package com.lantanagroup.link.shared.utils;
 
 import ca.uhn.fhir.context.BaseRuntimeElementDefinition;
 import ca.uhn.fhir.context.FhirContext;

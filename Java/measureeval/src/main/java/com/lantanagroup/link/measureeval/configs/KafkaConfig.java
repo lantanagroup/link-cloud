@@ -2,8 +2,8 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.ErrorHandler;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;

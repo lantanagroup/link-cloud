@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;

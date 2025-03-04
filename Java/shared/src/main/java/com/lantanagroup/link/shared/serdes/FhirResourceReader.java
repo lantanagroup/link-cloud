@@ -1,8 +1,8 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
-import com.lantanagroup.link.measureeval.utils.FhirContextUtils;
+import com.lantanagroup.link.shared.utils.FhirContextUtils;
 import jakarta.annotation.Nonnull;
 import org.bson.Document;
 import org.hl7.fhir.instance.model.api.IBaseResource;

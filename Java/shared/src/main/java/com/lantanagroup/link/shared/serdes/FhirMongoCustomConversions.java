@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions;

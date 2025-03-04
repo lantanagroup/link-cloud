@@ -1,8 +1,8 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.lantanagroup.link.measureeval.utils.FhirContextUtils;
+import com.lantanagroup.link.shared.utils.FhirContextUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 public class FhirModule extends SimpleModule {

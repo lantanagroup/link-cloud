@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.core.JsonGenerator;

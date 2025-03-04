@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.serdes;
+package com.lantanagroup.link.shared.serdes;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.DataFormatException;
@@ -6,7 +6,7 @@ import ca.uhn.fhir.parser.IParser;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import java.io.IOException;

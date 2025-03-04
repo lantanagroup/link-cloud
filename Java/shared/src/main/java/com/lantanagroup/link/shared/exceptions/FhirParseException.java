@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.exceptions;
+package com.lantanagroup.link.shared.exceptions;
 
 import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.core.JsonProcessingException;
