@@ -6,5 +6,5 @@ spring:
         stores:
           - connection-string: ${AZURE_APP_CONFIG_CONNECTION_STRING}
             selects:
-              - label-filter: ',Validation'
-                key-filter: '/'
+              - key-filter: '/'
+                label-filter: ',Validation'
