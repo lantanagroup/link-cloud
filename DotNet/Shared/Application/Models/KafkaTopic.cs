@@ -60,7 +60,6 @@ public enum KafkaTopic
     MeasureEvaluated,
     GenerateReportRequested,
     EvaluationRequested,
-    MeasureEvaluated,
     ReadyForValidation,
     ValidationComplete
 }
