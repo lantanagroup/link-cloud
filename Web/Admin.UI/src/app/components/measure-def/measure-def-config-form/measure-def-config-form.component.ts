@@ -60,10 +60,7 @@ export class MeasureDefinitionFormComponent implements OnInit {
     this.configForm = this.formBuilder.group(
       {
         bundleId: ["", Validators.required],
-        bundle: [null],
-      },
-      {
-        validators: [this.validateBundleId.bind(this)]
+        bundle: [null]
       }
     );
   }
