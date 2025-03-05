@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { IFacilityConfigModel, IScheduledTaskModel, PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import { IFacilityConfigModel, IScheduledReportModel, PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { Observable, catchError, map, tap, of } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { AppConfigService } from '../../app-config.service';
+import { IScheduledReport } from 'src/app/interfaces/testing/data-acquisition-requested.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -13,11 +14,11 @@ export class TenantService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
 
-  createFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      scheduledReports: scheduledReports
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility`, facility)
@@ -30,12 +31,12 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      scheduledReports: scheduledReports
     };
 
     return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
@@ -66,7 +67,7 @@ export class TenantService {
 
 
   listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
-    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
+    var list = this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
@@ -76,6 +77,7 @@ export class TenantService {
         }),
         catchError(this.handleError)
       )
+      return list;
   }
 
   private handleError(err: HttpErrorResponse) {
