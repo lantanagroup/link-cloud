@@ -4,7 +4,6 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
@@ -13,7 +12,6 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using System.Text.Json;
@@ -26,15 +24,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
         private readonly ILogger<ResourceEvaluatedListener> _logger;
         private readonly IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> _kafkaConsumerFactory;
-        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
         private readonly ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> _deadLetterExceptionHandler;
-
-        private readonly PatientReportSubmissionBundler _bundler;
-        private readonly MeasureReportAggregator _aggregator;
 
         private string Name => this.GetType().Name;
 
@@ -43,16 +38,12 @@ namespace LantanaGroup.Link.Report.Listeners
             IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue> kafkaConsumerFactory,
             ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue> deadLetterExceptionHandler,
-            PatientReportSubmissionBundler bundler,
-            MeasureReportAggregator aggregator,
             IServiceScopeFactory serviceScopeFactory, 
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
         {
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
-            _bundler = bundler;
-            _aggregator = aggregator;
 
             _serviceScopeFactory = serviceScopeFactory;
 
@@ -64,7 +55,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ResourceEvaluated) + "-Error";
-            _submissionReportProducer = submissionReportProducer;
+            _readyForValidationProducer = readyForValidationProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -151,8 +142,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry = await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
                                     {
                                         PatientId = value.PatientId,
-                                        Status = PatientSubmissionStatus.NotEvaluated,
-                                        ReportScheduleId = schedule.Id,
+                                        Status = PatientSubmissionStatus.PendingEvaluation,
+                                        ValidationStatus = ValidationStatus.Pending,
+                                        ReportScheduleId = schedule.Id!,
                                         FacilityId = facilityId,
                                         ReportType = value.ReportType,
                                     });
@@ -200,65 +192,47 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
-                                await submissionEntryManager.UpdateAsync(entry, consumeCancellationToken);
+                                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
 
-                                #region Submit Report Handling
-                                if (schedule.PatientsToQueryDataRequested)
+                                var submissionEntries =
+                                    await submissionEntryManager.FindAsync(
+                                        e => e.FacilityId == entry.FacilityId 
+                                             && e.PatientId == value.PatientId && e.ReportScheduleId == schedule.Id && e.Status != PatientSubmissionStatus.NotReportable, consumeCancellationToken);
+
+                                var allReady = submissionEntries.All(x => x.Status == PatientSubmissionStatus.ReadyForValidation);
+
+                                if (allReady && schedule.SubmitReportDateTime == null)
                                 {
-                                    var entries = await submissionEntryManager.FindAsync(s =>
-                                        s.FacilityId == entry.FacilityId
-                                        && s.ReportScheduleId == entry.ReportScheduleId
-                                        && s.Status != PatientSubmissionStatus.NotReportable, cancellationToken);
-
-                                    var allReady = entries.All(x => x.Status == PatientSubmissionStatus.ReadyForSubmission);
-
-                                    if (allReady && schedule.SubmitReportDateTime == null)
-                                    {
-                                        var patientIds = entries.Select(s => s.PatientId).ToList();
-
-                                        List<MeasureReport?> measureReports = entries
-                                              .Select(e => e.MeasureReport)
-                                              .Where(report => report != null)
-                                              .ToList();
-
-                                        var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
-                                            ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
-                                        
-                                        _submissionReportProducer.Produce(nameof(KafkaTopic.SubmitReport),
-                                            new Message<SubmitReportKey, SubmitReportValue>
+                                    _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
+                                        new Message<ReadyForValidationKey, ReadyForValidationValue>
+                                        {
+                                            Key = new ReadyForValidationKey()
                                             {
-                                                Key = new SubmitReportKey()
-                                                {
-                                                    FacilityId = schedule.FacilityId,
-                                                    ReportScheduleId = schedule.Id,
-                                                    StartDate = schedule.ReportStartDate,
-                                                    EndDate = schedule.ReportEndDate
-                                                },
-                                                Value = new SubmitReportValue()
-                                                {
-                                                    PatientIds = patientIds,
-                                                    MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
-                                                    Organization = organization,
-                                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, key.StartDate, key.EndDate)
-                                                },
-                                                Headers = new Headers
-                                                {
-                                                {
-                                                    "X-Correlation-Id",
-                                                    headerValue
-                                                }
-                                                }
-                                            });
+                                                FacilityId = schedule.FacilityId,
+                                                ReportId = schedule.Id!
+                                            },
+                                            Value = new ReadyForValidationValue
+                                            {
+                                                PatientId = value.PatientId,
+                                                ReportTypes = schedule.ReportTypes.ToList()
+                                            },
+                                            Headers = new Headers
+                                            {
+                                            {
+                                                "X-Correlation-Id",
+                                                headerValue
+                                            }
+                                            }
+                                        });
 
-                                        _submissionReportProducer.Flush(consumeCancellationToken);
+                                    _readyForValidationProducer.Flush(consumeCancellationToken);
 
-                                        
-                                        schedule.SubmitReportDateTime = DateTime.UtcNow;
-                                        await measureReportScheduledManager.UpdateAsync(schedule, consumeCancellationToken);
+                                    foreach (var e in submissionEntries)
+                                    {
+                                        e.Status = PatientSubmissionStatus.ValidationRequested;
+                                        await submissionEntryManager.UpdateAsync(e, cancellationToken);
                                     }
                                 }
-
-                                #endregion
                             }
                             catch (DeadLetterException ex)
                             {

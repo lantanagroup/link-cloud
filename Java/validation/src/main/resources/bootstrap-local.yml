@@ -7,4 +7,4 @@ spring:
           - endpoint: ${AZURE_APP_CONFIG_ENDPOINT}
             selects:
               - key-filter: '/'
-                label-filter: ',MeasureEval'
+                label-filter: ',Validation'

@@ -1,10 +1,10 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
-import com.lantanagroup.link.measureeval.kafka.Headers;
-import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.models.QueryType;
+import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
+import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.MeasureReport;
