@@ -23,9 +23,9 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 
 export class FileUploadComponent {
 
-  @Input() file: any;
+   file: any;
 
-  @Input() fileName = '';
+   fileName = '';
 
   disabled: boolean = false;
 

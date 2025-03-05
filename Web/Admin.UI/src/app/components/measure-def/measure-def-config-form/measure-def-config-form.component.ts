@@ -84,13 +84,15 @@ export class MeasureDefinitionFormComponent implements OnInit {
     return this.configForm.controls['bundle'];
   }
 
-
   loadFile(file: any) {
-    this.bundle.setValue(file);
-    if (!file) {
-      this.fileName = 'No bundle';
-    } else if (file?.["id"]) {
+    if (file) {
+      this.bundle.setValue(file);
       this.bundleId.setValue(file["id"]);
+    } else {
+      this.fileName = '';
+      this.bundleId.setValue('');
+      this.bundle.setValue(null);
+      this.configForm.reset();
     }
   }
 
@@ -100,7 +102,7 @@ export class MeasureDefinitionFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.configForm.reset();
+
   }
 
   submitConfiguration(): void {
