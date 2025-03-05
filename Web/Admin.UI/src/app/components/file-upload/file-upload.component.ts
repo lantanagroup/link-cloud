@@ -21,25 +21,23 @@ import {MatTooltipModule} from '@angular/material/tooltip';
   styleUrls: ['./file-upload.component.scss']
 })
 
-
 export class FileUploadComponent {
 
-  @Input() file: any;
+   file: any;
 
-  @Input() fileName = '';
-
-  @Input() viewOnly = false;
-
+   fileName = '';
 
   disabled: boolean = false;
 
   @Output() fileChange = new EventEmitter<any>();
+
 
   onClick(fileUpload: HTMLInputElement) {
     fileUpload.click();
   }
 
   clearFile() {
+    this.fileName = "";
     this.file = null;
     this.fileChange.emit(null);
   }

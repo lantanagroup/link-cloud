@@ -1,55 +1,32 @@
 <div class="input-container list-item-container">
+  <p>
+    <mat-toolbar class="page-header-bar" color="primary">
+      <span>Upload Measure Definition</span>
+    </mat-toolbar>
+  </p>
   <form [formGroup]="configForm" class="dialog-form">
+    <div class="form-input">
+      <mat-label>Bundle</mat-label>
+      <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+    </div>
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input">
         <mat-label>Bundle Id</mat-label>
-        <input matInput formControlName="bundleId"  [readonly]="viewOnly">
-        <button *ngIf="bundleId.value && !(viewOnly || isEditMode)" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundleId()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-error *ngIf="bundleId.hasError('required')">
+        <input matInput formControlName="bundleId" >
+        <mat-error *ngIf="bundleId.hasError('required') && configForm.get('bundleId')?.touched">
           A Bundle id is <strong>required</strong>
         </mat-error>
       </mat-form-field>
     </div>
-    <div class="form-input">
-      <mat-form-field appearance="outline" class="subject-input form-input">
-        <mat-label>Bundle Name</mat-label>
-        <input matInput formControlName="bundleName" [readonly]="viewOnly" >
-        <button *ngIf="bundleName.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundleName()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-error *ngIf="bundleName.hasError('required')  && !viewOnly">
-          A bundle name is <strong>required</strong>
-        </mat-error>
-      </mat-form-field>
-    </div>
-    <div class="form-input">
-      <mat-form-field appearance="outline" class="subject-input form-input">
-        <mat-label>Bundle Url</mat-label>
-        <input matInput formControlName="url" [readonly]="viewOnly" placeholder= "https://test.com">
-        <button *ngIf="url.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearBundleUrl()">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-error *ngIf="url.hasError('required')  && !viewOnly">
-          A Bundle url is <strong>required</strong>
-        </mat-error>
-        <mat-error *ngIf="url.hasError('pattern')  && !viewOnly">
-          Not a valid url
-        </mat-error>
-      </mat-form-field>
-    </div>
-    <div class="form-input">
-      <mat-label>Bundle</mat-label>
-      <file-upload [file]="bundle" [viewOnly]="viewOnly" [fileName]="fileName" (fileChange)="loadFile($event)">Upload</file-upload>
-    </div>
     <mat-error>
-      <span *ngIf="bundleAndUrlMissing">
-        Either an url must be provided or a bundle must be uploaded
-      </span>
-      <span *ngIf="invalidBundleId">
-           Bundle Id should match the Id in the uploaded bundle
-      </span>
+      <span *ngIf="invalidBundleId">Bundle Id should match the Id in the uploaded bundle</span>
     </mat-error>
   </form>
+  <div mat-dialog-actions align="end">
+    <button  mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
+      <mat-icon>save</mat-icon>
+      Upload Measure Definition Bundle
+    </button>
+  <!--  <button mat-raised-button mat-dialog-close (click)="clearForm()">Clear</button>-->
+  </div>
 </div>
