@@ -69,7 +69,7 @@
   </div>
 
   <div *ngIf="facilityConfigForm.hasError('reportsNotUnique')">
-    <small class="error">{{ facilityConfigForm.errors?.reportsNotUnique }}</small>
+    <small class="error">{{ facilityConfigForm.errors["reportsNotUnique"]}}</small>
   </div>
 
 </form>
