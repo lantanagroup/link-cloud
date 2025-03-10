@@ -55,9 +55,9 @@ Default `key-filter` and `label-filter` properties are specified for each servic
 
 ### Authentication
 
-Java Azure libraries have difficult using different authentication mechanisms between App Config (ACA) and Key Vault (AKV). If you specify AZURE_CLIENT_ID, it will attempt to use managed identity for _both_ ACA and AKV.
+Java Azure libraries have difficult using different authentication mechanisms between App Config (AAC) and Key Vault (AKV). If you specify AZURE_CLIENT_ID, it will attempt to use managed identity for _both_ AAC and AKV.
 
-If using managed identity authentication for one, it is suggested to use managed identity for both; _not_ a connectionString with a token/secret embedded in it for ACA and MI for AKV.
+If using managed identity authentication for one, it is suggested to use managed identity for both; _not_ a connectionString with a token/secret embedded in it for AAC and MI for AKV.
 
 Specifying all three `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and `AZURE_TENANT_ID` is only necessary when using a service principal for authentication. Only `AZURE_CLIENT_ID` is necessary to authenticate using managed identity.
 
