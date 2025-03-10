@@ -68,8 +68,8 @@
     </mat-form-field>
   </div>
 
-  <div *ngIf="facilityConfigForm.hasError('reportsNotUnique')">
-    <small class="error">{{ facilityConfigForm.errors["reportsNotUnique"]}}</small>
+  <div *ngIf="reportsNotUniqueError">
+    <small class="error">{{ reportsNotUniqueError }}</small>
   </div>
 
 </form>

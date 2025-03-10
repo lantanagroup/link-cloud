@@ -222,6 +222,9 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityNameControl.updateValueAndValidity();
   }
 
+  get reportsNotUniqueError(): string | null {
+    return this.facilityConfigForm.errors?.['reportsNotUnique'] || null;
+  }
 
   submitConfiguration(): void {
     if(this.facilityConfigForm.valid) {
