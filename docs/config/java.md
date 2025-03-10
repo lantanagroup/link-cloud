@@ -1,17 +1,66 @@
 ﻿[← Back Home](../README.md)
 
+# Configuring Java Services
+
+Spring Boot uses two main YAML configuration files:
+
+* `bootstrap.yml`
+    * Loaded before application.yml during the startup process.
+    * Used for early-stage configuration that is required before the main application context is loaded.
+* `application.yml`
+    * Loaded after bootstrap.yml, within the main application context.
+
+Some properties may want to be put in environment-specific configuration files with the naming convention `bootstrap-ENV.yml` and `application-ENV.yml`. For example, there may be `bootstrap-dev.yml` and `bootstrap-prod.yml`. At deployment-time, you can specify an environment variable `SPRING_PROFILES_ACTIVE` to indicate whether to load `dev` or `prod` on top of the default configurations.
+
+To convert a property name in the canonical-form to an environment variable name you can follow these rules:
+
+* Replace dots (.) with underscores (_).
+* Remove any dashes (-).
+* Convert to uppercase.
+
+For example, the configuration property spring.main.log-startup-info would be an environment variable named SPRING_MAIN_LOGSTARTUPINFO.
+
+Environment variables can also be used when binding to object lists. To bind to a List, the element number should be surrounded with underscores in the variable name.
+
+For example, the configuration property my.service[0].other would use an environment variable named MY_SERVICE_0_OTHER.
+
+Examples of environment variable naming conventions:
+
+| YAML / JSON Key                                                       | Converted Environment Variable                                     |
+|-----------------------------------------------------------------------|--------------------------------------------------------------------|
+| server.port                                                           | SERVER_PORT                                                        |
+| spring.datasource.url                                                 | SPRING_DATASOURCE_URL                                              |
+| spring.cloud.azure.appconfiguration.stores[0].selects[0].label-filter | SPRING_CLOUD_AZURE_APPCONFIGURATION_STORES_0_SELECTS_0_LABELFILTER |
+| my.custom.settings[2].api-key                                         | MY_CUSTOM_SETTINGS_2_APIKEY                                        |
+| config.services[1].endpoints.internal-url                             | CONFIG_SERVICES_1_ENDPOINTS_INTERNALURL                            |
+
+Note: Official guidance is to *remove* dashes (-) entirely from the environment variable. For example: `label-filter` becomes `LABELFILTER`. However, both `LABEL-FILTER` and `LABELFILTER` work interchangeably. 
+
 # Common Configurations for Java Services
 
 Any of the properties for serivce configuration can be provided either via environment variables, through a custom `application.yml` file, or via properties set in java using `-D<propertyName>=<value>` passed as an argument to the JVM during startup.
 
-## Azure App Config
+## Azure App Config and Key Vault
 
-| Property Name                                                                                                 | Description                                                                                                                                                                                          | Type/Value    |
-|---------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| spring.cloud.azure.appconfiguration.enabled                                                                   | Enable Azure App Configuration                                                                                                                                                                       | true or false |
-| spring.cloud.azure.appconfiguration.stores[0].connection-string<br/>OR<br/>AZURE_APP_CONFIG_CONNECTION_STRING | Connection string to Azure App Config instance. The `AZURE_APP_CONFIG_CONNECTION_STRING` variable is setup in the default bootstrap-dev.yml configuration that's used by Azure App Config libraries. | \<string>     |
-| spring.cloud.azure.appconfiguration.stores[0].selects[0].label-filter                                         | Label to use for configuration                                                                                                                                                                       | ",Validation" |
-| spring.cloud.azure.appconfiguration.stores[0].selects[0].key-filter                                           | Key to use for configuration                                                                                                                                                                         | "/"           |
+Default `key-filter` and `label-filter` properties are specified for each service, so that at deployment time only the connection to the Azure App Config or Key Vault services needs to be configured/specified in environment variables.
+
+| Property Name                                                         | Description                                                                                  | Type/Value    |
+|-----------------------------------------------------------------------|----------------------------------------------------------------------------------------------|---------------|
+| spring.cloud.azure.appconfiguration.enabled                           | Enable Azure App Configuration                                                               | true or false |
+| spring.cloud.azure.appconfiguration.stores[0].connection-string       | Connection string to Azure App Config instance (if not using managed identity).              | \<string>     |
+| spring.cloud.azure.appconfiguration.stores[0].endpoint                | Endpoint to use for App Config when managed identity should be specified via AZURE_CLIENT_ID | \<string>     |
+| spring.cloud.azure.appconfiguration.stores[0].selects[0].label-filter | Label to use for configuration                                                               | ",Validation" |
+| spring.cloud.azure.appconfiguration.stores[0].selects[0].key-filter   | Key to use for configuration                                                                 | "/"           |
+
+### Authentication
+
+Java Azure libraries have difficult using different authentication mechanisms between App Config (AAC) and Key Vault (AKV). If you specify AZURE_CLIENT_ID, it will attempt to use managed identity for _both_ AAC and AKV.
+
+If using managed identity authentication for one, it is suggested to use managed identity for both; _not_ a connectionString with a token/secret embedded in it for AAC and MI for AKV.
+
+Specifying all three `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and `AZURE_TENANT_ID` is only necessary when using a service principal for authentication. Only `AZURE_CLIENT_ID` is necessary to authenticate using managed identity.
+
+If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ the same as the subscription ID.
 
 ## Telemetry
 
