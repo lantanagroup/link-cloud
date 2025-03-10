@@ -27,13 +27,15 @@ When deploying Spring Boot applications in Docker/Kubernetes, overriding configu
 
 Examples of environment variable naming conventions:
 
-| YAML / JSON Key                                                        | Converted Environment Variable                                      |
-|------------------------------------------------------------------------|---------------------------------------------------------------------|
-| server.port                                                            | SERVER_PORT                                                         |
-| spring.datasource.url                                                  | SPRING_DATASOURCE_URL                                               |
-| spring.cloud.azure.appconfiguration.stores[0].selects[0].label-filter	 | SPRING_CLOUD_AZURE_APPCONFIGURATION_STORES_0_SELECTS_0_LABEL_FILTER |
-| my.custom.settings[2].api-key                                          | MY_CUSTOM_SETTINGS_2_API_KEY                                        |
-| config.services[1].endpoints.internal-url                              | CONFIG_SERVICES_1_ENDPOINTS_INTERNAL_URL                            |
+| YAML / JSON Key                                                       | Converted Environment Variable                                     |
+|-----------------------------------------------------------------------|--------------------------------------------------------------------|
+| server.port                                                           | SERVER_PORT                                                        |
+| spring.datasource.url                                                 | SPRING_DATASOURCE_URL                                              |
+| spring.cloud.azure.appconfiguration.stores[0].selects[0].label-filter | SPRING_CLOUD_AZURE_APPCONFIGURATION_STORES_0_SELECTS_0_LABELFILTER |
+| my.custom.settings[2].api-key                                         | MY_CUSTOM_SETTINGS_2_APIKEY                                        |
+| config.services[1].endpoints.internal-url                             | CONFIG_SERVICES_1_ENDPOINTS_INTERNALURL                            |
+
+Note: Official guidance is to *remove* dashes (-) entirely from the environment variable. For example: `label-filter` becomes `LABELFILTER`. However, both `LABEL-FILTER` and `LABELFILTER` work interchangeably. 
 
 # Common Configurations for Java Services
 
