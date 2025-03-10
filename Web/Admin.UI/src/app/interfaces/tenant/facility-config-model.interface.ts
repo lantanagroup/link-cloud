@@ -4,19 +4,14 @@ export interface IFacilityConfigModel {
   id?: string;
   facilityId: string;
   facilityName: string;
-  timezone?: string;
+  timeZone: string;
   scheduledReports: IScheduledReportModel;
 }
 
 export interface IScheduledReportModel {
   daily: string[];
-  weekly: string[];
   monthly: string[];
-}
-
-export interface IReportTypeScheduleModel {
-  reportType: string;
-  scheduledTriggers: string[];
+  weekly: string[];
 }
 
 export class PagedFacilityConfigModel {

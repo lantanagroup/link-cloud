@@ -24,6 +24,8 @@
     "angular-oauth2-oidc": "^15.0.1",
     "crypto-js": "^4.1.1",
     "jest-editor-support": "*",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.47",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
