@@ -123,9 +123,6 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
-      this.monthlyReportsControl.setValue(this.item.timeZone)
-      this.monthlyReportsControl.updateValueAndValidity();
-
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
 
