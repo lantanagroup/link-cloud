@@ -12,18 +12,17 @@ Spring Boot uses two main YAML configuration files:
 
 Some properties may want to be put in environment-specific configuration files with the naming convention `bootstrap-ENV.yml` and `application-ENV.yml`. For example, there may be `bootstrap-dev.yml` and `bootstrap-prod.yml`. At deployment-time, you can specify an environment variable `SPRING_PROFILES_ACTIVE` to indicate whether to load `dev` or `prod` on top of the default configurations.
 
-When deploying Spring Boot applications in Docker/Kubernetes, overriding configuration using environment variables is a common practice. Environment variables override JSON/YML specified in application config files. Here's some guidance on how to represent the hierarchy JSON/YML structure in an environment variable:
+To convert a property name in the canonical-form to an environment variable name you can follow these rules:
 
-* Replace dots (.) and dashes (-) with underscores (_).
-* Convert all characters to uppercase.
-* Reference array indexes using _INDEX_ notation (zero-based).
-* Remove any special characters (like hyphens) but keep underscores.
-* Maintain nesting structure by replacing separators (.) with _.
-* For camelCase keys, convert them to snake_case before applying rules.
-* Do not add extra underscores at the beginning or end.
-* Do not enclose values in quotes unless required.
-* For boolean values (true/false), use standard conversion (TRUE/FALSE if required).
-* Use SPRING_APPLICATION_JSON if passing deeply nested structures in a single variable.
+* Replace dots (.) with underscores (_).
+* Remove any dashes (-).
+* Convert to uppercase.
+
+For example, the configuration property spring.main.log-startup-info would be an environment variable named SPRING_MAIN_LOGSTARTUPINFO.
+
+Environment variables can also be used when binding to object lists. To bind to a List, the element number should be surrounded with underscores in the variable name.
+
+For example, the configuration property my.service[0].other would use an environment variable named MY_SERVICE_0_OTHER.
 
 Examples of environment variable naming conventions:
 
