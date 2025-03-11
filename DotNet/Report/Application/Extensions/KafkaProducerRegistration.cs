@@ -30,7 +30,12 @@ public static class KafkaProducerRegistration
         var submissionProducer = new KafkaProducerFactory<SubmitReportKey, SubmitReportValue>(kafkaConnection).CreateProducer(submissionProducerConfig);
         services.AddSingleton(submissionProducer);
 
-
+        var readyForValidationConfig = new ProducerConfig()
+        {
+            ClientId = "Report_ReadyForValidation"
+        };
+        var readyForValidationProducer = new KafkaProducerFactory<ReadyForValidationKey, ReadyForValidationValue>(kafkaConnection).CreateProducer(readyForValidationConfig);
+        services.AddSingleton(readyForValidationProducer);
 
         var config = new ProducerConfig()
         {
