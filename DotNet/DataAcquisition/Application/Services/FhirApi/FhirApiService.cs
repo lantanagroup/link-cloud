@@ -312,14 +312,17 @@ public class FhirApiService : IFhirApiService
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
 
-            await _fhirQueryManager.AddAsync(new Domain.Entities.FhirQuery
+            if (correlationId != null && !string.IsNullOrWhiteSpace(facilityId))
             {
-                ResourceType = resourceType,
-                CorrelationId = correlationId,
-                PatientId = patientId.SplitReference(),
-                FacilityId = facilityId,
-                SearchParams = JsonSerializer.Serialize(searchParams),
-            }, cancellationToken);
+                await _fhirQueryManager.AddAsync(new FhirQuery
+                {
+                    ResourceType = resourceType,
+                    CorrelationId = correlationId,
+                    PatientId = patientId.SplitReference(),
+                    FacilityId = facilityId,
+                    SearchParams = JsonSerializer.Serialize(searchParams),
+                }, cancellationToken);
+            }
 
             if (resultBundle != null)
             {
