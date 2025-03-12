@@ -95,6 +95,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
       this.loadPatientLists(this.item.ehrPatientLists);
+      this.patientListControl.updateValueAndValidity();
 
     } else {
       this.formMode = FormMode.Create;
@@ -117,6 +118,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
       this.loadPatientLists(this.item.ehrPatientLists);
+      this.patientListControl.updateValueAndValidity();
 
     }
   }
@@ -130,7 +132,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
   }
 
   get patientListControl() {
-   // return this.configForm.controls["ehrPatientList"] as FormArray;
     return this.configForm.get('patientListControl') as FormArray;
   }
 
@@ -213,7 +214,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
       ehrPatientList.forEach((ehrPatientListItem: IEhrPatientListModel) => {
 
-       // let measureIds = (ehrPatientListItem.measureIds ?? []).join(", ");
         let measureIds = (ehrPatientListItem.measureIds ?? []);
         let listIds = (ehrPatientListItem.listIds ?? []).join(", ");
 
@@ -230,7 +230,7 @@ export class DataAcquisitionFhirListConfigFormComponent {
       });
       this.patientListControl.push(patientForm);
     }
-   // this.patientListControl.updateValueAndValidity();
+
   }
 
   compareReportTypes(object1: any, object2: any) {
