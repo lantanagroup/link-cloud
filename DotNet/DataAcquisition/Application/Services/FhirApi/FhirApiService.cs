@@ -74,6 +74,7 @@ public interface IFhirApiService
     Task<List> GetPatientList(
         string baseUrl,
         string listId,
+        string facilityId,
         AuthenticationConfiguration authConfig,
         CancellationToken cancellationToken = default);
 
@@ -269,7 +270,7 @@ public class FhirApiService : IFhirApiService
         return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString());
     }
 
-    public async Task<List> GetPatientList(string baseUrl, string listId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
+    public async Task<List> GetPatientList(string baseUrl, string listId, string facilityId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
     {
         var fhirClient = GenerateFhirClient(baseUrl);
 
@@ -279,7 +280,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        return (List)await ReadFhirEndpointAsync(fhirClient, nameof(List), listId);
+        return (List)await ReadFhirEndpointAsync(fhirClient, nameof(List), listId, facilityId: facilityId);
     }
 
     private async Task<(Bundle bundle, List<ResourceReference> ResourceReference)> SearchFhirEndpointAsync(
