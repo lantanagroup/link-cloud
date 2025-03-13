@@ -1,4 +1,5 @@
-﻿using AngleSharp.Css.Values;
+﻿
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
