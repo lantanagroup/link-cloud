@@ -88,9 +88,23 @@
               <mat-icon>bug_report</mat-icon>&nbsp;Testing
             </mat-panel-title>
           </mat-expansion-panel-header>
-          <a mat-list-item routerLink="integration-test" routerLinkActive="active">
+          <a mat-list-item routerLink="monitor/health" routerLinkActive="active">
             <mat-icon matListItemIcon>integration_instructions</mat-icon>
             <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">Integration Test</div>
+          </a>
+        </mat-expansion-panel>
+      </mat-accordion>
+
+      <mat-accordion>
+        <mat-expansion-panel style="box-shadow: none">
+          <mat-expansion-panel-header style="margin-left: -8px">
+            <mat-panel-title>
+              <mat-icon>monitor_heart</mat-icon>&nbsp;Link Monitor
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <a mat-list-item routerLink="monitor/health" routerLinkActive="active">
+            <mat-icon matListItemIcon>ecg_heart</mat-icon>
+            <div class="side-nav-menu-title" matListItemTitle *ngIf="showMenuText">System Health</div>
           </a>
         </mat-expansion-panel>
       </mat-accordion>
