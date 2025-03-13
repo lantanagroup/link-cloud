@@ -104,18 +104,6 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException("Invalid Report Scheduled event");
                                 }
 
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                if (reportTypes == null || reportTypes.Count == 0)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: ReportTypes is null or empty.");
-                                }
-
                                 // Check if this already exists
                                 var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
                                                                                                         && x.ReportStartDate == startDate 
