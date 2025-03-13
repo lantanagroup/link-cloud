@@ -76,16 +76,16 @@ export class DataAcquisitionService {
   }
 
   //NOTE: currently no PUT endpoint for fhir list. Commenting this out for now.
-  //updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-  //  return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`, fhirListConfig)
-  //    .pipe(
-  //      tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
-  //      map((response: IEntityCreatedResponse) => {
-  //        return response;
-  //      }),
-  //      catchError((error) => this.errorHandler.handleError(error))
-  //    )
-  //}
+  updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+      .pipe(
+        tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
 
   deleteFhirListConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)

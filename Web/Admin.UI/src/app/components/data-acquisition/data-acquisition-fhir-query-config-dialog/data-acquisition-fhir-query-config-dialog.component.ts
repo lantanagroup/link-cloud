@@ -8,6 +8,7 @@ import { IDataAcquisitionQueryConfigModel } from '../../../interfaces/data-acqui
 import { IEntityCreatedResponse } from '../../../interfaces/entity-created-response.model';
 import { FormMode } from '../../../models/FormMode.enum';
 import { DataAcquisitionFhirQueryConfigFormComponent } from '../data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
+import {FormControl, FormGroup, Validators} from "@angular/forms";
 
 @Component({
   selector: 'app-data-acquisition-fhir-query-config-dialog',
@@ -20,7 +21,7 @@ import { DataAcquisitionFhirQueryConfigFormComponent } from '../data-acquisition
     DataAcquisitionFhirQueryConfigFormComponent
   ],
   templateUrl: './data-acquisition-fhir-query-config-dialog.component.html',
-  styleUrls: ['./data-acquisition-fhir-query-config-dialog.component.css']
+  styleUrls: ['./data-acquisition-fhir-query-config-dialog.component.scss']
 })
 export class DataAcquisitionFhirQueryConfigDialogComponent {
   dialogTitle: string = '';
@@ -33,7 +34,9 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, config: IDataAcquisitionQueryConfigModel },
     private dialogRef: MatDialogRef<DataAcquisitionFhirQueryConfigFormComponent>,
-    private snackBar: MatSnackBar) { }
+    private snackBar: MatSnackBar) {
+
+  }
 
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;

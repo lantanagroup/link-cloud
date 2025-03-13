@@ -21,7 +21,7 @@ import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisitio
   imports: [
     CommonModule,
     MatButtonModule,
-    MatFormFieldModule,    
+    MatFormFieldModule,
     MatInputModule,
     MatIconModule,
     MatChipsModule,
@@ -34,7 +34,7 @@ import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisitio
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
 })
 export class DataAcquisitionFhirQueryConfigFormComponent {
-  @Input() item!: IDataAcquisitionQueryConfigModel;  
+  @Input() item!: IDataAcquisitionQueryConfigModel;
 
   @Input() formMode!: FormMode;
 
@@ -46,7 +46,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
- 
+
   configForm!: FormGroup;
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
@@ -62,20 +62,20 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
   }
 
   ngOnInit(): void {
-    this.configForm.reset(); 
+    this.configForm.reset();
 
     if(this.item) {
       //set form values
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);     
+      this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
       this.queryPlanIdsControl.setValue(this.item.queryPlanIds.join(", "));
       this.queryPlanIdsControl.updateValueAndValidity();
-    }    
-   
+    }
+
     this.configForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.configForm.invalid);
     });
@@ -125,24 +125,24 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
   submitConfiguration(): void {
     if(this.configForm.valid) {
       var queryIdArray = this.queryPlanIdsControl.value.split(',');
-      if(this.formMode == FormMode.Create) {      
+      if(this.formMode == FormMode.Create) {
         this.dataAcquisitionService.createFhirQueryConfiguration(this.facilityIdControl.value, {
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
           queryPlanIds: queryIdArray
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+          this.submittedConfiguration.emit({id: response.id, message: "Query Config Created"});
         });
       }
       else if(this.formMode == FormMode.Edit) {
         this.dataAcquisitionService.updateFhirQueryConfiguration(
-          this.facilityIdControl.value, 
+          this.facilityIdControl.value,
           {
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
             queryPlanIds: queryIdArray
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+          this.submittedConfiguration.emit({id: this.item.id ?? '', message: "Query Config Updated"});
         }
         );
       }

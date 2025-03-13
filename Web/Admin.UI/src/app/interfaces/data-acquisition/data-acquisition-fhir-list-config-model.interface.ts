@@ -5,7 +5,7 @@ export interface IDataAcquisitionFhirListConfigModel {
     facilityId: string;
     fhirBaseServerUrl: string;
     authentication?: IDataAcquisitionAuthenticationConfigModel;
-    eHRPatientLists: IEhrPatientListModel[];
+    ehrPatientLists: IEhrPatientListModel[];
 }
 
 export interface IEhrPatientListModel {
