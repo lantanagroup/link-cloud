@@ -1,6 +1,5 @@
 ﻿
-
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models
 {

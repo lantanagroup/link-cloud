@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
@@ -9,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using System.Text;
@@ -99,16 +99,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var frequency = value.Frequency;
                                 var reportTypes = value.ReportTypes;
 
-                                if (string.IsNullOrWhiteSpace(facilityId))
+                                if (!value.IsValid())
                                 {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                if (reportTypes == null || reportTypes.Length == 0)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: ReportTypes is null or empty.");
+                                    throw new DeadLetterException("Invalid Report Scheduled event");
                                 }
 
                                 // Check if this already exists
@@ -130,9 +123,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     reportSchedule = new ReportScheduleModel
                                     {
                                         FacilityId = facilityId,
-                                        ReportStartDate = startDate,
-                                        ReportEndDate = endDate,
-                                        Frequency = frequency,
+                                        ReportStartDate = startDate.UtcDateTime,
+                                        ReportEndDate = endDate.UtcDateTime,
+                                        Frequency = frequency.ToString(),
                                         ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
                                     };

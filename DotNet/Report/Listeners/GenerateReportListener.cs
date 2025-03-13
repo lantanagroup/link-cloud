@@ -124,7 +124,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var value = result.Message.Value;
                                 var startDate = value.StartDate;
                                 var endDate = value.EndDate;
-                                var reportTypes = value.ReportTypes?.ToArray();
+                                var reportTypes = value.ReportTypes;
 
                                 facilityId = key;
 
@@ -158,7 +158,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else //Otherwise validate the values from the message
                                 {
-                                    if (reportTypes == null || reportTypes.Length == 0)
+                                    if (reportTypes == null || reportTypes.Count == 0)
                                     {
                                         throw new DeadLetterException(
                                             $"{Name}: ReportTypes is null or empty.");
@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
                                     Frequency = "AdHoc",
-                                    ReportTypes = reportTypes.ToArray(),
+                                    ReportTypes = reportTypes,
                                     PatientsToQueryDataRequested = true,
                                     EnableSubmission = !value.BypassSubmission,
                                     CreateDate = DateTime.UtcNow

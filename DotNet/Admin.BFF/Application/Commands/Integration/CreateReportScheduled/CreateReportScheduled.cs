@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
