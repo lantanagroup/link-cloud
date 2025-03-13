@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -26,6 +27,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
+        }
+        
+        public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
+        {
+            // HTTP GET
+            var response = await _client.GetAsync($"health", cancellationToken);
+            var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
+            if (healthResult is not null) healthResult.Service = "Census";
+
+            return healthResult;
         }
 
         private void InitHttpClient()
