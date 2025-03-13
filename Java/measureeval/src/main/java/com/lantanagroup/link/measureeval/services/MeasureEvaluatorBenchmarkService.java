@@ -33,6 +33,8 @@ import static java.lang.String.format;
  *   MeasureEvaluatorBenchmarkService benchmark = new MeasureEvaluatorBenchmarkService(
  *       "/path/to/measure-bundle.json",
  *       "/path/to/synthea/output/fhir",
+ *       "2022-01-01",
+ *       "2022-12-31",
  *       FhirContext.forR4Cached()
  *   );
  *   benchmark.initialize();
@@ -45,6 +47,8 @@ public class MeasureEvaluatorBenchmarkService {
 
     private final String measurePackagePath;
     private final String patientDataDirectory;
+    private final DateTimeType periodStart;
+    private final DateTimeType periodEnd;
     private final FhirContext fhirContext;
 
     // Performance metrics accumulators
@@ -69,9 +73,11 @@ public class MeasureEvaluatorBenchmarkService {
     // Capture patients in groups
     private final Map<String, List<String>> groupPopulations = new HashMap<>();
 
-    public MeasureEvaluatorBenchmarkService(String measurePackagePath, String patientDataDirectory, FhirContext fhirContext) {
+    public MeasureEvaluatorBenchmarkService(String measurePackagePath, String patientDataDirectory, String periodStart, String periodEnd, FhirContext fhirContext) {
         this.measurePackagePath = measurePackagePath;
         this.patientDataDirectory = patientDataDirectory;
+        this.periodStart = new DateTimeType(periodStart);
+        this.periodEnd = new DateTimeType(periodEnd);
         this.fhirContext = fhirContext;
     }
 
@@ -121,62 +127,38 @@ public class MeasureEvaluatorBenchmarkService {
      * Loops over each JSON file in the patient data directory, rewrites URN UUID references,
      * evaluates the measure for each patient, and gathers performance metrics.
      */
-    public void evaluateAllPatients() throws IOException {
+    public void evaluateAllPatients(List<Bundle> bundles) throws IOException {
         logger.info("Evaluating measure against patient data...");
-
-        var periodStart = new DateTimeType("2022-01-01");
-        var periodEnd   = new DateTimeType("2022-12-31");
-
-        var patientDirectory = new File(this.patientDataDirectory);
-        if (!patientDirectory.exists() || !patientDirectory.isDirectory()) {
-            throw new IllegalStateException("Invalid patient data directory: " + this.patientDataDirectory);
-        }
-
-        var jsonFiles = patientDirectory.listFiles((dir, name) -> name.endsWith(".json"));
-        if (jsonFiles == null || jsonFiles.length == 0) {
-            throw new IllegalStateException("No JSON files found in patient data directory: " + this.patientDataDirectory);
-        }
 
         var osBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
         var memoryBean = ManagementFactory.getMemoryMXBean();
 
-        for (var file : jsonFiles) {
-            var fileName = file.getName();
-            if (shouldSkipFile(fileName)) {
-                logger.debug("Skipping non-patient resource file: {}", fileName);
-                continue;
-            }
-
-            var content = Files.readString(file.toPath());
-            var bundle = UrnUuidRewriter.rewriteUrnUuids(
-                    fhirContext.newJsonParser().parseResource(Bundle.class, content), fhirContext);
-            bundle.setId(fileName);
-
+        for (var bundle : bundles) {
             var patients = BundleUtil.toListOfResourcesOfType(fhirContext, bundle, Patient.class);
             if (patients.isEmpty()) {
-                logger.warn("No Patient resource found in bundle {}", fileName);
+                logger.warn("No Patient resource found in bundle {}", bundle.getId());
                 continue;
             }
             var patient = patients.get(0);
             enforcePatientIdFormat(patient);
 
-            long startWallTime = System.nanoTime();
-            long startCpuTime  = osBean.getProcessCpuTime();
+            var startWallTime = System.nanoTime();
+            var startCpuTime  = osBean.getProcessCpuTime();
             totalRequests++;
 
             try {
                 var subject = new StringType(patient.getId());
                 var report = measureEvaluator.evaluate(periodStart, periodEnd, subject, bundle);
                 if (report == null) {
-                    throw new IllegalStateException("MeasureReport is null for bundle " + fileName);
+                    throw new IllegalStateException("MeasureReport is null for patient: " + patient.getId());
                 }
                 captureGroupPopulations(report);
             } catch (Exception e) {
                 failedRequests++;
-                logger.error("Measure evaluation failed for bundle {}: {}", fileName, e.getMessage(), e);
+                logger.error("Measure evaluation failed for bundle {}: {}", bundle.getId(), e.getMessage(), e);
             } finally {
                 updateMetrics(osBean, memoryBean, startWallTime, startCpuTime);
-                logger.info("Measure evaluation completed for file: {}", fileName);
+                logger.info("Measure evaluation completed for patient: {}", patient.getId());
             }
         }
     }
@@ -190,6 +172,34 @@ public class MeasureEvaluatorBenchmarkService {
         if (!patient.getIdElement().getValue().startsWith("Patient/")) {
             patient.setId("Patient/" + patientId);
         }
+    }
+
+    public List<Bundle> getSyntheaBundles() throws IOException {
+        var patientDirectory = new File(this.patientDataDirectory);
+        if (!patientDirectory.exists() || !patientDirectory.isDirectory()) {
+            throw new IllegalStateException("Invalid patient data directory: " + this.patientDataDirectory);
+        }
+
+        var jsonFiles = patientDirectory.listFiles((dir, name) -> name.endsWith(".json"));
+        if (jsonFiles == null || jsonFiles.length == 0) {
+            throw new IllegalStateException("No JSON files found in patient data directory: " + this.patientDataDirectory);
+        }
+
+        var bundles = new ArrayList<Bundle>();
+        for (var file : jsonFiles) {
+            var fileName = file.getName();
+            if (shouldSkipFile(fileName)) {
+                logger.debug("Skipping non-patient resource file: {}", fileName);
+                continue;
+            }
+
+            var content = Files.readString(file.toPath());
+            var bundle = UrnUuidRewriter.rewriteUrnUuids(
+                    fhirContext.newJsonParser().parseResource(Bundle.class, content), fhirContext);
+            bundle.setId(fileName);
+            bundles.add(bundle);
+        }
+        return bundles;
     }
 
     public void captureGroupPopulations(MeasureReport measureReport) {

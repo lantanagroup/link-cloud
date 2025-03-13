@@ -22,9 +22,9 @@ public class MeasureEvaluatorBenchmarkServiceTests {
     @Test
     @DisplayName("Initialize, evaluate and generate the performance report")
     void testEvaluateMeasure() throws IOException {
-        MeasureEvaluatorBenchmarkService service = new MeasureEvaluatorBenchmarkService(MEASURE_PACKAGE_PATH, PATIENT_DATA_DIRECTORY, FHIR_CONTEXT);
+        MeasureEvaluatorBenchmarkService service = new MeasureEvaluatorBenchmarkService(MEASURE_PACKAGE_PATH, PATIENT_DATA_DIRECTORY, "2022-01-01", "2022-12-31", FHIR_CONTEXT);
         service.initialize();
-        service.evaluateAllPatients();
+        service.evaluateAllPatients(service.getSyntheaBundles());
         service.generatePerformanceReport();
     }
 }
