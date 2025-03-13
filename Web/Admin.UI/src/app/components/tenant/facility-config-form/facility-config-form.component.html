@@ -68,8 +68,12 @@
     </mat-form-field>
   </div>
 
-  <div *ngIf="reportsNotUniqueError">
+  <div *ngIf="reportsNotUniqueError" [disabled]="viewOnly" >
     <small class="error">{{ reportsNotUniqueError }}</small>
+  </div>
+
+  <div *ngIf="noReportsEntered" [disabled]="viewOnly" >
+    <small class="error">{{ noReportsEntered }}</small>
   </div>
 
 </form>

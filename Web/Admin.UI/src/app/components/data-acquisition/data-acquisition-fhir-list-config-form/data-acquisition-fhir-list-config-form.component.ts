@@ -19,6 +19,7 @@ import {ENTER, COMMA} from '@angular/cdk/keycodes';
 import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {ReportType} from "../../../models/tenant/ReportType.enum";
 import {MatSelectModule} from "@angular/material/select";
+import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 
 @Component({
   selector: 'app-data-acquisition-fhir-list-config-form',
@@ -64,9 +65,9 @@ export class DataAcquisitionFhirListConfigFormComponent {
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
-  reportTypes: string[] = [ReportType.HYPO, ReportType.CDIHOB];
+  reportTypes: string[] = [];
 
-  constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
+  constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private measureDefinitionConfigurationService: MeasureDefinitionService, private fb: FormBuilder) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
     this.configForm = this.fb.group({
@@ -83,6 +84,16 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   ngOnInit(): void {
     this.configForm.reset();
+
+    this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
+      {
+        next: (response) => {
+          this.reportTypes = response.map(model => model.id);
+        },
+        error: (err) => {
+          this.submittedConfiguration.emit({id: '', message: err.message});
+        }
+      });
 
     if (this.item) {
       console.log("DataAcquisitionFhirListConfigFormComponent ngOnInit");
@@ -156,7 +167,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
         const patientForm = control as FormGroup;
         return {
           measureIds: patientForm.value.measureIds,
-       //     ? patientForm.value.measureIds.split(','): [],
           listIds: patientForm.value.listIds
             ? patientForm.value.listIds.split(',')
             : []
@@ -167,8 +177,13 @@ export class DataAcquisitionFhirListConfigFormComponent {
           facilityId: this.facilityIdControl.value,
           fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
           ehrPatientLists: ehrPatientLists
-        } as IDataAcquisitionFhirListConfigModel).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit({id: response.id, message: "Patient List Created"});
+        } as IDataAcquisitionFhirListConfigModel).subscribe({
+          next: (response) => {
+            this.submittedConfiguration.emit({id: response.id, message: "Patient List Created"});
+          },
+          error: (err) => {
+            this.submittedConfiguration.emit({id: this.item.id ?? '', message: err.message});
+          }
         });
       } else if (this.formMode == FormMode.Edit) {
         this.dataAcquisitionService.updateFhirListConfiguration(
@@ -177,8 +192,13 @@ export class DataAcquisitionFhirListConfigFormComponent {
             facilityId: this.facilityIdControl.value,
             fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
             ehrPatientLists: ehrPatientLists
-          } as IDataAcquisitionFhirListConfigModel).subscribe((response: IEntityCreatedResponse) => {
-            this.submittedConfiguration.emit({id: this.item.id ?? '', message: "Patient List Updated"});
+          } as IDataAcquisitionFhirListConfigModel).subscribe({
+            next: (response) => {
+              this.submittedConfiguration.emit({id: response.id, message: "Patient List Updated"});
+            },
+            error: (err) => {
+              this.submittedConfiguration.emit({id: this.item.id ?? '', message: err.message});
+            }
           }
         );
       }
@@ -198,7 +218,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
       listIds: this.fb.control('', Validators.required)
     });
     this.patientListControl.push(patientForm);
-
   }
 
   removePatientList(itemIndex: number) {
