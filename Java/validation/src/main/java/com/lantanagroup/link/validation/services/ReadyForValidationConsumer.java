@@ -51,8 +51,7 @@ public class ReadyForValidationConsumer {
             ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String facilityId = record.key().getFacilityId();
         String patientId = record.value().getPatientId();
-        String reportId = record.key().getReportId();
-        String reportTrackingId = record.value().getReportTrackingId();
+        String reportId = record.value().getReportTrackingId();
         PatientSubmissionModel model = reportClient.getSubmissionModel(facilityId, patientId, reportId);
         IParser parser = fhirContext.newJsonParser();
         Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
@@ -71,9 +70,9 @@ public class ReadyForValidationConsumer {
                 .allMatch(Category::isAcceptable);
         ValidationComplete.Key key = new ValidationComplete.Key();
         key.setFacilityId(facilityId);
-        key.setReportId(reportId);
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
+        value.setReportTrackingId(reportId);
         value.setValid(valid);
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
