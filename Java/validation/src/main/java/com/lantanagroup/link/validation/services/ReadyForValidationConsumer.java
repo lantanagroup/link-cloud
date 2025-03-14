@@ -44,14 +44,14 @@ public class ReadyForValidationConsumer {
             @Header(Headers.CORRELATION_ID) String correlationId,
             ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String facilityId = record.key().getFacilityId();
-        String reportId = record.key().getReportId();
         String patientId = record.value().getPatientId();
-        Bundle bundle = reportClient.getSubmissionBundle(facilityId, reportId, patientId);
+        String reportId = record.key().getReportId();
+        Bundle bundle = reportClient.getSubmissionBundle(facilityId, patientId, reportId);
         List<Result> results = validationService.validate(bundle);
         for (Result result : results) {
             result.setFacilityId(facilityId);
-            result.setReportId(reportId);
             result.setPatientId(patientId);
+            result.setReportId(reportId);
         }
         categorizationService.categorize(results);
         resultRepository.saveAll(results);
