@@ -177,7 +177,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     PatientIds = patientIds,
                                                     MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                                     Organization = organization,
-                                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate)
+                                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate),
+                                                    ReportTrackingId = value.ReportTrackingId
                                                 },
                                                 Headers = new Headers
                                                 {
