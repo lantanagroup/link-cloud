@@ -133,14 +133,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var entry in submissionEntries)
                                 {
-                                    entry.ValidationStatus =
-                                        value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+                                    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
 
                                     entry.Status = PatientSubmissionStatus.ValidationComplete;
 
                                     await submissionEntryManager.UpdateAsync(entry, cancellationToken);
                                 }
-
 
                                 #region Patients To Query & Submision Report Handling
 
