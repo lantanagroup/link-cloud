@@ -94,8 +94,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var value = result.Message.Value;
 
                                 facilityId = key;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
                                 var frequency = value.Frequency;
                                 var reportTypes = value.ReportTypes;
 
@@ -123,8 +123,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     reportSchedule = new ReportScheduleModel
                                     {
                                         FacilityId = facilityId,
-                                        ReportStartDate = startDate.UtcDateTime,
-                                        ReportEndDate = endDate.UtcDateTime,
+                                        ReportStartDate = startDate,
+                                        ReportEndDate = endDate,
                                         Frequency = frequency.ToString(),
                                         ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
