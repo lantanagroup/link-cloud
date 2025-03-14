@@ -7,9 +7,9 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
 using System.Text;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using Task = System.Threading.Tasks.Task;
 
 
