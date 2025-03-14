@@ -1,5 +1,6 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Hanlders;
 
@@ -34,6 +35,16 @@ public static class GetSystemHealth
         //if we upgrade to .NET 9, we can use Task.WhenEach
         var results = await Task.WhenAll(dotNetHealthCheckTasks);
         
-        return Results.Ok(results);
+        //TODO: improve integration with java services
+        var measureEvalHealthCheckResult = await measureEvalService.LinkServiceHealthCheck(context.RequestAborted);
+        var measureEvalHealthSummary = LinkServiceHealthReportExtensions.FromDomain(measureEvalHealthCheckResult);
+        measureEvalHealthSummary.KafkaConnection = LinkServiceHealthStatus.Unknown;
+        measureEvalHealthSummary.DatabaseConnection = LinkServiceHealthStatus.Unknown;
+        measureEvalHealthSummary.CacheConnection = LinkServiceHealthStatus.Unknown;
+        
+        var healthSummary = results.Select(LinkServiceHealthReportExtensions.FromDomain).ToList();
+        healthSummary.Add(measureEvalHealthSummary);
+        
+        return Results.Ok(healthSummary);
     }
 }

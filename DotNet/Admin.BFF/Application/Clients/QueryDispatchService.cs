@@ -3,6 +3,8 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -32,11 +34,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
-            var response = await _client.GetAsync($"health", cancellationToken);
-            var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
-            if (healthResult is not null) healthResult.Service = "Query Dispatch";
+            try
+            {
+                var response = await _client.GetAsync($"health", cancellationToken);
+                var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
+                if (healthResult is not null) healthResult.Service = "Query Dispatch";
 
-            return healthResult;
+                return healthResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Query Dispatch service health check failed");
+                return new LinkServiceHealthReport { Service = "Query Dispatch", Status = HealthStatus.Unhealthy };
+            }
         }
 
         private void InitHttpClient()
