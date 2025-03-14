@@ -1,8 +1,11 @@
 package com.lantanagroup.link.validation.services;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.parser.IParser;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.entities.Category;
+import com.lantanagroup.link.validation.entities.PatientSubmissionModel;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
@@ -20,6 +23,7 @@ import java.util.List;
 
 @Service
 public class ReadyForValidationConsumer {
+    private final FhirContext fhirContext;
     private final ReportClient reportClient;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
@@ -27,11 +31,13 @@ public class ReadyForValidationConsumer {
     private final KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate;
 
     public ReadyForValidationConsumer(
+            FhirContext fhirContext,
             ReportClient reportClient,
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
             KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate) {
+        this.fhirContext = fhirContext;
         this.reportClient = reportClient;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
@@ -46,8 +52,13 @@ public class ReadyForValidationConsumer {
         String facilityId = record.key().getFacilityId();
         String patientId = record.value().getPatientId();
         String reportId = record.key().getReportId();
-        Bundle bundle = reportClient.getSubmissionBundle(facilityId, patientId, reportId);
-        List<Result> results = validationService.validate(bundle);
+        String reportTrackingId = record.value().getReportTrackingId();
+        PatientSubmissionModel model = reportClient.getSubmissionModel(facilityId, patientId, reportId);
+        IParser parser = fhirContext.newJsonParser();
+        Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
+        Bundle otherResources = parser.parseResource(Bundle.class, model.getOtherResources());
+        patientResources.getEntry().addAll(otherResources.getEntry());
+        List<Result> results = validationService.validate(patientResources);
         for (Result result : results) {
             result.setFacilityId(facilityId);
             result.setPatientId(patientId);
