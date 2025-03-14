@@ -40,17 +40,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 //TODO: update when further functionality within the java services have been added
                 if (response.IsSuccessStatusCode)
                 {
-                    return new LinkServiceHealthReport { Service = "MeasureEvaluation", Status = HealthStatus.Healthy };
+                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Healthy };
                 }
                 else
                 {
-                    return new LinkServiceHealthReport { Service = "MeasureEvaluation", Status = HealthStatus.Unhealthy };
+                    return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Measure Evaluation service health check failed");
-                return new LinkServiceHealthReport { Service = "MeasureEvaluation", Status = HealthStatus.Unhealthy };
+                return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
             }
         }
 
