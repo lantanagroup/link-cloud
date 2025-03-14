@@ -86,6 +86,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
+
                                 if (!value.IsValid())
                                 {
                                     throw new DeadLetterException("Invalid Report Scheduled event");
@@ -93,9 +96,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var scope = _serviceScopeFactory.CreateScope();
                                 var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
-                                var key = result.Message.Key;
-                                var value = result.Message.Value;
 
                                 facilityId = key;
                                 var startDate = value.StartDate.UtcDateTime;
