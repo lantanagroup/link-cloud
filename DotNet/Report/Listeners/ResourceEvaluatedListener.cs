@@ -213,8 +213,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             Key = new ReadyForValidationKey()
                                             {
-                                                FacilityId = schedule.FacilityId,
-                                                ReportId = schedule.Id!
+                                                FacilityId = schedule.FacilityId
                                             },
                                             Value = new ReadyForValidationValue
                                             {

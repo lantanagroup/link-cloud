@@ -324,7 +324,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var resultModel = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.ReportScheduleId, consumeCancellationToken);
+                                                value.ReportTrackingId, consumeCancellationToken);
 
                                             patientFilesWritten.Add(resultModel.PatientFile);
                                             otherResourcesBag.Add(resultModel.OtherResources);
@@ -356,7 +356,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
                                 //Generate Metrics
-                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), key.ReportScheduleId, facilityId, key.StartDate, key.EndDate);
+                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), value.ReportTrackingId, facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
                             }
