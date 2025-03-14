@@ -119,7 +119,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
-                                var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == result.Message.Key.ReportId, cancellationToken);
+                                var reportId = result.Message.Value.ReportTrackingId;
+
+                                var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
                                 if (schedule == null)
                                 {
