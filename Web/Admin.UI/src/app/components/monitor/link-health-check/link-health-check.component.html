@@ -62,7 +62,7 @@
             <td mat-cell *matCellDef="let summary">
                 <mat-chip
                     [ngClass]="{
-                        'healthy-chip': summary.databaseCocacheConnectionnnection === 'Healthy',
+                        'healthy-chip': summary.cacheConnection === 'Healthy',
                         'unhealthy-chip': summary.cacheConnection === 'Unhealthy',
                         'not-applicable-chip': summary.cacheConnection === 'NotApplicable',
                         'unknown-chip': summary.cacheConnection === 'Unknown',
