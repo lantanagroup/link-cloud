@@ -1,6 +1,8 @@
-﻿using System.Runtime.Serialization;
+﻿
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.QueryDispatch.Application.Models
+namespace LantanaGroup.Link.Shared.Application.Models
 {
     [DataContract]
     public class ScheduledReport
@@ -8,7 +10,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Models
         [DataMember]
         public List<string> ReportTypes { get; set; }
         [DataMember]
-        public string Frequency { get; set; }
+        public Frequency Frequency { get; set; }
         [DataMember]
         public DateTime StartDate { get; set; }
         [DataMember]
