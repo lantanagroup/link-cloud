@@ -1,7 +1,9 @@
-﻿using Confluent.Kafka;
+﻿
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -182,9 +184,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
-                                    Frequency = "AdHoc",
+                                    Frequency = Frequency.Adhoc,
                                     ReportTypes = reportTypes,
-                                    PatientsToQueryDataRequested = true,
+                                    EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
                                     CreateDate = DateTime.UtcNow
                                 };
@@ -249,7 +251,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 {
                                                     StartDate = startDate.Value,
                                                     EndDate = endDate.Value,
-                                                    Frequency = "AdHoc",
+                                                    Frequency = Frequency.Adhoc,
                                                     ReportTypes = reportTypes
                                                 }
                                             },

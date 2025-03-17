@@ -97,14 +97,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
-                                    string correlationId = string.Empty;
-                                    string reportTrackingId = string.Empty;
+                                    string reportTrackingId = value.ReportTrackingId;
 
                                     string key = consumeResult.Message.Key;
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
-                                    var frequency = value.Frequency.ToString();
+                                    var frequency = value.Frequency;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 
