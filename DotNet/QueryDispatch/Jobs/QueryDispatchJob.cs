@@ -11,6 +11,7 @@ using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using QueryDispatch.Domain.Managers;
 using QueryDispatch.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -54,7 +55,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                 {
                     PatientId = patientDispatchEntity.PatientId,
                     ScheduledReports = new List<ScheduledReport>(),
-                    QueryType = QueryTypes.Initial.ToString(),
+                    QueryType = QueryType.Initial.ToString(),
                     ReportableEvent = ReportableEvents.Discharge.ToString()
                 };
 
@@ -63,7 +64,7 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
                     dataAcquisitionRequestedValue.ScheduledReports.Add(new ScheduledReport
                     {
                         ReportTypes = scheduledReportPeriod.ReportTypes,
-                        Frequency = scheduledReportPeriod.Frequency,
+                        Frequency = (Frequency)scheduledReportPeriod.Frequency,
                         StartDate = scheduledReportPeriod.StartDate,
                         EndDate = scheduledReportPeriod.EndDate,
                         ReportTrackingId = scheduledReportPeriod.ReportTrackingId

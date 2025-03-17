@@ -9,5 +9,6 @@ namespace LantanaGroup.Link.Report.Application.Models
         public string ReportType { get; set; } = string.Empty;
         public JsonElement Resource { get; set; }
         public bool IsReportable { get; set; }
+        public string ReportTrackingId { get; set; }
     }
 }

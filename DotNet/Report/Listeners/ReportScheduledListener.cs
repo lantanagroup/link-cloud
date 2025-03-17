@@ -86,29 +86,26 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
-
-                                facilityId = key;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
-                                var frequency = value.Frequency;
-                                var reportTypes = value.ReportTypes;
 
                                 if (!value.IsValid())
                                 {
                                     throw new DeadLetterException("Invalid Report Scheduled event");
                                 }
 
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+                                facilityId = key;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
+                                var frequency = value.Frequency;
+                                var reportTypes = value.ReportTypes;
+                                var reportId = value.ReportTrackingId;
+
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
-                                                                                                        && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate
-                                                                                                        && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
+                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportId, consumeCancellationToken);
 
                                 ReportScheduleModel? reportSchedule;
                                 if(existing != null) 
@@ -122,10 +119,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     reportSchedule = new ReportScheduleModel
                                     {
+                                        Id = reportId,
                                         FacilityId = facilityId,
-                                        ReportStartDate = startDate.UtcDateTime,
-                                        ReportEndDate = endDate.UtcDateTime,
-                                        Frequency = frequency.ToString(),
+                                        ReportStartDate = startDate,
+                                        ReportEndDate = endDate,
+                                        Frequency = frequency,
                                         ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
                                     };

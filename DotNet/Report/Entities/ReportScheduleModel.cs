@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Domain.Attributes;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;
 
@@ -14,8 +15,8 @@ namespace LantanaGroup.Link.Report.Entities
         public DateTime ReportEndDate { get; set; }
         public DateTime? SubmitReportDateTime { get; set; }
         public bool EnableSubmission { get; set; } = true;
-        public bool PatientsToQueryDataRequested { get; set; } = false;
+        public bool EndOfReportPeriodJobHasRun { get; set; } = false;
         public List<string> ReportTypes { get; set; } = new List<string>();
-        public string Frequency { get; internal set; } = string.Empty;
+        public Frequency Frequency { get; set; }
     }
 }
