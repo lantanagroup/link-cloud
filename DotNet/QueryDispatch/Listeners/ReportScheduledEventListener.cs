@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
-                                    var frequency = value.Frequency.ToString();
+                                    var frequency = value.Frequency;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 

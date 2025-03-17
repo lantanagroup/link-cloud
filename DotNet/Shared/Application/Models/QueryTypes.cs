@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.QueryDispatch.Application.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
     public enum QueryTypes
     {

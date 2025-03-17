@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig.Parameter;
+using LantanaGroup.Link.Shared.Application.Models;
 using System.Globalization;
 using System.Xml;
 
@@ -14,8 +14,6 @@ public class VariableParameterFactory
         ParameterFactoryResult parameterFactoryResult = parameter.Variable switch
         {
             Variable.LookbackStart => new ParameterFactoryResult(parameter.Name, CalculateLookBackStartDate(parameter, scheduledReport, lookback)),
-            Variable.PeriodStart => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.StartDate, nameof(scheduledReport.StartDate))),
-            Variable.PeriodEnd => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.EndDate, nameof(scheduledReport.EndDate))),
             Variable.PatientId => new ParameterFactoryResult(parameter.Name, TEMPORARYPatientIdPart(request.ConsumeResult.Message.Value.PatientId)),
             _ => throw new Exception("Invalid or null Variable type provided."),
         };
@@ -31,12 +29,7 @@ public class VariableParameterFactory
     private static string CalculateLookBackStartDate(VariableParameter parameter, ScheduledReport scheduledReport, string lookback)
     {
         TimeSpan ts = XmlConvert.ToTimeSpan(lookback);
-        var success = DateTime.TryParse(scheduledReport.StartDate, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var date);
-        
-        if (!success)
-        {
-            throw new Exception("Unable to parse ScheduledReport.StartDate");
-        }
+        var date = scheduledReport.StartDate;
 
         date.Subtract(ts);
 

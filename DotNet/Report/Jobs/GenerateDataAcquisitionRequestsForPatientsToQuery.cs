@@ -1,5 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -7,6 +7,7 @@ using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
 using System.Text;
@@ -21,7 +22,6 @@ namespace LantanaGroup.Link.Report.Jobs
         private readonly ILogger<GenerateDataAcquisitionRequestsForPatientsToQuery> _logger;
         private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
         private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
-        private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
         private readonly ISchedulerFactory _schedulerFactory;
 
         private readonly MeasureReportAggregator _aggregator;
@@ -33,8 +33,7 @@ namespace LantanaGroup.Link.Report.Jobs
             MeasureReportAggregator aggregator,
             IDatabase database,
             IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer,
-            IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
+            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
@@ -42,7 +41,6 @@ namespace LantanaGroup.Link.Report.Jobs
             _database = database;
             _dataAcqProducer = dataAcqProducer;
             _submissionReportProducer = submissionReportProducer;
-            _readyForValidationProducer = readyForValidationProducer;
         }
 
 
@@ -76,15 +74,15 @@ namespace LantanaGroup.Link.Report.Jobs
 
                         string reportableEvent = string.Empty;
 
-                        switch (schedule.Frequency.ToLower())
+                        switch (schedule.Frequency)
                         {
-                            case "monthly":
+                            case Frequency.Monthly:
                                 reportableEvent = "EOM";
                                 break;
-                            case "weekly":
+                            case Frequency.Weekly:
                                 reportableEvent = "EOW";
                                 break;
-                            case "daily":
+                            case Frequency.Daily:
                                 reportableEvent = "EOD";
                                 break;
                         }
@@ -97,6 +95,7 @@ namespace LantanaGroup.Link.Report.Jobs
                                 {
                                     new ()
                                     {
+                                        ReportTrackingId = schedule.Id!,
                                         StartDate = schedule.ReportStartDate,
                                         EndDate = schedule.ReportEndDate,
                                         Frequency = schedule.Frequency,
