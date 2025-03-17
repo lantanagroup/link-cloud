@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -45,7 +47,9 @@ public class CategorizationService {
 
     public void initializeCategories() throws IOException {
         logger.info("Initializing categories");
-        try (InputStream stream = ClassLoader.getSystemResourceAsStream("categories.json")) {
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        Resource resource = resolver.getResource("classpath:categories.json");
+        try (InputStream stream = resource.getInputStream()) {
             CategorySnapshot[] categorySnapshots = objectMapper.readValue(stream, CategorySnapshot[].class);
             for (CategorySnapshot categorySnapshot : categorySnapshots) {
                 logger.debug("Initializing category: {}", categorySnapshot.getId());

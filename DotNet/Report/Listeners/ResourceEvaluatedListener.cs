@@ -111,6 +111,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
+                                if (!result.Message.Headers.TryGetLastBytes("X-Report-Tracking-Id", out var reportTrackingId))
+                                {
+                                    throw new DeadLetterException($"{Name}: Received message without Report Tracking ID: {result.Topic}");
+                                }
+
                                 string CorrelationIdStr = Encoding.UTF8.GetString(headerValue);
                                 if(string.IsNullOrWhiteSpace(CorrelationIdStr))
                                 {
@@ -208,20 +213,20 @@ namespace LantanaGroup.Link.Report.Listeners
                                         {
                                             Key = new ReadyForValidationKey()
                                             {
-                                                FacilityId = schedule.FacilityId,
-                                                ReportId = schedule.Id!
+                                                FacilityId = schedule.FacilityId
                                             },
                                             Value = new ReadyForValidationValue
                                             {
                                                 PatientId = value.PatientId,
-                                                ReportTypes = schedule.ReportTypes.ToList()
+                                                ReportTypes = schedule.ReportTypes.ToList(),
+                                                ReportTrackingId = value.ReportTrackingId
                                             },
                                             Headers = new Headers
                                             {
-                                            {
-                                                "X-Correlation-Id",
-                                                headerValue
-                                            }
+                                                {
+                                                    "X-Correlation-Id",
+                                                    headerValue
+                                                }
                                             }
                                         });
 

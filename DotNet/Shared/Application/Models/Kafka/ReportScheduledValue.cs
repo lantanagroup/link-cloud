@@ -1,10 +1,8 @@
-﻿using Newtonsoft.Json;
-using QueryDispatch.Application.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.QueryDispatch.Application.Models
+namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {
-    [DataContract]
     public class ReportScheduledValue
     {
         [DataMember]

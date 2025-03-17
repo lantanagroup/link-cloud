@@ -3,6 +3,7 @@ using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Core;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
@@ -13,7 +14,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
-using LantanaGroup.Link.Report.Domain.Enums;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Listeners
@@ -119,7 +119,9 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
-                                var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == result.Message.Key.ReportId, cancellationToken);
+                                var reportId = result.Message.Value.ReportTrackingId;
+
+                                var schedule = await measureReportScheduledManager.SingleOrDefaultAsync(s => s.Id == reportId, cancellationToken);
 
                                 if (schedule == null)
                                 {
@@ -133,14 +135,12 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 foreach (var entry in submissionEntries)
                                 {
-                                    entry.ValidationStatus =
-                                        value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
+                                    entry.ValidationStatus = value.IsValid ? ValidationStatus.Passed : ValidationStatus.Failed;
 
                                     entry.Status = PatientSubmissionStatus.ValidationComplete;
 
                                     await submissionEntryManager.UpdateAsync(entry, cancellationToken);
                                 }
-
 
                                 #region Patients To Query & Submision Report Handling
 
@@ -177,7 +177,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     PatientIds = patientIds,
                                                     MeasureIds = measureReports.Select(mr => mr.Measure).Distinct().ToList(),
                                                     Organization = organization,
-                                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate)
+                                                    Aggregates = _aggregator.Aggregate(measureReports, organization.Id, schedule.ReportStartDate, schedule.ReportEndDate),
+                                                    ReportTrackingId = value.ReportTrackingId
                                                 },
                                                 Headers = new Headers
                                                 {

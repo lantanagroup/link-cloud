@@ -62,10 +62,10 @@
           <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage" *ngIf="showNoDataAcqFhirQueryConfigAlert"></app-link-alert>
           <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig" [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
           <mat-action-row>
-            <button mat-mini-fab aria-label="Add Fhir Resource Query configuration" matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="showNoCensusConfigAlert">
+            <button mat-mini-fab aria-label="Add Fhir Resource Query configuration" matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="showNoDataAcqFhirQueryConfigAlert">
               <mat-icon>add</mat-icon>
             </button>
-            <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration" matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="!showNoCensusConfigAlert">
+            <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration" matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()" *ngIf="!showNoDataAcqFhirQueryConfigAlert">
               <mat-icon>edit</mat-icon>
             </button>
           </mat-action-row>
@@ -74,10 +74,10 @@
          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage" *ngIf="showNoDataAcqFhirListConfigAlert"></app-link-alert>
          <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig" [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
          <mat-action-row>
-          <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="showNoCensusConfigAlert">
+          <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="showNoDataAcqFhirListConfigAlert">
             <mat-icon>add</mat-icon>
           </button>
-          <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="!showNoCensusConfigAlert">
+          <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration" (click)="showDataAcqFhirListDialog()" *ngIf="!showNoDataAcqFhirListConfigAlert">
             <mat-icon>edit</mat-icon>
           </button>
         </mat-action-row>

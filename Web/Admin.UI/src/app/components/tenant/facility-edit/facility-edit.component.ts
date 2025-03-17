@@ -70,6 +70,7 @@ export class FacilityEditComponent implements OnInit {
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
   dataAcqAuthQueryConfig!: IDataAcquisitionAuthenticationConfigModel;
   dataAcqAuthQueryListConfig!: IDataAcquisitionAuthenticationConfigModel;
+
   linkNoConfigAlertType = LinkAlertType.info;
   showNoCensusConfigAlert: boolean = false;
   noCensusConfigAlertMessage = 'No census configuration found for this facility.';
@@ -82,6 +83,9 @@ export class FacilityEditComponent implements OnInit {
   showNoDataAcqAuthQueryConfigAlert: boolean = false;
   noDataAcqAuthQueryListConfigAlertMessage = 'No FHIR List Authentication configuration found for this facility.';
   showNoDataAcqAuthQueryListConfigAlert: boolean = false;
+
+  noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query configuration found for this facility.';
+  showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
   private _displayReportDashboard: boolean = false;
 
@@ -221,14 +225,14 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(DataAcquisitionFhirListConfigDialogComponent,
       {
         width: '75%',
-        data: { dialogTitle: 'Fhir Query Configuration', formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit, viewOnly: false, dataAcqFhirListConfig: this.dataAcqFhirListConfig }
+        data: { dialogTitle: 'Fhir Query List Configuration', formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit, viewOnly: false, dataAcqFhirListConfig: this.dataAcqFhirListConfig }
       }).afterClosed().subscribe(res => {
         console.log(res)
         if (res) {
           this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe((data: IDataAcquisitionFhirListConfigModel) => {
             if (data) {
               console.log(data);
-              this.showNoDataAcqFhirQueryConfigAlert = false;
+              this.showNoDataAcqFhirListConfigAlert = false;
               this.dataAcqFhirListConfig = data;
             }
           });
@@ -241,73 +245,74 @@ export class FacilityEditComponent implements OnInit {
         }
       });
   }
+  
 
-  showDataAcqAuthDialog(configType: string): void {
-    this.dialog.open(DataAcquisitionAuthenticationConfigDialogComponent,
-      {
-        width: '75%',
-        data: { dialogTitle: 'Fhir Authentication Configuration', formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit, viewOnly: false, dataAcqFhirListConfig: this.dataAcqFhirListConfig }
-      }).afterClosed().subscribe(res => {
-        console.log(res)
-        if (res) {
-          this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, configType).subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
-            if (data) {
-              this.showNoDataAcqFhirQueryConfigAlert = false;
-              if (configType == 'fhirQueryConfiguration') {
-                this.dataAcqAuthQueryConfig = data;
-              } else {
-                this.dataAcqAuthQueryListConfig = data;
-              }
-            }
-          });
-          this.snackBar.open(`${res}`, '', {
+  /* showDataAcqAuthDialog(configType: string): void {
+     this.dialog.open(DataAcquisitionAuthenticationConfigDialogComponent,
+       {
+         width: '75%',
+         data: { dialogTitle: 'Fhir Authentication Configuration', formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit, viewOnly: false, dataAcqFhirListConfig: this.dataAcqFhirListConfig }
+       }).afterClosed().subscribe(res => {
+         console.log(res)
+         if (res) {
+           this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, configType).subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
+             if (data) {
+               this.showNoDataAcqFhirQueryConfigAlert = false;
+               if (configType == 'fhirQueryConfiguration') {
+                 this.dataAcqAuthQueryConfig = data;
+               } else {
+                 this.dataAcqAuthQueryListConfig = data;
+               }
+             }
+           });
+           this.snackBar.open(`${res}`, '', {
+             duration: 3500,
+             panelClass: 'success-snackbar',
+             horizontalPosition: 'end',
+             verticalPosition: 'top'
+           });
+         }
+       });
+   }*/
+
+
+  loadDataAcquisitionConfig() {
+    this.loadFhirQueryConfig();
+    this.loadFhirListConfig();
+    this.loadAuthenticationConfig();
+  }
+
+  loadAuthenticationConfig() {
+    if (!this.dataAcqAuthQueryConfig) {
+      this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, 'fhirQueryConfiguration').subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
+        this.dataAcqAuthQueryConfig = data;
+        if (this.dataAcqAuthQueryConfig) {
+          this.showNoDataAcqAuthQueryConfigAlert = false;
+        } else {
+          this.showNoDataAcqAuthQueryConfigAlert = true;
+        }
+      }, error => {
+        if (error.status == 404) {
+          this.snackBar.open(`No current FHIR query authentication configuration found for facility ${this.facilityId}, please create one.`, '', {
             duration: 3500,
-            panelClass: 'success-snackbar',
+            panelClass: 'info-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+          this.dataAcqAuthQueryConfig = { id: '', facilityId: this.facilityConfig.facilityId, audience: '', authType: '', clientId: '', key: '', password: '', tokenUrl: '', userName: '' } as IDataAcquisitionAuthenticationConfigModel;
+          this.showNoDataAcqAuthQueryConfigAlert = true;
+          //this.showDataAcqAuthDialog('fhirQueryConfiguration');
+        }
+        else {
+          this.snackBar.open(`Failed to load FHIR query authentication configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
           });
         }
-      });
-  }
-
-
-loadDataAcquisitionConfig() {
-  this.loadFhirQueryConfig();
-  this.loadFhirListConfig();
-  this.loadAuthenticationConfig();
-}
-
-loadAuthenticationConfig() {
-  if (!this.dataAcqAuthQueryConfig) {
-    this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, 'fhirQueryConfiguration').subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
-      this.dataAcqAuthQueryConfig = data;
-      if (this.dataAcqAuthQueryConfig) {
-        this.showNoDataAcqAuthQueryConfigAlert = false;
-      } else {
-        this.showNoDataAcqAuthQueryConfigAlert = true;
-      }
-    }, error => {
-      if (error.status == 404) {
-        this.snackBar.open(`No current FHIR query authentication configuration found for facility ${this.facilityId}, please create one.`, '', {
-          duration: 3500,
-          panelClass: 'info-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
-        this.dataAcqAuthQueryConfig = { id: '', facilityId: this.facilityConfig.facilityId, audience: '', authType: '', clientId: '', key: '', password: '', tokenUrl: '', userName: '' } as IDataAcquisitionAuthenticationConfigModel;
-        this.showNoDataAcqAuthQueryConfigAlert = true;
-        //this.showDataAcqAuthDialog('fhirQueryConfiguration');
-      }
-      else {
-        this.snackBar.open(`Failed to load FHIR query authentication configuration for the facility, see error for details.`, '', {
-          duration: 3500,
-          panelClass: 'error-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
-      }
-    })
-  }
+      })
+    }
 
   if (!this.dataAcqAuthQueryListConfig) {
     this.dataAcquisitionService.getAuthenticationConfig(this.facilityId, 'fhirQueryListConfiguration').subscribe((data: IDataAcquisitionAuthenticationConfigModel) => {
@@ -380,25 +385,25 @@ loadFhirListConfig() {
     this.dataAcquisitionService.getFhirListConfiguration(this.facilityId).subscribe((data: IDataAcquisitionFhirListConfigModel) => {
       this.dataAcqFhirListConfig = data;
       if (this.dataAcqFhirListConfig) {
-        this.showNoDataAcqFhirQueryConfigAlert = false;
+        this.showNoDataAcqFhirListConfigAlert = false;
       }
       else {
-        this.showNoDataAcqFhirQueryConfigAlert = true;
+        this.showNoDataAcqFhirListConfigAlert = true;
       }
     }, error => {
       if (error.status == 404) {
-        this.snackBar.open(`No current FHIR query configuration found for facility ${this.facilityId}, please create one.`, '', {
+        this.snackBar.open(`No current FHIR list configuration found for facility ${this.facilityId}, please create one.`, '', {
           duration: 3500,
           panelClass: 'info-snackbar',
           horizontalPosition: 'end',
           verticalPosition: 'top'
         });
-        this.dataAcqFhirListConfig = { id: '', facilityId: this.facilityConfig.facilityId, fhirBaseServerUrl: '', eHRPatientLists: [] } as IDataAcquisitionFhirListConfigModel;
-        this.showNoDataAcqFhirQueryConfigAlert = true;
+        this.dataAcqFhirListConfig = { id: '', facilityId: this.facilityConfig.facilityId, fhirBaseServerUrl: '', ehrPatientLists: [] } as IDataAcquisitionFhirListConfigModel;
+        this.showNoDataAcqFhirListConfigAlert = true;
         //this.showDataAcqFhirQueryDialog();
       }
       else {
-        this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
+        this.snackBar.open(`Failed to load FHIR list configuration for the facility, see error for details.`, '', {
           duration: 3500,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
@@ -408,7 +413,6 @@ loadFhirListConfig() {
     });
   }
 }
-
 
 
 }

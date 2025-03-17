@@ -7,12 +7,12 @@ import lombok.Setter;
 @Setter
 public class ValidationComplete {
     private String patientId;
+    private String reportTrackingId;
     private boolean isValid;
 
     @Getter
     @Setter
     public static class Key {
         private String facilityId;
-        private String reportId;
     }
 }

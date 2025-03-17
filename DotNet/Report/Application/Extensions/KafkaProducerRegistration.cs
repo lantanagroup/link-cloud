@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 
 namespace LantanaGroup.Link.Report.Application.Extensions;
