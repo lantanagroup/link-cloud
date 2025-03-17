@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         FacilityId = facilityId,
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,
-                                        Frequency = frequency.ToString(),
+                                        Frequency = frequency,
                                         ReportTypes = reportTypes,
                                         CreateDate = DateTime.UtcNow
                                     };

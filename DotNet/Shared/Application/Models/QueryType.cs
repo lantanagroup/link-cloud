@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Report.Domain.Enums
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
     public enum QueryType
     {
