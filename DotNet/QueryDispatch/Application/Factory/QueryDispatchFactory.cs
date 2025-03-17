@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Factory
         {
             return new ScheduledReportEntity()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = reportTrackingId,
                 FacilityId = facilityId,
                 ReportPeriods = new List<ReportPeriodEntity>()
                 {
