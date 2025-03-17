@@ -115,7 +115,8 @@ public class QueryPlanConfigController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", facilityId);
+            var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", sanitizedFacilityId);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
