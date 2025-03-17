@@ -1,6 +1,7 @@
 ﻿
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Models;
+using Quartz.Impl.Triggers;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
 {
@@ -60,6 +61,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// </summary>
         /// <example>Daily</example>
         public string Frequency { get; set;}
+
+        public string ReportTrackingId { get; set; } = string.Empty;
     }
 
     public class ReportScheduledKey

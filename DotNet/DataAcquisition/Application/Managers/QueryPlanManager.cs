@@ -14,6 +14,7 @@ public interface IQueryPlanManager
     Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<List<QueryPlan>> FindAsync(Expression<Func<QueryPlan, bool>> predicate, CancellationToken cancellationToken = default);
+    Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class QueryPlanManager : IQueryPlanManager
@@ -36,6 +37,13 @@ public class QueryPlanManager : IQueryPlanManager
     public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
         return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type, cancellationToken);
+
+    }
+
+    public async Task<List<string>> GetPlanNamesAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var plans = await _dbContext.QueryPlanRepository.FindAsync(q => q.FacilityId == facilityId, cancellationToken);
+        return plans.Select(q => q.PlanName).Distinct().ToList();
     }
 
     public async Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default)

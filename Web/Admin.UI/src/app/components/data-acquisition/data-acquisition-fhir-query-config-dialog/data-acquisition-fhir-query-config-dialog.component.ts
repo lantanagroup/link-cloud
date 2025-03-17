@@ -8,7 +8,7 @@ import { IDataAcquisitionQueryConfigModel } from '../../../interfaces/data-acqui
 import { IEntityCreatedResponse } from '../../../interfaces/entity-created-response.model';
 import { FormMode } from '../../../models/FormMode.enum';
 import { DataAcquisitionFhirQueryConfigFormComponent } from '../data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
-import {FormControl, FormGroup, Validators} from "@angular/forms";
+
 
 @Component({
   selector: 'app-data-acquisition-fhir-query-config-dialog',
@@ -32,7 +32,7 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
 
   @ViewChild(DataAcquisitionFhirQueryConfigFormComponent) configForm!: DataAcquisitionFhirQueryConfigFormComponent;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, config: IDataAcquisitionQueryConfigModel },
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, dataAcqFhirQueryConfig: IDataAcquisitionQueryConfigModel },
     private dialogRef: MatDialogRef<DataAcquisitionFhirQueryConfigFormComponent>,
     private snackBar: MatSnackBar) {
 
@@ -41,7 +41,7 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
-    this.config = this.data.config;
+    this.config = this.data.dataAcqFhirQueryConfig;
     this.formMode = this.data.formMode;
   }
 
