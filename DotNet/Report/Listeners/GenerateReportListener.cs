@@ -186,7 +186,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportEndDate = endDate.Value,
                                     Frequency = Frequency.Adhoc,
                                     ReportTypes = reportTypes,
-                                    PatientsToQueryDataRequested = true,
+                                    EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
                                     CreateDate = DateTime.UtcNow
                                 };
