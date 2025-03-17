@@ -4,13 +4,15 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ILinkServiceHealthSummary } from './link-service-health-summary.interface';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-link-health-check',
   imports: [
     CommonModule,
     MatToolbarModule,
-    MatTableModule    
+    MatTableModule,
+    MatIconModule   
   ],
   templateUrl: './link-health-check.component.html',
   styleUrl: './link-health-check.component.scss'

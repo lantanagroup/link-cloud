@@ -25,7 +25,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Telemetry;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Interfaces.Infrastructure;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.SerDes;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Telemetry;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;

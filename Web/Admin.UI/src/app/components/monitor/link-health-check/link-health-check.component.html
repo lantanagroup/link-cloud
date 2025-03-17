@@ -1,7 +1,10 @@
 <div class="content" *ngIf="!initializeSummaries;else initial_summary_loading">
     <p>
         <mat-toolbar class="page-header-bar" color="primary">
-          <span>Link Health Status</span>         
+          <span>Link Health Status</span>        
+          <button mat-mini-fab aria-label="Refresh" matTooltip="Refresh health summary" (click)="onRefresh()">
+            <mat-icon>refresh</mat-icon>
+          </button> 
         </mat-toolbar>
     </p>
 
