@@ -15,6 +15,8 @@ public class VariableParameterFactory
         {
             Variable.LookbackStart => new ParameterFactoryResult(parameter.Name, CalculateLookBackStartDate(parameter, scheduledReport, lookback)),
             Variable.PatientId => new ParameterFactoryResult(parameter.Name, TEMPORARYPatientIdPart(request.ConsumeResult.Message.Value.PatientId)),
+            Variable.PeriodStart => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.StartDate.ToString("yyyy-MM-dd"), nameof(scheduledReport.StartDate))),
+            Variable.PeriodEnd => new ParameterFactoryResult(parameter.Name, ConvertDateTimeStringToUTCFormat(parameter, scheduledReport.EndDate.ToString("yyyy-MM-dd"), nameof(scheduledReport.EndDate))),
             _ => throw new Exception("Invalid or null Variable type provided."),
         };
 
