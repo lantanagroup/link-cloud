@@ -1,6 +1,6 @@
 ﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
-    public enum QueryTypes
+    public enum QueryType
     {
         Initial,
         Supplemental

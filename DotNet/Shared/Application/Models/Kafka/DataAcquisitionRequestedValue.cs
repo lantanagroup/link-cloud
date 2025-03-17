@@ -10,7 +10,7 @@ public class DataAcquisitionRequestedValue
     [DataMember]
     public List<ScheduledReport> ScheduledReports { get; set; } = new List<ScheduledReport>();
     [DataMember]
-    public string QueryType { get; set; } = QueryTypes.Initial.ToString();
+    public string QueryType { get; set; } = Models.QueryType.Initial.ToString();
     public string ReportableEvent { get; set; } = string.Empty;
 }
 
