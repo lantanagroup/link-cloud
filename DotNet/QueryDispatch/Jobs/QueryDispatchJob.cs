@@ -1,17 +1,13 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using System.Text;
-using QueryDispatch.Application.Settings;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using QueryDispatch.Domain.Managers;
-using QueryDispatch.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using Quartz;
+using QueryDispatch.Application.Models;
+using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
+using System.Text;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {

@@ -1,12 +1,10 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
