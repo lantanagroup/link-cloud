@@ -26,6 +26,11 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule)
         {
+            if(schedule.SubmitReportDateTime.HasValue)
+            {
+                return false;
+            }
+
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)

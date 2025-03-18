@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
+﻿
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using MongoDB.Bson.Serialization.Attributes;

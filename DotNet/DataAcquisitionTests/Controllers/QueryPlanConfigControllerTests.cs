@@ -1,11 +1,11 @@
-﻿using LantanaGroup.Link.DataAcquisition.Controllers;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Repositories;
+using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using MediatR;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
 using System.Net;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
 namespace DataAcquisitionUnitTests.Controllers
 {
@@ -19,12 +19,12 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             var cancellationToken = new CancellationToken();
             _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
                 .ReturnsAsync(new QueryPlan());
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan(facilityId, LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None);
+            var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
             Assert.IsType<OkObjectResult>(result);
         }
 
@@ -32,12 +32,12 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void GetQueryPlanNegativeTest_NullResult()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
                 .ReturnsAsync((QueryPlan?)null);
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan(facilityId, LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None);
+            var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
 
             var problem = (ObjectResult)result;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
@@ -49,7 +49,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.GetQueryPlan("", LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly,  CancellationToken.None);
+            var result = await _controller.GetQueryPlan("", Frequency.Monthly,  CancellationToken.None);
 
             var problem = (ObjectResult)result;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
@@ -84,7 +84,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void UpdateQueryPlanTest()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly,  CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly,  CancellationToken.None))
                 .ReturnsAsync(new QueryPlan());
             _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan>(),  CancellationToken.None))
                 .ReturnsAsync(new QueryPlan());
@@ -99,7 +99,7 @@ namespace DataAcquisitionUnitTests.Controllers
         public async void UpdateQueryPlanNegativeTest_NullBody()
         {
             _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
                 .ReturnsAsync(new QueryPlan());
             _mocker.GetMock<IQueryPlanManager>().Setup(x => x.UpdateAsync(It.IsAny<QueryPlan?>(), CancellationToken.None))
                 .ReturnsAsync(new QueryPlan());
@@ -121,7 +121,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker.GetMock<IQueryPlanManager>().Setup(x => x.AddAsync(It.IsAny<QueryPlan>(), CancellationToken.None))
                 .ReturnsAsync(queryPlan);
 
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None))
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
                 .ReturnsAsync(queryPlan);
 
             var _createController = _mocker.CreateInstance<QueryPlanConfigController>();
@@ -132,7 +132,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan(facilityId, LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None);
+            var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
             
             var problem = (ObjectResult)result;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.Accepted);
@@ -144,7 +144,7 @@ namespace DataAcquisitionUnitTests.Controllers
             _mocker = new AutoMocker();
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan("", LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None);
+            var result = await _controller.DeleteQueryPlan("", Frequency.Monthly, CancellationToken.None);
 
             var problem = (ObjectResult)result;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
@@ -159,7 +159,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
-            var result = await _controller.DeleteQueryPlan(facilityId, LantanaGroup.Link.DataAcquisition.Domain.Models.Frequency.Monthly, CancellationToken.None);
+            var result = await _controller.DeleteQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
 
             var problem = (ObjectResult)result;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);

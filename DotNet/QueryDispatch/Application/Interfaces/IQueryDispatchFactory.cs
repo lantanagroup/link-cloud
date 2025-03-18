@@ -1,5 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
+﻿
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.QueryDispatch.Application.Interfaces
 {

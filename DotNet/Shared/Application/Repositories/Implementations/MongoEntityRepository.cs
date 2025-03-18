@@ -65,7 +65,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     {
         if (cancellationToken.IsCancellationRequested) return null;
 
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         try
         {

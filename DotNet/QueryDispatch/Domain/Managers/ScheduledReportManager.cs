@@ -46,11 +46,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Created schedule report for faciltiy {HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId)}");
 
-                var headers = new Headers
-                        {
-                            { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(scheduledReport.ReportPeriods[0].ReportTrackingId) }
-                        };
-
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = scheduledReport.FacilityId,
@@ -64,12 +59,10 @@ namespace QueryDispatch.Domain.Managers
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
-
-
 
                 return scheduledReport.FacilityId;
             }
@@ -129,11 +122,6 @@ namespace QueryDispatch.Domain.Managers
 
                 _logger.LogInformation($"Update scheduled report type {HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString())} for facility id {HtmlInputSanitizer.Sanitize(existingReport.FacilityId)}");
 
-                var headers = new Headers
-                    {
-                        { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(newReportPeriod.ReportTrackingId) }
-                    };
-
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = existingReport.FacilityId,
@@ -148,8 +136,8 @@ namespace QueryDispatch.Domain.Managers
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Value = auditMessage,
-                    Headers = headers
-                });
+                    Headers = new Headers()
+            });
 
                 _producer.Flush();
 
