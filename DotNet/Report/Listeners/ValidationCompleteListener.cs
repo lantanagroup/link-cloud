@@ -37,14 +37,14 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitReportProducer submitReportProducer,
-            IServiceScopeFactory serviceScopeFactory, 
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _submitReportProducer = submitReportProducer;
 
             _serviceScopeFactory = serviceScopeFactory;
+            _submitReportProducer = submitReportProducer;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -110,7 +110,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (schedule == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"No ReportSchedule found for ID {result.Message.Key.ReportId}");
+                                        $"No ReportSchedule found for ID {reportId}");
                                 }
 
                                 var submissionEntries =
