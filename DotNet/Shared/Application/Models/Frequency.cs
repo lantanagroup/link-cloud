@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text.Json.Serialization;
 
-namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
+namespace LantanaGroup.Link.Shared.Application.Models;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum Frequency

@@ -3,7 +3,6 @@ using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;

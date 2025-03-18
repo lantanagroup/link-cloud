@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using System.Runtime.Serialization;
+﻿using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Kafka
 {

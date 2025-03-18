@@ -2,7 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
