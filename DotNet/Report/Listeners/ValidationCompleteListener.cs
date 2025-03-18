@@ -20,9 +20,7 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ValidationCompleteListener> _logger;
-        private readonly IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> _kafkaConsumerFactory;
-       
-        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> _kafkaConsumerFactory;      
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
@@ -81,7 +79,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
-                _logger.LogInformation($"Started resource evaluated consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
+                _logger.LogInformation($"Started validation complete consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
