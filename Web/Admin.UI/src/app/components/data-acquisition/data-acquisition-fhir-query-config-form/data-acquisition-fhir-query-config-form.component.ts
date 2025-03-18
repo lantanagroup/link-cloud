@@ -1,6 +1,6 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {FormControl, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatChipsModule} from '@angular/material/chips';
 import {MatFormFieldModule} from '@angular/material/form-field';
@@ -15,6 +15,7 @@ import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response
 import {ENTER, COMMA} from '@angular/cdk/keycodes';
 import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {MatSelectModule} from "@angular/material/select";
+import {MatCheckboxModule} from "@angular/material/checkbox";
 
 @Component({
   selector: 'app-data-acquisition-fhir-query-config-form',
@@ -30,7 +31,9 @@ import {MatSelectModule} from "@angular/material/select";
     ReactiveFormsModule,
     MatSnackBarModule,
     MatToolbarModule,
-    MatSelectModule
+    MatSelectModule,
+    FormsModule,
+    MatCheckboxModule
   ],
   templateUrl: './data-acquisition-fhir-query-config-form.component.html',
   styleUrls: ['./data-acquisition-fhir-query-config-form.component.scss']
@@ -60,14 +63,24 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   planNames: string[] = [];
 
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
     this.configForm = new FormGroup({
       facilityId: new FormControl('', Validators.required),
       fhirServerBaseUrl: new FormControl('', Validators.required),
-      queryPlanIds: new FormControl([], Validators.required)
+      queryPlanIds: new FormControl([], Validators.required),
+      isAuthEnabled: new FormControl(false, Validators.required),
+      authType: new FormControl(''),
+      authKey: new FormControl(''),
+      tokenUrl: new FormControl(''),
+      audience: new FormControl(''),
+      clientId: new FormControl(''),
+      userName: new FormControl(''),
+      password: new FormControl('')
     });
+
   }
 
 
@@ -93,12 +106,52 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.fhirServerBaseUrlControl.setValue(this.item.fhirServerBaseUrl);
       this.fhirServerBaseUrlControl.updateValueAndValidity();
 
-     // this.queryPlanIdsControl.setValue(this.item.queryPlanIds.join(", "));
       this.queryPlanIdsControl.setValue(this.item.queryPlanIds);
       this.queryPlanIdsControl.updateValueAndValidity();
+
+      this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
+      this.isAuthEnabledControl.updateValueAndValidity();
+
+      this.authTypeControl.setValue(this.item.authentication?.authType);
+      this.authTypeControl.updateValueAndValidity();
+
+      this.authKeyControl.setValue(this.item.authentication?.key);
+      this.authKeyControl.updateValueAndValidity();
+
+      this.tokenUrlControl.setValue(this.item.authentication?.tokenUrl);
+      this.tokenUrlControl.updateValueAndValidity();
+
+      this.audienceControl.setValue(this.item.authentication?.audience);
+      this.audienceControl.updateValueAndValidity();
+
+      this.clientIdControl.setValue(this.item.authentication?.clientId);
+      this.clientIdControl.updateValueAndValidity();
+
+      this.userNameControl.setValue(this.item.authentication?.userName);
+      this.userNameControl.updateValueAndValidity();
+
+      this.passwordControl.setValue(this.item.authentication?.password);
+      this.passwordControl.updateValueAndValidity();
     }
 
     this.configForm.valueChanges.subscribe(() => {
+      if (this.isAuthEnabledControl.value) {
+        this.configForm.controls['authType'].setValidators(Validators.required);
+        this.configForm.controls['authKey'].setValidators(Validators.required);
+        this.configForm.controls['tokenUrl'].setValidators(Validators.required);
+        this.configForm.controls['audience'].setValidators(Validators.required);
+        this.configForm.controls['clientId'].setValidators(Validators.required);
+        this.configForm.controls['userName'].setValidators(Validators.required);
+        this.configForm.controls['password'].setValidators(Validators.required);
+      } else {
+        this.configForm.controls['authType'].clearValidators();
+        this.configForm.controls['authKey'].clearValidators();
+        this.configForm.controls['tokenUrl'].clearValidators();
+        this.configForm.controls['audience'].clearValidators();
+        this.configForm.controls['clientId'].clearValidators();
+        this.configForm.controls['userName'].clearValidators();
+        this.configForm.controls['password'].clearValidators();
+      }
       this.formValueChanged.emit(this.configForm.invalid);
     });
   }
@@ -126,6 +179,30 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.queryPlanIdsControl.setValue(this.item.queryPlanIds);
       this.queryPlanIdsControl.updateValueAndValidity();
 
+      this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
+      this.isAuthEnabledControl.updateValueAndValidity();
+
+      this.authTypeControl.setValue(this.item.authentication?.authType);
+      this.authTypeControl.updateValueAndValidity();
+
+      this.authKeyControl.setValue(this.item.authentication?.key);
+      this.authKeyControl.updateValueAndValidity();
+
+      this.tokenUrlControl.setValue(this.item.authentication?.tokenUrl);
+      this.tokenUrlControl.updateValueAndValidity();
+
+      this.audienceControl.setValue(this.item.authentication?.audience);
+      this.audienceControl.updateValueAndValidity();
+
+      this.clientIdControl.setValue(this.item.authentication?.clientId);
+      this.clientIdControl.updateValueAndValidity();
+
+      this.userNameControl.setValue(this.item.authentication?.userName);
+      this.userNameControl.updateValueAndValidity();
+
+      this.passwordControl.setValue(this.item.authentication?.password);
+      this.passwordControl.updateValueAndValidity();
+
       // toggle view
       this.toggleViewOnly(this.viewOnly);
     }
@@ -137,10 +214,38 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.fhirServerBaseUrlControl.disable();
       this.facilityIdControl.disable();
       this.queryPlanIdsControl.disable();
+      this.authTypeControl.disable();
+      this.authKeyControl.disable();
+      this.tokenUrlControl.disable();
+      this.audienceControl.disable();
+      this.clientIdControl.disable();
+      this.userNameControl.disable();
+      this.passwordControl.disable();
+      this.isAuthEnabledControl.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
       this.facilityIdControl.enable();
       this.queryPlanIdsControl.enable();
+      this.authTypeControl.enable();
+      this.authKeyControl.enable();
+      this.tokenUrlControl.enable();
+      this.audienceControl.enable();
+      this.clientIdControl.enable();
+      this.userNameControl.enable();
+      this.passwordControl.enable();
+      this.isAuthEnabledControl.enable();
+    }
+  }
+
+  toggleAuthFields() {
+    if (!this.isAuthEnabledControl.value) {
+      this.configForm.controls['authType'].reset();
+      this.configForm.controls['authKey'].reset();
+      this.configForm.controls['tokenUrl'].reset();
+      this.configForm.controls['audience'].reset();
+      this.configForm.controls['clientId'].reset();
+      this.configForm.controls['userName'].reset();
+      this.configForm.controls['password'].reset();
     }
   }
 
@@ -154,6 +259,38 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   get queryPlanIdsControl(): FormControl {
     return this.configForm.get('queryPlanIds') as FormControl;
+  }
+
+  get isAuthEnabledControl(): FormControl {
+    return this.configForm.get('isAuthEnabled') as FormControl;
+  }
+
+  get authTypeControl(): FormControl {
+    return this.configForm.get('authType') as FormControl;
+  }
+
+  get authKeyControl(): FormControl {
+    return this.configForm.get('authKey') as FormControl;
+  }
+
+  get tokenUrlControl(): FormControl {
+    return this.configForm.get('tokenUrl') as FormControl;
+  }
+
+  get audienceControl(): FormControl {
+    return this.configForm.get('audience') as FormControl;
+  }
+
+  get clientIdControl(): FormControl {
+    return this.configForm.get('clientId') as FormControl;
+  }
+
+  get userNameControl(): FormControl {
+    return this.configForm.get('userName') as FormControl;
+  }
+
+  get passwordControl(): FormControl {
+    return this.configForm.get('password') as FormControl;
   }
 
   clearFacilityId(): void {
@@ -175,12 +312,56 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
     return (object1 && object2) && object1 === object2;
   }
 
+  clearAuthType(): void {
+    this.authTypeControl.setValue('');
+    this.authTypeControl.updateValueAndValidity();
+  }
+
+  clearAuthKey(): void {
+    this.authKeyControl.setValue('');
+    this.authKeyControl.updateValueAndValidity();
+  }
+
+  clearTokenUrl(): void {
+    this.tokenUrlControl.setValue('');
+    this.tokenUrlControl.updateValueAndValidity();
+  }
+
+  clearAudience(): void {
+    this.audienceControl.setValue('');
+    this.audienceControl.updateValueAndValidity();
+  }
+
+  clearClientId(): void {
+    this.clientIdControl.setValue('');
+    this.clientIdControl.updateValueAndValidity();
+  }
+
+  clearUserName(): void {
+    this.userNameControl.setValue('');
+    this.userNameControl.updateValueAndValidity();
+  }
+
+  clearPassword(): void {
+    this.passwordControl.setValue('');
+    this.passwordControl.updateValueAndValidity();
+  }
+
+
   submitConfiguration(): void {
     if (this.configForm.valid) {
       if (this.formMode == FormMode.Create) {
         this.dataAcquisitionService.createFhirQueryConfiguration(this.facilityIdControl.value, {
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+          authentication:
+            {"authType" : this.authTypeControl.value,
+                 "key" : this.authKeyControl.value,
+              "tokenUrl" : this.tokenUrlControl.value,
+              "audience" : this.audienceControl.value,
+              "clientId" :  this.clientIdControl.value,
+              "userName" : this.userNameControl.value,
+              "password" : this.passwordControl.value},
           queryPlanIds: this.queryPlanIdsControl.value || []
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit({id: response.id, message: "Query Config Created"});
@@ -191,6 +372,14 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
           {
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
+            authentication:
+              {"authType" : this.authTypeControl.value,
+                   "key" : this.authKeyControl.value,
+                "tokenUrl" : this.tokenUrlControl.value,
+                "audience" : this.audienceControl.value,
+                "clientId" :  this.clientIdControl.value,
+                "userName" : this.userNameControl.value,
+                "password" : this.passwordControl.value},
             queryPlanIds: this.queryPlanIdsControl.value || []
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
             this.submittedConfiguration.emit({id: this.item.id ?? '', message: "Query Config Updated"});
