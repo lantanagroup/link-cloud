@@ -54,7 +54,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
-            _submissionReportProducer = submissionReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
