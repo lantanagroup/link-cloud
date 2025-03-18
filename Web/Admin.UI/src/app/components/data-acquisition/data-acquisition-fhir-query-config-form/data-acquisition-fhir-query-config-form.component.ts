@@ -132,16 +132,13 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.passwordControl.updateValueAndValidity();
     }
 
+    this.authTypeControl?.valueChanges.subscribe((value) => {
+      this.updateValidators(value);
+    });
+    this.updateValidators(this.authTypeControl?.value);
+
     this.configForm.valueChanges.subscribe(() => {
-      if (this.isAuthEnabledControl.value) {
-        this.configForm.controls['authType'].setValidators(Validators.required);
-        this.configForm.controls['authKey'].setValidators(Validators.required);
-        this.configForm.controls['tokenUrl'].setValidators(Validators.required);
-        this.configForm.controls['audience'].setValidators(Validators.required);
-        this.configForm.controls['clientId'].setValidators(Validators.required);
-        this.configForm.controls['userName'].setValidators(Validators.required);
-        this.configForm.controls['password'].setValidators(Validators.required);
-      } else {
+      if (this.isAuthEnabledControl.value == false) {
         this.configForm.controls['authType'].clearValidators();
         this.configForm.controls['authKey'].clearValidators();
         this.configForm.controls['tokenUrl'].clearValidators();
@@ -149,10 +146,13 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
         this.configForm.controls['clientId'].clearValidators();
         this.configForm.controls['userName'].clearValidators();
         this.configForm.controls['password'].clearValidators();
+      } else {
+        this.configForm.controls['authType'].setValidators(Validators.required);
       }
       this.formValueChanged.emit(this.configForm.invalid);
     });
   }
+
 
   ngOnChanges(changes: SimpleChanges) {
 
@@ -205,6 +205,32 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.toggleViewOnly(this.viewOnly);
     }
   }
+
+  private updateValidators(authType: string): void {
+    const isAuthRequired = authType !== 'None' && authType !== 'Basic';
+    const isBasicAuth = authType === 'Basic';
+
+    // Manage validators for fields requiring authentication
+    this.toggleValidators('authKey', isAuthRequired);
+    this.toggleValidators('tokenUrl', isAuthRequired);
+    this.toggleValidators('audience', isAuthRequired);
+    this.toggleValidators('clientId', isAuthRequired);
+
+    // Manage validators for Basic Auth fields
+    this.toggleValidators('userName', isBasicAuth);
+    this.toggleValidators('password', isBasicAuth);
+  }
+
+  private toggleValidators(controlName: string, shouldRequire: boolean): void {
+    const control = this.configForm.controls[controlName];
+    if (shouldRequire) {
+      control.setValidators(Validators.required);
+    } else {
+      control.clearValidators();
+    }
+    control.updateValueAndValidity();
+  }
+
 
   // Dynamically disable or enable the form control based on viewOnly
   toggleViewOnly(viewOnly: boolean) {
@@ -352,13 +378,15 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
           authentication:
-            {"authType" : this.authTypeControl.value,
-                 "key" : this.authKeyControl.value,
-              "tokenUrl" : this.tokenUrlControl.value,
-              "audience" : this.audienceControl.value,
-              "clientId" :  this.clientIdControl.value,
-              "userName" : this.userNameControl.value,
-              "password" : this.passwordControl.value},
+            {
+              "authType": this.authTypeControl.value,
+              "key": this.authKeyControl.value,
+              "tokenUrl": this.tokenUrlControl.value,
+              "audience": this.audienceControl.value,
+              "clientId": this.clientIdControl.value,
+              "userName": this.userNameControl.value,
+              "password": this.passwordControl.value
+            },
           queryPlanIds: this.queryPlanIdsControl.value || []
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
           this.submittedConfiguration.emit({id: response.id, message: "Query Config Created"});
@@ -370,13 +398,15 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
             authentication:
-              {"authType" : this.authTypeControl.value,
-                   "key" : this.authKeyControl.value,
-                "tokenUrl" : this.tokenUrlControl.value,
-                "audience" : this.audienceControl.value,
-                "clientId" :  this.clientIdControl.value,
-                "userName" : this.userNameControl.value,
-                "password" : this.passwordControl.value},
+              {
+                "authType": this.authTypeControl.value,
+                "key": this.authKeyControl.value,
+                "tokenUrl": this.tokenUrlControl.value,
+                "audience": this.audienceControl.value,
+                "clientId": this.clientIdControl.value,
+                "userName": this.userNameControl.value,
+                "password": this.passwordControl.value
+              },
             queryPlanIds: this.queryPlanIdsControl.value || []
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
             this.submittedConfiguration.emit({id: this.item.id ?? '', message: "Query Config Updated"});
