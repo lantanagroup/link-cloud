@@ -52,12 +52,22 @@ public class ReadyForValidationConsumer {
         String facilityId = record.key().getFacilityId();
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
+        Bundle bundle = getBundle(facilityId, patientId, reportId);
+        List<Result> results = validate(facilityId, patientId, reportId, bundle);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+    }
+
+    private Bundle getBundle(String facilityId, String patientId, String reportId) {
         PatientSubmissionModel model = reportClient.getSubmissionModel(facilityId, patientId, reportId);
         IParser parser = fhirContext.newJsonParser();
         Bundle patientResources = parser.parseResource(Bundle.class, model.getPatientResources());
         Bundle otherResources = parser.parseResource(Bundle.class, model.getOtherResources());
         patientResources.getEntry().addAll(otherResources.getEntry());
-        List<Result> results = validationService.validate(patientResources);
+        return patientResources;
+    }
+
+    private List<Result> validate(String facilityId, String patientId, String reportId, Bundle bundle) {
+        List<Result> results = validationService.validate(bundle);
         for (Result result : results) {
             result.setFacilityId(facilityId);
             result.setPatientId(patientId);
@@ -65,15 +75,23 @@ public class ReadyForValidationConsumer {
         }
         categorizationService.categorize(results);
         resultRepository.saveAll(results);
-        boolean valid = results.stream()
-                .flatMap(result -> result.getCategories().stream())
-                .allMatch(Category::isAcceptable);
+        return results;
+    }
+
+    private void produceValidationCompleteRecord(
+            String correlationId,
+            String facilityId,
+            String patientId,
+            String reportId,
+            List<Result> results) {
         ValidationComplete.Key key = new ValidationComplete.Key();
         key.setFacilityId(facilityId);
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
-        value.setValid(valid);
+        value.setValid(results.stream()
+                .flatMap(result -> result.getCategories().stream())
+                .allMatch(Category::isAcceptable));
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, key, value, headers));
