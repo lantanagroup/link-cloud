@@ -17,8 +17,7 @@
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
       <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly">
-      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-              (click)="clearFhirServerBaseUrl()">
+      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf="!viewOnly && fhirServerBaseUrlControl.hasError('required')">
@@ -37,7 +36,6 @@
       </mat-select>
     </mat-form-field>
   </div>
-
 
   <div *ngIf="!viewOnly">
     <mat-checkbox [formControl]="isAuthEnabledControl"  (change)="toggleAuthFields()">
