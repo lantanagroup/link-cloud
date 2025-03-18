@@ -41,6 +41,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     case Frequency.Daily:
                         reportableEvent = "EOD";
                         break;
+                    case Frequency.Adhoc:
+                        reportableEvent = "Adhoc";
+                        break;
                 }
 
                 var darValue = new DataAcquisitionRequestedValue()

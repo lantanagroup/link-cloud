@@ -14,7 +14,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
         [DataMember]
         public DateTimeOffset EndDate { get; set; }
         [DataMember]
-        public string ReportTrackingId { get; set; }
+        public string? ReportTrackingId { get; set; }
 
         public bool IsValid()
         {
