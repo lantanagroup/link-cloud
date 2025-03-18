@@ -80,6 +80,49 @@ public class QueryPlanConfigController : Controller
     }
 
     /// <summary>
+    /// Gets Query Plan Names for a given facilityId.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [HttpGet("QueryPlanNames")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> GetQueryPlanNames(
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                throw new BadRequestException("parameter facilityId is required.");
+            }
+
+            var result = await _queryPlanManager.GetPlanNamesAsync(facilityId, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (BadRequestException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (Exception ex)
+        {
+            var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", sanitizedFacilityId);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+
+    /// <summary>
     /// Creates a QueryPlanConfig for a facility
     /// </summary>
     /// <param name="facilityId"></param>

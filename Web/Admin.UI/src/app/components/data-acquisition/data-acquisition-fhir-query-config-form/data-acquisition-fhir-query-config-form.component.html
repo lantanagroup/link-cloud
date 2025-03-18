@@ -1,41 +1,40 @@
 <form [formGroup]="configForm" class="dialog-form">
-    <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Facility Id</mat-label>
-          <input matInput formControlName="facilityId" [readonly]="viewOnly">
-          <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="facilityIdControl.hasError('required')">
-            A facility id is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="viewOnly">
+      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearFacilityId()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="!viewOnly && facilityIdControl.hasError('required')">
+        A facility id is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
 
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Fhir Server Base Url</mat-label>
-          <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly">
-          <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="fhirServerBaseUrlControl.hasError('required')">
-            A fhir server base url is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Fhir Server Base Url</mat-label>
+      <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly">
+      <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFhirServerBaseUrl()">
+        <mat-icon>close</mat-icon>
+      </button>
+      <mat-error *ngIf="!viewOnly && fhirServerBaseUrlControl.hasError('required')">
+        A fhir server base url is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
 
-      <div class="form-input">
-        <mat-form-field appearance="outline" class="subject-input form-input ">
-          <mat-label>Query Plan IDs (comma seperated)</mat-label>
-          <input matInput formControlName="queryPlanIds" [readonly]="viewOnly">
-          <button *ngIf="queryPlanIdsControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearQueryPlanIds()">
-            <mat-icon>close</mat-icon>
-          </button>
-          <mat-error *ngIf="queryPlanIdsControl.hasError('required')">
-            A fhir server base url is <strong>required</strong>
-          </mat-error>
-        </mat-form-field>
-      </div>
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input">
+      <mat-label>Query Plan IDs (comma separated)</mat-label>
+      <mat-select formControlName="queryPlanIds" [disabled]="viewOnly" [compareWith]="comparePlanNames" multiple>
+        <mat-option [disabled]="viewOnly" *ngFor="let plan of planNames" [value]="plan">
+          {{plan}}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
 </form>
 

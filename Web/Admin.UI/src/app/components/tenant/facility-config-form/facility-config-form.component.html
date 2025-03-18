@@ -68,11 +68,11 @@
     </mat-form-field>
   </div>
 
-  <div *ngIf="reportsNotUniqueError && !viewOnly">
+  <div *ngIf="reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)">
     <small class="error">{{ reportsNotUniqueError }}</small>
   </div>
 
-  <div *ngIf="noReportsEntered && !viewOnly">
+  <div *ngIf="noReportsEntered && !viewOnly &&  (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)" >
     <small class="error">{{ noReportsEntered }}</small>
   </div>
 

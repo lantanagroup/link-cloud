@@ -60,6 +60,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// </summary>
         /// <example>Daily</example>
         public string Frequency { get; set;}
+
+        public string ReportTrackingId { get; set; } = string.Empty;
     }
 
     public class ReportScheduledKey
