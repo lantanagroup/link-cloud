@@ -1,8 +1,11 @@
 using System.Net;
+using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -19,12 +22,14 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
+        private readonly ScheduledReportFactory _scheduledReportFactory;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ScheduledReportFactory scheduledReportFactory)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
+            _scheduledReportFactory = scheduledReportFactory;
         }
 
         /// <summary>
@@ -115,6 +120,39 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 _logger.LogError(ex, "Exception in ReportController.GetReportScheduleSummary for facility '{FacilityId}' and report '{ReportId}'", HtmlInputSanitizer.SanitizeAndRemove(facilityId), HtmlInputSanitizer.Sanitize(reportScheduleId));
                 return Problem("An error occurred while retrieving the report schedule.", statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+        
+        /// <summary>
+        /// Returns a summary list item of a ReportSchedule based on the provided search criteria
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("summaries")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportListSummary))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ReportScheduleSummaryModel>> GetReportSummaryList()
+        {
+           //TODO: Add search criteria when requirements have been determined
+
+            try
+            {
+                var searchResults = await _database.ReportScheduledRepository.SearchAsync(
+                    x => true, 
+                    sortBy: "CreateDate",
+                    sortOrder: SortOrder.Descending, 
+                    pageSize: 10, pageNumber: 1, HttpContext.RequestAborted);
+                
+                var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
+
+                return Ok(new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2));
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportSummaryList");
+                return Problem("An error occurred while retrieving the report summary list.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
     }
