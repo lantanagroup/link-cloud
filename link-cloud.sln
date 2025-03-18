@@ -31,8 +31,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Account", "DotNet\Account\A
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuditTests", "DotNet\AuditTests\AuditTests.csproj", "{BFAF3F61-CEDC-4671-AEA3-5147440720B3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit.Specification", "DotNet\Audit.Specification\Audit.Specification.csproj", "{5E02424F-6A71-4EE1-89D7-59ADF421226A}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QueryDispatch", "DotNet\QueryDispatch\QueryDispatch.csproj", "{DC424202-1A59-436D-9849-A13925298109}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Submission", "DotNet\Submission\Submission.csproj", "{CD9F987F-E553-4050-AC48-C32B55D75C3F}"
@@ -152,10 +150,6 @@ Global
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.ActiveCfg = Release|Any CPU
