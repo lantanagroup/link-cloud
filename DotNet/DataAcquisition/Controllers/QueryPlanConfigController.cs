@@ -89,7 +89,7 @@ public class QueryPlanConfigController : Controller
     ///     Server Error: 500
     /// </returns>
     [HttpGet("QueryPlanNames")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(QueryPlan))]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -116,7 +116,7 @@ public class QueryPlanConfigController : Controller
         catch (Exception ex)
         {
             var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlan"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", sanitizedFacilityId);
+            _logger.LogError(new EventId(LoggingIds.GetItem, "GetQueryPlanNames"), ex, "An exception occurred while attempting to retrieve a query place with a facility id of {id}", sanitizedFacilityId);
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
