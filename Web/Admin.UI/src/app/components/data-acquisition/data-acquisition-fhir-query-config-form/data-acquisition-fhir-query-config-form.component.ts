@@ -62,6 +62,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
   planNames: string[] = [];
+  authTypes: string[] = ["Basic", "Epic", "None"];
 
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService) {
 
