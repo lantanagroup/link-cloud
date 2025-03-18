@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate)
+        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
         {
             if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
             {
