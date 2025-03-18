@@ -63,7 +63,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   planNames: string[] = [];
 
-
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -80,7 +79,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       userName: new FormControl(''),
       password: new FormControl('')
     });
-
   }
 
 
@@ -346,7 +344,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
     this.passwordControl.setValue('');
     this.passwordControl.updateValueAndValidity();
   }
-
 
   submitConfiguration(): void {
     if (this.configForm.valid) {

@@ -45,6 +45,5 @@ public static class KafkaProducerRegistration
         };
         var producer = new KafkaProducerFactory<string, EvaluationRequestedValue>(kafkaConnection).CreateProducer(config);
         services.AddSingleton(producer);
-
     }
 }
