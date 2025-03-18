@@ -103,7 +103,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.GenerateReportRequested)}' at {DateTime.UtcNow}");
+                _logger.LogInformation($"Started Genearate Report consumer for topic '{nameof(KafkaTopic.GenerateReportRequested)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
