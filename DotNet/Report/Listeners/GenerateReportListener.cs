@@ -235,7 +235,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     });
 
                                     //Submit a Data Acquisition Request for each patient
-                                    await _dataAcqProducer.Produce(reportSchedule);
+                                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
                                 }
                             }
                             catch (DeadLetterException ex)
