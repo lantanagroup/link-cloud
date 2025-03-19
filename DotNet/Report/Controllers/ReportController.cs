@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Net;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Core;
@@ -33,7 +34,7 @@ namespace LantanaGroup.Link.Report.Controllers
         }
 
         /// <summary>
-        /// Returns a serialized PatientSubmissionModel containing all of the Patient level resources and Other resources
+        /// Returns a serialized PatientSubmissionModel containing all the Patient level resources and Other resources
         /// for all measure reports for the provided FacilityId, PatientId, and Reporting Period.
         /// </summary>
         /// <param name="facilityId"></param>
@@ -122,27 +123,53 @@ namespace LantanaGroup.Link.Report.Controllers
                 return Problem("An error occurred while retrieving the report schedule.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
-        
+
         /// <summary>
         /// Returns a summary list item of a ReportSchedule based on the provided search criteria
         /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
         /// <returns></returns>
         [HttpGet("summaries")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportListSummary))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportScheduleSummaryModel>> GetReportSummaryList()
+        public async Task<ActionResult<ReportScheduleSummaryModel>> GetReportSummaryList(string? facilityId, int pageNumber = 1, int pageSize = 10)
         {
            //TODO: Add search criteria when requirements have been determined
 
+            if (pageNumber < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
+            
+            if (pageSize < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
+           
             try
             {
+                //create search predicates
+                //TODO: design way to dynamically build predicates or change search to use custom method
+                Expression<Func<ReportScheduleModel, bool>> predicate;
+                if (facilityId is null)
+                {
+                    predicate = r => true;
+                }
+                else
+                {
+                    
+                    predicate = r => r.FacilityId == facilityId;
+                }
+                
                 var searchResults = await _database.ReportScheduledRepository.SearchAsync(
-                    x => true, 
+                    predicate, 
                     sortBy: "CreateDate",
                     sortOrder: SortOrder.Descending, 
-                    pageSize: 10, pageNumber: 1, HttpContext.RequestAborted);
+                    pageSize: pageSize, pageNumber: pageNumber, HttpContext.RequestAborted);
                 
                 var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
 
