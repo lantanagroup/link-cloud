@@ -25,6 +25,8 @@ import java.util.Optional;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
   private final HandlerExceptionResolver handlerExceptionResolver;
   private final JwtService jwtService;
   private final AuthenticationConfig authenticationConfig;
@@ -47,6 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // Allow anonymous access to the hosted REST API
     if (this.authenticationConfig.isAnonymous()) {
+      logger.debug("Anonymous access is enabled");
       filterChain.doFilter(request, response);
       return;
     }

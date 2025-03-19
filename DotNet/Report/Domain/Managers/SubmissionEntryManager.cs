@@ -26,6 +26,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity,
             CancellationToken cancellationToken = default);
+
+        Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -36,6 +38,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public SubmissionEntryManager(IDatabase database)
         {
             _database = database;
+        }
+
+        public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
 
         public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)

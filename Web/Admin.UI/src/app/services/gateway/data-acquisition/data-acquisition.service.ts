@@ -1,16 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { environment } from 'src/environments/environment';
 import { ErrorHandlingService } from '../../error-handling.service';
-import { IDataAcquisitionFacilityModel, ITenantDataAcquisitionConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-config-model.interface';
 import { Observable, tap, map, catchError } from 'rxjs';
-import { ICensusConfiguration } from 'src/app/interfaces/census/census-config-model.interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
 import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
 import { IDataAcquisitionFhirListConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
 import { AppConfigService } from '../../app-config.service';
+
 
 @Injectable({
   providedIn: 'root'
@@ -64,6 +62,17 @@ export class DataAcquisitionService {
       )
   }
 
+  getQueryPlanNames(facilityId: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlanNames`)
+      .pipe(
+        tap(_ => console.log(`Fetched Query Plan Names.`)),
+        map((response: string[]) => {
+          return <string[]>response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
   createFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
       .pipe(
@@ -76,16 +85,16 @@ export class DataAcquisitionService {
   }
 
   //NOTE: currently no PUT endpoint for fhir list. Commenting this out for now.
-  //updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
-  //  return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`, fhirListConfig)
-  //    .pipe(
-  //      tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
-  //      map((response: IEntityCreatedResponse) => {
-  //        return response;
-  //      }),
-  //      catchError((error) => this.errorHandler.handleError(error))
-  //    )
-  //}
+  updateFhirListConfiguration(facilityId: string, fhirListConfig: IDataAcquisitionFhirListConfigModel): Observable<IEntityCreatedResponse> {
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/fhirQueryList`, fhirListConfig)
+      .pipe(
+        tap(_ => console.log(`Request for FHIR list configuration update was sent.`)),
+        map((response: IEntityCreatedResponse) => {
+          return response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
 
   deleteFhirListConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
@@ -125,11 +134,4 @@ export class DataAcquisitionService {
       )
   }
 
-deleteAuthenticationConfig(facilityId: string, queryConfigType: string): Observable<IEntityDeletedResponse> {
-  return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
-      .pipe(
-        tap(_ => console.log(`Request for authentication configuration deletion was sent.`)),
-        catchError((error) => this.errorHandler.handleError(error))
-      )
   }
-}

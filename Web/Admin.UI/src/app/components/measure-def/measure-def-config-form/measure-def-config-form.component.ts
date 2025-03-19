@@ -108,7 +108,7 @@ export class MeasureDefinitionFormComponent implements OnInit {
       console.log('Submitting form:', this.configForm.value);
 
       let createMeasureConfig: IMeasureDefinitionConfigModel = {
-        'bundleId': this.bundleId.value,
+        'id': this.bundleId.value,
         'bundle': this.bundle.value
       };
       this.measureDefinitionService.updateMeasureDefinitionConfiguration(createMeasureConfig).subscribe((response: IEntityCreatedResponse) => {

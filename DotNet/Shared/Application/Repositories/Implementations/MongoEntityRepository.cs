@@ -11,7 +11,6 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.InteropServices.Marshalling;
 
 namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
 
@@ -66,7 +65,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     {
         if (cancellationToken.IsCancellationRequested) return null;
 
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         try
         {
@@ -138,6 +137,11 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
 
         var result = (await _collection.FindAsync(_ => true, cancellationToken: cancellationToken)).ToList();
         return result;
+    }
+
+    public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _collection.CountDocumentsAsync<T>(predicate, cancellationToken: cancellationToken) > 0;
     }
 
     public virtual T Update(T entity)

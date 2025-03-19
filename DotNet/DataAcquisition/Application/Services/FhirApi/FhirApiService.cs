@@ -8,11 +8,11 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Net.Http.Headers;
@@ -74,6 +74,7 @@ public interface IFhirApiService
     Task<List> GetPatientList(
         string baseUrl,
         string listId,
+        string facilityId,
         AuthenticationConfiguration authConfig,
         CancellationToken cancellationToken = default);
 
@@ -269,7 +270,7 @@ public class FhirApiService : IFhirApiService
         return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString());
     }
 
-    public async Task<List> GetPatientList(string baseUrl, string listId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
+    public async Task<List> GetPatientList(string baseUrl, string listId, string facilityId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
     {
         var fhirClient = GenerateFhirClient(baseUrl);
 
@@ -279,7 +280,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        return (List)await ReadFhirEndpointAsync(fhirClient, nameof(List), listId);
+        return (List)await ReadFhirEndpointAsync(fhirClient, nameof(List), listId, facilityId: facilityId);
     }
 
     private async Task<(Bundle bundle, List<ResourceReference> ResourceReference)> SearchFhirEndpointAsync(
@@ -312,17 +313,16 @@ public class FhirApiService : IFhirApiService
 
             var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
 
-            if (correlationId != null && !string.IsNullOrWhiteSpace(facilityId))
+
+            await _fhirQueryManager.AddAsync(new FhirQuery
             {
-                await _fhirQueryManager.AddAsync(new FhirQuery
-                {
-                    ResourceType = resourceType,
-                    CorrelationId = correlationId,
-                    PatientId = patientId.SplitReference(),
-                    FacilityId = facilityId,
-                    SearchParams = JsonSerializer.Serialize(searchParams),
-                }, cancellationToken);
-            }
+                ResourceType = resourceType,
+                CorrelationId = correlationId,
+                PatientId = patientId.SplitReference(),
+                FacilityId = facilityId,
+                SearchParams = JsonSerializer.Serialize(searchParams),
+            }, cancellationToken);
+            
 
             if (resultBundle != null)
             {

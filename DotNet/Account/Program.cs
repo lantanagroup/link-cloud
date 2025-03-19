@@ -210,6 +210,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database")
+        .AddCheck<CacheHealthCheck>("Cache")
         .AddKafka(kafkaHealthOptions);
 
     // Add tenant API service

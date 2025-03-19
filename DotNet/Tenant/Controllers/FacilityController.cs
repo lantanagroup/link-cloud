@@ -337,15 +337,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 using var producer = _adHocKafkaProducerFactory.CreateProducer(producerConfig);
 
-                var headers = new Headers
-                {
-                    { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
-                };
-
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
-                    Headers = headers,
+                    Headers = new Headers(),
                     Value = new GenerateReportValue
                     {
                         StartDate = request.StartDate,
@@ -411,15 +406,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 using var producer = _adHocKafkaProducerFactory.CreateProducer(producerConfig);
 
-                var headers = new Headers
-                {
-                    { "X-Report-Tracking-Id", System.Text.Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
-                };
-
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = reportScheduleSummary.FacilityId,
-                    Headers = headers,
+                    Headers = new Headers(),
                     Value = new GenerateReportValue()
                     {
                         ReportId = reportScheduleSummary.ReportId,

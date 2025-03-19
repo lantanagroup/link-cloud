@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -98,32 +97,13 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new DeadLetterException("Invalid Report Scheduled event");
                                     }
 
-                                    string correlationId = string.Empty;
-                                    string reportTrackingId = string.Empty;
-
-                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                                    {
-                                        correlationId = Encoding.UTF8.GetString(headerValue);
-                                    }
-                                    else
-                                    {
-                                        throw new DeadLetterException("Correlation Id missing");
-                                    }
-
-                                    if (consumeResult.Message.Headers.TryGetLastBytes("X-Report-Tracking-Id", out headerValue))
-                                    {
-                                        reportTrackingId = Encoding.UTF8.GetString(headerValue);
-                                    }
-                                    else
-                                    {
-                                        throw new DeadLetterException("Report Tracking Id missing");
-                                    }
+                                    string reportTrackingId = value.ReportTrackingId;
 
                                     string key = consumeResult.Message.Key;
 
                                     var startDate = value.StartDate.UtcDateTime;
                                     var endDate = value.EndDate.UtcDateTime;
-                                    var frequency = value.Frequency.ToString();
+                                    var frequency = value.Frequency;
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 

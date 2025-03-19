@@ -8,6 +8,9 @@ using Microsoft.Extensions.Options;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -41,6 +44,24 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
+        }
+        
+        public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
+        {
+            // HTTP GET
+            try
+            {
+                var response = await _client.GetAsync($"health", cancellationToken);
+                var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
+                if (healthResult is not null) healthResult.Service = "Account";
+
+                return healthResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Account service health check failed");
+                return new LinkServiceHealthReport { Service = "Account", Status = HealthStatus.Unhealthy };
+            }
         }
 
         public async Task<HttpResponseMessage> GetAccountByEmail(string email, CancellationToken cancellationToken)

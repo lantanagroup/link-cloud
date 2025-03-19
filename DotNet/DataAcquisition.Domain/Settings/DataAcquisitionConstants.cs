@@ -34,7 +34,6 @@ public static class DataAcquisitionConstants
     public static class HeaderNames
     {
         public const string CorrelationId = "X-Correlation-Id";
-        public const string ReportId = "X-Report-Tracking-Id";
     }
 
     public static class ContentTypes

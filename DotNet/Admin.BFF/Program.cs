@@ -31,6 +31,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
@@ -124,7 +125,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
         builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     }
-
    
     builder.Services.AddTransient<KafkaConsumerManager>();
     builder.Services.AddTransient<KafkaConsumerService>();
@@ -352,6 +352,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
     });    
+    
+    // builder.Services.ConfigureHttpJsonOptions(options =>
+    // {
+    //     options.SerializerOptions.Converters.Add(new HealthStatusJsonConverter());
+    // });
 
     // Add YARP (reverse proxy)
     Log.Logger.Information("Registering YARP for the Link Admin API.");
@@ -424,6 +429,7 @@ static void SetupMiddleware(WebApplication app)
     }    
 
     // Map health check middleware
+    app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
