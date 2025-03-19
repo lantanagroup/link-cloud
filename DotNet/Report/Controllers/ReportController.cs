@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ReportScheduleSummaryModel>> GetReportSummaryList(string? facilityId, int pageNumber = 1, int pageSize = 10)
+        public async Task<ActionResult<PagedConfigModel<ScheduledReportListSummary>>> GetReportSummaryList(string? facilityId, int pageNumber = 1, int pageSize = 10)
         {
            //TODO: Add search criteria when requirements have been determined
 
