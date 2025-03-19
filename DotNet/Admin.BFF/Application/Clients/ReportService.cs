@@ -19,21 +19,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
-        private readonly IOptions<LinkTokenServiceSettings> _tokenServiceConfig;
         private readonly ICreateLinkBearerToken _createLinkBearerToken;
         
-        private readonly ClaimsPrincipal _systemPrincipal;
-
-        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IOptions<LinkTokenServiceSettings> tokenServiceConfig, ICreateLinkBearerToken createLinkBearerToken)
+        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreateLinkBearerToken createLinkBearerToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
-            _tokenServiceConfig = tokenServiceConfig ?? throw new ArgumentNullException(nameof(tokenServiceConfig));
             _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
 
-            _systemPrincipal = CreateSystemAccountPrincipal();
             InitHttpClient();
         }
 
@@ -63,56 +58,30 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
         }
         
-        public async Task<HttpResponseMessage> ReportSummaryList(string? facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken)
+        public async Task<HttpResponseMessage> ReportSummaryList(ClaimsPrincipal user, string? facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken)
         {
             // HTTP GET
-            try
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
+                //create a bearer token for the system account
                 if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
                 {
-                    //create a bearer token for the system account
-                    var bearerToken = await _createLinkBearerToken.ExecuteAsync(_systemPrincipal, 2);
-                    if (string.IsNullOrEmpty(bearerToken))
-                    {
-                        _logger.LogLinkAdminTokenGenerationException("Failed to create bearer token for user account retrieval");
-                        return null;
-                    }
-
-                    //add the bearer token to the request
-                    _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+                    var token = await _createLinkBearerToken.ExecuteAsync(user, 2);
+                    _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 }
-                
-                var queryStringBuilder = new StringBuilder("?");
-                if(facilityId is not null)
-                {
-                    queryStringBuilder.Append($"facilityId={facilityId}&");
-                }
+            }
             
-                queryStringBuilder.Append($"pageNumber={pageNumber}&pageSize={pageSize}");
-                
-                var response = await _client.GetAsync($"api/Report/summaries{queryStringBuilder}", cancellationToken);
-                
-                return response;
-            }
-            catch (Exception ex)
+            var queryStringBuilder = new StringBuilder("?");
+            if(facilityId is not null)
             {
-                _logger.LogError(ex, "Report service health check failed");
-                throw new Exception("Report summary list request failed");
+                queryStringBuilder.Append($"facilityId={facilityId}&");
             }
-        }
         
-        //TODO: centralize this along with the current implementation in account service client
-        private ClaimsPrincipal CreateSystemAccountPrincipal()
-        {
-            var claims = new List<Claim>
-            {
-                new(LinkAuthorizationConstants.LinkSystemClaims.Email, _tokenServiceConfig.Value.LinkAdminEmail ?? string.Empty),
-                new(LinkAuthorizationConstants.LinkSystemClaims.Subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount),
-                new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
-                new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.IsLinkAdmin))
-            };
-           
-            return new ClaimsPrincipal(new ClaimsIdentity(claims));
+            queryStringBuilder.Append($"pageNumber={pageNumber}&pageSize={pageSize}");
+            
+            var response = await _client.GetAsync($"api/Report/summaries{queryStringBuilder}", cancellationToken);
+            
+            return response;
         }
 
         private void InitHttpClient()

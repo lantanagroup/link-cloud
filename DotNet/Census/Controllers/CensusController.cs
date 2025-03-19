@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Census.Domain.Entities;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Models.Census;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -99,6 +100,46 @@ public class CensusController : Controller
         {
             _logger.LogError(ex, "Exception encountered in CensusController.GetAdmittedPatients");
             return Problem(detail: "An error occurred while retrieving facility admitted patients.", statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+    
+    /// <summary>
+    /// Gets the count of admitted and discharged patients for a facility within a date range. If no dates are provided, it will return all active patients.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CensusCount))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpGet("history/count")]
+    public async Task<ActionResult<CensusCount>> GetPatientsCount(string facilityId, DateTime startDate = default, DateTime endDate = default)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+        {
+            return BadRequest("Facility Id parameter is null or empty.");
+        }
+        
+        if(startDate > endDate)
+        {
+            return BadRequest("Start date cannot be greater than end date.");
+        }
+        
+        try
+        {
+            var patientCount = (await _patientListManager.GetCensusCount(facilityId, startDate, endDate));
+
+            return Ok(patientCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusController.GetPatientsCount");
+            return Problem(detail: "An error occurred while retrieving facility patients count.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 

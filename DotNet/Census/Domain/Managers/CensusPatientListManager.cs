@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -13,6 +14,8 @@ public interface ICensusPatientListManager
 
     Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate);
 
+    Task<CensusCount> GetCensusCount(string facilityId, DateTime? startDate, DateTime? endDate, CancellationToken cancellationToken = default);
+    
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
@@ -20,6 +23,7 @@ public interface ICensusPatientListManager
 
     Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
         CancellationToken cancellationToken = default);
+    
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
@@ -72,6 +76,29 @@ public class CensusPatientListManager : ICensusPatientListManager
         {
             return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId)).DistinctBy(p => p.PatientId).ToList();
         }
+    }
+
+    public async Task<CensusCount> GetCensusCount(string facilityId, DateTime? startDate, DateTime? endDate,
+        CancellationToken cancellationToken = default)
+    {
+        List<CensusPatientListEntity> patients;
+        
+        if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
+        {
+            patients = (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate >= startDate && c.AdmitDate <= endDate, cancellationToken)).DistinctBy(p => p.PatientId).ToList();
+        }
+        else
+        {
+            patients = (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId, cancellationToken)).DistinctBy(p => p.PatientId).ToList();
+        }
+        
+        var censusCount = new CensusCount
+        {
+            AdmittedPatients = patients.Count(x => !x.IsDischarged),
+            DischargedPatients = patients.Count(x => x.IsDischarged)
+        };
+
+        return censusCount;
     }
 
     public async Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default)
