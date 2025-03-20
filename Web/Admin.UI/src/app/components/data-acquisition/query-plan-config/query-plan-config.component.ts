@@ -107,8 +107,6 @@ export class QueryPlanConfigFormComponent {
     this.planForm.reset();
 
     if (this.item) {
-      console.log("DataAcquisitionFhirListConfigFormComponent ngOnInit");
-      console.log(this.item);
       //set form values
       this.planNameControl.setValue(this.item.PlanName);
       this.planNameControl.updateValueAndValidity();
@@ -142,8 +140,6 @@ export class QueryPlanConfigFormComponent {
 
   ngOnChanges(changes: SimpleChanges) {
 
-    console.log("DataAcquisitionFhirListConfigFormComponent ngOnChanges");
-    console.log(changes);
     if (changes['item'] && changes['item'].currentValue) {
 
       this.planNameControl.setValue(this.item.PlanName);

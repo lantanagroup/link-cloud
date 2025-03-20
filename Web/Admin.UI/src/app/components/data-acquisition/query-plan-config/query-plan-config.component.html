@@ -77,7 +77,7 @@
       <mat-error *ngIf=" !viewOnly && supplementalQueriesControl.hasError('required')">
         Supplemental Queries string is required <strong>required</strong>
       </mat-error>
-      <mat-error *ngIf="!viewOnly && initialQueriesControl.hasError('invalidJson')">
+      <mat-error *ngIf="!viewOnly && supplementalQueriesControl.hasError('invalidJson')">
         ❌ Invalid JSON format.
       </mat-error>
     </mat-form-field>
