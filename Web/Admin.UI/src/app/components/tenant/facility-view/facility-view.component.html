@@ -3,36 +3,60 @@
 <mat-card appearance="outlined">
   <mat-card-content>
     <p><strong>Facility Id:</strong> {{facilityId}}</p>
-    <p><strong>NHSN Org Id:</strong> {{nhsnOrgId}}</p>
   </mat-card-content>
 </mat-card>
 
 <h3>Reports</h3>
-<div class="report-table-container">
-  <table mat-table [dataSource]="reports">
+<mat-card>
+  <div class="table-container" *ngIf="reportListSummary.length > 0">
+    <table mat-table [dataSource]="reportListSummary">
+  
+      <!-- Report ID Column -->
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef> Report ID </th>
+        <td mat-cell *matCellDef="let report">
+          <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a>
+        </td>
+      </ng-container>
+  
+      <!-- Reporting Period Column -->
+      <ng-container matColumnDef="period">
+        <th mat-header-cell *matHeaderCellDef> Reporting Period </th>
+        <td mat-cell *matCellDef="let report"> {{report.reportStartDate | date}} - {{report.reportEndDate | date}} </td>
+      </ng-container>
+  
+      <!-- Query Plan Column -->
+      <ng-container matColumnDef="plan">
+        <th mat-header-cell *matHeaderCellDef> Query Plan </th>
+        <td mat-cell *matCellDef="let report"> TODO </td>
+      </ng-container>
+  
+      <!-- Reporting Cadence Column -->
+      <ng-container matColumnDef="cadence">
+        <th mat-header-cell *matHeaderCellDef> Reporting Cadence </th>
+        <td mat-cell *matCellDef="let report"> {{report.frequency}} </td>
+      </ng-container>
+  
+      <!-- Measures Column -->
+      <ng-container matColumnDef="measures">
+        <th mat-header-cell *matHeaderCellDef> Measures </th>
+        <td mat-cell *matCellDef="let report"> {{report.reportTypes}} </td>
+      </ng-container>
+  
+      <ng-container matColumnDef="census">
+        <th mat-header-cell *matHeaderCellDef> Patients in Census </th>
+        <td mat-cell *matCellDef="let report"> {{report.censusCount?.totalPatients}} </td>
+      </ng-container>
+  
+      <ng-container matColumnDef="ip">
+        <th mat-header-cell *matHeaderCellDef> Patients in IP </th>
+        <td mat-cell *matCellDef="let report"> {{report.initialPopulationCount}} </td>
+      </ng-container>
+  
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  
+    </table>
+  </div>
+</mat-card>
 
-    <!-- Report ID Column -->
-    <ng-container matColumnDef="reportId">
-      <th mat-header-cell *matHeaderCellDef> Report ID </th>
-      <td mat-cell *matCellDef="let report">
-        <a [routerLink]="['/tenant/facility', facilityId, 'report', report.reportId]">{{report.reportId}}</a>
-      </td>
-    </ng-container>
-
-    <!-- Reporting Period Column -->
-    <ng-container matColumnDef="reportingPeriod">
-      <th mat-header-cell *matHeaderCellDef> Reporting Period </th>
-      <td mat-cell *matCellDef="let report"> {{report.reportingPeriod}} </td>
-    </ng-container>
-
-    <!-- Measures Column -->
-    <ng-container matColumnDef="measures">
-      <th mat-header-cell *matHeaderCellDef> Measures </th>
-      <td mat-cell *matCellDef="let report"> {{report.measures}} </td>
-    </ng-container>
-
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-  </table>
-</div>
