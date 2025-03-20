@@ -14,9 +14,15 @@ export class FacilityViewService {
 
 
    getReportSummaryList(facilityId: string, pageNumber: number, pageSize: number): Observable<IPagedReportListSummary> {
-      return this.http.get<IPagedReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries?facilityId=${facilityId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
+    
+    //javascript based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+    
+    return this.http.get<IPagedReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/aggregate/reports/summaries?facilityId=${facilityId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
         .pipe(
             map((response: IPagedReportListSummary) => {
+                //revert back to zero based paging
+                response.metadata.pageNumber--;
                 return response;
             }),
             catchError(this.handleError.bind(this))

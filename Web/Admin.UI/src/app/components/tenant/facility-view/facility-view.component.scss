@@ -1,0 +1,41 @@
+@use '../../../../styles/core.scss';
+
+$primary: #398eb4;
+
+.table-container {
+    border: solid 1px rgba(0, 0, 0, 0.12);
+    margin-top: 1em;
+}
+
+.report-type-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin-left: 0;
+}
+
+.monthly-chip {
+    background-color: #00877E; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.weekly-chip {
+    background-color: #870023; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.daily-chip {
+    background-color: #003B87; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}

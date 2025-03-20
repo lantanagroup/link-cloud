@@ -1,4 +1,5 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
+import { Location } from '@angular/common';
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {ActivatedRoute, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
@@ -8,17 +9,23 @@ import { FacilityViewService } from './facility-view.service';
 import { IPagedReportListSummary, IReportListSummary } from './report-list-summary.interface';
 import { CommonModule } from '@angular/common';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatIconModule } from '@angular/material/icon';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 @Component({
   selector: 'app-facility-view',
   imports: [
     CommonModule,
+    MatToolbarModule,
+    MatIconModule,
     MatTableModule,
+    MatPaginatorModule,
     RouterLink,
     MatCardModule
   ],
   templateUrl: './facility-view.component.html',
-  styleUrl: './facility-view.component.css'
+  styleUrl: './facility-view.component.scss'
 })
 export class FacilityViewComponent implements OnInit {
   dataSource!: MatTableDataSource<IReportListSummary>;
@@ -26,13 +33,15 @@ export class FacilityViewComponent implements OnInit {
 
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
+  scheduledReports: { cadence: string; measures: string[] }[] = []; // Array to hold scheduled reports
  
-  defaultPageNumber: number = 1;
+  defaultPageNumber: number = 0
   defaultPageSize: number = 10;
   reportListSummary: IReportListSummary[] = [];  
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
   constructor(
+    private location: Location,
     private route: ActivatedRoute, 
     private tenantService: TenantService,
     private facilityViewService: FacilityViewService) { }  
@@ -50,6 +59,12 @@ export class FacilityViewComponent implements OnInit {
    loadFacilityConfig(): void {
       this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
         this.facilityConfig = data;
+
+        this.scheduledReports = [
+          { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+          { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+          { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+        ]
       });
     }
 
@@ -64,12 +79,21 @@ export class FacilityViewComponent implements OnInit {
         error: (error) => {
           console.error('Error fetching facility report summaries:', error);
         }
-      });   
-             
+      });                
     }
 
-    onRefresh(pageNumber: number, pageSize: number): void {
-      this.loadReportSummaryList(this.paginationMetadata.pageNumber, this.paginationMetadata.pageSize);
+    pagedEvent(event: PageEvent) {
+      this.paginationMetadata.pageSize = event.pageSize;
+      this.paginationMetadata.pageNumber = event.pageIndex;
+      this.loadReportSummaryList(event.pageIndex, event.pageSize);
+    }
+
+    onRefresh(): void {
+      this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
+    }
+
+    navBack(): void {
+      this.location.back();
     }
 
 }
