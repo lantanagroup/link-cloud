@@ -119,6 +119,16 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   ngOnChanges(changes: SimpleChanges) {
 
+    this.measureDefinitionConfigurationService.getMeasureDefinitionConfigurations().subscribe(
+      {
+        next: (response) => {
+          this.reportTypes = response.map(model => model.id);
+        },
+        error: (err) => {
+          this.submittedConfiguration.emit({id: '', message: err.message});
+        }
+      });
+
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
