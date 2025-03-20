@@ -380,14 +380,14 @@ export class FacilityEditComponent implements OnInit {
     if (!this.dataAcqFhirQueryConfig) {
       this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId).subscribe((data: IQueryPlanModel) => {
         this.dataAcqQueryPlanConfig = data;
-        if (this.dataAcqFhirQueryConfig) {
+        if (this.dataAcqQueryPlanConfig) {
           this.showNoDataAcqQueryPlanConfigAlert = false;
         } else {
           this.showNoDataAcqQueryPlanConfigAlert = true;
         }
       }, error => {
         if (error.status == 404) {
-          this.snackBar.open(`No current FHIR query configuration found for facility ${this.facilityId}, please create one.`, '', {
+          this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId}, please create one.`, '', {
             duration: 3500,
             panelClass: 'info-snackbar',
             horizontalPosition: 'end',
@@ -405,7 +405,7 @@ export class FacilityEditComponent implements OnInit {
           this.showNoDataAcqQueryPlanConfigAlert = true;
           //this.showDataAcqFhirQueryDialog();
         } else {
-          this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
+          this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
             duration: 3500,
             panelClass: 'error-snackbar',
             horizontalPosition: 'end',
