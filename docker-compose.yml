@@ -38,7 +38,7 @@ services:
     restart: always
     ports:
       - '6379:6379'
-    container_name: redis
+    container_name: redis_cache
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
     volumes: 
       - redis_cache:/data
@@ -427,6 +427,7 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Redis__Password: ${REDIS_PASS}
       ConnectionStrings__Redis: redis_cache:6379
       Cache__Type: Redis
       EnableIntegrationFeature: true
@@ -465,9 +466,9 @@ services:
       ReverseProxy__Routes__route6__ClusterId: NormalizationService
       ReverseProxy__Routes__route6__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route6__Match__Path: api/normalization/{**catch-all}
-      #ReverseProxy__Routes__route7__ClusterId: NotificationService
-      #ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
-      #ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
+      ReverseProxy__Routes__route7__ClusterId: NotificationService
+      ReverseProxy__Routes__route7__AuthorizationPolicy: AuthenticatedUser
+      ReverseProxy__Routes__route7__Match__Path: api/notification/{**catch-all}
       ReverseProxy__Routes__route8__ClusterId: ReportService
       ReverseProxy__Routes__route8__AuthorizationPolicy: AuthenticatedUser
       ReverseProxy__Routes__route8__Match__Path: api/report/{**catch-all}
@@ -486,7 +487,7 @@ services:
       ReverseProxy__Clusters__DataAcquisitionService__Destinations__destination1__Address: http://dataacquisition:8065
       ReverseProxy__Clusters__MeasureEvaluationService__Destinations__destination1__Address: http://measureeval:8067
       ReverseProxy__Clusters__NormalizationService__Destinations__destination1__Address: http://normalization:8068
-      #ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
+      ReverseProxy__Clusters__NotificationService__Destinations__destination1__Address: http://notification:8069
       ReverseProxy__Clusters__ReportService__Destinations__destination1__Address: http://report:8072
       ReverseProxy__Clusters__TenantService__Destinations__destination1__Address: http://tenant:8074
       ReverseProxy__Clusters__QueryDispatchService__Destinations__destination1__Address: http://querydispatch:8071
@@ -501,8 +502,6 @@ services:
     networks:
       - link-nw
     depends_on:
-      kafka_init:
-        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       redis_cache:
@@ -526,7 +525,7 @@ services:
       tenant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8065/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
   
   census:
     image: link-census
