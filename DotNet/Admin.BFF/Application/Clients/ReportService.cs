@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {            
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
+            var response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }

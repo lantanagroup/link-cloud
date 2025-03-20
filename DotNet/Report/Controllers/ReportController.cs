@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
@@ -24,13 +25,15 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
         private readonly ScheduledReportFactory _scheduledReportFactory;
+        private readonly ISubmissionEntryManager _submissionEntryManager;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ScheduledReportFactory scheduledReportFactory)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ScheduledReportFactory scheduledReportFactory, ISubmissionEntryManager submissionEntryManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
             _scheduledReportFactory = scheduledReportFactory;
+            _submissionEntryManager = submissionEntryManager;
         }
 
         /// <summary>
@@ -152,7 +155,7 @@ namespace LantanaGroup.Link.Report.Controllers
            
             try
             {
-                //create search predicates
+                // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
                 Expression<Func<ReportScheduleModel, bool>> predicate;
                 if (facilityId is null)
@@ -172,6 +175,14 @@ namespace LantanaGroup.Link.Report.Controllers
                     pageSize: pageSize, pageNumber: pageNumber, HttpContext.RequestAborted);
                 
                 var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
+
+                // Get total IP count for reports in list
+                foreach (var summary in summaries)
+                {
+                    summary.InitialPopulationCount =
+                        await _submissionEntryManager.GetReportInitialPopulationCount(summary.Id,
+                            HttpContext.RequestAborted);
+                }
 
                 return Ok(new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2));
 

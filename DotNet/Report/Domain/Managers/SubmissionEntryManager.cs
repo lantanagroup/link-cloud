@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Report.Entities;
 using System.Linq.Expressions;
+using LantanaGroup.Link.Report.Domain.Enums;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -28,6 +29,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             CancellationToken cancellationToken = default);
 
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
+
+        Task<int> GetReportInitialPopulationCount(string reportId, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -43,6 +46,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
+        }
+
+        public async Task<int> GetReportInitialPopulationCount(string reportId, CancellationToken cancellationToken = default)
+        {
+            var reportEntries = await _database.SubmissionEntryRepository
+                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+            
+            //TODO: Eventually may need to check validation results
+            var initialPopulationCount = reportEntries.Count(x => 
+                x.Status != PatientSubmissionStatus.PendingEvaluation && 
+                x.Status != PatientSubmissionStatus.NotReportable);
+
+            return initialPopulationCount;
         }
 
         public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
