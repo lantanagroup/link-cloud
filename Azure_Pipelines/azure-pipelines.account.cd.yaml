@@ -10,7 +10,6 @@ trigger:
     - dev
     - release/*
     - linkathon/*
-    - linkathon/*
   paths:
     include:
     - DotNet/Account/*
