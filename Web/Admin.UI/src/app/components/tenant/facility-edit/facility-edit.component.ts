@@ -421,7 +421,7 @@ export class FacilityEditComponent implements OnInit {
       this.dataAcquisitionService.getQueryPlanNames(this.facilityId).subscribe((data: string[]) => {
         this.dataAcqQueryPlanNames = data;
       }, error => {
-        this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
+        this.snackBar.open(`Failed to load FHIR query plan names for the facility, see error for details.`, '', {
           duration: 3500,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
