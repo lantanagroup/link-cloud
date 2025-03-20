@@ -417,7 +417,7 @@ export class FacilityEditComponent implements OnInit {
   }
 
   loadQueryPlanNames() {
-    if (!this.dataAcqFhirQueryConfig) {
+    if (!this.dataAcqQueryPlanNames || this.dataAcqQueryPlanNames.length === 0) {
       this.dataAcquisitionService.getQueryPlanNames(this.facilityId).subscribe((data: string[]) => {
         this.dataAcqQueryPlanNames = data;
       }, error => {
