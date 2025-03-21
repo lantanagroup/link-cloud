@@ -60,11 +60,11 @@ export class FacilityViewComponent implements OnInit {
       this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
         this.facilityConfig = data;
 
-        this.scheduledReports = [
+        this.scheduledReports = this.facilityConfig?.scheduledReports ? [
           { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
           { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
           { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-        ]
+        ] : []
       });
     }
 
