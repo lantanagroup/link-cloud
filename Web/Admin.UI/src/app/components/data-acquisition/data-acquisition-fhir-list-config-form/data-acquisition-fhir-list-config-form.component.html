@@ -2,7 +2,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [readonly]="viewOnly" placeholder="Facility Id">
+      <input matInput formControlName="facilityId" [disabled]="viewOnly" placeholder="Facility Id">
       <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
               (click)="clearFacilityId()">
         <mat-icon>close</mat-icon>
@@ -16,7 +16,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Fhir Server Base Url</mat-label>
-      <input matInput formControlName="fhirServerBaseUrl" [readonly]="viewOnly" placeholder="Fhir Server Base URL">
+      <input matInput formControlName="fhirServerBaseUrl" [disabled]="viewOnly" placeholder="Fhir Server Base URL">
       <button *ngIf="fhirServerBaseUrlControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
               (click)="clearFhirServerBaseUrl()">
         <mat-icon>close</mat-icon>
@@ -30,8 +30,8 @@
   <div formArrayName="patientListControl">
     <div *ngFor="let patientForm of patientListControl.controls; let i = index" [formGroup]="patientForm">
       <div class="form-input">
-        <mat-label>List IDs(Comma separated)*</mat-label>
         <mat-form-field appearance="outline" class="subject-input form-input">
+          <mat-label>List IDs(Comma separated)*</mat-label>
           <input matInput formControlName="listIds" [readonly]="viewOnly" placeholder="List Ids">
         </mat-form-field>
       </div>

@@ -119,8 +119,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   ngOnChanges(changes: SimpleChanges) {
 
-    console.log("DataAcquisitionFhirListConfigFormComponent ngOnChanges");
-    console.log(changes);
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
@@ -131,6 +129,21 @@ export class DataAcquisitionFhirListConfigFormComponent {
       this.loadPatientLists(this.item.ehrPatientLists);
       this.patientListControl.updateValueAndValidity();
 
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  // Dynamically disable or enable the form control based on viewOnly
+  toggleViewOnly(viewOnly: boolean) {
+    if (viewOnly) {
+      this.fhirServerBaseUrlControl.disable();
+      this.facilityIdControl.disable();
+      this.patientListControl.disable();
+    } else {
+      this.fhirServerBaseUrlControl.enable();
+      this.facilityIdControl.enable();
+      this.patientListControl.enable();
     }
   }
 

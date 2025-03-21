@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
@@ -20,55 +19,65 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule)
+        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null)
         {
-            var patientsToEvaluate = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
+            if (patientsToEvaluate == null || patientsToEvaluate.Count == 0)
+            {
+                patientsToEvaluate = (await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status == PatientSubmissionStatus.PendingEvaluation)).Select(x => x.PatientId).Distinct().ToList();
+            }
+
+            string reportableEvent = string.Empty;
+
+            switch (schedule.Frequency)
+            {
+                case Frequency.Monthly:
+                    reportableEvent = "EOM";
+                    break;
+                case Frequency.Weekly:
+                    reportableEvent = "EOW";
+                    break;
+                case Frequency.Daily:
+                    reportableEvent = "EOD";
+                    break;
+                case Frequency.Adhoc:
+                    reportableEvent = "Adhoc";
+                    break;
+            }
 
             foreach (string patientId in patientsToEvaluate)
             {
                 var darKey = schedule.FacilityId;
-
-                string reportableEvent = string.Empty;
-
-                switch (schedule.Frequency)
-                {
-                    case Frequency.Monthly:
-                        reportableEvent = "EOM";
-                        break;
-                    case Frequency.Weekly:
-                        reportableEvent = "EOW";
-                        break;
-                    case Frequency.Daily:
-                        reportableEvent = "EOD";
-                        break;
-                }
-
                 var darValue = new DataAcquisitionRequestedValue()
                 {
                     PatientId = patientId,
                     ReportableEvent = reportableEvent,
                     ScheduledReports = new List<ScheduledReport>()
-                                {
-                                    new ()
-                                    {
-                                        ReportTrackingId = schedule.Id!,
-                                        StartDate = schedule.ReportStartDate,
-                                        EndDate = schedule.ReportEndDate,
-                                        Frequency = schedule.Frequency,
-                                        ReportTypes = schedule.ReportTypes
-                                    }
-                                },
+                    {
+                        new ()
+                        {
+                            ReportTrackingId = schedule.Id!,
+                            StartDate = schedule.ReportStartDate,
+                            EndDate = schedule.ReportEndDate,
+                            Frequency = schedule.Frequency,
+                            ReportTypes = schedule.ReportTypes
+                        }
+                    },
                     QueryType = QueryType.Initial.ToString(),
                 };
 
                 var headers = new Headers
-                            {
-                                { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
-                            };
+                {
+                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                };
 
-                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested),
-                    new Message<string, DataAcquisitionRequestedValue>
-                    { Key = darKey, Value = darValue, Headers = headers });
+                _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), 
+                    new Message<string, DataAcquisitionRequestedValue> 
+                    { 
+                        Key = darKey, 
+                        Value = darValue, 
+                        Headers = headers 
+                    });
+
                 _dataAcqProducer.Flush();
             }
 

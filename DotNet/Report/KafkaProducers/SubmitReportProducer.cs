@@ -26,12 +26,18 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task<bool> Produce(ReportScheduleModel schedule)
         {
-            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            if(schedule.SubmitReportDateTime.HasValue)
+            {
+                return false;
+            }
+
+            var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
+
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null).ToList();
 
-            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).ToList();
+            var patientIds = submissionEntries.Where(s => s.Status == PatientSubmissionStatus.ValidationComplete).Select(s => s.PatientId).Distinct().ToList();
 
             var organization = FhirHelperMethods.CreateOrganization(schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
                                                                     ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);

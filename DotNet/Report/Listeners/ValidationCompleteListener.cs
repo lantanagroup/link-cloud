@@ -20,9 +20,7 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ValidationCompleteListener> _logger;
-        private readonly IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> _kafkaConsumerFactory;
-       
-        private readonly IProducer<SubmitReportKey, SubmitReportValue> _submissionReportProducer;
+        private readonly IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> _kafkaConsumerFactory;      
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
@@ -39,14 +37,14 @@ namespace LantanaGroup.Link.Report.Listeners
             ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitReportProducer submitReportProducer,
-            IServiceScopeFactory serviceScopeFactory, 
-            IProducer<SubmitReportKey, SubmitReportValue> submissionReportProducer)
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _submitReportProducer = submitReportProducer;
 
             _serviceScopeFactory = serviceScopeFactory;
+            _submitReportProducer = submitReportProducer;
 
             _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentException(nameof(deadLetterExceptionHandler));
@@ -56,7 +54,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
             _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ValidationComplete) + "-Error";
-            _submissionReportProducer = submissionReportProducer;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,7 +78,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
-                _logger.LogInformation($"Started resource evaluated consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
+                _logger.LogInformation($"Started validation complete consumer for topic '{nameof(KafkaTopic.ValidationComplete)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -113,7 +110,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (schedule == null)
                                 {
                                     throw new DeadLetterException(
-                                        $"No ReportSchedule found for ID {result.Message.Key.ReportId}");
+                                        $"No ReportSchedule found for ID {reportId}");
                                 }
 
                                 var submissionEntries =

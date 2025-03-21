@@ -3,11 +3,11 @@ using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -40,8 +40,9 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ICreateSystemToken _createSystemToken;
 
-        private readonly IProducer<string, DataAcquisitionRequestedValue> _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
+
+        private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
 
         private string Name => this.GetType().Name;
 
@@ -54,7 +55,7 @@ namespace LantanaGroup.Link.Report.Listeners
             IOptions<LinkTokenServiceSettings> linkTokenService,
             ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
-            IProducer<string, DataAcquisitionRequestedValue> dataAcqProducer,
+            DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -101,7 +102,7 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.GenerateReportRequested));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.GenerateReportRequested)}' at {DateTime.UtcNow}");
+                _logger.LogInformation($"Started Genearate Report consumer for topic '{nameof(KafkaTopic.GenerateReportRequested)}' at {DateTime.UtcNow}");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -130,19 +131,11 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 facilityId = key;
 
-
                                 if (string.IsNullOrWhiteSpace(facilityId))
                                 {
                                     throw new DeadLetterException(
                                         $"{Name}: FacilityId is null or empty.");
                                 }
-
-                                result.Message.Headers.TryGetLastBytes("X-Report-Tracking-Id", out var headerValue);
-                                if (headerValue == null)
-                                {
-                                    throw new DeadLetterException("Header 'X-Report-Tracking-Id' not found in message headers.");
-                                }
-                                var newReportId = System.Text.Encoding.UTF8.GetString(headerValue);
 
                                 //If we are re-running an existing report, fetch the details from the database and replace the Values retrieved from the message
                                 if (value.ReportId != null)
@@ -174,13 +167,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                     {
                                         throw new DeadLetterException("End date must be after start date.");
                                     }
-
                                 }
 
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = newReportId,
+                                    Id = Guid.NewGuid().ToString(),
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
@@ -208,10 +200,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 PreviousReportId = value.ReportId,
                                                 PatientId = p,
+                                                ReportTrackingId = reportSchedule.Id
                                             },
                                             Headers = new Headers
                                             {
-                                                { "X-Report-Tracking-Id", Encoding.ASCII.GetBytes(newReportId) },
                                                 { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
                                             }
                                         });
@@ -234,39 +226,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                             {
                                                 PatientId = patient,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
-                                                ReportScheduleId = newReportId,
+                                                ReportScheduleId = reportSchedule.Id,
                                                 FacilityId = facilityId,
                                                 ReportType = reportType,
                                             }, cancellationToken);
                                         }
-
-                                        //Submit a Data Acquisition Request for each patient
-                                        var darValue = new DataAcquisitionRequestedValue()
-                                        {
-                                            PatientId = patient,
-                                            ReportableEvent = "AdHoc",
-                                            ScheduledReports = new List<ScheduledReport>()
-                                            {
-                                                new ()
-                                                {
-                                                    StartDate = startDate.Value,
-                                                    EndDate = endDate.Value,
-                                                    Frequency = Frequency.Adhoc,
-                                                    ReportTypes = reportTypes
-                                                }
-                                            },
-                                            QueryType = QueryType.Initial.ToString(),
-                                        };
-
-                                        await _dataAcqProducer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
-                                        {
-                                            Key = facilityId,
-                                            Value = darValue,
-                                            Headers = result.Message.Headers
-                                        });
-
-                                        _dataAcqProducer.Flush(cancellationToken);
                                     });
+
+                                    //Submit a Data Acquisition Request for each patient
+                                    await _dataAcqProducer.Produce(reportSchedule, value.PatientIds);
                                 }
                             }
                             catch (DeadLetterException ex)

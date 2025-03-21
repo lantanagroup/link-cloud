@@ -6,6 +6,9 @@ loki:
 server:
   port: 31820
 
+telemetry:
+  exporterEndpoint: http://localhost:55690
+
 springdoc:
   api-docs:
     enabled: false

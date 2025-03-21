@@ -129,7 +129,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
-    
+    builder.Services.AddTransient<IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue>, KafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue>>();
+
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Producers
@@ -140,6 +141,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ValidationCompleteKey, ValidationCompleteValue>, KafkaProducerFactory<ValidationCompleteKey, ValidationCompleteValue>>();
 
     // Add repositories
     builder.Services.AddTransient<IEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
@@ -235,6 +237,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<PatientIdsAcquiredListener>();
+    builder.Services.AddHostedService<ValidationCompleteListener>();
 
     builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
@@ -275,6 +278,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //DataAcquisitionRequested Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
+
+    //ValidationComplete Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>, DeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>, TransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>>();
 
     #endregion
 
