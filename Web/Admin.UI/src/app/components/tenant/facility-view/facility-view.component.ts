@@ -57,15 +57,20 @@ export class FacilityViewComponent implements OnInit {
   }
 
    loadFacilityConfig(): void {
-      this.tenantService.getFacilityConfiguration(this.facilityId).subscribe((data: IFacilityConfigModel) => {
-        this.facilityConfig = data;
+      this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
+          next: (response: IFacilityConfigModel) => {
+            this.facilityConfig = response;
 
-        this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-          { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-          { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-          { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-        ] : []
-      });
+            this.scheduledReports = this.facilityConfig?.scheduledReports ? [
+              { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+              { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+              { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+            ] : []
+          },
+          error: (error) => {
+            console.error('Error fetching facility configuration:', error);
+          }
+        });            
     }
 
     loadReportSummaryList(pageNumber: number, pageSize: number): void {
