@@ -87,8 +87,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 // Get census information for each report
                 summary.CensusCount = new CensusCount
                 {
-                    AdmittedPatients = reportEntries.Count(x => x.ReportScheduleId == summary.Id),
-                    DischargedPatients = reportEntries.Count(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation)
+                    AdmittedPatients = reportEntries.Where(x => x.ReportScheduleId == summary.Id).DistinctBy(x => x.PatientId).Count(),
+                    DischargedPatients = reportEntries.Where(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation).DistinctBy(x => x.PatientId).Count()
                 };
             }
             
