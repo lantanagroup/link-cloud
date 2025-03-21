@@ -229,6 +229,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 ReportScheduleId = reportSchedule.Id,
                                                 FacilityId = facilityId,
                                                 ReportType = reportType,
+                                                CreateDate = DateTime.UtcNow
                                             }, cancellationToken);
                                         }
                                     });
@@ -329,7 +330,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
             }
 
-            return admittedPatients?.Entry?.Select(p => p.Item.Reference).ToList() ?? new List<string>();
+            return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
