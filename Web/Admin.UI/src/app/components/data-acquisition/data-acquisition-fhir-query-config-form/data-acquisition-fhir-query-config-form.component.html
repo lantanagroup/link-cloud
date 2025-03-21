@@ -48,11 +48,11 @@
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input ">
         <mat-label>Auth Type</mat-label>
-        <input matInput formControlName="authType" [readonly]="viewOnly" placeholder="Authentication Type">
-        <button *ngIf="authTypeControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-                (click)="clearAuthType()">
-          <mat-icon>close</mat-icon>
-        </button>
+        <mat-select formControlName="authType" [disabled]="viewOnly" >
+          <mat-option [disabled]="viewOnly" *ngFor="let authType of authTypes" [value]="authType">
+            {{authType}}
+          </mat-option>
+        </mat-select>
         <mat-error *ngIf="authTypeControl.hasError('required')">
           Auth Type is <strong>required</strong>. Allowed values are Basic, Epic, and None.
         </mat-error>

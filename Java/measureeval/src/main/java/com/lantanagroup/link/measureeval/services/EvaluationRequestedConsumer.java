@@ -11,6 +11,7 @@ import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluation
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -62,15 +63,15 @@ public class EvaluationRequestedConsumer {
     }
 
     @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
-    public void consume(@Header(Headers.REPORT_TRACKING_ID) String reportTrackingID,
-                        @Header(Headers.CORRELATION_ID) String correlationId,
+    public void consume(@Header(Headers.CORRELATION_ID) String correlationId,
                         ConsumerRecord<String, EvaluationRequested> record) {
 
         Span currentSpan = Span.current();
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        Attributes attributes = Attributes.builder().put(stringKey("reportTrackingID"), reportTrackingID).build();
+        var reportTrackingId = record.value().getReportTrackingId();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_ID), reportTrackingId).build();
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
@@ -78,7 +79,7 @@ public class EvaluationRequestedConsumer {
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(patientReportStatus);
-            evaluateMeasures(reportTrackingID, correlationId, record.value(), patientReportStatus, bundle);
+            evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
         }
@@ -119,9 +120,9 @@ public class EvaluationRequestedConsumer {
     }
 
     private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-        Attributes attributes = Attributes.builder().put(stringKey("facilityId"), patientStatus.getFacilityId()).
-                    put(stringKey("patientId"), patientStatus.getPatientId()).
-                    put(stringKey("correlationId"), patientStatus.getCorrelationId()).build();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
+                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
+                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
             if (reportablePatient) {
                 measureEvalMetrics.IncrementPatientReportableCounter(attributes);
             } else {

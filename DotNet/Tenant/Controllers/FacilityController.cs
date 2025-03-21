@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using AutoMapper;
+﻿using AutoMapper;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -14,12 +13,10 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Quartz;
 using System.Diagnostics;
 using System.Net;
-using Microsoft.Extensions.Options;
-using System.Threading;
-using Microsoft.IdentityModel.Tokens;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
