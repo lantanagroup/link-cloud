@@ -32,6 +32,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             var submissionEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id && x.Status != PatientSubmissionStatus.NotReportable);
+
             var measureReports = submissionEntries
                         .Select(e => e.MeasureReport)
                         .Where(report => report != null).ToList();
