@@ -212,9 +212,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
-                                dtFormat = "yyyyMMddTHHmmss";
+                                dtFormat = "yyyyMMdd";
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}");
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}_{value.ReportTrackingId}");
 
                                 string fileName;
                                 string contents;

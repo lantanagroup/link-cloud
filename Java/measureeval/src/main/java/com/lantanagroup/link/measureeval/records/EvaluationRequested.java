@@ -8,4 +8,5 @@ import lombok.Setter;
 public class EvaluationRequested {
     private String PreviousReportId;
     private String PatientId;
+    private String ReportTrackingId;
 }
