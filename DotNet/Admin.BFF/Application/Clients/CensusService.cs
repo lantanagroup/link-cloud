@@ -55,22 +55,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 return new LinkServiceHealthReport { Service = "Census", Status = HealthStatus.Unhealthy };
             }
         }
-        
-        public async Task<HttpResponseMessage> GetCensusCount(ClaimsPrincipal user, string facilityId,
-            DateTime startDate = default, DateTime endDate = default, CancellationToken cancellationToken = default)
-        {
-            // HTTP GET
-            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-            {
-                var token = await _createLinkBearerToken.ExecuteAsync(user, 2);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            var queryString = $"?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}";
-            var response = await _client.GetAsync($"api/census/{facilityId}/history/count{queryString}", cancellationToken);
-
-            return response;
-        }
 
         private void InitHttpClient()
         {

@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -13,8 +12,6 @@ public interface ICensusPatientListManager
         CancellationToken cancellationToken = default);
 
     Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate);
-
-    Task<CensusCount> GetCensusCount(string facilityId, DateTime? startDate, DateTime? endDate, CancellationToken cancellationToken = default);
     
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
@@ -76,20 +73,6 @@ public class CensusPatientListManager : ICensusPatientListManager
         {
             return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId)).DistinctBy(p => p.PatientId).ToList();
         }
-    }
-
-    public async Task<CensusCount> GetCensusCount(string facilityId, DateTime? startDate, DateTime? endDate,
-        CancellationToken cancellationToken = default)
-    {
-        var patients = (await GetPatientList(facilityId, startDate, endDate)).ToList();
-        
-        var censusCount = new CensusCount
-        {
-            AdmittedPatients = patients.Count(x => !x.IsDischarged),
-            DischargedPatients = patients.Count(x => x.IsDischarged)
-        };
-
-        return censusCount;
     }
 
     public async Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default)

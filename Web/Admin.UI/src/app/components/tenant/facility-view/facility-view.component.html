@@ -89,7 +89,8 @@
                     [ngClass]="{
                         'monthly-chip': report.frequency === 'Monthly',
                         'weekly-chip': report.frequency === 'Weekly',
-                        'daily-chip': report.frequency === 'Daily'
+                        'daily-chip': report.frequency === 'Daily',
+                        'adhoc-chip': report.frequency === 'Adhoc'
                     }"
             >{{report.frequency}} 
             </mat-chip>
@@ -109,7 +110,7 @@
     
         <ng-container matColumnDef="census">
           <th mat-header-cell *matHeaderCellDef> Patients in Census </th>
-          <td mat-cell *matCellDef="let report"> {{report.censusCount?.totalPatients}} </td>
+          <td mat-cell *matCellDef="let report"> {{report.censusCount?.admittedPatients}} </td>
         </ng-container>
     
         <ng-container matColumnDef="ip">

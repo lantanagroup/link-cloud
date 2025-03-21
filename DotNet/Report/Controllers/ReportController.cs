@@ -1,12 +1,10 @@
 using System.Linq.Expressions;
 using System.Net;
-using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -24,15 +22,13 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly ILogger<ReportController> _logger;
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
-        private readonly ScheduledReportFactory _scheduledReportFactory;
         private readonly ISubmissionEntryManager _submissionEntryManager;
 
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ScheduledReportFactory scheduledReportFactory, ISubmissionEntryManager submissionEntryManager)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
-            _scheduledReportFactory = scheduledReportFactory;
             _submissionEntryManager = submissionEntryManager;
         }
 
@@ -168,27 +164,9 @@ namespace LantanaGroup.Link.Report.Controllers
                     predicate = r => r.FacilityId == facilityId;
                 }
                 
-                var searchResults = await _database.ReportScheduledRepository.SearchAsync(
-                    predicate, 
-                    sortBy: "CreateDate",
-                    sortOrder: SortOrder.Descending, 
-                    pageSize: pageSize, pageNumber: pageNumber, HttpContext.RequestAborted);
-                
-                var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
+                var summaries = await _submissionEntryManager.GetScheduledReportSummaries(predicate, pageSize, pageNumber);
 
-                // Get total IP count for reports in list
-                var populationCounts = await _submissionEntryManager
-                    .GetReportInitialPopulationCountBatch(summaries.Select(x => x.Id)
-                        .Distinct().ToList(), HttpContext.RequestAborted);
-                
-                foreach (var summary in summaries)
-                {
-                    if(!populationCounts.TryGetValue(summary.Id, out var count)) continue;
-                    
-                    summary.InitialPopulationCount = count;
-                }
-
-                return Ok(new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2));
+                return Ok(summaries);
 
             }
             catch (Exception ex)

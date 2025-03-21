@@ -4,5 +4,4 @@ public class CensusCount
 {
     public int AdmittedPatients { get; set; }
     public int DischargedPatients { get; set; }
-    public int TotalPatients => AdmittedPatients + DischargedPatients;
 }

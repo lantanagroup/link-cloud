@@ -1,6 +1,11 @@
 ﻿using LantanaGroup.Link.Report.Entities;
 using System.Linq.Expressions;
+using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Census;
+using LantanaGroup.Link.Shared.Application.Models.Report;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -30,57 +35,64 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
-        Task<int> GetReportInitialPopulationCount(string reportId, CancellationToken cancellationToken = default);
-        
-        Task<Dictionary<string, int>> GetReportInitialPopulationCountBatch(List<string> reportIds, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
+            Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber,
+            CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
     {
 
         private readonly IDatabase _database;
+        private readonly ScheduledReportFactory _scheduledReportFactory;
 
-        public SubmissionEntryManager(IDatabase database)
+        public SubmissionEntryManager(IDatabase database, ScheduledReportFactory scheduledReportFactory)
         {
             _database = database;
+            _scheduledReportFactory = scheduledReportFactory;
         }
 
         public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
-
-        public async Task<int> GetReportInitialPopulationCount(string reportId, CancellationToken cancellationToken = default)
+        
+        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
-            var reportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+            var searchResults = await _database.ReportScheduledRepository.SearchAsync(
+                predicate, 
+                sortBy: "CreateDate",
+                sortOrder: SortOrder.Descending, 
+                pageSize: pageSize, pageNumber: pageNumber, cancellationToken);
             
-            //TODO: Eventually may need to check validation results
-            var initialPopulationCount = reportEntries.Count(x => 
-                x.Status != PatientSubmissionStatus.PendingEvaluation && 
-                x.Status != PatientSubmissionStatus.NotReportable);
-
-            return initialPopulationCount;
-        }
-
-        public async Task<Dictionary<string, int>> GetReportInitialPopulationCountBatch(List<string> reportIds, CancellationToken cancellationToken = default)
-        {
+            var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
+            
+            // Get Census and IP information from individual measure report entries
+            var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
             var reportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => reportIds.Contains(x.ReportScheduleId), cancellationToken);
-            var populationCounts = new Dictionary<string, int>();
-            foreach (var reportId in reportIds)
+                .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken); 
+            
+            foreach (var summary in summaries)
             {
+                // Get the initial population count for each report
                 //TODO: Eventually may need to check validation results
-                if (!string.IsNullOrWhiteSpace(reportId))
-                    populationCounts.TryAdd(reportId,
+                if (!string.IsNullOrWhiteSpace(summary.Id))
+                    summary.InitialPopulationCount =
                         reportEntries.Count(
-                            x => x.ReportScheduleId == reportId &&
+                            x => x.ReportScheduleId == summary.Id &&
                                  x.Status != PatientSubmissionStatus.PendingEvaluation &&
                                  x.Status != PatientSubmissionStatus.NotReportable
-                        ));
+                        );
+                
+                // Get census information for each report
+                summary.CensusCount = new CensusCount
+                {
+                    AdmittedPatients = reportEntries.Count(x => x.ReportScheduleId == summary.Id),
+                    DischargedPatients = reportEntries.Count(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation)
+                };
             }
             
-            return populationCounts;
+            return new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2);
         }
 
         public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)

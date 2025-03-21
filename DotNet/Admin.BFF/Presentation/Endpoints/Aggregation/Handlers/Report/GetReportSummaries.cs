@@ -40,28 +40,7 @@ public static class GetReportSummaries
             
             var summaries = await response.Content.ReadFromJsonAsync<PagedConfigModel<ScheduledReportListSummary>>(cancellationToken: context.RequestAborted);
 
-            if (summaries is null) return Results.NotFound("No report summaries found.");
-            
-            //Get census count for each scheduled report from census service
-            foreach (var summary in summaries.Records)
-            {
-                var censusResponse = await censusService.GetCensusCount(context.User, summary.FacilityId,
-                    summary.ReportStartDate, summary.ReportEndDate, context.RequestAborted);
-                if (censusResponse.IsSuccessStatusCode)
-                {
-                    summary.CensusCount =
-                        await censusResponse.Content.ReadFromJsonAsync<CensusCount>(
-                            cancellationToken: context.RequestAborted);
-                }
-                else
-                {
-                    logger.LogWarning("Failed to retrieve census count for scheduled report {ReportId}, for facility {FacilityId}: Status code - {code}.",
-                        summary.Id, summary.FacilityId, censusResponse.StatusCode);
-                }
-            }
-
-            return Results.Ok(summaries);
-
+            return summaries is null ? Results.NotFound("No report summaries found.") : Results.Ok(summaries);
         }
         catch (Exception ex)
         {

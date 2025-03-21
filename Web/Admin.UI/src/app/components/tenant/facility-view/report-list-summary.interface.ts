@@ -18,7 +18,6 @@ export interface ICensusCount
 {
     admittedPatients: number;
     dischargedPatients: number;
-    totalPatients: number;
 }
 
 export class IPagedReportListSummary {
