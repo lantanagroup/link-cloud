@@ -119,19 +119,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                     throw new DeadLetterException($"{Name}: Received message without correlation ID: {result.Topic}");
                                 }
 
-                                if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                                    string.IsNullOrWhiteSpace(value.ReportType) ||
-                                    key.StartDate == DateTime.MinValue ||
-                                    key.EndDate == DateTime.MinValue)
+                                if (string.IsNullOrWhiteSpace(key.FacilityId) || string.IsNullOrEmpty(value.ReportTrackingId))
                                 {
                                     throw new DeadLetterException(
                                         $"{Name}: One or more required Key/Value properties are null, empty, or otherwise invalid.");
                                 }
 
                                 // find existing report scheduled for this facility, report type, and date range
-                                var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, key.StartDate, key.EndDate, value.ReportType, consumeCancellationToken) ??
-                                            throw new TransientException(
-                                                $"{Name}: report schedule not found for Facility {key.FacilityId} and reporting period of {key.StartDate} - {key.EndDate} for {value.ReportType}");
+                                var schedule = await measureReportScheduledManager.GetReportSchedule(key.FacilityId, value.ReportTrackingId, consumeCancellationToken) ??
+                                            throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
                                 var entry = await submissionEntryManager.SingleOrDefaultAsync(e =>

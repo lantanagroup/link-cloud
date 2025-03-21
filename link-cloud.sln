@@ -109,8 +109,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2
 		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{5A81D12E-D10B-4BA8-B030-74C786A41788}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
 	ProjectSection(SolutionItems) = preProject
 		.env = .env
@@ -235,7 +233,6 @@ Global
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
 		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
-		{5A81D12E-D10B-4BA8-B030-74C786A41788} = {0BA1C290-3881-4224-B231-BBC64740D229}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}
