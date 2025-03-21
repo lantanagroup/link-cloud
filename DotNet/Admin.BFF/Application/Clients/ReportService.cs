@@ -64,11 +64,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 //create a bearer token for the system account
-                if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-                {
-                    var token = await _createLinkBearerToken.ExecuteAsync(user, 2);
-                    _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                }
+                var token = await _createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             
             var queryStringBuilder = new StringBuilder("?");

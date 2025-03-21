@@ -31,6 +31,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
         Task<int> GetReportInitialPopulationCount(string reportId, CancellationToken cancellationToken = default);
+        
+        Task<Dictionary<string, int>> GetReportInitialPopulationCountBatch(List<string> reportIds, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -59,6 +61,26 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 x.Status != PatientSubmissionStatus.NotReportable);
 
             return initialPopulationCount;
+        }
+
+        public async Task<Dictionary<string, int>> GetReportInitialPopulationCountBatch(List<string> reportIds, CancellationToken cancellationToken = default)
+        {
+            var reportEntries = await _database.SubmissionEntryRepository
+                .FindAsync(x => reportIds.Contains(x.ReportScheduleId), cancellationToken);
+            var populationCounts = new Dictionary<string, int>();
+            foreach (var reportId in reportIds)
+            {
+                //TODO: Eventually may need to check validation results
+                if (!string.IsNullOrWhiteSpace(reportId))
+                    populationCounts.TryAdd(reportId,
+                        reportEntries.Count(
+                            x => x.ReportScheduleId == reportId &&
+                                 x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                                 x.Status != PatientSubmissionStatus.NotReportable
+                        ));
+            }
+            
+            return populationCounts;
         }
 
         public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)

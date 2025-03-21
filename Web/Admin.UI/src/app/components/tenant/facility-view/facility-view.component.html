@@ -49,13 +49,15 @@
     </span>
   </p>
 
-  <h3>Reports</h3>
-  <div *ngIf="reportListSummary.length > 0">
-    <div style="display: flex; justify-content: flex-end;">
+  <p>
+    <mat-toolbar class="page-header-bar page-secondary-bar">          
+      <span>Reports</span> 
       <button mat-mini-fab matTooltip="Refresh report list summary" (click)="onRefresh()">
         <mat-icon>refresh</mat-icon>
       </button>
-    </div>
+    </mat-toolbar>
+</p>
+  <div *ngIf="reportListSummary.length > 0">
     <div class="table-container">      
       <table mat-table [dataSource]="reportListSummary">
 

@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Han
 public static class GetReportSummaries
 {
     public static async Task<IResult> Handle(
+        ILoggerFactory loggerFactory,
         HttpContext context,
         ReportService reportService,
         CensusService censusService,
@@ -19,6 +20,7 @@ public static class GetReportSummaries
     {
         try
         {
+            var logger = loggerFactory.CreateLogger("GetReportSummaries");
             
             //TODO: add validation for facilityId
             
@@ -43,17 +45,19 @@ public static class GetReportSummaries
             //Get census count for each scheduled report from census service
             foreach (var summary in summaries.Records)
             {
-                var censusResponse =  await censusService.GetCensusCount(context.User, summary.FacilityId, summary.ReportStartDate, summary.ReportEndDate, context.RequestAborted);
-                if (!censusResponse.IsSuccessStatusCode)
-                    return censusResponse.StatusCode switch
-                    {
-                        HttpStatusCode.Unauthorized => Results.Unauthorized(),
-                        HttpStatusCode.Forbidden => Results.Forbid(),
-                        _ => Results.Problem("An error occurred while processing your request.",
-                            statusCode: (int)censusResponse.StatusCode)
-                    };
-                
-                summary.CensusCount = await censusResponse.Content.ReadFromJsonAsync<CensusCount>(cancellationToken: context.RequestAborted);
+                var censusResponse = await censusService.GetCensusCount(context.User, summary.FacilityId,
+                    summary.ReportStartDate, summary.ReportEndDate, context.RequestAborted);
+                if (censusResponse.IsSuccessStatusCode)
+                {
+                    summary.CensusCount =
+                        await censusResponse.Content.ReadFromJsonAsync<CensusCount>(
+                            cancellationToken: context.RequestAborted);
+                }
+                else
+                {
+                    logger.LogWarning("Failed to retrieve census count for scheduled report {ReportId}, for facility {FacilityId}: Status code - {code}.",
+                        summary.Id, summary.FacilityId, censusResponse.StatusCode);
+                }
             }
 
             return Results.Ok(summaries);

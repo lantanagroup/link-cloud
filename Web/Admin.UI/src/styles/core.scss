@@ -1,3 +1,5 @@
+$primary: #398eb4;
+
 .content {
   margin: 2em;
 }
@@ -5,6 +7,11 @@
 .page-header-bar span {
   font-size: 1.5em;
   font-weight: 300;
+}
+
+.page-secondary-bar {
+  background-color: #7D9099;
+  color: #FFF;
 }
 
 .page-header-bar button {

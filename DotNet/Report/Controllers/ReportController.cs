@@ -135,7 +135,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="pageSize"></param>
         /// <returns></returns>
         [HttpGet("summaries")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportListSummary))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ScheduledReportListSummary>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -177,11 +177,15 @@ namespace LantanaGroup.Link.Report.Controllers
                 var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
 
                 // Get total IP count for reports in list
+                var populationCounts = await _submissionEntryManager
+                    .GetReportInitialPopulationCountBatch(summaries.Select(x => x.Id)
+                        .Distinct().ToList(), HttpContext.RequestAborted);
+                
                 foreach (var summary in summaries)
                 {
-                    summary.InitialPopulationCount =
-                        await _submissionEntryManager.GetReportInitialPopulationCount(summary.Id,
-                            HttpContext.RequestAborted);
+                    if(!populationCounts.TryGetValue(summary.Id, out var count)) continue;
+                    
+                    summary.InitialPopulationCount = count;
                 }
 
                 return Ok(new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2));

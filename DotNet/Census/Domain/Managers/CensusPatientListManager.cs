@@ -81,16 +81,7 @@ public class CensusPatientListManager : ICensusPatientListManager
     public async Task<CensusCount> GetCensusCount(string facilityId, DateTime? startDate, DateTime? endDate,
         CancellationToken cancellationToken = default)
     {
-        List<CensusPatientListEntity> patients;
-        
-        if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
-        {
-            patients = (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate >= startDate && c.AdmitDate <= endDate, cancellationToken)).DistinctBy(p => p.PatientId).ToList();
-        }
-        else
-        {
-            patients = (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId, cancellationToken)).DistinctBy(p => p.PatientId).ToList();
-        }
+        var patients = (await GetPatientList(facilityId, startDate, endDate)).ToList();
         
         var censusCount = new CensusCount
         {
