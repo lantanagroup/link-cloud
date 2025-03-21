@@ -8,7 +8,7 @@ on:
 jobs:
       
   docker-build-and-run:
-    runs-on: Docker
+    runs-on: ['Docker']
 
     env:
       PROJECT_NAME: link
