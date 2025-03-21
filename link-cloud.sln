@@ -100,6 +100,27 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 		Azure_Pipelines\deploy_tags_all.yml = Azure_Pipelines\deploy_tags_all.yml
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{0BA1C290-3881-4224-B231-BBC64740D229}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2013B-29DF-4736-9B16-CB5655C0AB26}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\pr-title-check.yml = .github\workflows\pr-title-check.yml
+		.github\workflows\smoke-test.yaml = .github\workflows\smoke-test.yaml
+		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
+	ProjectSection(SolutionItems) = preProject
+		.env = .env
+		create-dbs.sql = create-dbs.sql
+		docker-compose.collector.yml = docker-compose.collector.yml
+		docker-compose.dcproj = docker-compose.dcproj
+		docker-compose.grafana.yml = docker-compose.grafana.yml
+		docker-compose.prometheus.yml = docker-compose.prometheus.yml
+		docker-compose.tempo.yml = docker-compose.tempo.yml
+		kafka-client.properties = kafka-client.properties
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -211,6 +232,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
+		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}
