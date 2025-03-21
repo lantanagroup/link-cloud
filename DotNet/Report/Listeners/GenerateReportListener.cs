@@ -217,7 +217,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                                    value.PatientIds.AsParallel().ForAll(async patient =>
+                                    value.PatientIds.Distinct().AsParallel().ForAll(async patient =>
                                     {
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
@@ -229,6 +229,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                 ReportScheduleId = reportSchedule.Id,
                                                 FacilityId = facilityId,
                                                 ReportType = reportType,
+                                                CreateDate = DateTime.UtcNow
                                             }, cancellationToken);
                                         }
                                     });
