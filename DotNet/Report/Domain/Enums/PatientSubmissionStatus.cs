@@ -2,8 +2,11 @@
 
 public enum PatientSubmissionStatus
 {
-    NotEvaluated = 1,
+    PendingEvaluation = 1,
     NotReportable = 2,
-    ReadyForSubmission = 3
+    ReadyForValidation = 3,
+    ValidationRequested = 4,
+    ValidationComplete = 5,
+    Submitted = 6
 }
 

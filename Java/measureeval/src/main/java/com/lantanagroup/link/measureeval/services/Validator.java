@@ -1,6 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 
 import java.util.ArrayList;
 import java.util.List;

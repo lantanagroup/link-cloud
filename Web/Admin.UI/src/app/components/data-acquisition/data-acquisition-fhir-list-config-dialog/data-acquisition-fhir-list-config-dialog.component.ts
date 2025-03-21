@@ -31,14 +31,14 @@ export class DataAcquisitionFhirListConfigDialogComponent {
 
   @ViewChild(DataAcquisitionFhirListConfigFormComponent) configForm!: DataAcquisitionFhirListConfigFormComponent;
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, config: IDataAcquisitionFhirListConfigModel },
+  constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, dataAcqFhirListConfig: IDataAcquisitionFhirListConfigModel },
     private dialogRef: MatDialogRef<DataAcquisitionFhirListConfigFormComponent>,
     private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
     this.dialogTitle = this.data.dialogTitle;
     this.viewOnly = this.data.viewOnly;
-    this.config = this.data.config;
+    this.config = this.data.dataAcqFhirListConfig;
     this.formMode = this.data.formMode;
   }
 

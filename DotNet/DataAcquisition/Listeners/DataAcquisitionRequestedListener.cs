@@ -32,6 +32,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
     {
         string facilityId;
         string correlationId;
+        string reportTrackingId;
 
         try
         {
@@ -64,7 +65,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         {
             ConsumeResult = consumeResult,
             FacilityId = facilityId,
-            CorrelationId = correlationId,
+            CorrelationId = correlationId
         }, cancellationToken);
     }
 
@@ -85,6 +86,7 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         return facilityId;
     }
 
+    
     protected override string ExtractCorrelationId(ConsumeResult<string, DataAcquisitionRequested> consumeResult)
     {
         var cIBytes = consumeResult.Headers

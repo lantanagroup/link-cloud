@@ -31,7 +31,9 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,7 +125,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
         builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     }
-
    
     builder.Services.AddTransient<KafkaConsumerManager>();
     builder.Services.AddTransient<KafkaConsumerService>();
@@ -145,7 +146,6 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ConnectionString = redisConnection;
             options.Password = builder.Configuration.GetValue<string>("Redis:Password");
 
-            options.Enabled = builder.Configuration.GetValue<string>("Cache:Type") == "Redis";
             if (builder.Configuration.GetValue<int>("Cache:Timeout") > 0)
             {
                 options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
@@ -255,7 +255,7 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddCheck<TenantServiceHealthCheck>("Tenant Service");
     }
 
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
         healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
     }
@@ -352,6 +352,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
     });    
+    
+    // builder.Services.ConfigureHttpJsonOptions(options =>
+    // {
+    //     options.SerializerOptions.Converters.Add(new HealthStatusJsonConverter());
+    // });
 
     // Add YARP (reverse proxy)
     Log.Logger.Information("Registering YARP for the Link Admin API.");
@@ -424,6 +429,7 @@ static void SetupMiddleware(WebApplication app)
     }    
 
     // Map health check middleware
+    app.MapGroup("/api/monitor").MapMonitorEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse

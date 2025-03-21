@@ -1,8 +1,8 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.kafka.Headers;
-import com.lantanagroup.link.measureeval.kafka.Topics;
-import com.lantanagroup.link.measureeval.models.NormalizationStatus;
+import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.measureeval.entities.NormalizationStatus;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourceAcquired;
 import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
@@ -23,22 +23,26 @@ public class ResourceAcquiredErrorConsumer extends AbstractResourceConsumer<Reso
     public ResourceAcquiredErrorConsumer(
             AbstractResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
-            MeasureEvaluatorCache measureEvaluatorCache,
             MeasureReportNormalizer measureReportNormalizer,
             Predicate<MeasureReport> reportabilityPredicate,
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             @Qualifier("compressedKafkaTemplate")
             KafkaTemplate<ResourceEvaluated.Key, ResourceEvaluated> resourceEvaluatedTemplate,
-            MeasureEvalMetrics measureEvalMetrics){
+            MeasureEvalMetrics measureEvalMetrics,
+            EvaluateMeasureService evaluateMeasureService,
+            PatientStatusBundler patientStatusBundler,
+            ResourceEvaluatedProducer resourceEvaluatedProducer){
         super(
                 resourceRepository,
                 patientStatusRepository,
-                measureEvaluatorCache,
                 measureReportNormalizer,
                 reportabilityPredicate,
                 dataAcquisitionRequestedTemplate,
                 resourceEvaluatedTemplate,
-                measureEvalMetrics);
+                measureEvalMetrics,
+                evaluateMeasureService,
+                patientStatusBundler,
+                resourceEvaluatedProducer);
     }
 
     @Override

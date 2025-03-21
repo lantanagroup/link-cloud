@@ -1,5 +1,5 @@
 
-  <input type="file" class="file-input" (change)="onFileSelected($event)" #fileUpload>
+  <input type="file" class="file-input"  (change)="onFileSelected($event)" #fileUpload>
 
   <div class="file-upload">
 
@@ -7,13 +7,13 @@
 
       <input matInput [disabled]="true" [value]="fileName">
 
-      <button *ngIf="file && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFile()">
+      <button *ngIf="file" matSuffix mat-icon-button aria-label="Clear" matTooltip="Clear the bundle" (click)="clearFile()">
         <mat-icon>close</mat-icon>
       </button>
 
     </mat-form-field>
 
-    <button mat-mini-fab color="primary" *ngIf="!viewOnly" class="upload-btn" (click)="onClick(fileUpload)" [disabled]="disabled" matTooltip="Upload a bundle definition in json format">
+    <button mat-mini-fab color="primary"  class="upload-btn" (click)="onClick(fileUpload)" [disabled]="disabled" matTooltip="Upload a measure definition bundle in json format">
       <mat-icon>attach_file</mat-icon>
     </button>
   </div>

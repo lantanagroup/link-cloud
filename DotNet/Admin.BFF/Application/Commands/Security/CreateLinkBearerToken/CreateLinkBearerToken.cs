@@ -2,11 +2,11 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.LinkAdmin.BFF.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Trace;
@@ -25,10 +25,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         private readonly IOptions<DataProtectionSettings> _dataProtectionSettings;
         private readonly IOptions<LinkTokenServiceSettings> _linkTokenServiceConfig;
         private readonly ILinkAdminMetrics _metrics;
-        private readonly IOptions<CacheSettings> _cacheSettings;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, ISecretManager secretManager, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics, IOptions<CacheSettings> cacheSettings, IServiceScopeFactory serviceScopeFactory)
+        private readonly ICacheService _cache;
+
+
+        public CreateLinkBearerToken(ILogger<CreateLinkBearerToken> logger, ISecretManager secretManager, ICacheService cache, IDataProtectionProvider dataProtectionProvider, IOptions<DataProtectionSettings> dataProtectionSettings, IOptions<LinkTokenServiceSettings> linkBearerServiceConfig, ILinkAdminMetrics metrics)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secretManager = secretManager ?? throw new ArgumentNullException(nameof(secretManager));
@@ -36,8 +37,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
             _dataProtectionSettings = dataProtectionSettings ?? throw new ArgumentNullException(nameof(dataProtectionSettings));
             _linkTokenServiceConfig = linkBearerServiceConfig ?? throw new ArgumentNullException(nameof(linkBearerServiceConfig));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-            _cacheSettings = cacheSettings ?? throw new ArgumentNullException(nameof(cacheSettings));
-            _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<string> ExecuteAsync(ClaimsPrincipal user, int timespan)
@@ -57,21 +57,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
                 if (_linkTokenServiceConfig.Value.SigningKey is null)
                 {
-                    //if no cache providers have been registered, get the signing key from the secret manager
-                    if (!_cacheSettings.Value.Enabled)
                     {
-                        bearerKey = await _secretManager.GetSecretAsync(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, CancellationToken.None);
-                        encodedKey = Encoding.UTF8.GetBytes(bearerKey);
-                    }
-                    else
-                    {
-                        using var scope = _serviceScopeFactory.CreateScope();
-                        var _cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
-
                         //attempt to get signing key from cache
                         try
                         {
-                            bearerKey = _cache.GetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
+                            bearerKey = _cache.Get<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName) ?? string.Empty;
                         }
                         catch (Exception ex)
                         {
@@ -88,11 +78,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
                             {
                                 if (_dataProtectionSettings.Value.Enabled)
                                 {
-                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey));
+                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, protector.Protect(bearerKey), TimeSpan.FromMinutes(5));
                                 }
                                 else
                                 {
-                                    _cache.SetString(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey);
+                                    _cache.Set<string>(LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName, bearerKey, TimeSpan.FromMinutes(5));
                                 }
                             }
                             catch (Exception ex)

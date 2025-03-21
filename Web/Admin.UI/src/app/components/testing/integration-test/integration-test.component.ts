@@ -86,7 +86,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   facilities: IFacilityConfigModel[] = [];
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  intervalId!: NodeJS.Timer | null;
+  //intervalId!: NodeJS.Timer | null;
+
+  intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
 
   consumersData: Map<string, string> = new Map();
 
@@ -148,7 +150,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       this.consumersDataOutput = new Map();
       this.isLoading = false; // Hide spinner
       this.isTestRunning = false; // Update test state
-      this.stopPollingConsumerEvents();
+
     }, error => {
       console.error('Error creating consumer:', error);
       this.isTestRunning = false;
@@ -166,7 +168,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   }
 
   stopTest(): void {
+    this.isLoading = true; // Show spinner
     this.consumersDataOutput.clear();
+    this.stopPollingConsumerEvents();
     this.deleteConsumers(this.facilityIdControl.value);
   }
 
@@ -194,7 +198,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
       this.consumersData.forEach((value, key) => {
         this.consumersDataOutput.set(key, JSON.parse(value) ?? "");
       });
-      this.isLoading = false
+      this.isLoading = false;
     }, error => {
       console.error('Error creating consumer:', error);
       this.isTestRunning = false;
