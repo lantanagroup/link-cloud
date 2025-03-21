@@ -2,8 +2,7 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.Serialization;
 using LantanaGroup.Link.Shared.Domain.Entities;
-using DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Entities;
 

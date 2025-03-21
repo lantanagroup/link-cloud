@@ -21,7 +21,6 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Frequency</mat-label>
       <mat-select formControlName="selectedFrequency">
-        <mat-option>None</mat-option>
         <mat-option *ngFor="let frequency of frequencies" [value]="frequency">
           {{frequency}}
         </mat-option>

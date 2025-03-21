@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 var scheduledReports =
-                                    await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.PatientsToQueryDataRequested == false, cancellationToken);
+                                    await database.ReportScheduledRepository.FindAsync(x => x.FacilityId == key && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 
                                 if (!scheduledReports?.Any() ?? false)
                                 {
@@ -106,7 +106,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         $"{Name}: No Scheduled Reports found for facilityId: {key}");
                                 }
 
-                                foreach (var scheduledReport in scheduledReports.Where(sr => !sr.PatientsToQueryDataRequested))
+                                foreach (var scheduledReport in scheduledReports)
                                 {
                                     foreach (var reportType in scheduledReport.ReportTypes)
                                     {
@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             if (entry == null)
                                             {
 
-                                                _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                                await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
                                                 {
                                                     PatientId = patientId,
                                                     Status = PatientSubmissionStatus.PendingEvaluation,
@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             else
                                             {
                                                 entry.Status = PatientSubmissionStatus.PendingEvaluation;
-                                                _submissionEntryManager.UpdateAsync(entry);
+                                                await _submissionEntryManager.UpdateAsync(entry);
                                             }
                                         }
                                     }
