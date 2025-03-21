@@ -121,7 +121,6 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                             if (entry == null)
                                             {
-
                                                 await _submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
                                                 {
                                                     PatientId = patientId,

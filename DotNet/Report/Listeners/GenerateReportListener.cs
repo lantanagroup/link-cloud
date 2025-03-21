@@ -217,14 +217,14 @@ namespace LantanaGroup.Link.Report.Listeners
                                         value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
 
-                                    value.PatientIds.Distinct().AsParallel().ForAll(async patient =>
+                                    value.PatientIds.AsParallel().ForAll(async patient =>
                                     {
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
                                             await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
                                             {
-                                                PatientId = patient.Replace("Patient/", ""),
+                                                PatientId = patient,
                                                 Status = PatientSubmissionStatus.PendingEvaluation,
                                                 ReportScheduleId = reportSchedule.Id,
                                                 FacilityId = facilityId,
@@ -330,7 +330,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
             }
 
-            return admittedPatients?.Entry?.Select(p => p.Item.Reference).ToList() ?? new List<string>();
+            return admittedPatients?.Entry?.Select(p => p.Item.Reference.Split('/').Last()).Distinct().ToList() ?? new List<string>();
         }
 
         private static string GetFacilityIdFromHeader(Headers headers)
