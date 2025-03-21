@@ -5,7 +5,7 @@
 1. [General](#general)
 2. [Census Acquisition](#census-acquisition)
 3. [Patient Data Acquisition](#patient-data-acquisition)
-4. [Normalization](#normalization)~~~~
+4. [Normalization](#normalization)
 5. [Evaluation](#evaluation)
 6. [Validation](#validation)
 7. [Submission](#submission)
