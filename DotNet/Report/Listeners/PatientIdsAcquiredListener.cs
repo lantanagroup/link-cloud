@@ -129,6 +129,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                                     ReportScheduleId = scheduledReport.Id,
                                                     FacilityId = scheduledReport.FacilityId,
                                                     ReportType = reportType,
+                                                    CreateDate = DateTime.UtcNow,
                                                 });
                                             }
                                             else
