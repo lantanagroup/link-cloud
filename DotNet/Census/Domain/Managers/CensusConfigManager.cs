@@ -69,14 +69,19 @@ public class CensusConfigManager : ICensusConfigManager
 
             try
             {
+                await _censusConfigRepository.StartTransactionAsync(cancellationToken);
+
                 await _censusConfigRepository.UpdateAsync(existingEntity, cancellationToken);
 
                 await _censusSchedulingRepo.UpdateJobsForFacility(existingEntity,
-                    await _schedulerFactory.GetScheduler(cancellationToken));
+                await _schedulerFactory.GetScheduler(cancellationToken));
+
+                await _censusConfigRepository.CommitTransactionAsync(cancellationToken);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception in CensusConfigManager.AddOrUpdateCensusConfig");
+                await _censusConfigRepository.RollbackTransactionAsync(cancellationToken);
                 throw;
             }
         }
@@ -93,14 +98,19 @@ public class CensusConfigManager : ICensusConfigManager
 
             try
             {
+                await _censusConfigRepository.StartTransactionAsync(cancellationToken);
+
                 await _censusConfigRepository.AddAsync(existingEntity, cancellationToken);
 
                 await _censusSchedulingRepo.AddJobForFacility(existingEntity,
-                    await _schedulerFactory.GetScheduler(cancellationToken));
+                await _schedulerFactory.GetScheduler(cancellationToken));
+
+                await _censusConfigRepository.CommitTransactionAsync(cancellationToken);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception in CensusConfigManager.AddOrUpdateCensusConfig");
+                await _censusConfigRepository.RollbackTransactionAsync(cancellationToken);
                 throw;
             }
         }

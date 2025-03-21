@@ -1,12 +1,13 @@
-artifact:
-  init: true
 loki:
   enabled: false
   url: ''
-  app: link-dev
+  app: link-cloud
 
 server:
   port: 31820
+
+telemetry:
+  exporterEndpoint: http://localhost:55690
 
 springdoc:
   api-docs:
@@ -18,6 +19,13 @@ springdoc:
 spring:
   application:
     name: ValidationService
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
+  mvc:
+    problemdetails:
+      enabled: true
   security:
     oauth2:
       resourceserver:
@@ -27,24 +35,20 @@ spring:
   #  url: jdbc:sqlserver://;serverName=localhost\SQLEXPRESS;encrypt=true;trustServerCertificate=true
   #  username: link-user
   #  password: link-password
-  jpa:
-    hibernate:
-      ddl-auto: none
-    properties:
-      show_sql: true
-      hibernate:
-        dialect: org.hibernate.dialect.SQLServerDialect
   kafka:
     bootstrap-servers: ''
     consumer:
       group-id: validation
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
     producer:
       client-id: validation-service
     #properties:
       #security.protocol: SASL_SSL
       #sasl.mechanism: PLAIN
       #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
 
 secret-management:
   key-vault-uri: ''
@@ -52,3 +56,14 @@ secret-management:
 authentication:
   anonymous: false
   authority: ''
+
+link:
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}

@@ -22,15 +22,12 @@ using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Microsoft.OpenApi.Models;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Spi;
@@ -38,7 +35,6 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,6 +76,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
+    });
+
     // Add service information
     var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
@@ -118,9 +119,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
         options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
     });
-
-    // Add Controllers
-    builder.Services.AddControllers();
 
     // Add hosted services
     builder.Services.AddHostedService<SubmitReportListener>();

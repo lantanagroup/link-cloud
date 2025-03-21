@@ -1,8 +1,15 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Commands;
@@ -26,11 +33,6 @@ using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Middleware;
-using LantanaGroup.Link.Shared.Application.Factories;
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
 
 namespace Tenant
 {
@@ -146,13 +148,12 @@ namespace Tenant
                 }
             });
 
-
-
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaProducerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaProducerFactory<string, object>>();
+            builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+            builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
             var producer = new KafkaProducerFactory<string, object>(kafkaConnection).CreateProducer(new Confluent.Kafka.ProducerConfig());
             builder.Services.AddSingleton<IProducer<string, object>>(producer);
 
-            builder.Services.AddTransient<LantanaGroup.Link.Shared.Application.Interfaces.IKafkaConsumerFactory<string, object>, LantanaGroup.Link.Shared.Application.Factories.KafkaConsumerFactory<string, object>>();
+            builder.Services.AddTransient<IKafkaConsumerFactory<string, object>, KafkaConsumerFactory<string, object>>();
 
 
             builder.Services.AddHttpClient();
@@ -272,13 +273,6 @@ namespace Tenant
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
 
-            // Ensure database created
-            using (var scope = app.Services.CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<FacilityDbContext>();
-                context.Database.EnsureCreated();
-
-            }
             // Configure the HTTP request pipeline.
             //app.MapGrpcService<TenantService>();
             //app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");

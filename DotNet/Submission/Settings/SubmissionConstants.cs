@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Utility;
-
-namespace LantanaGroup.Link.Submission.Settings
+﻿namespace LantanaGroup.Link.Submission.Settings
 {
     public static class SubmissionConstants
     {

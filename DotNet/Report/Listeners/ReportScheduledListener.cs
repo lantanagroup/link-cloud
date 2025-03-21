@@ -1,6 +1,5 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
@@ -9,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Quartz;
 using System.Text;
@@ -86,36 +86,26 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
 
+                                if (!value.IsValid())
+                                {
+                                    throw new DeadLetterException("Invalid Report Scheduled event");
+                                }
+
+                                var scope = _serviceScopeFactory.CreateScope();
+                                var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
                                 facilityId = key;
-                                var startDate = value.StartDate;
-                                var endDate = value.EndDate;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
                                 var frequency = value.Frequency;
                                 var reportTypes = value.ReportTypes;
-
-                                if (string.IsNullOrWhiteSpace(facilityId))
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: FacilityId is null or empty.");
-                                }
-
-                                if (reportTypes == null || reportTypes.Length == 0)
-                                {
-                                    throw new DeadLetterException(
-                                        $"{Name}: ReportTypes is null or empty.");
-                                }
+                                var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.FacilityId == facilityId 
-                                                                                                        && x.ReportStartDate == startDate 
-                                                                                                        && x.ReportEndDate == endDate
-                                                                                                        && reportTypes.Any(r => x.ReportTypes.Contains(r)), consumeCancellationToken);
+                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportId, consumeCancellationToken);
 
                                 ReportScheduleModel? reportSchedule;
                                 if(existing != null) 
@@ -129,6 +119,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     reportSchedule = new ReportScheduleModel
                                     {
+                                        Id = reportId,
                                         FacilityId = facilityId,
                                         ReportStartDate = startDate,
                                         ReportEndDate = endDate,

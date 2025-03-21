@@ -1,122 +1,82 @@
 package com.lantanagroup.link.validation.services;
 
-import com.lantanagroup.link.validation.config.ArtifactConfig;
-import com.lantanagroup.link.validation.entities.ArtifactEntity;
+import ca.uhn.fhir.context.FhirContext;
+import com.lantanagroup.link.validation.entities.Artifact;
+import com.lantanagroup.link.validation.entities.ArtifactType;
 import com.lantanagroup.link.validation.repositories.ArtifactRepository;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.List;
-import java.util.Objects;
 
 @Service
 public class ArtifactService {
-    private static final Logger log = LoggerFactory.getLogger(ArtifactService.class);
+    private static final Logger logger = LoggerFactory.getLogger(ArtifactService.class);
 
-    private final ArtifactRepository repository;
+    private final FhirContext fhirContext;
+    private final ArtifactRepository artifactRepository;
+    private ArtifactValidationSupport validationSupport;
 
-    public ArtifactService(ArtifactRepository repository, ArtifactConfig artifactConfig) {
-        this.repository = repository;
+    public ArtifactService(FhirContext fhirContext, ArtifactRepository artifactRepository) {
+        this.fhirContext = fhirContext;
+        this.artifactRepository = artifactRepository;
+    }
 
-        if (artifactConfig.isInit()) {
-            this.initArtifacts(ArtifactEntity.Types.PACKAGE);
-            this.initArtifacts(ArtifactEntity.Types.RESOURCE);
-        } else {
-            log.info("Skipping artifact initialization due to configuration");
+    private void doSaveArtifact(ArtifactType type, String name, byte[] content) {
+        Artifact artifact = artifactRepository.findByTypeAndName(type, name).orElseGet(Artifact::new);
+        artifact.setType(type);
+        artifact.setName(name);
+        artifact.setContent(content);
+        artifactRepository.save(artifact);
+    }
+
+    public void saveArtifact(ArtifactType type, String name, byte[] content) {
+        doSaveArtifact(type, name, content);
+        invalidateValidationSupport();
+    }
+
+    public void deleteArtifact(ArtifactType type, String name) {
+        if (artifactRepository.deleteByTypeAndName(type, name)) {
+            invalidateValidationSupport();
         }
     }
 
-    public void createOrUpdateArtifact(String name, ArtifactEntity.Types type, byte[] content) {
-        List<ArtifactEntity> artifactEntities = this.repository.findByTypeAndName(type, name);
-
-        if (artifactEntities.size() > 1) {
-            throw new RuntimeException("Multiple artifacts found with the same name");
-        } else if (artifactEntities.size() == 1) {
-            ArtifactEntity artifactEntity = artifactEntities.get(0);
-            artifactEntity.setContent(content);
-            this.repository.save(artifactEntity);
-        } else {
-            ArtifactEntity artifactEntity = new ArtifactEntity();
-            artifactEntity.setType(type);
-            artifactEntity.setName(name);
-            artifactEntity.setContent(content);
-            this.repository.save(artifactEntity);
-        }
+    public void initializeArtifacts() throws IOException {
+        logger.info("Initializing artifacts");
+        initializeArtifacts(ArtifactType.PACKAGE, "classpath*:artifacts/packages/*.tgz");
+        initializeArtifacts(ArtifactType.RESOURCE, "classpath*:artifacts/resources/*.json");
+        invalidateValidationSupport();
     }
 
-    public void deleteArtifact(ArtifactEntity.Types type, String name) {
-        List<ArtifactEntity> artifactEntities = this.repository.findByTypeAndName(type, name);
-        if (artifactEntities.size() > 1) {
-            throw new RuntimeException("Multiple artifacts found with the same name");
-        } else if (artifactEntities.size() == 1) {
-            this.repository.delete(artifactEntities.get(0));
-        }
-    }
-
-    public List<ArtifactEntity> listArtifacts() {
-        return this.repository
-                .findAll()
-                .stream().map(artifactEntity -> {
-                    artifactEntity.setContent(null);
-                    return artifactEntity;
-                }).toList();
-    }
-
-    public List<ArtifactEntity> getArtifacts() {
-        return this.repository.findAll();
-    }
-
-    private void initArtifacts(ArtifactEntity.Types type) {
-        List<String> extensions = type == ArtifactEntity.Types.RESOURCE ? List.of("json", "xml") : List.of("tgz");
-        String path = type == ArtifactEntity.Types.RESOURCE ? "classpath:/resources/**" : "classpath:/packages/**";
+    private void initializeArtifacts(ArtifactType type, String locationPattern) throws IOException {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        org.springframework.core.io.Resource[] resources;
-
-        try {
-            resources = resolver.getResources(path);
-        } catch (IOException e) {
-            log.error("Error initializing artifacts for type {} from path {} in class resources", type, path, e);
-            throw new RuntimeException("Error initializing artifacts");
-        }
-
-        for (org.springframework.core.io.Resource resourceResource : resources) {
-            String extension = Objects.requireNonNull(resourceResource.getFilename())
-                    .substring(resourceResource.getFilename().lastIndexOf(".") + 1)
-                    .toLowerCase();
-            String fileName = new File(resourceResource.getFilename())
-                    .getName();
-
-            if (StringUtils.isEmpty(fileName) || StringUtils.isEmpty(extension)) {
-                continue;
-            } else if (!extensions.contains(extension.toLowerCase())) {
-                log.warn("Unexpected file name {} for type {} in class resources", resourceResource.getFilename(), type);
+        for (Resource resource : resolver.getResources(locationPattern)) {
+            String name = FilenameUtils.getBaseName(resource.getFilename());
+            if (StringUtils.isEmpty(name)) {
+                logger.warn("Empty filename: {}", resource.getDescription());
                 continue;
             }
+            logger.debug("Initializing {} artifact: {}", type, name);
+            doSaveArtifact(type, name, resource.getContentAsByteArray());
+        }
+    }
 
-            // Remove the file extension and remove the "CodeSystem-" or "ValueSet-" prefix
-            fileName = fileName.substring(0, resourceResource.getFilename().lastIndexOf("."))
-                    .replaceFirst("^(CodeSystem|ValueSet)-", "");
+    private synchronized void invalidateValidationSupport() {
+        validationSupport = null;
+    }
 
-            log.info("Loading resource {}", resourceResource.getFilename());
-
-            try {
-                byte[] resourceContent = resourceResource.getContentAsByteArray();
-
-                if (this.repository.findByTypeAndName(type, fileName).isEmpty()) {
-                    ArtifactEntity artifactEntity = new ArtifactEntity();
-                    artifactEntity.setType(type);
-                    artifactEntity.setName(fileName);
-                    artifactEntity.setContent(resourceContent);
-                    this.repository.save(artifactEntity);
-                }
-            } catch (IOException e) {
-                log.error("Error get content for resource in class resources {}", resourceResource.getFilename(), e);
+    public synchronized ArtifactValidationSupport getValidationSupport() throws IOException {
+        if (validationSupport == null) {
+            validationSupport = new ArtifactValidationSupport(fhirContext);
+            for (Artifact artifact : artifactRepository.findAll()) {
+                validationSupport.addArtifact(artifact);
             }
         }
+        return validationSupport;
     }
 }
