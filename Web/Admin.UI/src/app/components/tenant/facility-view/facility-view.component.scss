@@ -66,11 +66,11 @@ $primary: #398eb4;
     border-top: 1px solid #e5e7eb;
   }  
 
-  .link-table tr:hover {
+  .table-body tr:hover {
     background-color: #f1f5f9; 
   }
 
-  .link-table tr:hover + .submittion-row {
+  .table-body tr:hover + .submission-row {
     background-color: #f1f5f9; 
   }
 
@@ -87,16 +87,16 @@ $primary: #398eb4;
     border-top: none;
   }  
 
-  .link-table tr + .submittion-row {    
+  .link-table tr + .submission-row {    
     border-top: none;
   } 
   
-  tr.submittion-row {
+  tr.submission-row {
     font-size: 1.2rem;
     font-weight: 500;
   }
 
-  tr.submittion-row:hover {
+  tr.submission-row:hover {
     background-color: transparent;
   }
 

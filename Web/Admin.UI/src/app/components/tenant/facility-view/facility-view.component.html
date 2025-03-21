@@ -91,7 +91,7 @@
               <td class="table-cell">{{report.censusCount?.admittedPatients}}</td>
               <td class="table-cell">{{report.initialPopulationCount}}</td>
             </tr>
-            <tr class="submittion-row" *ngIf="report.submitted">
+            <tr class="submission-row" *ngIf="report.submitted">
               <td class="table-cell" colspan="7">
                 Report submitted on {{report.submitDate | date}}.
               </td>
@@ -99,67 +99,7 @@
           </ng-container>
         </tbody>
 
-      </table>
-      
-
-      <!-- <table mat-table [dataSource]="reportListSummary">
-        
-        <ng-container matColumnDef="id">
-          <th mat-header-cell *matHeaderCellDef> Report ID </th>
-          <td mat-cell *matCellDef="let report">
-            <a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a>
-          </td>
-        </ng-container>    
-       
-        <ng-container matColumnDef="period">
-          <th mat-header-cell *matHeaderCellDef> Reporting Period </th>
-          <td mat-cell *matCellDef="let report"> {{report.reportStartDate | date}} - {{report.reportEndDate | date}} </td>
-        </ng-container>    
-        
-        <ng-container matColumnDef="plan">
-          <th mat-header-cell *matHeaderCellDef> Query Plan </th>
-          <td mat-cell *matCellDef="let report"> TODO </td>
-        </ng-container>    
-     
-        <ng-container matColumnDef="cadence">
-          <th mat-header-cell *matHeaderCellDef> Reporting Cadence </th>
-          <td mat-cell *matCellDef="let report">
-            <mat-chip
-                    [ngClass]="{
-                        'monthly-chip': report.frequency === 'Monthly',
-                        'weekly-chip': report.frequency === 'Weekly',
-                        'daily-chip': report.frequency === 'Daily',
-                        'adhoc-chip': report.frequency === 'Adhoc'
-                    }"
-            >{{report.frequency}} 
-            </mat-chip>
-             
-          </td>
-        </ng-container>    
-       
-        <ng-container matColumnDef="measures">
-          <th mat-header-cell *matHeaderCellDef> Measures </th>
-          <td mat-cell *matCellDef="let report">            
-            <ul class="report-type-list">
-              <li *ngFor="let type of report.reportTypes">{{type}}</li>
-            </ul>
-          </td>
-        </ng-container>
-    
-        <ng-container matColumnDef="census">
-          <th mat-header-cell *matHeaderCellDef> Patients in Census </th>
-          <td mat-cell *matCellDef="let report"> {{report.censusCount?.admittedPatients}} </td>
-        </ng-container>
-    
-        <ng-container matColumnDef="ip">
-          <th mat-header-cell *matHeaderCellDef> Patients in IP </th>
-          <td mat-cell *matCellDef="let report"> {{report.initialPopulationCount}} </td>
-        </ng-container>
-    
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-    
-      </table> -->
+      </table>     
       <mat-paginator 
         [length]="paginationMetadata.totalCount"
         [pageIndex]="paginationMetadata.pageNumber"
