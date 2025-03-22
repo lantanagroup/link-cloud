@@ -135,20 +135,21 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<ScheduledReportListSummary>>> GetReportSummaryList(string? facilityId, int pageNumber = 1, int pageSize = 10)
+        public async Task<ActionResult<PagedConfigModel<ScheduledReportListSummary>>> GetReportSummaryList(
+            string? facilityId, int pageNumber = 1, int pageSize = 10)
         {
-           //TODO: Add search criteria when requirements have been determined
+            //TODO: Add search criteria when requirements have been determined
 
             if (pageNumber < 1)
             {
                 return BadRequest("Parameter pageNumber must be greater than 0");
             }
-            
+
             if (pageSize < 1)
             {
                 return BadRequest("Parameter pageSize must be greater than 0");
             }
-           
+
             try
             {
                 // Create search predicates
@@ -160,11 +161,12 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
                 else
                 {
-                    
+
                     predicate = r => r.FacilityId == facilityId;
                 }
-                
-                var summaries = await _submissionEntryManager.GetScheduledReportSummaries(predicate, pageSize, pageNumber);
+
+                var summaries =
+                    await _submissionEntryManager.GetScheduledReportSummaries(predicate, pageSize, pageNumber);
 
                 return Ok(summaries);
 
@@ -172,7 +174,42 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Exception in ReportController.GetReportSummaryList");
-                return Problem("An error occurred while retrieving the report summary list.", statusCode: (int)HttpStatusCode.InternalServerError);
+                return Problem("An error occurred while retrieving the report summary list.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+
+        /// <summary>
+        /// Returns a summary of a scheduled report based on the provided reportId
+        /// </summary>
+        /// <param name="reportId"></param>
+        /// <returns></returns>
+        [HttpGet("summaries/{reportId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportSummary))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ScheduledReportSummary>> GetReportSummary(string? reportId)
+        {
+           //TODO: Add search criteria when requirements have been determined
+
+            if (string.IsNullOrEmpty(reportId))
+            {
+                return BadRequest("Parameter reportId cannot be null or empty");
+            }
+            
+            try
+            {
+                var summary =
+                    await _submissionEntryManager.GetScheduledReportSummary(reportId, HttpContext.RequestAborted);
+                
+                return Ok(summary);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportSummary");
+                return Problem("An error occurred while retrieving the report summary.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
     }
