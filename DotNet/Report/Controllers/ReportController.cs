@@ -280,5 +280,58 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
+        
+        /// <summary>
+        /// Returns a summary list item of a ReportSchedule based on the provided search criteria
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        [HttpGet("summaries/{facilityId}/measure-reports/{reportId}/resources")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ResourceSummary>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<PagedConfigModel<ResourceSummary>>> GetMeasureReportResources(
+            string facilityId, string reportId, int pageNumber = 1, int pageSize = 10)
+        {
+            //TODO: Add search criteria when requirements have been determined
+
+            if (pageNumber < 1)
+            {
+                return BadRequest("Parameter pageNumber must be greater than 0");
+            }
+
+            if (pageSize < 1)
+            {
+                return BadRequest("Parameter pageSize must be greater than 0");
+            }
+            
+            if(string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
+
+            try
+            {
+                // Create search predicates
+                //TODO: design way to dynamically build predicates or change search to use custom method
+                Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId && r.ReportScheduleId == reportId;
+              
+                var resources =
+                    await _submissionEntryManager.GetMeasureReportResourceSummary(facilityId, reportId, pageSize, pageNumber, HttpContext.RequestAborted);
+
+                return Ok(resources);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReports");
+                return Problem("An error occurred while retrieving measures reports.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
     }
 }

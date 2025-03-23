@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { IPagedMeasureReportSummary, IPagedReportListSummary, IReportListSummary } from "./report-view.interface";
+import { IPagedMeasureReportSummary, IPagedReportListSummary, IPagedResourceSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 
 
@@ -54,6 +54,22 @@ export class FacilityViewService {
             );
     }
 
+    getMeasureReportResourceDetails(facilityId: string, measureReportId: string, pageNumber: number, pageSize: number): Observable<IPagedResourceSummary> {
+    
+        //javascript based paging is zero based, so increment page number by 1
+        pageNumber = pageNumber + 1;
+
+        return this.http.get<IPagedResourceSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports/${measureReportId}/resources?pageNumber=${pageNumber}&pageSize=${pageSize}`)
+            .pipe(
+                map((response: IPagedResourceSummary) => {
+                    //revert back to zero based paging
+                    response.metadata.pageNumber--;
+                    return response;
+                }),
+                catchError(this.handleError.bind(this))
+            );
+    }
+    
     private handleError(err: HttpErrorResponse) {
         return this.errorHandler.handleError(err);
     }

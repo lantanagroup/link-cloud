@@ -43,7 +43,18 @@ export class IPagedMeasureReportSummary
 
 export interface IResourceSummary
 {
+  facilityId: string;
+  measureReportId: string;
+  patientId: string;
+  resourceId: string;
+  fhirId: string;
   resourceType: string;
   resourceCategory: string;
-  resourceCount: number;
+  reference: string;
+}
+
+export class IPagedResourceSummary
+{
+  records: IResourceSummary[] = [];
+  metadata: PaginationMetadata = new PaginationMetadata;
 }

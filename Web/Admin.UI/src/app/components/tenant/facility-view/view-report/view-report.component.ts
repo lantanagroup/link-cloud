@@ -12,10 +12,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
+import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-report.component';
 @Component({
   selector: 'app-view-report',
   imports: [
     CommonModule,
+    MatDialogModule,
     MatToolbarModule,
     MatIconModule,
     MatPaginatorModule,
@@ -41,6 +44,7 @@ export class ViewReportComponent implements OnInit {
     private location: Location,
     private route: ActivatedRoute, 
     private tenantService: TenantService,
+    private dialog: MatDialog,
     private facilityViewService: FacilityViewService) { }
 
   ngOnInit(): void {
@@ -74,6 +78,19 @@ export class ViewReportComponent implements OnInit {
       }
     });
   }
+
+  onSelectReport(measureReport: IMeasureReportSummary): void {
+    const dialogConfig = new MatDialogConfig();
+    dialogConfig.minWidth = '75vw'; 
+    dialogConfig.data = {
+      dialogTitle: 'Measure Report Details',
+      viewOnly: false,
+      facilityId: this.facilityId,
+      measureReport: measureReport
+    };
+    
+      this.dialog.open(ViewMeasureReportComponent, dialogConfig);
+    }
 
   pagedEvent(event: PageEvent) {
       this.paginationMetadata.pageSize = event.pageSize;

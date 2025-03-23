@@ -38,3 +38,20 @@ public class MeasureReportSummaryFactory
         };
     }
 }
+
+public class ResourceSummaryFactory
+{
+    public ResourceSummary FromDomain(string facilityId, string measureReportId, string patientId, MeasureReportSubmissionEntryModel.ContainedResource resource)
+    {
+        return new ResourceSummary()
+        {
+            FacilityId = facilityId,
+            MeasureReportId = measureReportId,
+            PatientId = patientId,
+            ResourceId = resource.DocumentId,
+            FhirId = resource.ResourceId,
+            ResourceType = Enum.Parse<ResourceType>(resource.ResourceType),
+            ResourceCategory = resource.CategoryType.ToString()
+        };
+    }
+}
