@@ -1,17 +1,93 @@
-<p><a [routerLink]="['/tenant']">Tenants</a> > <a [routerLink]="['/tenant/facility/', facilityId]">Viewing {{facilityId}}</a> > Viewing Report {{reportId}}</p>
+<div class="content">
+  <p>
+      <mat-toolbar class="page-header-bar" color="primary">          
+        <span>{{facilityId}}\{{reportId}}</span> 
+        <button mat-mini-fab (click)="navBack()" matTooltip="Back to facility list">
+          <mat-icon>arrow_back</mat-icon>          
+        </button>
+      </mat-toolbar>
+  </p>
 
-<mat-card appearance="outlined">
-  <mat-card-content>
-    <p><strong>Report Id:</strong> {{reportInfo.reportId}}</p>
-    <p><strong>Reporting Period:</strong> {{reportInfo.reportingPeriodStart}} - {{reportInfo.reportingPeriodEnd}}</p>
-    <p><strong>Measures:</strong>&nbsp;<mat-chip *ngFor="let m of reportInfo.measures">{{m.shortName}}</mat-chip></p>
-  </mat-card-content>
-</mat-card>
-<mat-card appearance="outlined">
-  <mat-card-title>
-    Validation Results
-  </mat-card-title>
-  <mat-card-content>
-    <app-validation-results></app-validation-results>
-  </mat-card-content>
-</mat-card>
+  <p>        
+    <span><strong>Facility Name:</strong> {{facilityConfig?.facilityName}}</span>
+  </p>
+  <p>
+    <span><strong>TimeZone:</strong> {{facilityConfig?.timeZone}}</span>
+  </p>
+  <p>
+    <span>
+      <strong>Scheduled Reports:</strong>
+      <div class="table-container" style="width: 75%;">       
+        <table class="link-table">
+          <thead class="table-head">
+            <tr>
+              <th class="header-column">Cadence</th>
+              <th class="header-column">Measures</th>              
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            <ng-container *ngFor="let report of scheduledReports">
+              <tr>
+                <td class="table-cell">
+                  <mat-chip [ngClass]="{
+                    'daily-chip': report.cadence === 'Daily',
+                    'weekly-chip': report.cadence === 'Weekly',
+                    'monthly-chip': report.cadence === 'Monthly'
+                  }">{{report.cadence}}</mat-chip>
+                </td>
+                <td class="table-cell">
+                  <ul class="report-type-list no-bullets">
+                    <li *ngFor="let measure of report.measures">{{measure}}</li>
+                  </ul>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
+    </span>
+  </p>
+
+  <mat-tab-group>
+    <mat-tab label="Reports"> 
+      <button mat-mini-fab matTooltip="Refresh report list summary" (click)="onRefresh()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+      <div *ngIf="reportSummary?.patientReportSummaries?.length > 0">
+        <div class="table-container">    
+          <table class="link-table">
+            <thead>
+              <tr>
+                <th class="header-column">Patient</th>
+                <th class="header-column">Measure</th>
+                <th class="header-column">Status</th>
+                <th class="header-column">Validation</th>
+                <th class="header-column">Resource Count</th>
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let report of reportSummary?.patientReportSummaries">
+                <tr>              
+                  <td class="table-cell">{{report.patientId}}</td>
+                  <td class="table-cell">{{report.reportType}}</td>              
+                  <!-- <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td> -->
+                  <td class="table-cell">{{report.status}}</td>
+                  <td class="table-cell">{{report.validationStatus}}</td>
+                  <td class="table-cell">{{report.patientResources.length + reportSummary.sharedResources.length}}</td>
+                </tr>            
+              </ng-container>
+            </tbody>
+          </table>   
+        </div>
+      </div>     
+    </mat-tab>
+    <mat-tab label="Validation">
+      <app-validation-results></app-validation-results>
+    </mat-tab>
+  </mat-tab-group> 
+ 
+</div>  
+    
+  
+
+

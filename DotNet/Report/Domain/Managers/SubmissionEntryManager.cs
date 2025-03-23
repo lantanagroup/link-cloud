@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
 
-        Task<ScheduledReportSummary> GetScheduledReportSummary(string reportId,
+        Task<ScheduledReportSummary> GetScheduledReportSummary(string facilityId, string reportId,
             CancellationToken cancellationToken = default);
     }
 
@@ -101,9 +101,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2);
         }
         
-        public async Task<ScheduledReportSummary> GetScheduledReportSummary(string reportId, CancellationToken cancellationToken = default)
+        public async Task<ScheduledReportSummary> GetScheduledReportSummary(string facilityId, string reportId, CancellationToken cancellationToken = default)
         {
-           var scheduledReport = await _database.ReportScheduledRepository.GetAsync(reportId, cancellationToken);
+           var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
            
             if (scheduledReport == null)
                 throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");

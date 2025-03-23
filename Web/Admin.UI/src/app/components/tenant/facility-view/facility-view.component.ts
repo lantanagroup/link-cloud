@@ -1,12 +1,11 @@
 import {Component, OnInit} from '@angular/core';
 import { Location } from '@angular/common';
-import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {ActivatedRoute, RouterLink} from "@angular/router";
 import {MatCardModule} from "@angular/material/card";
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { FacilityViewService } from './facility-view.service';
-import { IPagedReportListSummary, IReportListSummary } from './report-list-summary.interface';
+import { IPagedReportListSummary, IReportListSummary } from './report-view.interface';
 import { CommonModule } from '@angular/common';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -19,7 +18,6 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
     CommonModule,
     MatToolbarModule,
     MatIconModule,
-    MatTableModule,
     MatPaginatorModule,
     RouterLink,
     MatCardModule
@@ -28,9 +26,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
   styleUrl: './facility-view.component.scss'
 })
 export class FacilityViewComponent implements OnInit {
-  dataSource!: MatTableDataSource<IReportListSummary>;
-  displayedColumns: string[] = ['id', 'period', 'plan', 'cadence', 'measures', 'census', 'ip']; 
-
+ 
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
   scheduledReports: { cadence: string; measures: string[] }[] = []; // Array to hold scheduled reports
@@ -46,8 +42,7 @@ export class FacilityViewComponent implements OnInit {
     private tenantService: TenantService,
     private facilityViewService: FacilityViewService) { }  
  
-  ngOnInit(): void {
-    this.dataSource = new MatTableDataSource<IReportListSummary>();
+  ngOnInit(): void {   
     
     this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
@@ -78,8 +73,6 @@ export class FacilityViewComponent implements OnInit {
         next: (response: IPagedReportListSummary) => {
           this.reportListSummary = response.records;
           this.paginationMetadata = response.metadata;
-          this.dataSource.data = this.reportListSummary;
-          //this.initializeSummaries = false;
         },
         error: (error) => {
           console.error('Error fetching facility report summaries:', error);

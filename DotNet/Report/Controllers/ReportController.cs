@@ -182,26 +182,32 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <summary>
         /// Returns a summary of a scheduled report based on the provided reportId
         /// </summary>
+        /// <param name="facilityId"></param>
         /// <param name="reportId"></param>
         /// <returns></returns>
-        [HttpGet("summaries/{reportId}")]
+        [HttpGet("summaries/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ScheduledReportSummary))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ScheduledReportSummary>> GetReportSummary(string? reportId)
+        public async Task<ActionResult<ScheduledReportSummary>> GetReportSummary(string facilityId, string reportId)
         {
            //TODO: Add search criteria when requirements have been determined
 
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facility cannot be null or empty");
+            }
+            
             if (string.IsNullOrEmpty(reportId))
             {
-                return BadRequest("Parameter reportId cannot be null or empty");
+                return BadRequest("A report id needs to be specified");
             }
             
             try
             {
                 var summary =
-                    await _submissionEntryManager.GetScheduledReportSummary(reportId, HttpContext.RequestAborted);
+                    await _submissionEntryManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
                 
                 return Ok(summary);
 

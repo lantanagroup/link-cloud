@@ -19,7 +19,7 @@
       <strong>Scheduled Reports:</strong>
       <div class="table-container" style="width: 75%;">       
         <table class="link-table">
-          <thead>
+          <thead class="table-head">
             <tr>
               <th class="header-column">Cadence</th>
               <th class="header-column">Measures</th>              
@@ -55,7 +55,7 @@
         <mat-icon>refresh</mat-icon>
       </button>
     </mat-toolbar>
-</p>
+  </p>
   <div *ngIf="reportListSummary.length > 0">
     <div class="table-container">    
       <table class="link-table">
@@ -98,7 +98,6 @@
             </tr> 
           </ng-container>
         </tbody>
-
       </table>     
       <mat-paginator 
         [length]="paginationMetadata.totalCount"
@@ -108,7 +107,7 @@
         (page)="pagedEvent($event)"
         showFirstLastButtons
         aria-label="Select page of report summaries">
-    </mat-paginator>
+      </mat-paginator>
     </div>
   </div>
 </div>

@@ -24,3 +24,26 @@ export class IPagedReportListSummary {
   records: IReportListSummary[] = [];
   metadata: PaginationMetadata = new PaginationMetadata;
 }
+
+export interface IReportSummary extends IReportListSummary
+{
+  patientReportSummaries: IPatientReportSummary[]; 
+  sharedResources: IResourceSummary[];
+}
+
+export interface IPatientReportSummary
+{
+  id: string;
+  patientId: string;
+  reportType: string;
+  status: string;
+  validationStatus: string;
+  patientResources: IResourceSummary[];
+}
+
+export interface IResourceSummary
+{
+  resourceType: string;
+  resourceCategory: string;
+  resourceCount: number;
+}
