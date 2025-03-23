@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Report.Application.Factory;
 
 public class ScheduledReportFactory
 {
-    public ScheduledReportListSummary FromDomainToListSummary(ReportScheduleModel reportScheduleModel)
+    public ScheduledReportListSummary FromDomain(ReportScheduleModel reportScheduleModel)
     {
         return new ScheduledReportListSummary()
         {
@@ -21,34 +21,20 @@ public class ScheduledReportFactory
             Frequency = reportScheduleModel.Frequency
         };
     }
-    
-    public ScheduledReportSummary FromDomainToSummary(ReportScheduleModel reportScheduleModel)
-    {
-        return new ScheduledReportSummary()
-        {
-            Id = reportScheduleModel.Id ?? string.Empty,
-            FacilityId = reportScheduleModel.FacilityId,
-            ReportStartDate = reportScheduleModel.ReportStartDate,
-            ReportEndDate = reportScheduleModel.ReportEndDate,
-            Submitted = reportScheduleModel.SubmitReportDateTime.HasValue,
-            SubmitDate = reportScheduleModel.SubmitReportDateTime,
-            ReportTypes = reportScheduleModel.ReportTypes,
-            Frequency = reportScheduleModel.Frequency
-        };
-    }
 }
 
-public class PatientReportSummaryFactory
+public class MeasureReportSummaryFactory
 {
-    public PatientReportSummary FromDomain(MeasureReportSubmissionEntryModel measureReport)
+    public MeasureReportSummary FromDomain(MeasureReportSubmissionEntryModel measureReport)
     {
-        return new PatientReportSummary()
+        return new MeasureReportSummary()
         {
             Id = measureReport.Id ?? string.Empty,
             PatientId = measureReport.PatientId,
             ReportType = measureReport.ReportType,
             Status = measureReport.Status.ToString(),
-            ValidationStatus = measureReport.ValidationStatus.ToString()
+            ValidationStatus = measureReport.ValidationStatus.ToString(),
+            ResourceCount = measureReport.ContainedResources.Count
         };
     }
 }

@@ -25,20 +25,20 @@ export class IPagedReportListSummary {
   metadata: PaginationMetadata = new PaginationMetadata;
 }
 
-export interface IReportSummary extends IReportListSummary
-{
-  patientReportSummaries: IPatientReportSummary[]; 
-  sharedResources: IResourceSummary[];
-}
-
-export interface IPatientReportSummary
+export interface IMeasureReportSummary
 {
   id: string;
   patientId: string;
   reportType: string;
   status: string;
   validationStatus: string;
-  patientResources: IResourceSummary[];
+  resourceCount: number;
+}
+
+export class IPagedMeasureReportSummary
+{
+  records: IMeasureReportSummary[] = [];
+  metadata: PaginationMetadata = new PaginationMetadata;
 }
 
 export interface IResourceSummary

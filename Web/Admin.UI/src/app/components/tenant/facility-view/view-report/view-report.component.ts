@@ -5,18 +5,20 @@ import {CommonModule} from "@angular/common";
 
 import {ActivatedRoute, RouterLink} from "@angular/router";
 import { FacilityViewService } from '../facility-view.service';
-import { IReportSummary } from '../report-view.interface';
+import { IMeasureReportSummary, IReportListSummary } from '../report-view.interface';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
-import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 @Component({
   selector: 'app-view-report',
   imports: [
     CommonModule,
     MatToolbarModule,
     MatIconModule,
+    MatPaginatorModule,
     MatTabsModule,
     RouterLink,
     ValidationResultsComponent    
@@ -27,11 +29,14 @@ import { IFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-
 export class ViewReportComponent implements OnInit {
   facilityId: string = '';
   reportId: string = '';
-  reportSummary: IReportSummary | undefined;
 
-  facilityConfig: IFacilityConfigModel | undefined;
-  scheduledReports: { cadence: string; measures: string[] }[] = []; // Array to hold scheduled reports
+  reportSummary: IReportListSummary | undefined;
 
+  defaultPageNumber: number = 0
+  defaultPageSize: number = 10;
+  measureReports: IMeasureReportSummary[] = [];
+  paginationMetadata: PaginationMetadata = new PaginationMetadata;
+  
   constructor(
     private location: Location,
     private route: ActivatedRoute, 
@@ -42,27 +47,10 @@ export class ViewReportComponent implements OnInit {
     this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.reportId = params['reportId'];   
-      this.loadFacilityConfig();
       this.loadReportSummary();  
+      this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
     });
   }
-
-  loadFacilityConfig(): void {
-        this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
-            next: (response: IFacilityConfigModel) => {
-              this.facilityConfig = response;
-  
-              this.scheduledReports = this.facilityConfig?.scheduledReports ? [
-                { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
-                { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
-                { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
-              ] : []
-            },
-            error: (error) => {
-              console.error('Error fetching facility configuration:', error);
-            }
-          });            
-      }
 
   loadReportSummary(): void {
     this.facilityViewService.getReportSummary(this.facilityId, this.reportId).subscribe({
@@ -75,8 +63,26 @@ export class ViewReportComponent implements OnInit {
     });
   }
 
+  loadMeasureReports(pageNumber: number, pageSize: number): void {
+    this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, pageNumber, pageSize).subscribe({
+      next: (response) => {
+        this.measureReports = response.records;
+        this.paginationMetadata = response.metadata;
+      },
+      error: (error) => {
+        console.error('Error loading measure reports:', error);
+      }
+    });
+  }
+
+  pagedEvent(event: PageEvent) {
+      this.paginationMetadata.pageSize = event.pageSize;
+      this.paginationMetadata.pageNumber = event.pageIndex;
+      this.loadMeasureReports(event.pageIndex, event.pageSize);
+    }
+
   onRefresh(): void {
-    this.loadReportSummary();
+    this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
   }
 
   navBack(): void {

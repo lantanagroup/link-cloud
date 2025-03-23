@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { catchError, map, Observable } from "rxjs";
 import { AppConfigService } from "src/app/services/app-config.service";
-import { IPagedReportListSummary, IReportSummary } from "./report-view.interface";
+import { IPagedMeasureReportSummary, IPagedReportListSummary, IReportListSummary } from "./report-view.interface";
 import { ErrorHandlingService } from "src/app/services/error-handling.service";
 
 
@@ -28,10 +28,26 @@ export class FacilityViewService {
             );
     }
     
-    getReportSummary(facilityId: string, reportId: string): Observable<IReportSummary> {
-        return this.http.get<IReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}?reportId=${reportId}`)
+    getReportSummary(facilityId: string, reportId: string): Observable<IReportListSummary> {
+        return this.http.get<IReportListSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}?reportId=${reportId}`)
             .pipe(
-                map((response: IReportSummary) => {
+                map((response: IReportListSummary) => {
+                    return response;
+                }),
+                catchError(this.handleError.bind(this))
+            );
+    }
+
+    getMeasureReportSummaryList(facilityId: string, reportId: string, pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
+        
+        //javascript based paging is zero based, so increment page number by 1
+        pageNumber = pageNumber + 1;
+        
+        return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
+            .pipe(
+                map((response: IPagedMeasureReportSummary) => {
+                    //revert back to zero based paging
+                    response.metadata.pageNumber--;
                     return response;
                 }),
                 catchError(this.handleError.bind(this))
