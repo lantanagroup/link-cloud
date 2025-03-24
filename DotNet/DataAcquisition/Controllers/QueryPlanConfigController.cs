@@ -158,7 +158,7 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("facilityId is required.");
             }
 
-            var existing = await _queryPlanManager.GetAsync(facilityId, queryPlan.Type, queryPlan.PlanName, cancellationToken);
+            var existing = await _queryPlanManager.GetAsync(facilityId, queryPlan.Type, cancellationToken);
 
             if (existing != null) 
             {
