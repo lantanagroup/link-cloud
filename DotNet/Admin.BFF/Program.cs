@@ -31,6 +31,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
@@ -430,6 +431,7 @@ static void SetupMiddleware(WebApplication app)
 
     // Map health check middleware
     app.MapGroup("/api/monitor").MapMonitorEndpoints();
+    app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse

@@ -1,0 +1,47 @@
+@use '../../../../styles/core.scss';
+@use '../../../../styles/link-table.scss';
+
+$primary: #398eb4;
+
+
+.report-type-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin-left: 0;
+}
+
+.monthly-chip {
+    background-color: #007D74; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.weekly-chip {
+    background-color: #87003B; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.daily-chip {
+    background-color: #003B87; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.adhoc-chip {
+    background-color: #43007D; 
+    color: #FFFFFF;
+    padding: 5px 10px;
+    border-radius: 16px;
+    margin-right: 5px;
+    display: inline-block;
+}
