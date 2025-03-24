@@ -12,7 +12,7 @@ public interface ICensusPatientListManager
         CancellationToken cancellationToken = default);
 
     Task<IEnumerable<CensusPatientListEntity>> GetPatientList(string facilityId, DateTime? startDate, DateTime? endDate);
-
+    
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
@@ -20,6 +20,7 @@ public interface ICensusPatientListManager
 
     Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
         CancellationToken cancellationToken = default);
+    
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
