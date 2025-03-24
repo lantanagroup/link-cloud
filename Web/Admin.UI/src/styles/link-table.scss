@@ -1,0 +1,68 @@
+.table-container {
+    border: solid 1px rgba(0, 0, 0, 0.12);
+    margin-top: 1em;
+}
+
+.link-table {
+    background-color: #fff;
+    min-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+  
+  .link-table th, .link-table td {
+    padding: 1rem;
+    text-align: left;
+  }
+
+  .link-table tr {
+    border-top: 1px solid #e5e7eb;
+  }  
+
+  .table-body tr:hover {
+    background-color: #f1f5f9; 
+  }
+
+  .table-body tr:hover + .submission-row {
+    background-color: #f1f5f9; 
+  }
+
+  .header-column {
+    padding-right: 1rem;
+    font-size: .9rem;
+    font-weight: 500;
+    color: #111827; 
+    white-space: nowrap;
+    border-bottom: 1px solid #e5e7eb; /* Adds a border to the bottom of each header */
+  }
+
+  .link-table tr:first-child  {
+    border-top: none;
+  }  
+
+  .link-table tr + .submission-row {    
+    border-top: none;
+  } 
+  
+  tr.submission-row {
+    font-size: 1.2rem;
+    font-weight: 500;
+  }
+
+  tr.submission-row:hover {
+    background-color: transparent;
+  }
+
+  .table-head {
+    background-color: #fff;
+  }
+
+  .table-body {
+    background-color: #fff;    
+  }
+  
+  .table-cell {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    color: #4b5563; 
+  }

@@ -1,5 +1,7 @@
 ﻿using System.Linq.Expressions;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -19,6 +21,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportScheduleModel?> SingleOrDefaultAsync(
             Expression<Func<ReportScheduleModel, bool>> predicate,
             CancellationToken cancellationToken = default);
+        
+        Task<(List<ReportScheduleModel>, PaginationMetadata metadata)> SearchAsync(Expression<Func<ReportScheduleModel, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
     }
 
 
@@ -40,6 +44,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<ReportScheduleModel?> SingleOrDefaultAsync(Expression<Func<ReportScheduleModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.ReportScheduledRepository.SingleOrDefaultAsync(predicate, cancellationToken);
+        }
+
+        public async Task<(List<ReportScheduleModel>, PaginationMetadata metadata)> SearchAsync(Expression<Func<ReportScheduleModel, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageNumber, int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var searchResults = await _database.ReportScheduledRepository.SearchAsync(predicate, sortBy, sortOrder, pageNumber, pageSize, cancellationToken);
+            
+            return searchResults;
         }
 
         public async Task<List<ReportScheduleModel>> FindAsync(Expression<Func<ReportScheduleModel, bool>> predicate, CancellationToken cancellationToken = default)

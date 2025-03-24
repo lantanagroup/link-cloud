@@ -2,7 +2,9 @@
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using System.Security.Claims;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -13,14 +15,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<CensusService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
+        private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
+        private readonly ICreateLinkBearerToken _createLinkBearerToken;
 
-        public CensusService(ILogger<CensusService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
+        public CensusService(ILogger<CensusService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreateLinkBearerToken createLinkBearerToken)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
-
+            _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
+            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
+           
             InitHttpClient();
+            
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)

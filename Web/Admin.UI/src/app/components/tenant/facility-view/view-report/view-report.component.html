@@ -1,17 +1,71 @@
-<p><a [routerLink]="['/tenant']">Tenants</a> > <a [routerLink]="['/tenant/facility/', facilityId]">Viewing {{facilityId}}</a> > Viewing Report {{reportId}}</p>
+<div class="content">
+  <p>
+      <mat-toolbar class="page-header-bar" color="primary">          
+        <span>{{facilityId}}\{{reportId}}</span> 
+        <button mat-mini-fab (click)="navBack()" matTooltip="Back to facility list">
+          <mat-icon>arrow_back</mat-icon>          
+        </button>
+      </mat-toolbar>
+  </p>
 
-<mat-card appearance="outlined">
-  <mat-card-content>
-    <p><strong>Report Id:</strong> {{reportInfo.reportId}}</p>
-    <p><strong>Reporting Period:</strong> {{reportInfo.reportingPeriodStart}} - {{reportInfo.reportingPeriodEnd}}</p>
-    <p><strong>Measures:</strong>&nbsp;<mat-chip *ngFor="let m of reportInfo.measures">{{m.shortName}}</mat-chip></p>
-  </mat-card-content>
-</mat-card>
-<mat-card appearance="outlined">
-  <mat-card-title>
-    Validation Results
-  </mat-card-title>
-  <mat-card-content>
-    <app-validation-results></app-validation-results>
-  </mat-card-content>
-</mat-card>
+  <p>
+    <span><strong>Report Id:</strong> {{reportSummary?.id}}</span>
+  <p>        
+    <span><strong>Facility Name:</strong> {{reportSummary?.facilityId}}</span>
+  </p>
+  <p>        
+    <span><strong>Reporting Period:</strong> {{reportSummary?.reportStartDate | date}} - {{reportSummary?.reportEndDate | date}} </span>
+  </p>
+
+  <mat-tab-group>
+    <mat-tab label="Measure Reports"> 
+      <button mat-mini-fab matTooltip="Refresh measure report list" (click)="onRefresh()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+      <div *ngIf="measureReports?.length > 0">
+        <div class="table-container">    
+          <table class="link-table">
+            <thead>
+              <tr>
+                <th class="header-column">Patient</th>
+                <th class="header-column">Measure</th>
+                <th class="header-column">Status</th>
+                <th class="header-column">Validation</th>
+                <th class="header-column">Resources</th>
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let report of measureReports">
+                <tr class="report-row" (click)="onSelectReport(report)">              
+                  <td class="table-cell">{{report.patientId}}</td>
+                  <td class="table-cell">{{report.reportType}}</td>              
+                  <!-- <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td> -->
+                  <td class="table-cell">{{report.status}}</td>
+                  <td class="table-cell">{{report.validationStatus}}</td>
+                  <td class="table-cell">{{report.resourceCount}}</td>
+                </tr>            
+              </ng-container>
+            </tbody>
+          </table>   
+          <mat-paginator 
+            [length]="paginationMetadata.totalCount"
+            [pageIndex]="paginationMetadata.pageNumber"
+            [pageSize]="paginationMetadata.pageSize"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="pagedEvent($event)"
+            showFirstLastButtons
+            aria-label="Select page of measure report summaries">
+          </mat-paginator>
+        </div>
+      </div>     
+    </mat-tab>
+    <mat-tab label="Validation">
+      <app-validation-results></app-validation-results>
+    </mat-tab>
+  </mat-tab-group> 
+ 
+</div>  
+    
+  
+
+

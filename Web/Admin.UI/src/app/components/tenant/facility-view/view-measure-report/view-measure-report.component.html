@@ -1,0 +1,51 @@
+<div class="content">
+    <p>
+        Facility Id: {{facilityId}}
+    </p>
+    <p>
+        Measure Report Id: {{measureReport.id}}
+    </p>
+    <p>
+        Patient Id: {{measureReport.patientId}}
+    </p>
+    <p>
+        Status: {{measureReport.status}}
+    </p>
+    <p>
+        Validation Status: {{measureReport.validationStatus}}
+    </p>
+    
+    
+    <div *ngIf="resources.length > 0">
+        <div class="table-container">    
+          <table class="link-table">
+            <thead>
+              <tr>
+                <th class="header-column">Resource Type</th>
+                <th class="header-column">Fhir Id</th>            
+                <th class="header-column">Category</th>            
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let resource of resources">
+                <tr>            
+                  <td class="table-cell">{{resource.resourceType}}</td>
+                  <td class="table-cell">{{resource.fhirId}}</td>
+                  <td class="table-cell">{{resource.resourceCategory}}</td>             
+                </tr> 
+              </ng-container>
+            </tbody>
+          </table>     
+          <mat-paginator 
+            [length]="paginationMetadata.totalCount"
+            [pageIndex]="paginationMetadata.pageNumber"
+            [pageSize]="paginationMetadata.pageSize"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="pagedEvent($event)"
+            showFirstLastButtons
+            aria-label="Select page of measure report resources">
+          </mat-paginator>
+        </div>
+      </div>
+    
+</div>
