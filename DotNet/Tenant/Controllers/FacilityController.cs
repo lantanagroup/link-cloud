@@ -340,7 +340,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     request.StartDate.Value.Day,
                     request.StartDate.Value.Hour,
                     request.StartDate.Value.Minute,
-                    request.StartDate.Value.Second
+                    request.StartDate.Value.Second,
+                    DateTimeKind.Utc
                 );
 
                var endDate = new DateTime(
@@ -349,7 +350,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     request.EndDate.Value.Day,
                     request.EndDate.Value.Hour,
                     request.EndDate.Value.Minute,
-                    request.EndDate.Value.Second
+                    request.EndDate.Value.Second,
+                    DateTimeKind.Utc
                 );
 
                 var message = new Message<string, GenerateReportValue>

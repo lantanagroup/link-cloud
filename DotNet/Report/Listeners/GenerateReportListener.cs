@@ -174,7 +174,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     startDate.Value.Day,
                                     startDate.Value.Hour,
                                     startDate.Value.Minute,
-                                    startDate.Value.Second
+                                    startDate.Value.Second,
+                                    DateTimeKind.Utc
                                 );
 
                                 endDate = new DateTime(
@@ -183,7 +184,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     endDate.Value.Day,
                                     endDate.Value.Hour,
                                     endDate.Value.Minute,
-                                    endDate.Value.Second
+                                    endDate.Value.Second,
+                                    DateTimeKind.Utc
                                 );
 
                                 // Create ReportSchedule for AdHoc Report
