@@ -23,7 +23,7 @@ public class PatientController {
         this.patientStatusBundler = patientStatusBundler;
     }
 
-    @GetMapping("/:facilityId/:reportId/:patientId")
+    @GetMapping("/{facilityId}/{reportId}/{patientId}")
     public Bundle getPatientData(@PathVariable String facilityId, @PathVariable String reportId, @PathVariable String patientId) {
         var patientReportStatus = patientReportingEvaluationStatusTemplateRepository.getFirstByFacilityIdAndPatientIdAndReports_ReportTrackingId(facilityId, patientId, reportId);
 
