@@ -7,8 +7,6 @@ using System.Text;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Link.Authorization.Infrastructure;
-using Link.Authorization.Permissions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
