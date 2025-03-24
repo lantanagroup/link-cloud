@@ -8,7 +8,7 @@ import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquis
 import { IDataAcquisitionFhirListConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
 import { AppConfigService } from '../../app-config.service';
-
+import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -62,12 +62,45 @@ export class DataAcquisitionService {
       )
   }
 
+  getQueryPlanConfiguration(facilityId: string): Observable<IQueryPlanModel> {
+    return this.http.get<string>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`)
+      .pipe(
+        tap(_ => console.log(`Fetched Query Plan configuration.`)),
+        map((response: string) => {
+          return <IQueryPlanModel>JSON.parse(response);
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
   getQueryPlanNames(facilityId: string): Observable<string[]> {
     return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlanNames`)
       .pipe(
         tap(_ => console.log(`Fetched Query Plan Names.`)),
         map((response: string[]) => {
           return <string[]>response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  createQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IQueryPlanModel> {
+    return this.http.post<string>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+      .pipe(
+        tap(_ => console.log(`Post Query Plan configuration.`)),
+        map((response: string) => {
+          return <IQueryPlanModel>JSON.parse(response);
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  updateQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IEntityCreatedResponse> {
+    return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
+      .pipe(
+        tap(_ => console.log(`Update Query Plan configuration.`)),
+        map((response) => {
+          return response;
         }),
         catchError((error) => this.errorHandler.handleError(error))
       )
