@@ -100,8 +100,7 @@ export class QueryPlanConfigFormComponent {
       ehrDescription: new FormControl('', Validators.required),
       lookBack: new FormControl('', Validators.required),
       initialQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      type: new FormControl('')
+      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator])
     });
   }
 
@@ -121,9 +120,6 @@ export class QueryPlanConfigFormComponent {
 
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.Type);
-      this.typeControl.updateValueAndValidity();
 
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
@@ -155,9 +151,6 @@ export class QueryPlanConfigFormComponent {
 
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.Type);
-      this.typeControl.updateValueAndValidity();
 
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
@@ -194,9 +187,6 @@ export class QueryPlanConfigFormComponent {
     return this.planForm.get('supplementalQueries') as FormControl;
   }
 
-  get typeControl(): FormControl {
-    return this.planForm.get('type') as FormControl;
-  }
 
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
@@ -264,6 +254,10 @@ export class QueryPlanConfigFormComponent {
 
   submitConfiguration(): void {
     if (this.planForm.valid) {
+      let successCount = 0;
+      let errorCount = 0;
+      let totalOperations = this.types.length
+
       for (const type of this.types) {
         if (this.formMode == FormMode.Create) {
           this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
@@ -276,10 +270,18 @@ export class QueryPlanConfigFormComponent {
             Type: type
           } as IQueryPlanModel).subscribe({
             next: (response) => {
-              this.submittedConfiguration.emit({id: '', message: "Query Plan Created"});
+              successCount++
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans`});
+              }
+              //this.submittedConfiguration.emit({id: '', message: `Query Plan Created for type ${type}`});
             },
             error: (err) => {
-              this.submittedConfiguration.emit({id: '', message: err.message});
+              errorCount++;
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
+              }
+              //this.submittedConfiguration.emit({id: '', message: err.message});
             }
           });
         } else if (this.formMode == FormMode.Edit) {
@@ -294,10 +296,18 @@ export class QueryPlanConfigFormComponent {
               Type: type
             } as IQueryPlanModel).subscribe({
             next: (response) => {
-              this.submittedConfiguration.emit({id: '', message: "Query Plan Updated"});
+              //this.submittedConfiguration.emit({id: '', message: `Query Plan Updated for type ${type}`});
+              successCount++
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans`});
+              }
             },
             error: (err) => {
-              this.submittedConfiguration.emit({id: '', message: err.message});
+              //this.submittedConfiguration.emit({id: '', message: err.message});
+              errorCount++;
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
+              }
             }
           });
         }
