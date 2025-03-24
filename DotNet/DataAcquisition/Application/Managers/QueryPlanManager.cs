@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 public interface IQueryPlanManager
 {
     Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default);
+    Task<QueryPlan> GetAsync(string facilityId, Frequency type, string measureId, CancellationToken cancellationToken = default);
     Task<QueryPlan> AddAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task<QueryPlan> UpdateAsync(QueryPlan entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -37,6 +38,12 @@ public class QueryPlanManager : IQueryPlanManager
     public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, CancellationToken cancellationToken = default)
     {
         return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type, cancellationToken);
+
+    }
+
+    public async Task<QueryPlan> GetAsync(string facilityId, Frequency type, string measureId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.QueryPlanRepository.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == type && q.PlanName == measureId, cancellationToken);
 
     }
 
