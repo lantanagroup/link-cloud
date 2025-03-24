@@ -8,7 +8,6 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
-import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -92,11 +91,6 @@ public class EvaluationRequestedConsumer {
 
         //get valid report in array
         var reports = patientStatus.getReports().stream().filter(r -> Objects.equals(r.getReportTrackingId(), value.getPreviousReportId())).toList();
-
-        if(reports.size() > 1){
-            var message = String.format("Multiple reports found with the same reportTrackingId: %s", value.getPreviousReportId());
-            throw new ValidationException(message);
-        }
 
         //create new PatientReportingEvaluationStatus and save it
         reports.forEach(r -> r.setReportTrackingId(reportTrackingId));
