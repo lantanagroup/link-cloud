@@ -1,5 +1,4 @@
-﻿
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -168,6 +167,24 @@ namespace LantanaGroup.Link.Report.Listeners
                                         throw new DeadLetterException("End date must be after start date.");
                                     }
                                 }
+
+                                startDate = new DateTime(
+                                    startDate.Value.Year,
+                                    startDate.Value.Month,
+                                    startDate.Value.Day,
+                                    startDate.Value.Hour,
+                                    startDate.Value.Minute,
+                                    startDate.Value.Second
+                                );
+
+                                endDate = new DateTime(
+                                    endDate.Value.Year,
+                                    endDate.Value.Month,
+                                    endDate.Value.Day,
+                                    endDate.Value.Hour,
+                                    endDate.Value.Minute,
+                                    endDate.Value.Second
+                                );
 
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
