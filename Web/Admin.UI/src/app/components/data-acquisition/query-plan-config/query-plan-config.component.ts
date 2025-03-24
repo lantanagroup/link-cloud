@@ -306,7 +306,7 @@ export class QueryPlanConfigFormComponent {
               //this.submittedConfiguration.emit({id: '', message: err.message});
               errorCount++;
               if (successCount + errorCount === totalOperations) {
-                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
+                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
               }
             }
           });
