@@ -14,6 +14,8 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
 import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-report.component';
+import { Subscription } from 'rxjs';
+
 @Component({
   selector: 'app-view-report',
   imports: [
@@ -30,6 +32,7 @@ import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-
   styleUrl: './view-report.component.scss'
 })
 export class ViewReportComponent implements OnInit {
+  private subscription: Subscription | undefined;
   facilityId: string = '';
   reportId: string = '';
 
@@ -48,12 +51,18 @@ export class ViewReportComponent implements OnInit {
     private facilityViewService: FacilityViewService) { }
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
+    this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
       this.reportId = params['reportId'];   
       this.loadReportSummary();  
       this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+        this.subscription.unsubscribe();
+    }
   }
 
   loadReportSummary(): void {
@@ -80,6 +89,9 @@ export class ViewReportComponent implements OnInit {
   }
 
   onSelectReport(measureReport: IMeasureReportSummary): void {
+
+    
+
     const dialogConfig = new MatDialogConfig();
     dialogConfig.minWidth = '75vw'; 
     dialogConfig.data = {

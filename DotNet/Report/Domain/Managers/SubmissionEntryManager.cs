@@ -167,43 +167,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             // Build patient report summaries
             var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
             
-            // foreach (var measureReport in searchResults.Item1)
-            // {
-            //     var report = _measureReportSummaryFactory.FromDomain(measureReport);
-            //     
-            //     // Determine patient resource metrics
-            //     var distinctResourceTypes = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct();
-            //     foreach (var resourceType in distinctResourceTypes)
-            //     {
-            //         var count = measureReport.ContainedResources.Count(x => x.ResourceType == resourceType && x.CategoryType == ResourceCategoryType.Patient);
-            //     
-            //         if (count > 0)
-            //         {
-            //             report.PatientResources.Add(new ResourceSummary()
-            //             {
-            //                 ResourceType = Enum.Parse<ResourceType>(resourceType),
-            //                 ResourceCategory = ResourceCategoryType.Patient.ToString(),
-            //                 ResourceCount = count
-            //             });
-            //         }
-            //         
-            //         // Separating out shared resources for now as I am unsure if there would be a case where a same resource type could be unique to a patient and shared
-            //         var sharedCount = measureReport.ContainedResources.Count(x => x.ResourceType == resourceType && x.CategoryType == ResourceCategoryType.Shared);
-            //         if (sharedCount > 0)
-            //         {
-            //             report.PatientResources.Add(new ResourceSummary()
-            //             {
-            //                 ResourceType = Enum.Parse<ResourceType>(resourceType),
-            //                 ResourceCategory = ResourceCategoryType.Shared.ToString(),
-            //                 ResourceCount = sharedCount
-            //             });
-            //         }
-            //     }
-            //     
-            //     measureReports.Add(report);
-            // }
-          
-
             return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
         }
 

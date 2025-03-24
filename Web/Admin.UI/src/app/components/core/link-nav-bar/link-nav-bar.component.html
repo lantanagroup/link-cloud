@@ -1,0 +1,74 @@
+<nav class="navbar">
+    <ul class="nav-menu">
+      <li class="nav-item">
+        <a [routerLink]="['/']" routerLinkActive="active">Home</a>
+      </li>
+      <li class="nav-item">
+        <a [routerLink]="['/tenant']" routerLinkActive="active">
+            <span class="material-icons nav-icon">local_hospital</span>
+            Tenants
+        </a>
+      </li>
+      <li class="nav-item dropdown">
+        <a href="#">
+            <span class="material-icons nav-icon">settings_applications</span>
+            System
+        </a>
+        <ul class="dropdown-menu">
+            <li>
+                <a [routerLink]="['/account']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">manage_accounts</span>
+                    Manage Accounts
+                </a>
+            </li>
+            <li>
+                <a [routerLink]="['/measure-def']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">attach_file</span>
+                    Measure Definitions
+                </a>
+            </li>
+            <li>
+                <a [routerLink]="['/validation-config']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">done_all</span>
+                    Validation Config
+                </a>
+            </li>
+            <li>
+                <a [routerLink]="['/audit']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">feed</span>
+                    Audit Log                
+                </a>
+            </li>
+        </ul>
+      </li>
+      <li class="nav-item dropdown">
+        <a href="#">
+            <span class="material-icons nav-icon">bug_report</span>
+            Testing
+        </a>
+        <ul class="dropdown-menu">
+            <li>
+                <a [routerLink]="['/integration-test']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">integration_instructions</span>
+                    Integration Test
+                </a>
+            </li>
+        </ul>
+      </li>
+      <li class="nav-item dropdown">
+        <a href="#">
+            <span class="material-icons nav-icon">monitor_heart</span>
+            Link Monnitor
+        </a>
+        <ul class="dropdown-menu">
+            <li>
+                <a [routerLink]="['/monitor/health']" routerLinkActive="active">
+                    <span class="material-icons nav-icon">health_and_safety</span>
+                    System Health
+                </a>
+            </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+  
