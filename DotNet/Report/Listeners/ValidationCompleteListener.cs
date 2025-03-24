@@ -115,7 +115,7 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 var submissionEntries =
                                     await submissionEntryManager.FindAsync(
-                                        e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId, consumeCancellationToken);
+                                        e => e.ReportScheduleId == schedule.Id && e.PatientId == value.PatientId && e.Status == PatientSubmissionStatus.ValidationRequested, consumeCancellationToken);
 
                                 foreach (var entry in submissionEntries)
                                 {
