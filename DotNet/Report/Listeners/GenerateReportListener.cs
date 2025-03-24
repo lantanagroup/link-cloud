@@ -193,6 +193,19 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     pids.AsParallel().ForAll(async p =>
                                     {
+                                        foreach (var reportType in reportTypes)
+                                        {
+                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            {
+                                                PatientId = p,
+                                                Status = PatientSubmissionStatus.PendingEvaluation,
+                                                ReportScheduleId = reportSchedule.Id,
+                                                FacilityId = facilityId,
+                                                ReportType = reportType,
+                                                CreateDate = DateTime.UtcNow
+                                            }, cancellationToken);
+                                        }
+
                                         await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
                                         {
                                             Key = facilityId,
