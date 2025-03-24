@@ -89,6 +89,8 @@ export class QueryPlanConfigFormComponent {
 
   isInvalidJson = false;
 
+  types: string[] = ["0", "1", "2", "3"];
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -262,41 +264,43 @@ export class QueryPlanConfigFormComponent {
 
   submitConfiguration(): void {
     if (this.planForm.valid) {
-      if (this.formMode == FormMode.Create) {
-        this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
-          PlanName: this.planNameControl.value,
-          FacilityId: this.facilityIdControl.value,
-          EHRDescription: this.ehrDescriptionControl.value,
-          LookBack: this.lookBackControl.value,
-          InitialQueries: JSON.parse(this.initialQueriesControl.value),
-          SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-          Type: "0"
-        } as IQueryPlanModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: "Query Plan Created"});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: err.message});
-          }
-        });
-      } else if (this.formMode == FormMode.Edit) {
-        this.dataAcquisitionService.updateQueryPlanConfiguration(this.facilityIdControl.value,
-          {
+      for (const type of this.types) {
+        if (this.formMode == FormMode.Create) {
+          this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
             PlanName: this.planNameControl.value,
             FacilityId: this.facilityIdControl.value,
             EHRDescription: this.ehrDescriptionControl.value,
             LookBack: this.lookBackControl.value,
             InitialQueries: JSON.parse(this.initialQueriesControl.value),
             SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-            Type: "0"
+            Type: type
           } as IQueryPlanModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: "Query Plan Updated"});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: err.message});
-          }
-        });
+            next: (response) => {
+              this.submittedConfiguration.emit({id: '', message: "Query Plan Created"});
+            },
+            error: (err) => {
+              this.submittedConfiguration.emit({id: '', message: err.message});
+            }
+          });
+        } else if (this.formMode == FormMode.Edit) {
+          this.dataAcquisitionService.updateQueryPlanConfiguration(this.facilityIdControl.value,
+            {
+              PlanName: this.planNameControl.value,
+              FacilityId: this.facilityIdControl.value,
+              EHRDescription: this.ehrDescriptionControl.value,
+              LookBack: this.lookBackControl.value,
+              InitialQueries: JSON.parse(this.initialQueriesControl.value),
+              SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
+              Type: type
+            } as IQueryPlanModel).subscribe({
+            next: (response) => {
+              this.submittedConfiguration.emit({id: '', message: "Query Plan Updated"});
+            },
+            error: (err) => {
+              this.submittedConfiguration.emit({id: '', message: err.message});
+            }
+          });
+        }
       }
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {
