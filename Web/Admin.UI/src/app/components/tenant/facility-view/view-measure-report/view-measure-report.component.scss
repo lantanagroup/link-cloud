@@ -1,2 +1,17 @@
 @use '../../../../../styles/core.scss';
 @use '../../../../../styles/link-table.scss';
+
+.split-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1em;
+  }
+  
+  .left-pane {
+    flex: 1;
+    margin-right: 1em;
+  }
+  
+  .right-pane {
+    flex: 2;
+  }

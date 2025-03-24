@@ -27,7 +27,7 @@ public class MeasureReportSummaryFactory
 {
     public MeasureReportSummary FromDomain(MeasureReportSubmissionEntryModel measureReport)
     {
-        return new MeasureReportSummary()
+        var summary = new MeasureReportSummary()
         {
             Id = measureReport.Id ?? string.Empty,
             PatientId = measureReport.PatientId,
@@ -36,6 +36,17 @@ public class MeasureReportSummaryFactory
             ValidationStatus = measureReport.ValidationStatus.ToString(),
             ResourceCount = measureReport.ContainedResources.Count
         };
+        
+        summary.ResourceCountSummary = measureReport.ContainedResources
+            .GroupBy(x => x.ResourceType)
+            .Select(x => new ResourceCountSummary()
+            {
+                ResourceType = Enum.Parse<ResourceType>(x.Key),
+                ResourceCount = x.Count()
+            })
+            .ToList();
+        
+        return summary;
     }
 }
 
