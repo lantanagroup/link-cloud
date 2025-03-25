@@ -232,7 +232,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     Hl7.Fhir.Model.Device device = new Device();
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
-                                        Name = "Link"
+                                        Name = "NHSNLink"
                                     });
 
                                     Assembly assembly = Assembly.GetExecutingAssembly();
