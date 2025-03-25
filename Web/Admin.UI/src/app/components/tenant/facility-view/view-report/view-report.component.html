@@ -18,7 +18,7 @@
   </div>
   <div class="data-label">
     Reporting Period
-    <span class="data-value selectable-value">{{reportSummary?.reportStartDate | date: "M/d/yy h:mm:ss a"}} - {{reportSummary?.reportEndDate | date: "M/d/yy h:mm:ss a"}}</span>
+    <span class="data-value selectable-value">{{reportSummary?.reportStartDate}} - {{reportSummary?.reportEndDate}}</span>
   </div>
  
   <mat-tab-group>
@@ -27,7 +27,7 @@
         <mat-icon>refresh</mat-icon>
       </button>
       <div *ngIf="measureReports?.length > 0">
-        <div class="table-container">    
+        <div class="table-container">
           <table class="link-table">
             <thead>
               <tr>
