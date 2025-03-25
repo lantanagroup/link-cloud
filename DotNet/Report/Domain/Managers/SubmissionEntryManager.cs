@@ -37,14 +37,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
-            Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber,
+            Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
 
         Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId,
             CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, int pageSize, int pageNumber,
+            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
@@ -76,12 +76,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
         
-        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             var searchResults = await _database.ReportScheduledRepository.SearchAsync(
                 predicate, 
-                sortBy: "CreateDate",
-                sortOrder: SortOrder.Descending, 
+                sortBy: sortBy,
+                sortOrder: sortOrder, 
                 pageSize: pageSize, pageNumber: pageNumber, cancellationToken);
             
             var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
@@ -154,15 +154,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return summary;
         }
         
-        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             
             // Get individual measure report entries for this report
             var searchResults = await _database.SubmissionEntryRepository
                 .SearchAsync(
                     predicate,
-                    sortBy: "PatientId",
-                    sortOrder: SortOrder.Ascending, 
+                    sortBy: sortBy,
+                    sortOrder: sortOrder, 
                     pageSize: pageSize, pageNumber: pageNumber, 
                     cancellationToken); 
             
