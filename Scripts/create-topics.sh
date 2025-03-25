@@ -104,6 +104,9 @@ topics=(
   "AuditableEventOccurred"
   "AuditableEventOccurred-Error"
   "AuditableEventOccurred-Retry"
+  "ValidationComplete"
+  "ValidationComplete-Error"
+  "ValidationComplete-Retry"
 )
 
 # Create each topic
