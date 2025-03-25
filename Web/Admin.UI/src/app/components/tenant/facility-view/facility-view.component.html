@@ -78,7 +78,10 @@
           <ng-container *ngFor="let report of reportListSummary">
             <tr>
               <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
-              <td class="table-cell">{{report.reportStartDate | date}} - {{report.reportEndDate | date}}</td>
+              <td class="table-cell">
+                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate | date: "M/d/yy h:mm:ss a"}}</span>
+                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate | date: "M/d/yy h:mm:ss a"}}</span>                
+              </td>
               <td class="table-cell">TODO</td>
               <td class="table-cell">
                 <mat-chip

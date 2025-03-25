@@ -18,7 +18,7 @@
   </div>
   <div class="data-label">
     Reporting Period
-    <span class="data-value selectable-value">{{reportSummary?.reportStartDate | date}} - {{reportSummary?.reportEndDate | date}}</span>
+    <span class="data-value selectable-value">{{reportSummary?.reportStartDate | date: "M/d/yy h:mm:ss a"}} - {{reportSummary?.reportEndDate | date: "M/d/yy h:mm:ss a"}}</span>
   </div>
  
   <mat-tab-group>
