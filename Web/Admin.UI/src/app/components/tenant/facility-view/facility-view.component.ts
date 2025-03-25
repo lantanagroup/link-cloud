@@ -11,12 +11,14 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'app-facility-view',
   imports: [
     CommonModule,
     MatToolbarModule,
+    MatButtonModule,
     MatIconModule,
     MatPaginatorModule,
     RouterLink,

@@ -4,12 +4,15 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
+using LinqKit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -167,7 +170,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
 
                 var summaries =
-                    await _submissionEntryManager.GetScheduledReportSummaries(predicate, pageSize, pageNumber,  HttpContext.RequestAborted);
+                    await _submissionEntryManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber,  HttpContext.RequestAborted);
 
                 return Ok(summaries);
 
@@ -225,8 +228,15 @@ namespace LantanaGroup.Link.Report.Controllers
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="reportId"></param>
+        /// <param name="sortOrder"></param>
         /// <param name="pageNumber"></param>
         /// <param name="pageSize"></param>
+        /// <param name="patientId"></param>
+        /// <param name="measureReportId"></param>
+        /// <param name="measure"></param>
+        /// <param name="reportStatus"></param>
+        /// <param name="validationStatus"></param>
+        /// <param name="sortBy"></param>
         /// <returns></returns>
         [HttpGet("summaries/{facilityId}/measure-reports")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<MeasureReportSummary>))]
@@ -234,7 +244,9 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<MeasureReportSummary>>> GetMeasureReports(
-            string facilityId, string? reportId, int pageNumber = 1, int pageSize = 10)
+            string facilityId, string? reportId, string? patientId, string? measureReportId, string? measure, 
+            PatientSubmissionStatus? reportStatus, ValidationStatus? validationStatus, string? sortBy, 
+            SortOrder sortOrder = SortOrder.Descending, int pageNumber = 1, int pageSize = 10)
         {
             //TODO: Add search criteria when requirements have been determined
 
@@ -257,19 +269,56 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 // Create search predicates
                 //TODO: design way to dynamically build predicates or change search to use custom method
-                Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate;
-                if (reportId is null)
-                {
-                    predicate = r => r.FacilityId == facilityId;
-                }
-                else
-                {
+                Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId;
 
-                    predicate = r => r.FacilityId == facilityId && r.ReportScheduleId == reportId;
+                if (!string.IsNullOrEmpty(reportId))
+                {
+                    predicate = predicate.And(r => r.ReportScheduleId == reportId);
                 }
+
+                if (!string.IsNullOrEmpty(patientId))
+                {
+                    predicate = predicate.And(r => r.PatientId == patientId);
+                }
+                
+                if (!string.IsNullOrEmpty(measureReportId))
+                {
+                    predicate = predicate.And(r => r.Id == measureReportId);
+                }
+
+                if (!string.IsNullOrEmpty(measure))
+                {
+                    predicate = predicate.And(r => r.ReportType == measure);
+                }
+
+                if (reportStatus is not null)
+                {
+                    predicate = predicate.And(r => r.Status == reportStatus);
+                }
+
+                if (validationStatus is not null)
+                {
+                    predicate = predicate.And(r => r.ValidationStatus == validationStatus);
+                }
+                
+                if (string.IsNullOrEmpty(sortBy))
+                {
+                    sortBy = "CreateDate";
+                }
+
+                var sortCol = sortBy.ToLowerInvariant() switch
+                {
+                    "createdate" => "CreateDate",
+                    "patientid" => "PatientId",
+                    "reporttype" => "ReportType",
+                    "status" => "Status",
+                    "validationstatus" => "ValidationStatus",
+                    _ => "CreateDate"
+                };
+                 
 
                 var summaries =
-                    await _submissionEntryManager.GetMeasureReports(predicate, pageSize, pageNumber, HttpContext.RequestAborted);
+                    await _submissionEntryManager.GetMeasureReports(predicate, sortCol, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 return Ok(summaries);
 

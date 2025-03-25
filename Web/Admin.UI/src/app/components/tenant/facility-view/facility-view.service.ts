@@ -36,12 +36,34 @@ export class FacilityViewService {
             );
     }
 
-    getMeasureReportSummaryList(facilityId: string, reportId: string, pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
+    getMeasureReportSummaryList(facilityId: string, reportId: string, 
+        patientId: string | null, measureReportId: string | null, measure: string | null, 
+        reportStatus: string | null, validationStatus: string | null,
+        pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
         
         //javascript based paging is zero based, so increment page number by 1
         pageNumber = pageNumber + 1;
-        
-        return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
+
+        let queryString: string = `?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+
+        //add filters to query string
+        if(patientId) {
+            queryString += `&patientId=${patientId}`;
+        }
+        if(measureReportId) {
+            queryString += `&measureReportId=${measureReportId}`;
+        }
+        if(measure) {
+            queryString += `&measure=${measure}`;
+        }
+        if(reportStatus) {
+            queryString += `&reportStatus=${reportStatus}`;
+        }
+        if(validationStatus) {
+            queryString += `&validationStatus=${validationStatus}`;
+        }        
+
+        return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports${queryString}`)
             .pipe(
                 map((response: IPagedMeasureReportSummary) => {
                     //revert back to zero based paging
