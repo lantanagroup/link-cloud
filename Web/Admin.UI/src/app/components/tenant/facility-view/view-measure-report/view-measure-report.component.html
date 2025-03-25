@@ -1,41 +1,33 @@
-<div class="content">
+<div class="content" style="overflow-y: scroll;">
     <div class="split-container">
         <div class="left-pane">
-            <p>
-                Facility Id: {{facilityId}}
-            </p>
-            <p>
-                Measure Report Id: {{measureReport.id}}
-            </p>
-            <p>
-                Patient Id: {{measureReport.patientId}}
-            </p>
-            <p>
-                Status: {{measureReport.status}}
-            </p>
-            <p>
-                Validation Status: {{measureReport.validationStatus}}
-            </p>
+          <div class="data-label">
+            Report
+            <span class="data-value selectable-value">{{measureReport.id}}</span>
+          </div>
+          <div class="data-label">
+            Facility
+            <span class="data-value">{{facilityId}}</span>
+          </div>
+          <div class="data-label">
+            Measure
+            <span class="data-value">{{measureReport.reportType}}</span>
+          </div>
+          <div class="data-label">
+            Patient
+            <span class="data-value">{{measureReport.patientId}}</span>
+          </div>
+          <div class="data-label">
+            Validation Status
+            <span class="data-value">{{measureReport.validationStatus}}</span>
+          </div>
+          <div class="data-label">
+            Submission Status
+            <span class="data-value">{{measureReport.status}}</span>
+          </div>
         </div>
         <div class="right-pane">
-            <div class="table-container" *ngIf="measureReport.resourceCountSummary.length > 0">    
-                <table class="link-table">
-                  <thead>
-                    <tr>
-                      <th class="header-column">Resource Type</th>
-                      <th class="header-column">Count</th>                       
-                    </tr>
-                  </thead>
-                  <tbody class="table-body">
-                    <ng-container *ngFor="let count of measureReport.resourceCountSummary">
-                      <tr>            
-                        <td class="table-cell">{{count.resourceType}}</td>
-                        <td class="table-cell">{{count.resourceCount}}</td>
-                      </tr> 
-                    </ng-container>
-                  </tbody>
-                </table>                
-              </div>
+          <app-resource-pie-chart [data]="measureReport.resourceCountSummary"></app-resource-pie-chart>   
         </div>
     </div> 
     

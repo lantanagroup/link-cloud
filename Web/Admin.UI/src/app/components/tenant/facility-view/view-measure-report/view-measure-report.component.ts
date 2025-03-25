@@ -5,12 +5,14 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { ResourcePieChartComponent } from '../resource-pie-chart/resource-pie-chart.component';
 
 @Component({
   selector: 'app-view-measure-report',
   imports: [
     CommonModule,
-    MatPaginatorModule
+    MatPaginatorModule,
+    ResourcePieChartComponent
   ],
   templateUrl: './view-measure-report.component.html',
   styleUrl: './view-measure-report.component.scss'

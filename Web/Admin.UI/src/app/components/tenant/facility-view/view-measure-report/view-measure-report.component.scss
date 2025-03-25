@@ -14,4 +14,24 @@
   
   .right-pane {
     flex: 2;
+    text-align: end;
+  }
+
+  .data-label {
+    font-size: 1.2rem; 
+    font-weight: 400;
+  }
+
+  .data-value {
+    display: block; 
+    color: #5f6672;
+    font-size: 1.1rem;
+    font-weight: 300; 
+    margin-top: .5em; 
+    margin-bottom: .5em;
+  }
+
+  .selectable-value {
+    cursor: pointer;
+    user-select: all;
   }

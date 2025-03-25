@@ -8,16 +8,19 @@
       </mat-toolbar>
   </p>
 
-  <p>        
-    <span><strong>Facility Name:</strong> {{facilityConfig?.facilityName}}</span>
-  </p>
-  <p>
-    <span><strong>TimeZone:</strong> {{facilityConfig?.timeZone}}</span>
-  </p>
-  <p>
-    <span>
-      <strong>Scheduled Reports:</strong>
-      <div class="table-container" style="width: 75%;" *ngIf="scheduledReports?.length > 0">       
+  <div class="split-container">
+    <div class="left-pane">
+      <div class="data-label">
+        Facility
+        <span class="data-value">{{facilityConfig?.facilityName}}</span>
+      </div>
+      <div class="data-label">
+        TimeZone
+        <span class="data-value selectable-value">{{facilityConfig?.timeZone}}</span>
+      </div>      
+    </div>
+    <div class="right-pane">  
+      <div class="table-container" *ngIf="scheduledReports?.length > 0">       
         <table class="link-table">
           <thead class="table-head">
             <tr>
@@ -45,8 +48,9 @@
           </tbody>
         </table>
       </div>
-    </span>
-  </p>
+    </div>
+  </div>
+
 
   <p>
     <mat-toolbar class="page-header-bar page-secondary-bar">          
