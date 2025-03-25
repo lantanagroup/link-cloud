@@ -8,6 +8,9 @@ The Validation service is a Java based application that is responsible for valid
 - **Image Name**: link-validation
 - **Port**: 8075
 - **Database**: SQL Server
+- **Runtime Requirements**
+  - CPU: 1/2 - 1 
+  - RAM: 1024-3072 MB
 
 ## Common Configurations
 
@@ -18,11 +21,17 @@ The Validation service is a Java based application that is responsible for valid
 * [Kafka](../config/java.md#kafka)
 * [Service Authentication](../config/java.md#service-authentication)
 
+## Environment Variables
+
+| Env Variable      | Description                                                                       | Type/Value              | Secret? |
+|-------------------|-----------------------------------------------------------------------------------|-------------------------|---------|
+| JAVA_TOOL_OPTIONS | Specify min/max Java heap size                                                    | `-Xms1024 -Xmx2048`     | No      |
+
 ## Custom Configurations
 
-| Property Name | Description                                                                       | Type/Value              | Secret? |
-|---------------|-----------------------------------------------------------------------------------|-------------------------|---------|
-| artifact.init | Whether or not to initialize the artifacts in the database with default artifacts | true (default) or false | No      |
+| Property Name     | Description                                                                       | Type/Value              | Secret? |
+|-------------------|-----------------------------------------------------------------------------------|-------------------------|---------|
+| artifact.init     | Whether or not to initialize the artifacts in the database with default artifacts | true (default) or false | No      |
 
 ## Kafka Events/Topics
 
@@ -33,6 +42,15 @@ The Validation service is a Java based application that is responsible for valid
 ### Produced Events
 
 None
+
+## New Installation Notes
+
+After a new installation of the validation service, the following should be run/executed:
+
+* `/api/aritfact/$initialize` endpoint should be run to initialize load the database with artifacts that are embedded in the validation service.
+* `/api/category/$initialize` endpoint should be run to initialize the database with default categories stored in `/src/main/resources/categories.json` (within the code-base)
+
+PENDING: This functionality is going to be altered so that they are automatically initialized on service startup when no artifacts or categories already exist in the service's database.
 
 ## API Operations
 

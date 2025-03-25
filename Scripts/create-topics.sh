@@ -1,25 +1,27 @@
 #!/bin/bash
 # Ex URL: http://kafka.test.local/v3/clusters/<cluster_id>/topics
-# Example
-# ./create-topics.sh http://kafka.test.local <cluster_id> <user> <pass>
+# Example:
+# ./create-topics.sh http://kafka.test.local <cluster_id> <user> <pass> [partitions] [replication_factor]
 
-# Check if all parameters are provided
-if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <kafka-rest-url> <cluster-id> <username> <password>"
+# Check if minimum required parameters are provided
+if [ "$#" -lt 4 ]; then
+  echo "Usage: $0 <kafka-rest-url> <cluster-id> <username> <password> [partitions] [replication_factor]"
   exit 1
 fi
 
-# Variables
+# Required arguments
 KAFKA_REST_URL=$1
 CLUSTER_ID=$2
 USERNAME=$3
 PASSWORD=$4
 
+# Optional arguments with defaults
+PARTITIONS=${5:-5}
+REPLICATION_FACTOR=${6:-2}
+
 # Function to create a Kafka topic
 create_topic() {
   local topic_name=$1
-  local partitions=3
-  local replication_factor=2
   local retention_ms=259200000
   local retention_bytes=1073741824
 
@@ -27,8 +29,8 @@ create_topic() {
   local payload=$(cat <<EOF
 {
   "topic_name": "$topic_name",
-  "partitions_count": $partitions,
-  "replication_factor": $replication_factor,
+  "partitions_count": $PARTITIONS,
+  "replication_factor": $REPLICATION_FACTOR,
   "configs": [
     {
       "name": "retention.ms",
@@ -104,7 +106,7 @@ topics=(
   "AuditableEventOccurred-Retry"
 )
 
-# Create each topic with default settings
+# Create each topic
 for topic in "${topics[@]}"; do
   create_topic "$topic"
 done
