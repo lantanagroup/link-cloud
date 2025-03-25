@@ -1,5 +1,4 @@
-﻿
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -169,6 +168,26 @@ namespace LantanaGroup.Link.Report.Listeners
                                     }
                                 }
 
+                                startDate = new DateTime(
+                                    startDate.Value.Year,
+                                    startDate.Value.Month,
+                                    startDate.Value.Day,
+                                    startDate.Value.Hour,
+                                    startDate.Value.Minute,
+                                    startDate.Value.Second,
+                                    DateTimeKind.Utc
+                                );
+
+                                endDate = new DateTime(
+                                    endDate.Value.Year,
+                                    endDate.Value.Month,
+                                    endDate.Value.Day,
+                                    endDate.Value.Hour,
+                                    endDate.Value.Minute,
+                                    endDate.Value.Second,
+                                    DateTimeKind.Utc
+                                );
+
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
@@ -193,6 +212,19 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     pids.AsParallel().ForAll(async p =>
                                     {
+                                        foreach (var reportType in reportTypes)
+                                        {
+                                            await submissionEntryManager.AddAsync(new MeasureReportSubmissionEntryModel()
+                                            {
+                                                PatientId = p,
+                                                Status = PatientSubmissionStatus.PendingEvaluation,
+                                                ReportScheduleId = reportSchedule.Id,
+                                                FacilityId = facilityId,
+                                                ReportType = reportType,
+                                                CreateDate = DateTime.UtcNow
+                                            }, cancellationToken);
+                                        }
+
                                         await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
                                         {
                                             Key = facilityId,

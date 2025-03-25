@@ -121,6 +121,7 @@ export class QueryPlanConfigFormComponent {
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
 
+
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
 
@@ -151,6 +152,7 @@ export class QueryPlanConfigFormComponent {
 
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
+
 
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();

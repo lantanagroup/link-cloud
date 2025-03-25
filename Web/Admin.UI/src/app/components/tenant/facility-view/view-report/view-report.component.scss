@@ -3,3 +3,53 @@
 .report-row:hover {
     cursor: pointer;
 }
+
+.filter-bar {       
+    padding: 8px;
+    background-color: white;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    margin-top: 1em;
+  }
+
+  .filter-bar-header {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;   
+  }
+
+  .filter-bar-input-container {
+    display: flex;
+    gap: 1em;
+  }
+
+  .filter-bar-inputs {    
+    align-items: center;
+    margin-top: .5em;
+  }  
+  
+  .filter-bar label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .filter-bar select,
+  .filter-bar input {
+    padding: 8px 8px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .filter-bar input {
+    flex-grow: 1;
+  }
+
+  .filter-bar-buttons {
+    margin-left: auto;    
+  }
+
+  .filter-bar-buttons button {
+    margin-left: .5em;
+  }

@@ -16,15 +16,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
-        private readonly ICreateLinkBearerToken _createLinkBearerToken;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public CensusService(ILogger<CensusService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreateLinkBearerToken createLinkBearerToken)
+        public CensusService(ILogger<CensusService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
-            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
            
             InitHttpClient();
             

@@ -1,2 +1,75 @@
 @use '../../../../../styles/core.scss';
 @use '../../../../../styles/link-table.scss';
+
+.split-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1em;
+  }
+  
+  .left-pane {
+    flex: 1;
+    margin-right: 1em;
+  }
+  
+  .right-pane {
+    flex: 2;
+    text-align: end;
+  }
+
+  .data-label {
+    font-size: 1.2rem; 
+    font-weight: 400;
+  }
+
+  .data-value {
+    display: block; 
+    color: #5f6672;
+    font-size: 1.1rem;
+    font-weight: 300; 
+    margin-top: .5em; 
+    margin-bottom: .5em;
+  }
+
+  .selectable-value {
+    cursor: pointer;
+    user-select: all;
+  }
+
+  .filter-bar {   
+    padding: 8px;
+    background-color: white;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  .filter-bar-header {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;   
+  }
+
+  .filter-bar-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: .5em;
+  }
+  
+  .filter-bar label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .filter-bar select,
+  .filter-bar input {
+    padding: 8px 8px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .filter-bar input {
+    flex-grow: 1;
+  }

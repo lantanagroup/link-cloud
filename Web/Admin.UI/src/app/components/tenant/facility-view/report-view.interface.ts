@@ -33,6 +33,13 @@ export interface IMeasureReportSummary
   status: string;
   validationStatus: string;
   resourceCount: number;
+  resourceCountSummary: IResourceCountSummary[];
+}
+
+export interface IResourceCountSummary
+{
+  resourceType: string;
+  resourceCount: number;
 }
 
 export class IPagedMeasureReportSummary

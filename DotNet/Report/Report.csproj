@@ -35,6 +35,7 @@
     <PackageReference Include="AutoMapper" Version="13.*" />
     <PackageReference Include="Azure.Identity" Version="1.12.0" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
+    <PackageReference Include="LinqKit.Core" Version="1.2.5" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
