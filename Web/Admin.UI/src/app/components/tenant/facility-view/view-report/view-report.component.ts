@@ -94,6 +94,7 @@ export class ViewReportComponent implements OnInit {
 
     const dialogConfig = new MatDialogConfig();
     dialogConfig.minWidth = '75vw'; 
+    dialogConfig.maxHeight = '75vh';
     dialogConfig.data = {
       dialogTitle: 'Measure Report Details',
       viewOnly: false,
