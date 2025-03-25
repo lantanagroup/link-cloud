@@ -74,7 +74,7 @@ public class CensusPatientListManager : ICensusPatientListManager
         }
         else if (startDate.HasValue && endDate.HasValue && startDate.Value != default && endDate.Value != default)
         {
-            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate <= endDate && (c.DischargeDate != default || c.DischargeDate >= startDate))).DistinctBy(p => p.PatientId).ToList();
+            return (await _patientListRepository.FindAsync(c => c.FacilityId == facilityId && c.AdmitDate <= endDate && (c.DischargeDate == default || c.DischargeDate >= startDate))).DistinctBy(p => p.PatientId).ToList();
         }
         else
         {
