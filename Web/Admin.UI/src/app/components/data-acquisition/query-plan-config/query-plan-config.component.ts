@@ -89,6 +89,8 @@ export class QueryPlanConfigFormComponent {
 
   isInvalidJson = false;
 
+  types: string[] = ["0", "1", "2", "3"];
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -98,8 +100,7 @@ export class QueryPlanConfigFormComponent {
       ehrDescription: new FormControl('', Validators.required),
       lookBack: new FormControl('', Validators.required),
       initialQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      type: new FormControl('')
+      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator])
     });
   }
 
@@ -119,9 +120,6 @@ export class QueryPlanConfigFormComponent {
 
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.Type);
-      this.typeControl.updateValueAndValidity();
 
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
@@ -153,9 +151,6 @@ export class QueryPlanConfigFormComponent {
 
       this.lookBackControl.setValue(this.item.LookBack);
       this.lookBackControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.Type);
-      this.typeControl.updateValueAndValidity();
 
       this.initialQueriesControl.setValue(this.item?.InitialQueries ? JSON.stringify(this.item.InitialQueries, null, 2) : '');
       this.initialQueriesControl.updateValueAndValidity();
@@ -192,9 +187,6 @@ export class QueryPlanConfigFormComponent {
     return this.planForm.get('supplementalQueries') as FormControl;
   }
 
-  get typeControl(): FormControl {
-    return this.planForm.get('type') as FormControl;
-  }
 
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
@@ -262,41 +254,63 @@ export class QueryPlanConfigFormComponent {
 
   submitConfiguration(): void {
     if (this.planForm.valid) {
-      if (this.formMode == FormMode.Create) {
-        this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
-          PlanName: this.planNameControl.value,
-          FacilityId: this.facilityIdControl.value,
-          EHRDescription: this.ehrDescriptionControl.value,
-          LookBack: this.lookBackControl.value,
-          InitialQueries: JSON.parse(this.initialQueriesControl.value),
-          SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-          Type: "0"
-        } as IQueryPlanModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: "Query Plan Created"});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: err.message});
-          }
-        });
-      } else if (this.formMode == FormMode.Edit) {
-        this.dataAcquisitionService.updateQueryPlanConfiguration(this.facilityIdControl.value,
-          {
+      let successCount = 0;
+      let errorCount = 0;
+      let totalOperations = this.types.length
+
+      for (const type of this.types) {
+        if (this.formMode == FormMode.Create) {
+          this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
             PlanName: this.planNameControl.value,
             FacilityId: this.facilityIdControl.value,
             EHRDescription: this.ehrDescriptionControl.value,
             LookBack: this.lookBackControl.value,
             InitialQueries: JSON.parse(this.initialQueriesControl.value),
             SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-            Type: "0"
+            Type: type
           } as IQueryPlanModel).subscribe({
-          next: (response) => {
-            this.submittedConfiguration.emit({id: '', message: "Query Plan Updated"});
-          },
-          error: (err) => {
-            this.submittedConfiguration.emit({id: '', message: err.message});
-          }
-        });
+            next: (response) => {
+              successCount++
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans`});
+              }
+              //this.submittedConfiguration.emit({id: '', message: `Query Plan Created for type ${type}`});
+            },
+            error: (err) => {
+              errorCount++;
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
+              }
+              //this.submittedConfiguration.emit({id: '', message: err.message});
+            }
+          });
+        } else if (this.formMode == FormMode.Edit) {
+          this.dataAcquisitionService.updateQueryPlanConfiguration(this.facilityIdControl.value,
+            {
+              PlanName: this.planNameControl.value,
+              FacilityId: this.facilityIdControl.value,
+              EHRDescription: this.ehrDescriptionControl.value,
+              LookBack: this.lookBackControl.value,
+              InitialQueries: JSON.parse(this.initialQueriesControl.value),
+              SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
+              Type: type
+            } as IQueryPlanModel).subscribe({
+            next: (response) => {
+              //this.submittedConfiguration.emit({id: '', message: `Query Plan Updated for type ${type}`});
+              successCount++
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans`});
+              }
+            },
+            error: (err) => {
+              //this.submittedConfiguration.emit({id: '', message: err.message});
+              errorCount++;
+              if (successCount + errorCount === totalOperations) {
+                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
+              }
+            }
+          });
+        }
       }
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {
