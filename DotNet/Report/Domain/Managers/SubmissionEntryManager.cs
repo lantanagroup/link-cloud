@@ -177,6 +177,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
         {
+            
+            
             var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
                 x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
@@ -201,7 +203,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 PageSize = pageSize,
                 PageNumber = pageNumber,
-                TotalCount = measureReport.ContainedResources.Count
+                TotalCount = resourceQuery.ToList().Count
             });
         }
         
