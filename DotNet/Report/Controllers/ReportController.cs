@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Net;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Core;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain;
@@ -280,12 +281,13 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
-        
+
         /// <summary>
         /// Returns a summary list item of a ReportSchedule based on the provided search criteria
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="reportId"></param>
+        /// <param name="resourceType"></param>
         /// <param name="pageNumber"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
@@ -295,7 +297,7 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<ResourceSummary>>> GetMeasureReportResources(
-            string facilityId, string reportId, int pageNumber = 1, int pageSize = 10)
+            string facilityId, string reportId, ResourceType? resourceType, int pageNumber = 1, int pageSize = 10)
         {
             //TODO: Add search criteria when requirements have been determined
 
@@ -321,7 +323,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate = r => r.FacilityId == facilityId && r.ReportScheduleId == reportId;
               
                 var resources =
-                    await _submissionEntryManager.GetMeasureReportResourceSummary(facilityId, reportId, pageSize, pageNumber, HttpContext.RequestAborted);
+                    await _submissionEntryManager.GetMeasureReportResourceSummary(facilityId, reportId, resourceType, pageSize, pageNumber, HttpContext.RequestAborted);
 
                 return Ok(resources);
 
@@ -330,6 +332,47 @@ namespace LantanaGroup.Link.Report.Controllers
             {
                 _logger.LogError(ex, "Exception in ReportController.GetMeasureReports");
                 return Problem("An error occurred while retrieving measures reports.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+        
+        /// <summary>
+        /// Returns a list of unique resouces types contained in a measure report
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <returns></returns>
+        [HttpGet("summaries/{facilityId}/measure-reports/{reportId}/resource-types")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<List<string>>> GetMeasureReportResourceTypes(
+            string facilityId, string reportId)
+        {
+            if(string.IsNullOrEmpty(facilityId))
+            {
+                return BadRequest("Parameter facilityId cannot be null or empty");
+            }
+            
+            if(string.IsNullOrEmpty(reportId))
+            {
+                return BadRequest("Parameter reportId cannot be null or empty");
+            }
+
+            try
+            {
+                var resourceTypes = await
+                    _submissionEntryManager.GetMeasureReportResourceTypeList(facilityId, reportId,
+                        HttpContext.RequestAborted);
+
+                return Ok(resourceTypes);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetMeasureReportResourceTypes");
+                return Problem("An error occurred while retrieving resource types within a measure report.",
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
