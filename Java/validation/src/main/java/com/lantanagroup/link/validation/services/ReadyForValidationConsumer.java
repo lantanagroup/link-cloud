@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -34,7 +33,7 @@ public class ReadyForValidationConsumer {
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
     private final ResultRepository resultRepository;
-    private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
+    private final KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
 
     public ReadyForValidationConsumer(
@@ -43,7 +42,7 @@ public class ReadyForValidationConsumer {
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
-            KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
+            KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics) {
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
@@ -63,11 +62,11 @@ public class ReadyForValidationConsumer {
         String reportId = record.value().getReportTrackingId();
         Bundle bundle = getBundle(facilityId, patientId, reportId);
         Instant start = Instant.now();
-      //  List<Result> results = validate(facilityId, patientId, reportId, bundle);
+        List<Result> results = validate(facilityId, patientId, reportId, bundle);
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, new ArrayList());
-       // produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+        produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
     }
 
     private Bundle getBundle(String facilityId, String patientId, String reportId) {
@@ -99,16 +98,17 @@ public class ReadyForValidationConsumer {
             String patientId,
             String reportId,
             List<Result> results) {
+        ValidationComplete.Key key = new ValidationComplete.Key();
+        key.setFacilityId(facilityId);
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
-      /*  value.setValid(results.stream()
+        value.setValid(results.stream()
                 .flatMap(result -> result.getCategories().stream())
-                .allMatch(Category::isAcceptable));*/
-        value.setValid(true);
+                .allMatch(Category::isAcceptable));
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
-        validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));
+        validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, key, value, headers));
     }
 
     private void produceMetrics(
