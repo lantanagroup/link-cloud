@@ -170,30 +170,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new DeadLetterException(
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
-
-                                #region Patient FHIR List
-                                var admittedPatients = new List();
-                                admittedPatients.Status = List.ListStatus.Current;
-                                admittedPatients.Mode = ListMode.Snapshot;
-                                admittedPatients.Extension.Add(new Extension()
-                                {
-                                    Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
-                                    Value = new Period()
-                                    {
-                                        StartElement = new FhirDateTime(new DateTimeOffset(key.StartDate)),
-                                        EndElement = new FhirDateTime(new DateTimeOffset(key.EndDate))
-                                    }
-                                });
-
-                                foreach (var patient in value.PatientIds)
-                                {
-                                    admittedPatients.Entry.Add(new List.EntryComponent()
-                                    {
-                                        Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
-                                    });
-                                }
-                                #endregion
-
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
