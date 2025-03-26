@@ -40,9 +40,6 @@ using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Health;
-using System.Text.Json.Serialization;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -127,28 +124,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IAuditService, AuditService>();
 
-    /* builder.Services.AddControllers(
-        options => options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true
-        ).AddJsonOptions(options =>
-        {
-            options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-            //options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-           // options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
-            //options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
-        });*/
-
-   /* builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-    {
-        options.SerializerOptions.PropertyNamingPolicy = null; // Preserve uppercase property names
-    });*/
-
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
-            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-            options.JsonSerializerOptions.PropertyNamingPolicy = null; // Preserve uppercase property names
         });
 
     builder.Services.AddHttpClient();

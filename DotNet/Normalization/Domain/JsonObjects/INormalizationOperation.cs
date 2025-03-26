@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
-[JsonDerivedType(typeof(ConceptMapOperation), "ConceptMapOperation")]
+[JsonDerivedType(typeof(ConceptMapOperation), nameof(ConceptMapOperation))]
 [JsonDerivedType(typeof(CopyElementOperation), nameof(CopyElementOperation))]
 [JsonDerivedType(typeof(CopyLocationIdentifierToTypeOperation), nameof(CopyLocationIdentifierToTypeOperation))]
 [JsonDerivedType(typeof(ConditionalTransformationOperation), nameof(ConditionalTransformationOperation))]
