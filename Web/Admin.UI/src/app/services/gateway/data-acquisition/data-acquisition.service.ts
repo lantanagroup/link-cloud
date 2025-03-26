@@ -62,8 +62,8 @@ export class DataAcquisitionService {
       )
   }
 
-  getQueryPlanConfiguration(facilityId: string): Observable<IQueryPlanModel> {
-    return this.http.get<string>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`)
+  getQueryPlanConfiguration(facilityId: string, type: string): Observable<IQueryPlanModel> {
+    return this.http.get<string>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan?type=${type}`)
       .pipe(
         tap(_ => console.log(`Fetched Query Plan configuration.`)),
         map((response: string) => {
@@ -167,4 +167,4 @@ export class DataAcquisitionService {
       )
   }
 
-  }
+}
