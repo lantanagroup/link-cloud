@@ -7,8 +7,6 @@ using System.Text;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Link.Authorization.Infrastructure;
-using Link.Authorization.Permissions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
@@ -19,15 +17,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
-        private readonly ICreateLinkBearerToken _createLinkBearerToken;
+        private readonly IServiceScopeFactory _scopeFactory;
         
-        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, ICreateLinkBearerToken createLinkBearerToken)
+        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
-            _createLinkBearerToken = createLinkBearerToken ?? throw new ArgumentNullException(nameof(createLinkBearerToken));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
             InitHttpClient();
         }
@@ -63,8 +61,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             // HTTP GET
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                
                 //create a bearer token for the system account
-                var token = await _createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             
