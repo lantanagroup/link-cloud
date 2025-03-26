@@ -67,7 +67,7 @@ public class KafkaConfig {
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
         Map<String, Serializer<?>> serializers = Map.of(
-                Topics.VALIDATION_COMPLETE, getJsonSerializer(objectMapper, ValidationComplete.Key.class));
+                Topics.VALIDATION_COMPLETE, getJsonSerializer(objectMapper, String.class));
         return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
     }
 
