@@ -12,11 +12,14 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 @Component({
   selector: 'app-facility-view',
   imports: [
     CommonModule,
+    FontAwesomeModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -28,6 +31,8 @@ import { MatButtonModule } from '@angular/material/button';
   styleUrl: './facility-view.component.scss'
 })
 export class FacilityViewComponent implements OnInit {
+  faRotate = faRotate;
+  faArrowLeft = faArrowLeft;
  
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
