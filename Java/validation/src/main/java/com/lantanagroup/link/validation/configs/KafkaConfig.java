@@ -5,10 +5,7 @@ import com.lantanagroup.link.shared.kafka.ErrorHandler;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.common.serialization.Serializer;
-import org.apache.kafka.common.serialization.VoidDeserializer;
-import org.apache.kafka.common.serialization.VoidSerializer;
+import org.apache.kafka.common.serialization.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
@@ -67,7 +64,7 @@ public class KafkaConfig {
     @Bean
     public Serializer<?> keySerializer(ObjectMapper objectMapper) {
         Map<String, Serializer<?>> serializers = Map.of(
-                Topics.VALIDATION_COMPLETE, getJsonSerializer(objectMapper, String.class));
+                Topics.VALIDATION_COMPLETE, new StringSerializer());
         return new DelegatingByTopicSerializer(byPattern(serializers), new VoidSerializer());
     }
 
