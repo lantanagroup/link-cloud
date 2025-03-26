@@ -1,5 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Serializers;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
