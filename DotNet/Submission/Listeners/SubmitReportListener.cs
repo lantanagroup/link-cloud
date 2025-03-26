@@ -170,6 +170,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     throw new DeadLetterException(
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
+
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
