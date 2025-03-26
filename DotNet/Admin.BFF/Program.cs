@@ -185,6 +185,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     else
     {
         Log.Logger.Information("Enabling anonymous access for the Link Admin API.");
+        
+        builder.Services.Configure<AuthenticationSchemaConfig>(options =>
+        {
+            options.EnableAnonymousAccess = allowAnonymousAccess;
+        });
+        
         //create anonymous access
         builder.Services.AddAuthorizationBuilder()        
             .AddPolicy("AuthenticatedUser", pb =>

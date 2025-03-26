@@ -23,8 +23,7 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
-                }),
-                catchError(this.handleError.bind(this))
+                })
             );
     }
     
@@ -33,44 +32,74 @@ export class FacilityViewService {
             .pipe(
                 map((response: IReportListSummary) => {
                     return response;
-                }),
-                catchError(this.handleError.bind(this))
+                })
             );
     }
 
-    getMeasureReportSummaryList(facilityId: string, reportId: string, pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
+    getMeasureReportSummaryList(facilityId: string, reportId: string, 
+        patientId: string | null, measureReportId: string | null, measure: string | null, 
+        reportStatus: string | null, validationStatus: string | null,
+        pageNumber: number, pageSize: number): Observable<IPagedMeasureReportSummary> {
         
         //javascript based paging is zero based, so increment page number by 1
         pageNumber = pageNumber + 1;
-        
-        return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`)
+
+        let queryString: string = `?reportId=${reportId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+
+        //add filters to query string
+        if(patientId) {
+            queryString += `&patientId=${patientId}`;
+        }
+        if(measureReportId) {
+            queryString += `&measureReportId=${measureReportId}`;
+        }
+        if(measure) {
+            queryString += `&measure=${measure}`;
+        }
+        if(reportStatus) {
+            queryString += `&reportStatus=${reportStatus}`;
+        }
+        if(validationStatus) {
+            queryString += `&validationStatus=${validationStatus}`;
+        }        
+
+        return this.http.get<IPagedMeasureReportSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports${queryString}`)
             .pipe(
                 map((response: IPagedMeasureReportSummary) => {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
-                }),
-                catchError(this.handleError.bind(this))
+                })
             );
     }
 
-    getMeasureReportResourceDetails(facilityId: string, measureReportId: string, pageNumber: number, pageSize: number): Observable<IPagedResourceSummary> {
+    getMeasureReportResourceDetails(facilityId: string, measureReportId: string, resourceType: string | null, pageNumber: number, pageSize: number): Observable<IPagedResourceSummary> {
     
         //javascript based paging is zero based, so increment page number by 1
         pageNumber = pageNumber + 1;
 
-        return this.http.get<IPagedResourceSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports/${measureReportId}/resources?pageNumber=${pageNumber}&pageSize=${pageSize}`)
+        let queryString: string = `?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+
+        if(resourceType) {
+            queryString += `&resourceType=${resourceType}`;
+        }
+
+        return this.http.get<IPagedResourceSummary>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports/${measureReportId}/resources${queryString}`)
             .pipe(
                 map((response: IPagedResourceSummary) => {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
-                }),
-                catchError(this.handleError.bind(this))
+                })
             );
     }
-    
-    private handleError(err: HttpErrorResponse) {
-        return this.errorHandler.handleError(err);
-    }
+
+    getMeasureReportResourceTypes(facilityId: string, measureReportId: string): Observable<string[]> {
+        return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/report/summaries/${facilityId}/measure-reports/${measureReportId}/resource-types`)
+            .pipe(
+                map((response: string[]) => {
+                    return response;
+                })
+            );
+    }    
 }

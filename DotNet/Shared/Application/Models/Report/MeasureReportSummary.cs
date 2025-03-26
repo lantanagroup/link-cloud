@@ -11,7 +11,8 @@ public class MeasureReportSummary
     public string ReportType { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string ValidationStatus { get; set; } = string.Empty;
-    public int ResourceCount { get; set; } 
+    public int ResourceCount { get; set; }
+    public List<ResourceCountSummary> ResourceCountSummary { get; set; } = [];
 }
 
 public class ResourceSummary
@@ -25,4 +26,11 @@ public class ResourceSummary
     public ResourceType ResourceType { get; set; }
     public string ResourceCategory { get; set; } = string.Empty; //TODO: Potentially move enum to shared project
     public string Reference => $"{ResourceType}/{FhirId}";
+}
+
+public class ResourceCountSummary
+{
+    [JsonConverter(typeof(ResourceTypeJsonConverter))]
+    public ResourceType ResourceType { get; set; }
+    public int ResourceCount { get; set; }
 }
