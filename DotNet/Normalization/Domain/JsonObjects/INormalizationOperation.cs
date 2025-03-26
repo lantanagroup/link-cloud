@@ -1,8 +1,9 @@
-﻿using System.Text.Json.Serialization;
+﻿using LantanaGroup.Link.Normalization.Application.Serializers;
+using System.Text.Json.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Domain.JsonObjects;
 
-[JsonDerivedType(typeof(ConceptMapOperation), nameof(ConceptMapOperation))]
+[JsonDerivedType(typeof(ConceptMapOperation), "ConceptMapOperation")]
 [JsonDerivedType(typeof(CopyElementOperation), nameof(CopyElementOperation))]
 [JsonDerivedType(typeof(CopyLocationIdentifierToTypeOperation), nameof(CopyLocationIdentifierToTypeOperation))]
 [JsonDerivedType(typeof(ConditionalTransformationOperation), nameof(ConditionalTransformationOperation))]

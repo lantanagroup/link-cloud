@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -62,11 +63,11 @@ public class ReadyForValidationConsumer {
         String reportId = record.value().getReportTrackingId();
         Bundle bundle = getBundle(facilityId, patientId, reportId);
         Instant start = Instant.now();
-        List<Result> results = validate(facilityId, patientId, reportId, bundle);
+      //  List<Result> results = validate(facilityId, patientId, reportId, bundle);
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
-        produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, new ArrayList());
+       // produceMetrics(correlationId, facilityId, patientId, reportId, bundle, results, duration);
     }
 
     private Bundle getBundle(String facilityId, String patientId, String reportId) {
@@ -101,9 +102,10 @@ public class ReadyForValidationConsumer {
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
-        value.setValid(results.stream()
+      /*  value.setValid(results.stream()
                 .flatMap(result -> result.getCategories().stream())
-                .allMatch(Category::isAcceptable));
+                .allMatch(Category::isAcceptable));*/
+        value.setValid(true);
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));

@@ -79,10 +79,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
         /// <param name="facilityId"></param>
         /// <returns></returns>
         [HttpGet("{facilityId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(NormalizationConfigModel))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<NormalizationConfig>> GetConfig(string facilityId)
+        public async Task<ActionResult> GetConfig(string facilityId)
         {
             NormalizationConfig config = null;
             try
@@ -101,6 +101,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 _logger.LogError(ex, "Exception encountered in NormalizationController.GetConfig");
                 return Problem(detail: "An error occurred while retrieving the configuration.", statusCode: StatusCodes.Status500InternalServerError);
             }
+
+           /* NormalizationConfigModel model = new NormalizationConfigModel
+            {
+                FacilityId = config.FacilityId,
+                OperationSequence = config.OperationSequence
+            };*/
 
             return Ok(config);
         }
