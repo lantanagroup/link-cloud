@@ -31,9 +31,6 @@ import {DataAcquisitionFhirListConfigFormComponent} from '../../data-acquisition
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {QueryPlanConfigDialogComponent} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
-import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
-import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
-import {NormalizationFormComponent} from "../../normalization/normalization-config/normalization.component";
 
 @Component({
   selector: 'app-facility-edit',
