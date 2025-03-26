@@ -28,8 +28,6 @@ import {DataAcquisitionFhirQueryConfigDialogComponent} from '../../data-acquisit
 import {DataAcquisitionFhirQueryConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
 import {DataAcquisitionFhirListConfigDialogComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
 import {DataAcquisitionFhirListConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
-import {IDataAcquisitionAuthenticationConfigModel} from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
-import {DataAcquisitionAuthenticationConfigFormComponent} from '../../data-acquisition/data-acquisition-authentication-config-form/data-acquisition-authentication-config-form.component';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {QueryPlanConfigDialogComponent} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
@@ -62,6 +60,8 @@ import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-co
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
 
+  @ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
+
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
   facilityConfigFormViewOnly: boolean = true;
@@ -86,6 +86,7 @@ export class FacilityEditComponent implements OnInit {
   dataAcqQueryPlanConfig!: IQueryPlanModel;
 
   dataAcqQueryPlanNames: string[] = [];
+
 
   private _displayReportDashboard: boolean = false;
 
@@ -279,7 +280,7 @@ export class FacilityEditComponent implements OnInit {
       }).afterClosed().subscribe(res => {
       console.log(res)
       if (res) {
-        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId).subscribe((data: IQueryPlanModel) => {
+        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.Type).subscribe((data: IQueryPlanModel) => {
           if (data) {
             console.log(data);
             this.showNoDataAcqQueryPlanConfigAlert = false;
@@ -296,10 +297,11 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
+
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
-    this.loadQueryPlan();
+    this.loadQueryPlan("0");
   }
 
   loadFhirQueryConfig() {
@@ -376,59 +378,52 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
-  loadQueryPlan() {
-    if (!this.dataAcqFhirQueryConfig) {
-      this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId).subscribe((data: IQueryPlanModel) => {
-        this.dataAcqQueryPlanConfig = data;
-        if (this.dataAcqQueryPlanConfig) {
-          this.showNoDataAcqQueryPlanConfigAlert = false;
-        } else {
-          this.showNoDataAcqQueryPlanConfigAlert = true;
-        }
-      }, error => {
-        if (error.status == 404) {
-          this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId}, please create one.`, '', {
-            duration: 3500,
-            panelClass: 'info-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-          this.dataAcqQueryPlanConfig = {
-            FacilityId: this.facilityConfig.facilityId,
-            PlanName: '',
-            EHRDescription: '',
-            LookBack: '',
-            InitialQueries: '',
-            SupplementalQueries: '',
-            Type: '0'
-          } as IQueryPlanModel;
-          this.showNoDataAcqQueryPlanConfigAlert = true;
-          //this.showDataAcqFhirQueryDialog();
-        } else {
-          this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
-            duration: 3500,
-            panelClass: 'error-snackbar',
-            horizontalPosition: 'end',
-            verticalPosition: 'top'
-          });
-        }
-      });
+  onPlanSelected(outcome: any) {
+    this.dataAcqQueryPlanConfig.Type = outcome.type;
+    this.loadQueryPlan(outcome.type);
+    if (outcome) {
+      this.showNoDataAcqQueryPlanConfigAlert = false;
+    } else {
+      this.showNoDataAcqQueryPlanConfigAlert = true;
     }
   }
 
-  loadQueryPlanNames() {
-    if (!this.dataAcqQueryPlanNames || this.dataAcqQueryPlanNames.length === 0) {
-      this.dataAcquisitionService.getQueryPlanNames(this.facilityId).subscribe((data: string[]) => {
-        this.dataAcqQueryPlanNames = data;
-      }, error => {
-        this.snackBar.open(`Failed to load FHIR query plan names for the facility, see error for details.`, '', {
+  loadQueryPlan(type: string) {
+    this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, type).subscribe((data: IQueryPlanModel) => {
+      this.dataAcqQueryPlanConfig = data;
+      if (this.dataAcqQueryPlanConfig) {
+        this.showNoDataAcqQueryPlanConfigAlert = false;
+      } else {
+        this.showNoDataAcqQueryPlanConfigAlert = true;
+      }
+    }, error => {
+      if (error.status == 404) {
+        this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId} and ${type}, please create one.`, '', {
+          duration: 3500,
+          panelClass: 'info-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.dataAcqQueryPlanConfig = {
+          FacilityId: this.facilityConfig.facilityId,
+          PlanName: '',
+          EHRDescription: '',
+          LookBack: '',
+          InitialQueries: '',
+          SupplementalQueries: '',
+          Type: type
+        } as IQueryPlanModel;
+        this.showNoDataAcqQueryPlanConfigAlert = true;
+        //this.showDataAcqFhirQueryDialog();
+      } else {
+        this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and ${type}, see error for details.`, '', {
           duration: 3500,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',
           verticalPosition: 'top'
         });
-      });
-    }
+      }
+    });
   }
 
 }

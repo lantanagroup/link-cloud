@@ -1,9 +1,22 @@
 <form [formGroup]="planForm" class="dialog-form">
+
+  <div>
+    <mat-form-field class="form-select" appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select matInput formControlName="type" (selectionChange)="onTypeChange($event)">
+        <mat-option [disabled] = "!viewOnly" *ngFor="let type of types" [value]="type.value">
+          {{ type.label }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
       <input matInput formControlName="facilityId" [readonly]="viewOnly" placeholder="Facility Id">
-      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearFacilityId()">
+      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearFacilityId()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf="!viewOnly && facilityIdControl.hasError('required')">
@@ -16,7 +29,8 @@
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Plan Name</mat-label>
       <input matInput formControlName="planName" [readonly]="viewOnly" placeholder="Plan Name">
-      <button *ngIf="planNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearPlanName()">
+      <button *ngIf="planNameControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearPlanName()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf=" !viewOnly && planNameControl.hasError('required')">
@@ -29,7 +43,8 @@
     <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Ehr Description</mat-label>
       <input matInput formControlName="ehrDescription" [readonly]="viewOnly" placeholder="Ehr Description">
-      <button *ngIf="ehrDescriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearEhrDescription()">
+      <button *ngIf="ehrDescriptionControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearEhrDescription()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf=" !viewOnly && ehrDescriptionControl.hasError('required')">
@@ -41,8 +56,9 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Look Back</mat-label>
-      <input matInput formControlName="lookBack" [readonly]="viewOnly" placeholder="Look Back" >
-      <button *ngIf="lookBackControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearLookBack()">
+      <input matInput formControlName="lookBack" [readonly]="viewOnly" placeholder="Look Back">
+      <button *ngIf="lookBackControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearLookBack()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf=" !viewOnly && lookBackControl.hasError('required')">
@@ -54,8 +70,10 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Initial Queries</mat-label>
-      <textarea class="large-textarea" rows="10" matInput formControlName="initialQueries" [readonly]="viewOnly"></textarea>
-      <button *ngIf="initialQueriesControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearInitialQueries()">
+      <textarea class="large-textarea" rows="10" matInput formControlName="initialQueries"
+                [readonly]="viewOnly"></textarea>
+      <button *ngIf="initialQueriesControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearInitialQueries()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf=" !viewOnly && initialQueriesControl.hasError('required')">
@@ -70,8 +88,10 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input">
       <mat-label>Supplemental Queries</mat-label>
-      <textarea class="large-textarea" rows="10" matInput formControlName="supplementalQueries" [readonly]="viewOnly"></textarea>
-      <button *ngIf="supplementalQueriesControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear" (click)="clearSupplementalQueries()">
+      <textarea class="large-textarea" rows="10" matInput formControlName="supplementalQueries"
+                [readonly]="viewOnly"></textarea>
+      <button *ngIf="supplementalQueriesControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearSupplementalQueries()">
         <mat-icon>close</mat-icon>
       </button>
       <mat-error *ngIf=" !viewOnly && supplementalQueriesControl.hasError('required')">

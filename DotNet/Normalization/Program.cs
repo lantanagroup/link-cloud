@@ -129,6 +129,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         {
             options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
         });
+
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
 

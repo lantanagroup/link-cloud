@@ -98,8 +98,9 @@
           </mat-action-row>
         </mat-tab>
         <mat-tab label="Query Plan">
-          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"  *ngIf="showNoDataAcqQueryPlanConfigAlert"></app-link-alert>
-          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true"></app-query-plan-config-form>
+          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
+                          *ngIf="showNoDataAcqQueryPlanConfigAlert"></app-link-alert>
+          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true" (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
           <mat-action-row>
             <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
                     (click)="showDataAcqQueryPlanDialog()" *ngIf="showNoDataAcqQueryPlanConfigAlert">
@@ -114,7 +115,7 @@
       </mat-tab-group>
     </mat-expansion-panel>
 
-    <mat-expansion-panel>
+    <mat-expansion-panel id="normalizationPanel">
       <mat-expansion-panel-header>
         <mat-panel-title>
           Normalization Configuration
@@ -124,6 +125,7 @@
       </mat-expansion-panel-header>
       -- stuff here
     </mat-expansion-panel>
+
 
     <mat-expansion-panel>
       <mat-expansion-panel-header>
