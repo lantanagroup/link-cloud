@@ -37,19 +37,22 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
-            Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber,
+            Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
 
         Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId,
             CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
-            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, int pageSize, int pageNumber,
+            Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
 
         Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
-            string facilityId, string reportId, int pageSize, int pageNumber,
+            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
+
+        Task<List<string>> GetMeasureReportResourceTypeList(
+            string facilityId, string reportId, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -73,12 +76,12 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
         
-        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             var searchResults = await _database.ReportScheduledRepository.SearchAsync(
                 predicate, 
-                sortBy: "CreateDate",
-                sortOrder: SortOrder.Descending, 
+                sortBy: sortBy,
+                sortOrder: sortOrder, 
                 pageSize: pageSize, pageNumber: pageNumber, cancellationToken);
             
             var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
@@ -151,15 +154,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return summary;
         }
         
-        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             
             // Get individual measure report entries for this report
             var searchResults = await _database.SubmissionEntryRepository
                 .SearchAsync(
                     predicate,
-                    sortBy: "PatientId",
-                    sortOrder: SortOrder.Ascending, 
+                    sortBy: sortBy,
+                    sortOrder: sortOrder, 
                     pageSize: pageSize, pageNumber: pageNumber, 
                     cancellationToken); 
             
@@ -171,16 +174,25 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         }
 
         public async Task<PagedConfigModel<ResourceSummary>> GetMeasureReportResourceSummary(
-            string facilityId, string reportId, int pageSize, int pageNumber,
+            string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
         {
+            
+            
             var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
                 x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
             if (measureReport is null)
                 return new PagedConfigModel<ResourceSummary>();
             
-            var pagedResources = measureReport.ContainedResources
+            var resourceQuery = measureReport.ContainedResources.AsQueryable();
+
+            if (resourceType.HasValue)
+            {
+                resourceQuery = resourceQuery.Where(x => x.ResourceType == resourceType.ToString());
+            }
+
+            var pagedResources = resourceQuery
                 .OrderBy(x => x.ResourceType)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize).ToList();
@@ -191,8 +203,22 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 PageSize = pageSize,
                 PageNumber = pageNumber,
-                TotalCount = measureReport.ContainedResources.Count
+                TotalCount = resourceQuery.ToList().Count
             });
+        }
+        
+        public async Task<List<string>> GetMeasureReportResourceTypeList(
+            string facilityId, string reportId, CancellationToken cancellationToken = default)
+        {
+            var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
+                x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+
+            if (measureReport is null || measureReport.ContainedResources.Count == 0)
+                return [];
+                
+            var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
+            
+            return resourceList;
         }
 
         public async Task<List<MeasureReportSubmissionEntryModel>> FindAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)

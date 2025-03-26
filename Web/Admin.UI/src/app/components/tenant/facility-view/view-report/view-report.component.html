@@ -8,22 +8,75 @@
       </mat-toolbar>
   </p>
 
-  <p>
-    <span><strong>Report Id:</strong> {{reportSummary?.id}}</span>
-  <p>        
-    <span><strong>Facility Name:</strong> {{reportSummary?.facilityId}}</span>
-  </p>
-  <p>        
-    <span><strong>Reporting Period:</strong> {{reportSummary?.reportStartDate | date}} - {{reportSummary?.reportEndDate | date}} </span>
-  </p>
-
+  <div class="data-label">
+    Scheduled Report
+    <span class="data-value selectable-value">{{reportSummary?.id}}</span>
+  </div>
+  <div class="data-label">
+    Facility
+    <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
+  </div>
+  <div class="data-label">
+    Reporting Period
+    <span class="data-value selectable-value">{{reportSummary?.reportStartDate}} - {{reportSummary?.reportEndDate}}</span>
+  </div>
+ 
   <mat-tab-group>
-    <mat-tab label="Measure Reports"> 
-      <button mat-mini-fab matTooltip="Refresh measure report list" (click)="onRefresh()">
-        <mat-icon>refresh</mat-icon>
-      </button>
+    <mat-tab label="Measure Reports">       
       <div *ngIf="measureReports?.length > 0">
-        <div class="table-container">    
+        <div class="filter-bar">  
+          <span class="filter-bar-header">Filters</span> 
+          <div class="filter-bar-input-container">
+            <div class="filter-bar-inputs">
+              <label>
+                Patient Id
+              </label>
+              <input id="patientId" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
+            </div>
+            <div class="filter-bar-inputs">
+              <label>
+                Report Id
+              </label>
+              <input id="reportId" type="text" [(ngModel)]="reportFilter" (keydown.enter)="onReportIdChange()" placeholder="Enter report Id">
+            </div>
+            <div class="filter-bar-inputs">
+              <label>
+                Measure
+              </label>
+              <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>    
+              </select> 
+            </div>
+            <div class="filter-bar-inputs">
+              <label>
+                Report Status
+              </label>
+              <select id="reportStatusFilter" [(ngModel)]="selectedReportStatusFilter" (change)="onReportStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of reportStatuses" [value]="status">{{status}}</option>    
+              </select> 
+            </div>  
+            <div class="filter-bar-inputs">
+              <label>
+                Validation Status
+              </label>
+              <select id="validationStatusFilter" [(ngModel)]="selectedValidationStatusFilter" (change)="onValidationStatusFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let status of validationStatuses" [value]="status">{{status}}</option>      
+              </select> 
+            </div>
+            <div class="filter-bar-buttons">    
+              <button mat-mini-fab matTooltip="Clear filters" (click)="clearFilters()">
+                <mat-icon>close</mat-icon> 
+              </button>        
+              <button mat-mini-fab matTooltip="Refresh measure report list" (click)="onRefresh()">
+                <mat-icon>refresh</mat-icon>
+              </button>
+            </div>
+          </div>                 
+        </div>
+        <div class="table-container">
           <table class="link-table">
             <thead>
               <tr>

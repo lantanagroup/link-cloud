@@ -334,14 +334,34 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
                 using var producer = _adHocKafkaProducerFactory.CreateProducer(producerConfig);
 
+                var startDate = new DateTime(
+                    request.StartDate.Value.Year,
+                    request.StartDate.Value.Month,
+                    request.StartDate.Value.Day,
+                    request.StartDate.Value.Hour,
+                    request.StartDate.Value.Minute,
+                    request.StartDate.Value.Second,
+                    DateTimeKind.Utc
+                );
+
+               var endDate = new DateTime(
+                    request.EndDate.Value.Year,
+                    request.EndDate.Value.Month,
+                    request.EndDate.Value.Day,
+                    request.EndDate.Value.Hour,
+                    request.EndDate.Value.Minute,
+                    request.EndDate.Value.Second,
+                    DateTimeKind.Utc
+                );
+
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
                     Headers = new Headers(),
                     Value = new GenerateReportValue
                     {
-                        StartDate = request.StartDate,
-                        EndDate = request.EndDate,
+                        StartDate = startDate,
+                        EndDate = endDate,
                         ReportTypes = request.ReportTypes,
                         PatientIds = request.PatientIds,
                         BypassSubmission = request.BypassSubmission?? false

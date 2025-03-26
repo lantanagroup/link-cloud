@@ -8,16 +8,19 @@
       </mat-toolbar>
   </p>
 
-  <p>        
-    <span><strong>Facility Name:</strong> {{facilityConfig?.facilityName}}</span>
-  </p>
-  <p>
-    <span><strong>TimeZone:</strong> {{facilityConfig?.timeZone}}</span>
-  </p>
-  <p>
-    <span>
-      <strong>Scheduled Reports:</strong>
-      <div class="table-container" style="width: 75%;" *ngIf="scheduledReports?.length > 0">       
+  <div class="split-container">
+    <div class="left-pane">
+      <div class="data-label">
+        Facility
+        <span class="data-value">{{facilityConfig?.facilityName}}</span>
+      </div>
+      <div class="data-label">
+        TimeZone
+        <span class="data-value selectable-value">{{facilityConfig?.timeZone}}</span>
+      </div>      
+    </div>
+    <div class="right-pane">  
+      <div class="table-container" *ngIf="scheduledReports?.length > 0">       
         <table class="link-table">
           <thead class="table-head">
             <tr>
@@ -45,8 +48,9 @@
           </tbody>
         </table>
       </div>
-    </span>
-  </p>
+    </div>
+  </div>
+
 
   <p>
     <mat-toolbar class="page-header-bar page-secondary-bar">          
@@ -74,7 +78,10 @@
           <ng-container *ngFor="let report of reportListSummary">
             <tr>
               <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
-              <td class="table-cell">{{report.reportStartDate | date}} - {{report.reportEndDate | date}}</td>
+              <td class="table-cell">
+                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
+                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>                
+              </td>
               <td class="table-cell">TODO</td>
               <td class="table-cell">
                 <mat-chip
