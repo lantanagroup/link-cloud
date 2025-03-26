@@ -170,29 +170,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
-                                #region Patient FHIR List
-                                var admittedPatients = new List();
-                                admittedPatients.Status = List.ListStatus.Current;
-                                admittedPatients.Mode = ListMode.Snapshot;
-                                admittedPatients.Extension.Add(new Extension()
-                                {
-                                    Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
-                                    Value = new Period()
-                                    {
-                                        StartElement = new FhirDateTime(new DateTimeOffset(key.StartDate)),
-                                        EndElement = new FhirDateTime(new DateTimeOffset(key.EndDate))
-                                    }
-                                });
-
-                                foreach (var patient in value.PatientIds)
-                                {
-                                    admittedPatients.Entry.Add(new List.EntryComponent()
-                                    {
-                                        Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
-                                    });
-                                }
-                                #endregion
-
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
@@ -254,13 +231,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #endregion
 
                                     #region Patient List
-
-                                    fileName = "patient-list.json";
-                                    contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        consumeCancellationToken);
-
+                                    await WritePatientFhirList(value.PatientIds, submissionDirectory, key.StartDate, key.EndDate);
                                     #endregion
 
                                     #region Aggregates
@@ -404,6 +375,35 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected async Task WritePatientFhirList(List<string> patientIds, string directory, DateTime startDate, DateTime endDate)
+        {
+            var admittedPatients = new List();
+            admittedPatients.Status = List.ListStatus.Current;
+            admittedPatients.Mode = ListMode.Snapshot;
+            admittedPatients.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patientIds)
+            {
+                admittedPatients.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
+                });
+            }
+
+            var fileName = "patient-list.json";
+            var contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
+
+            await File.WriteAllTextAsync(directory + "/" + fileName, contents, CancellationToken.None);
         }
 
         protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate)
