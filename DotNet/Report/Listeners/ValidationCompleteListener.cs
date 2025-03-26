@@ -20,12 +20,12 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ValidationCompleteListener> _logger;
-        private readonly IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> _kafkaConsumerFactory;      
+        private readonly IKafkaConsumerFactory<string, ValidationCompleteValue> _kafkaConsumerFactory;      
 
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        private readonly ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<string, ValidationCompleteValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, ValidationCompleteValue> _deadLetterExceptionHandler;
 
         private readonly SubmitReportProducer _submitReportProducer;
 
@@ -33,9 +33,9 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public ValidationCompleteListener(
             ILogger<ValidationCompleteListener> logger, 
-            IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue> kafkaConsumerFactory,
-            ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue> deadLetterExceptionHandler,
+            IKafkaConsumerFactory<string, ValidationCompleteValue> kafkaConsumerFactory,
+            ITransientExceptionHandler<string, ValidationCompleteValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, ValidationCompleteValue> deadLetterExceptionHandler,
             SubmitReportProducer submitReportProducer,
             IServiceScopeFactory serviceScopeFactory)
         {
@@ -99,9 +99,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                             try
                             {
-                                var key = result.Message.Key;
                                 var value = result.Message.Value;
-                                facilityId = key.FacilityId;
+                                facilityId = result.Message.Key;
 
                                 var reportId = result.Message.Value.ReportTrackingId;
 
