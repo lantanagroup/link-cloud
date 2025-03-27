@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 {
                     try
                     {
-                        resultLists.Add(await _fhirApiManager.GetPatientList(facilityConfig.FhirBaseServerUrl, listId,
+                        resultLists.Add(await _fhirApiManager.GetPatientList(facilityConfig.FhirBaseServerUrl, listId, facilityId,
                             facilityConfig.Authentication));
                     }
                     catch (Exception ex)

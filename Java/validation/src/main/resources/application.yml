@@ -6,6 +6,9 @@ loki:
 server:
   port: 31820
 
+telemetry:
+  exporterEndpoint: http://localhost:55690
+
 springdoc:
   api-docs:
     enabled: false
@@ -58,7 +61,7 @@ link:
   report:
     base-url: http://localhost:5110
     routes:
-      submission-bundle:
+      submission-model:
         path: /api/Report/Bundle/Patient
         query:
           - facilityId={facilityId}
