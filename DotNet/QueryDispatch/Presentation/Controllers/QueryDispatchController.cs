@@ -115,8 +115,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Controllers
 
             if (existingConfig != null)
             {
-                _logger.LogError($"Query dispatch configuration for Facility Id {model.FacilityId} was already created: {model}.");
-                //_logger.LogError($"Query dispatch configuration for Facility Id {HtmlInputSanitizer.Sanitize(model.FacilityId)} was already created: {HtmlInputSanitizer.Sanitize(JsonSerializer.Serialize(model))}.");
+                _logger.LogError($"Query dispatch configuration for Facility Id {HtmlInputSanitizer.Sanitize(model.FacilityId)} was already created: {HtmlInputSanitizer.Sanitize(JsonSerializer.Serialize(model))}.");
                 return BadRequest($"FacilityID {model.FacilityId} configuration was already created.");
             }
 
