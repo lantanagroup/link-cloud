@@ -298,7 +298,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+                sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
                 _logger.LogGetNotificationConfigurationByFacilityIdException(sanitizedFacilityId, ex.Message);
                 throw;
             }
