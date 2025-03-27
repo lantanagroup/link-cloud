@@ -301,7 +301,7 @@ export class FacilityEditComponent implements OnInit {
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
-    this.loadQueryPlan("0");
+    this.loadQueryPlan("0", "Discharge");
   }
 
   loadFhirQueryConfig() {
@@ -380,16 +380,16 @@ export class FacilityEditComponent implements OnInit {
 
   onPlanSelected(outcome: any) {
     this.dataAcqQueryPlanConfig.Type = outcome.type;
-    this.loadQueryPlan(outcome.type);
-    if (outcome) {
+    this.loadQueryPlan(outcome.type, outcome.label);
+    if (outcome.exists) {
       this.showNoDataAcqQueryPlanConfigAlert = false;
     } else {
       this.showNoDataAcqQueryPlanConfigAlert = true;
     }
   }
 
-  loadQueryPlan(type: string) {
-    this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, type).subscribe((data: IQueryPlanModel) => {
+  loadQueryPlan(type: string, label:string) {
+    this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, label).subscribe((data: IQueryPlanModel) => {
       this.dataAcqQueryPlanConfig = data;
       if (this.dataAcqQueryPlanConfig) {
         this.showNoDataAcqQueryPlanConfigAlert = false;
@@ -398,7 +398,7 @@ export class FacilityEditComponent implements OnInit {
       }
     }, error => {
       if (error.status == 404) {
-        this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId} and ${type}, please create one.`, '', {
+        this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId} and type ${label} , please create one.`, '', {
           duration: 3500,
           panelClass: 'info-snackbar',
           horizontalPosition: 'end',
@@ -416,7 +416,7 @@ export class FacilityEditComponent implements OnInit {
         this.showNoDataAcqQueryPlanConfigAlert = true;
         //this.showDataAcqFhirQueryDialog();
       } else {
-        this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and ${type}, see error for details.`, '', {
+        this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and type ${type}, see error for details.`, '', {
           duration: 3500,
           panelClass: 'error-snackbar',
           horizontalPosition: 'end',

@@ -36,32 +36,35 @@
 
       <!-- Actions Column -->
       <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef> Actions </th>
-        <td mat-cell *matCellDef="let facility">
-          <button mat-mini-fab aria-label="Edit facility" title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
-            Edit
-          </button>
-          <button mat-mini-fab aria-label="Delete facility" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
-            Delete
-          </button>
-          <button mat-mini-fab aria-label="View facility" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
-            View
-          </button>
-        </td>
+
+          <th mat-header-cell *matHeaderCellDef> Actions </th>
+          <td mat-cell *matCellDef="let facility">
+            <div class="actions" >
+              <button mat-icon-button aria-label="Edit facility" color="primary" class="mat-elevation-z2"  title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button aria-label="Delete facility" color="warn" class="mat-elevation-z2" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
+                <mat-icon>delete</mat-icon>
+              </button>
+              <button mat-icon-button aria-label="View facility" color="primary" class="mat-elevation-z2" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </div>
+          </td>
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
 
     </table>
-   <!-- <mat-paginator [length]="paginationMetadata.totalCount"
-                 [pageIndex]="paginationMetadata.pageNumber"
-                 [pageSize]="paginationMetadata.pageSize"
-                 [pageSizeOptions]="[5, 10, 20]"
-                 (page)="pagedEvent($event)"
-                 showFirstLastButtons
-                 aria-label="Select page of facilities">
-  </mat-paginator>-->
+    <mat-paginator [length]="paginationMetadata.totalCount"
+                   [pageIndex]="paginationMetadata.pageNumber"
+                   [pageSize]="paginationMetadata.pageSize"
+                   [pageSizeOptions]="[5, 10, 20]"
+                   (page)="pagedEvent($event)"
+                   showFirstLastButtons
+                   aria-label="Select page of tenants">
+    </mat-paginator>
   </div>
   <ng-template #no_facilities_found>
     <div class="no-results-found-container">
