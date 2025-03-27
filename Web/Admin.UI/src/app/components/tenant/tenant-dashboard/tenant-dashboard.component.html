@@ -35,18 +35,18 @@
       </ng-container>
 
       <!-- Actions Column -->
-      <ng-container matColumnDef="actions">
+      <ng-container matColumnDef="Actions">
 
           <th mat-header-cell *matHeaderCellDef> Actions </th>
           <td mat-cell *matCellDef="let facility">
             <div class="actions" >
-              <button mat-icon-button aria-label="Edit facility" color="primary" class="mat-elevation-z2"  title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
+              <button mat-icon-button  aria-label="Edit facility" color="primary" class="mat-elevation-z2"  title="Edit facility" matTooltip="Edit Facility" [routerLink]="['/tenant/facility', facility.facilityId, 'edit']">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button aria-label="Delete facility" color="warn" class="mat-elevation-z2" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
+              <button mat-icon-button  aria-label="Delete facility" color="warn" class="mat-elevation-z2" title="Delete facility" matTooltip="Delete Facility" (click)="deleteTenant()">
                 <mat-icon>delete</mat-icon>
               </button>
-              <button mat-icon-button aria-label="View facility" color="primary" class="mat-elevation-z2" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
+              <button mat-icon-button  aria-label="View facility" color="primary" class="mat-elevation-z2" title="View facility" matTooltip="View Facility" [routerLink]="['/tenant/facility', facility.facilityId]">
                 <mat-icon>visibility</mat-icon>
               </button>
             </div>
