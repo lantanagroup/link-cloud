@@ -19,7 +19,13 @@
           Facility
           <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
         </div>
-      </div>
+      </div>  
+      <div>
+        <div class="data-label">
+          Cadence
+          <span class="data-value">{{reportSummary?.frequency}}</span>
+        </div>
+      </div>    
       <div>
         <div class="data-label">
           Reporting Period
@@ -44,10 +50,10 @@
       <div>
         <div class="data-label">
           Submitted
-          <span class="data-value selectable-value">{{reportSummary?.submitted ? (reportSummary?.submitDate | date) : "False"}}</span>
+          <span class="data-value selectable-value">{{reportSummary?.submitted ? (reportSummary?.submitDate | date) : "Pending"}}</span>
         </div>
       </div>      
-    </div>    
+    </div>   
   </div>
   
  

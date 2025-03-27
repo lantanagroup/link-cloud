@@ -63,33 +63,15 @@ export class ViewReportComponent implements OnInit {
   selectedMeasureFilter: string = 'any';
   selectedReportStatusFilter: string = 'any';
   selectedValidationStatusFilter: string = 'any';
-
-  measures: string[] = [
-    "NHSNdQMAcuteCareHospitalInitialPopulation",
-    "NHSNGlycemicControlHypoglycemicInitialPopulation"
-  ];
-  
-  reportStatuses: string[] = [
-    "PendingEvaluation",
-    "NotReportable",
-    "ReadyForValidation",
-    "ValidationRequested",
-    "ValidationComplete",
-    "Submitted"
-  ]
-
-  validationStatuses: string[] = [
-    "Pending",
-    "Passed",
-    "Failed",
-    "Requested"
-  ]
+  measures: string[] = [];
+  reportStatuses: string[] = [];
+  validationStatuses: string[] = [];
 
   constructor(
     private location: Location,
     private route: ActivatedRoute, 
     private dialog: MatDialog,
-    private facilityViewService: FacilityViewService,
+    private facilityViewService: FacilityViewService,     
     private loadingService: LoaderService) { }
 
   ngOnInit(): void {    
@@ -100,14 +82,23 @@ export class ViewReportComponent implements OnInit {
 
     this.loadingService.show();
     
-      forkJoin([
-        this.facilityViewService.getReportSummary(this.facilityId, this.reportId),
-        this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize)        
+    forkJoin([
+        this.facilityViewService.getReportSummary(this.facilityId, this.reportId),        
+        this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
+        this.facilityViewService.getReportSubmissionStatuses(),
+        this.facilityViewService.getReportValidationStatuses()
       ]).subscribe({
         next: (response) => {
           this.reportSummary = response[0];
           this.measureReports = response[1].records;
           this.paginationMetadata = response[1].metadata;
+          this.measures = this.reportSummary.reportTypes;
+          this.reportStatuses = response[2];
+          this.validationStatuses = response[3];
+          this.loadingService.hide();
+        },
+        error: (error) => {
+          console.error('Error loading report summary:', error);
           this.loadingService.hide();
         }
       });

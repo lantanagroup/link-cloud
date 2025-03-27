@@ -101,5 +101,23 @@ export class FacilityViewService {
                     return response;
                 })
             );
-    }    
+    } 
+    
+    getReportSubmissionStatuses(): Observable<string[]> {
+        return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/report/report-submission-statuses`)
+            .pipe(
+                map((response: string[]) => {
+                    return response;
+                })
+            );
+    } 
+
+    getReportValidationStatuses(): Observable<string[]> {
+        return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/report/report-validation-statuses`)
+            .pipe(
+                map((response: string[]) => {
+                    return response;
+                })
+            );
+    } 
 }
