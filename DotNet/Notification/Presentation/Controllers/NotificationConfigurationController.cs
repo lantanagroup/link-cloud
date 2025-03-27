@@ -285,7 +285,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             //add id to current activity
             var activity = Activity.Current;
             activity?.AddTag("facility.id", facilityId);
-            _logger.LogGetNotificationConfigurationByFacilityId(facilityId);
+            var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+            _logger.LogGetNotificationConfigurationByFacilityId(sanitizedFacilityId);
 
             try
             {
@@ -297,7 +298,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogGetNotificationConfigurationByFacilityIdException(facilityId, ex.Message);
+                var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+                _logger.LogGetNotificationConfigurationByFacilityIdException(sanitizedFacilityId, ex.Message);
                 throw;
             }
 
