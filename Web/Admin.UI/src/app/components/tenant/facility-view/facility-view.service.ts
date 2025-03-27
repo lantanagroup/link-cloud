@@ -108,12 +108,12 @@ export class FacilityViewService {
             .pipe(
                 map((response: string[]) => {
                     return response;
-                },
+                }),
                 catchError((error: HttpErrorResponse) => {
                     this.errorHandler.handleError(error);
                     return [];
                 })
-            ));
+            );
     } 
 
     getReportValidationStatuses(): Observable<string[]> {
@@ -121,11 +121,11 @@ export class FacilityViewService {
             .pipe(
                 map((response: string[]) => {
                     return response;
-                },
+                }),
                 catchError((error: HttpErrorResponse) => {
                     this.errorHandler.handleError(error);
                     return [];
                 })
-            ));
+            );
     } 
 }
