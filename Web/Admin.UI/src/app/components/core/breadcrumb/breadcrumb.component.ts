@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
-import { filter } from 'rxjs';
+import { filter, Subscription } from 'rxjs';
 
 
 interface BreadcrumbItem {
@@ -19,16 +19,23 @@ interface BreadcrumbItem {
   styleUrl: './breadcrumb.component.scss'
 })
 export class BreadcrumbComponent {
+  private subscription: Subscription;
   items: BreadcrumbItem[] = [];
 
   constructor(private router: Router, private route: ActivatedRoute) {
     
-    this.router.events.pipe(
+    this.subscription = this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe(() => {
       this.items = this.buildBreadcrumb(this.route.root);
     });
     
+  }
+
+  ngOnDestroy(): void {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 
   private buildBreadcrumb(route: ActivatedRoute, url: string = '', breadcrumbs: BreadcrumbItem[] = []): BreadcrumbItem[] {
@@ -54,7 +61,8 @@ export class BreadcrumbComponent {
         });
       }
 
-      return this.buildBreadcrumb(child, url, breadcrumbs);
+      // Recursively build breadcrumbs for this child's children
++     this.buildBreadcrumb(child, url, breadcrumbs);
     }
 
     return breadcrumbs;
