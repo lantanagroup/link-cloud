@@ -169,8 +169,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 if (pageSize > maxNotificationsPageSize) { pageSize = maxNotificationsPageSize; }
 
                 if (pageNumber < 1) { pageNumber = 1; }
-                var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-                _logger.LogGetNotificationByFacilityId(sanitizedFacilityId);
+                //var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+                //_logger.LogGetNotificationByFacilityId(sanitizedFacilityId);
+                _logger.LogGetNotificationByFacilityId(facilityId);
 
                 //Get list of audit events using supplied filters and pagination
                 PagedNotificationModel notificationList = await _getFacilityNotificatonsQuery.Execute(facilityId, sortBy, sortOrder, pageSize, pageNumber, HttpContext.RequestAborted);
@@ -182,8 +183,9 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-                _logger.LogGetNotificationByFacilityIdException(sanitizedFacilityId, ex.Message);               
+                //var sanitizedFacilityId = facilityId.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+                //_logger.LogGetNotificationByFacilityIdException(sanitizedFacilityId, ex.Message);  
+                _logger.LogGetNotificationByFacilityIdException(facilityId, ex.Message);              
                 throw;
             }
 
