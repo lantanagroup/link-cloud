@@ -1,54 +1,84 @@
-<div class="content">
-  <p>
-      <mat-toolbar class="page-header-bar" color="primary">          
-        <span>{{facilityId}}\{{reportId}}</span> 
-        <button mat-mini-fab (click)="navBack()" matTooltip="Back to facility list">
-          <mat-icon>arrow_back</mat-icon>          
-        </button>
-      </mat-toolbar>
-  </p>
+<div class="content" *ngIf="reportSummary; else initializing">
+  <div style="width: 100%; display: flex; justify-content: flex-end;">
+    <button class="link-button light btn-lg" (click)="navBack()">
+      <fa-icon [icon]="faArrowLeft"></fa-icon>
+      Back
+    </button>
+  </div>
 
-  <div class="data-label">
-    Scheduled Report
-    <span class="data-value selectable-value">{{reportSummary?.id}}</span>
+  <div class="link-card" style="margin-bottom: 2em;">
+    <div class="link-card-row">
+      <div>
+        <div class="data-label">
+          Scheduled Report
+          <span class="data-value selectable-value">{{reportSummary?.id}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Facility
+          <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
+        </div>
+      </div>  
+      <div>
+        <div class="data-label">
+          Cadence
+          <span class="data-value">{{reportSummary?.frequency}}</span>
+        </div>
+      </div>    
+      <div>
+        <div class="data-label">
+          Reporting Period
+          <span class="data-value selectable-value">
+            <strong>Start</strong>: {{reportSummary?.reportStartDate}} <br>
+            <strong>End</strong>: {{reportSummary?.reportEndDate}}
+          </span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Patients in Census
+          <span class="data-value selectable-value">{{reportSummary?.censusCount.admittedPatients}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Patients in IP
+          <span class="data-value selectable-value">{{reportSummary?.initialPopulationCount}}</span>
+        </div>
+      </div>
+      <div>
+        <div class="data-label">
+          Submitted
+          <span class="data-value selectable-value">{{reportSummary?.submitted ? (reportSummary?.submitDate | date) : "Pending"}}</span>
+        </div>
+      </div>      
+    </div>   
   </div>
-  <div class="data-label">
-    Facility
-    <span class="data-value selectable-value">{{reportSummary?.facilityId}}</span>
-  </div>
-  <div class="data-label">
-    Reporting Period
-    <span class="data-value selectable-value">{{reportSummary?.reportStartDate}} - {{reportSummary?.reportEndDate}}</span>
-  </div>
+  
  
   <mat-tab-group>
-    <mat-tab label="Measure Reports">       
-      <div *ngIf="measureReports?.length > 0">
-        <div class="filter-bar">  
-          <span class="filter-bar-header">Filters</span> 
-          <div class="filter-bar-input-container">
-            <div class="filter-bar-inputs">
+    <mat-tab label="Measure Reports">    
+      <div class="filter-bar">  
+        <span class="filter-bar-header">Filters</span> 
+        <div class="filter-bar-row">
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
               <label>
                 Patient Id
               </label>
               <input id="patientId" type="text" [(ngModel)]="patientFilter" (keydown.enter)="onPatientIdChange()" placeholder="Enter Patient Id">
             </div>
-            <div class="filter-bar-inputs">
+            <div class="filter-bar-item">
               <label>
                 Report Id
               </label>
               <input id="reportId" type="text" [(ngModel)]="reportFilter" (keydown.enter)="onReportIdChange()" placeholder="Enter report Id">
-            </div>
-            <div class="filter-bar-inputs">
-              <label>
-                Measure
-              </label>
-              <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
-                <option value="any">Any</option>
-                <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>    
-              </select> 
-            </div>
-            <div class="filter-bar-inputs">
+            </div>            
+          </div>
+          
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
               <label>
                 Report Status
               </label>
@@ -57,7 +87,7 @@
                 <option *ngFor="let status of reportStatuses" [value]="status">{{status}}</option>    
               </select> 
             </div>  
-            <div class="filter-bar-inputs">
+            <div class="filter-bar-item">
               <label>
                 Validation Status
               </label>
@@ -66,16 +96,35 @@
                 <option *ngFor="let status of validationStatuses" [value]="status">{{status}}</option>      
               </select> 
             </div>
-            <div class="filter-bar-buttons">    
-              <button mat-mini-fab matTooltip="Clear filters" (click)="clearFilters()">
-                <mat-icon>close</mat-icon> 
-              </button>        
-              <button mat-mini-fab matTooltip="Refresh measure report list" (click)="onRefresh()">
-                <mat-icon>refresh</mat-icon>
-              </button>
+          </div>
+
+          <div class="filter-bar-col">
+            <div class="filter-bar-item">
+              <label>
+                Measure
+              </label>
+              <select id="measureFilter" [(ngModel)]="selectedMeasureFilter" (change)="onMeasureFilterChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let measure of measures" [value]="measure">{{measure}}</option>    
+              </select> 
             </div>
-          </div>                 
-        </div>
+          </div>
+          
+          <div class="filter-bar-col">
+            <div class="filter-bar-buttons">
+              <button class="link-button primary" (click)="clearFilters()">
+                <fa-icon [icon]="faXmark"></fa-icon>
+                Clear Filters
+              </button>
+              <button class="link-button light" (click)="onRefresh()">
+                <fa-icon [icon]="faRotate"></fa-icon>
+                Refresh
+              </button>
+            </div>                       
+          </div>         
+        </div>                 
+      </div>   
+      <div *ngIf="measureReports?.length > 0">        
         <div class="table-container">
           <table class="link-table">
             <thead>
@@ -119,6 +168,13 @@
  
 </div>  
     
+<ng-template #initializing>
+  <div class="content">
+      <div class="no-results-found-container">
+          <span>Loading report summary summary.</span>
+        </div>
+  </div>    
+</ng-template>
   
 
 

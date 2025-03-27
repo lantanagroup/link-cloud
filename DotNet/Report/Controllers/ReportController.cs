@@ -425,5 +425,61 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
+        
+        /// <summary>
+        /// Returns a list of possible report submission statuses
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("report-submission-statuses")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public ActionResult<List<string>> GetReportSubmissionStatuses()
+        {
+
+            try
+            {
+                var submissionStatuses = Enum.GetNames(typeof(PatientSubmissionStatus)).ToList();
+
+                return Ok(submissionStatuses);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportSubmissionStatuses");
+                return Problem("An error occurred while retrieving submission statuses.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+        
+        /// <summary>
+        /// Returns a list of possible report validation statuses
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("report-validation-statuses")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public ActionResult<List<string>> GetReportValidationStatuses()
+        {
+
+            try
+            {
+                var submissionStatuses = Enum.GetNames(typeof(ValidationStatus)).ToList();
+
+                return Ok(submissionStatuses);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception in ReportController.GetReportValidationStatuses");
+                return Problem("An error occurred while retrieving validation statuses.",
+                    statusCode: (int)HttpStatusCode.InternalServerError);
+            }
+        }
+        
+        
     }
 }
