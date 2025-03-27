@@ -7,7 +7,6 @@
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Report Type</mat-label>
       <mat-select formControlName="selectedReportTypes" [compareWith]="compareReportTypes"  multiple>
-        <mat-option>None</mat-option>
         <mat-option *ngFor="let type of reportTypes" [value]="type">
           {{type}}
         </mat-option>
@@ -46,7 +45,6 @@
     <mat-form-field class="form-input" appearance="outline">
       <mat-label>Run Report In (Minutes)</mat-label>
       <mat-select formControlName="selectedDelay">
-        <mat-option>None</mat-option>
         <mat-option *ngFor="let delay of delays" [value]="delay">
           {{ delay }} minute{{ delay > 1 ? 's' : '' }}
         </mat-option>

@@ -22,7 +22,6 @@ import {IEntityCreatedResponse} from "../../../interfaces/entity-created-respons
 })
 export class QueryPlanConfigDialogComponent {
 
-
   @ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
 
   dialogTitle: string = '';

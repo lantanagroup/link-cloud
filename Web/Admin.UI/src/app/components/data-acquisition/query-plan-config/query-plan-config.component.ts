@@ -26,8 +26,6 @@ import {MatTabsModule} from "@angular/material/tabs";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {DataAcquisitionService} from "../../../services/gateway/data-acquisition/data-acquisition.service";
-import {IDataAcquisitionQueryConfigModel} from "../../../interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface";
-import {IDataAcquisitionFhirListConfigModel} from "../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface";
 
 @Component({
   selector: 'app-query-plan-config-form',
@@ -85,11 +83,18 @@ export class QueryPlanConfigFormComponent {
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
+  @Output() planSelected = new EventEmitter<any>();
+
   planForm: FormGroup;
 
   isInvalidJson = false;
 
-  types: string[] = ["0", "1", "2", "3"];
+  types = [
+    { value: '0', label: 'Discharge' },
+    { value: '2', label: 'Weekly' },
+    { value: '1', label: 'Daily' },
+    { value: '3', label: 'Monthly' }
+  ];
 
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
 
@@ -100,7 +105,8 @@ export class QueryPlanConfigFormComponent {
       ehrDescription: new FormControl('', Validators.required),
       lookBack: new FormControl('', Validators.required),
       initialQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator])
+      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator]),
+      type: new FormControl('', Validators.required)
     });
   }
 
@@ -114,6 +120,9 @@ export class QueryPlanConfigFormComponent {
 
       this.facilityIdControl.setValue(this.item.FacilityId);
       this.facilityIdControl.updateValueAndValidity();
+
+      this.typeControl.setValue(this.item.Type.toString());
+      this.typeControl.updateValueAndValidity();
 
       this.ehrDescriptionControl.setValue(this.item.EHRDescription);
       this.ehrDescriptionControl.updateValueAndValidity();
@@ -147,6 +156,9 @@ export class QueryPlanConfigFormComponent {
       this.facilityIdControl.setValue(this.item.FacilityId);
       this.facilityIdControl.updateValueAndValidity();
 
+      this.typeControl.setValue(this.item.Type.toString());
+      this.typeControl.updateValueAndValidity();
+
       this.ehrDescriptionControl.setValue(this.item.EHRDescription);
       this.ehrDescriptionControl.updateValueAndValidity();
 
@@ -162,6 +174,44 @@ export class QueryPlanConfigFormComponent {
     }
     // toggle view
     this.toggleViewOnly(this.viewOnly);
+  }
+
+  onTypeChange(event: any) {
+    console.log('Selected type:', event.value);
+    this.loadQueryPlan();
+  }
+
+  loadQueryPlan() {
+      this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityIdControl.value, this.typeControl.value).subscribe((data: IQueryPlanModel) => {
+        this.item = data;
+        this.planSelected.emit({"type" : this.typeControl.value, "exists" : true});
+      }, error => {
+        if (error.status == 404) {
+          this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityIdControl.value}, please create one.`, '', {
+            duration: 3500,
+            panelClass: 'info-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+          this.item = {
+            FacilityId: this.facilityIdControl.value,
+            PlanName: '',
+            EHRDescription: '',
+            LookBack: '',
+            InitialQueries: '',
+            SupplementalQueries: '',
+            Type: '0'
+          } as IQueryPlanModel;
+          this.planSelected.emit({"type" : this.typeControl.value, "exists" : false});
+        } else {
+          this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
   }
 
   // Getter methods for form controls
@@ -189,6 +239,9 @@ export class QueryPlanConfigFormComponent {
     return this.planForm.get('supplementalQueries') as FormControl;
   }
 
+  get typeControl(): FormControl {
+    return this.planForm.get('type') as FormControl;
+  }
 
   clearFacilityId(): void {
     this.facilityIdControl.setValue('');
@@ -243,6 +296,7 @@ export class QueryPlanConfigFormComponent {
       this.lookBackControl.disable();
       this.initialQueriesControl.disable();
       this.supplementalQueriesControl.disable();
+      this.typeControl.enable();
     } else {
       this.facilityIdControl.enable();
       this.planNameControl.enable();
@@ -250,17 +304,13 @@ export class QueryPlanConfigFormComponent {
       this.lookBackControl.enable();
       this.initialQueriesControl.enable();
       this.supplementalQueriesControl.enable();
+      this.typeControl.disable();
     }
   }
 
 
   submitConfiguration(): void {
     if (this.planForm.valid) {
-      let successCount = 0;
-      let errorCount = 0;
-      let totalOperations = this.types.length
-
-      for (const type of this.types) {
         if (this.formMode == FormMode.Create) {
           this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
             PlanName: this.planNameControl.value,
@@ -269,21 +319,13 @@ export class QueryPlanConfigFormComponent {
             LookBack: this.lookBackControl.value,
             InitialQueries: JSON.parse(this.initialQueriesControl.value),
             SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-            Type: type
+            Type: this.typeControl.value
           } as IQueryPlanModel).subscribe({
             next: (response) => {
-              successCount++
-              if (successCount + errorCount === totalOperations) {
-                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans`});
-              }
-              //this.submittedConfiguration.emit({id: '', message: `Query Plan Created for type ${type}`});
+              this.submittedConfiguration.emit({id: '', message: `Created query plan`});
             },
             error: (err) => {
-              errorCount++;
-              if (successCount + errorCount === totalOperations) {
-                this.submittedConfiguration.emit({id: '', message: `Created ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
-              }
-              //this.submittedConfiguration.emit({id: '', message: err.message});
+              this.submittedConfiguration.emit({id: '', message: `Error Creating plan`});
             }
           });
         } else if (this.formMode == FormMode.Edit) {
@@ -295,25 +337,16 @@ export class QueryPlanConfigFormComponent {
               LookBack: this.lookBackControl.value,
               InitialQueries: JSON.parse(this.initialQueriesControl.value),
               SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
-              Type: type
+              Type: this.typeControl.value
             } as IQueryPlanModel).subscribe({
             next: (response) => {
-              //this.submittedConfiguration.emit({id: '', message: `Query Plan Updated for type ${type}`});
-              successCount++
-              if (successCount + errorCount === totalOperations) {
-                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans`});
-              }
+              this.submittedConfiguration.emit({id: '', message: `Updated query plan`});
             },
             error: (err) => {
-              //this.submittedConfiguration.emit({id: '', message: err.message});
-              errorCount++;
-              if (successCount + errorCount === totalOperations) {
-                this.submittedConfiguration.emit({id: '', message: `Updated ${successCount} of ${totalOperations} query plans. Errors: ${errorCount}`});
-              }
+              this.submittedConfiguration.emit({id: '', message: `Error updating query plan`});
             }
           });
         }
-      }
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {
         duration: 3500,
