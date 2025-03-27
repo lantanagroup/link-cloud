@@ -169,6 +169,8 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 if (pageSize > maxNotificationsPageSize) { pageSize = maxNotificationsPageSize; }
 
                 if (pageNumber < 1) { pageNumber = 1; }
+                
+                // this needs to be fixed
                 _logger.LogGetNotificationByFacilityId(facilityId);
 
                 //Get list of audit events using supplied filters and pagination
