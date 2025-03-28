@@ -21,6 +21,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faXmark, faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { LoaderService } from 'src/app/services/loading.service';
+import { PieChartComponent } from "../../../core/pie-chart/pie-chart.component";
 
 @Component({
   selector: 'app-view-report',
@@ -36,8 +37,9 @@ import { LoaderService } from 'src/app/services/loading.service';
     MatButtonModule,
     MatTooltipModule,
     RouterLink,
-    ValidationResultsComponent    
-  ],
+    ValidationResultsComponent,
+    PieChartComponent
+],
   templateUrl: './view-report.component.html',
   styleUrl: './view-report.component.scss'
 })
@@ -51,6 +53,7 @@ export class ViewReportComponent implements OnInit {
   reportId: string = '';
 
   reportSummary: IReportListSummary | undefined;
+  measuresInSubmission: Record<string, number>[] = [];
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -109,6 +112,10 @@ export class ViewReportComponent implements OnInit {
     if (this.subscription) {
         this.subscription.unsubscribe();
     }
+  }
+
+  createCharts(): void {
+    //this.measuresInSubmission = this.reportSummary?..map(summary => ({ [summary.measure]: summary.submissions })) || [];
   }
 
   loadReportSummary(): void {
