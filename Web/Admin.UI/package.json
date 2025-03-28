@@ -21,6 +21,8 @@
     "@angular/platform-browser-dynamic": "^19.1.4",
     "@angular/router": "^19.1.4",
     "@fireflysemantics/join": "^1.0.14",
+    "@fortawesome/angular-fontawesome": "^1.0.0",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "angular-oauth2-oidc": "^15.0.1",
     "crypto-js": "^4.1.1",
     "d3": "^7.9.0",

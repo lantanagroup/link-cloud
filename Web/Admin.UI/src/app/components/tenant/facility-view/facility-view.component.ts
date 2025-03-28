@@ -12,11 +12,16 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { LoaderService } from 'src/app/services/loading.service';
+import { forkJoin, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-facility-view',
   imports: [
     CommonModule,
+    FontAwesomeModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -28,6 +33,10 @@ import { MatButtonModule } from '@angular/material/button';
   styleUrl: './facility-view.component.scss'
 })
 export class FacilityViewComponent implements OnInit {
+  private subscription: Subscription | undefined;
+  
+  faRotate = faRotate;
+  faArrowLeft = faArrowLeft;
  
   facilityId: string = '';
   facilityConfig: IFacilityConfigModel | undefined;
@@ -42,17 +51,47 @@ export class FacilityViewComponent implements OnInit {
     private location: Location,
     private route: ActivatedRoute, 
     private tenantService: TenantService,
-    private facilityViewService: FacilityViewService) { }  
+    private facilityViewService: FacilityViewService,
+    private loadingService: LoaderService) { }  
  
   ngOnInit(): void {   
     
-    this.route.params.subscribe(params => {
-      this.facilityId = params['facilityId'];
-      this.loadFacilityConfig();
-      this.loadReportSummaryList(this.defaultPageNumber, this.defaultPageSize);
+    this.subscription = this.route.params.subscribe(params => {
+      this.facilityId = params['facilityId'];    
+    });
+
+    this.loadingService.show();
+
+    forkJoin([
+        this.tenantService.getFacilityConfiguration(this.facilityId),
+        this.facilityViewService.getReportSummaryList(this.facilityId, this.defaultPageNumber, this.defaultPageSize)
+      ]).subscribe({
+        next: (response) => {
+          this.facilityConfig = response[0];
+          
+          this.scheduledReports = this.facilityConfig?.scheduledReports ? [
+            { cadence: 'Daily', measures: this.facilityConfig.scheduledReports.daily },
+            { cadence: 'Weekly', measures: this.facilityConfig.scheduledReports.weekly },
+            { cadence: 'Monthly', measures: this.facilityConfig.scheduledReports.monthly }
+          ] : [];
+
+          this.reportListSummary = response[1].records;
+          this.paginationMetadata = response[1].metadata;
+
+          this.loadingService.hide();
+        },
+        error: (error) => {
+          console.error('Error loading report summaries:', error);
+          this.loadingService.hide();
+        }
     });
   }
 
+  ngOnDestroy(): void {
+    if (this.subscription) {
+        this.subscription.unsubscribe();
+    }
+  } 
    loadFacilityConfig(): void {
       this.tenantService.getFacilityConfiguration(this.facilityId).subscribe({
           next: (response: IFacilityConfigModel) => {

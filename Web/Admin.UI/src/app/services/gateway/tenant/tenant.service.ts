@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
 import {
   IFacilityConfigModel,
   IScheduledReportModel,
@@ -71,8 +71,20 @@ export class TenantService {
   }
 
 
-  listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
-    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
+  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
+
+    //javascript based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+
+    const params = new HttpParams()
+      .set('facilityId', facilityId)
+      .set('facilityName', facilityName)
+      .set('sortBy', sortBy)
+      .set('sortOrder', sortOrder)
+      .set('pageSize', pageSize)
+      .set('pageNumber', pageNumber);
+
+    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
