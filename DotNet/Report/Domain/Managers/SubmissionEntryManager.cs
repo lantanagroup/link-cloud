@@ -143,6 +143,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             var metrics = new ScheduledReportMetrics
             {
                 MeasureIpCounts = measureReportEntries
+                    .Where(x => 
+                        x.ReportScheduleId == summary.Id &&
+                        x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                        x.Status != PatientSubmissionStatus.NotReportable)
                     .GroupBy(x => x.ReportType)
                     .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
                 ReportStatusCounts = measureReportEntries
