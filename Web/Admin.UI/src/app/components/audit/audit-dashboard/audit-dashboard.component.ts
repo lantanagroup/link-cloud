@@ -160,7 +160,7 @@ export class AuditDashboardComponent implements OnInit {
 
   loadFacilityFilter() : string[] {
     var facilityList: string[] = ["All"];
-    this.tenantService.listFacilities('', '').subscribe((facilities: PagedFacilityConfigModel) => {
+    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe((facilities: PagedFacilityConfigModel) => {
           facilities.records.map(facility => facility.facilityId).forEach(facilityId => {
             facilityList.push(facilityId);
           });

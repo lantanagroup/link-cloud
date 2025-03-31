@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -104,11 +105,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                         );
                 
                 // Get census information for each report
-                summary.CensusCount = new CensusCount
-                {
-                    AdmittedPatients = reportEntries.Where(x => x.ReportScheduleId == summary.Id).DistinctBy(x => x.PatientId).Count(),
-                    DischargedPatients = reportEntries.Where(x => x.ReportScheduleId == summary.Id && x.Status != PatientSubmissionStatus.PendingEvaluation).DistinctBy(x => x.PatientId).Count()
-                };
+                summary.CensusCount = reportEntries.Where(x => x.ReportScheduleId == summary.Id)
+                    .DistinctBy(x => x.PatientId).Count();
             }
             
             return new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2);
@@ -122,34 +120,44 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
            
             var summary = _scheduledReportFactory.FromDomain(scheduledReport);
-
+            if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
+            
+            //TODO: Eventually may need to check validation results
             // Get individual measure report entries for this report
             var measureReportEntries = await _database.SubmissionEntryRepository
                 .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken); 
 
             // Get the initial population count for each report
-            //TODO: Eventually may need to check validation results
-            if (!string.IsNullOrWhiteSpace(summary?.Id))
-                summary.InitialPopulationCount =
-                    measureReportEntries.Count(
-                        x => x.ReportScheduleId == summary.Id &&
-                             x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                             x.Status != PatientSubmissionStatus.NotReportable
-                    );
-                
+            summary.InitialPopulationCount =
+                measureReportEntries.Count(
+                    x => x.ReportScheduleId == summary.Id &&
+                         x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                         x.Status != PatientSubmissionStatus.NotReportable
+                );
+            
             // Get census information for each report
-            if (summary != null)
+            summary.CensusCount = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
+                .DistinctBy(x => x.PatientId).Count();
+            
+            // Get the metrics for the scheduled report
+            var metrics = new ScheduledReportMetrics
             {
-                summary.CensusCount = new CensusCount
-                {
-                    AdmittedPatients = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
-                        .DistinctBy(x => x.PatientId).Count(),
-                    DischargedPatients = measureReportEntries
-                        .Where(x => x.ReportScheduleId == summary.Id &&
-                                    x.Status != PatientSubmissionStatus.PendingEvaluation).DistinctBy(x => x.PatientId)
-                        .Count()
-                };
-            }
+                MeasureIpCounts = measureReportEntries
+                    .Where(x => 
+                        x.ReportScheduleId == summary.Id &&
+                        x.Status != PatientSubmissionStatus.PendingEvaluation &&
+                        x.Status != PatientSubmissionStatus.NotReportable)
+                    .GroupBy(x => x.ReportType)
+                    .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
+                ReportStatusCounts = measureReportEntries
+                    .GroupBy(x => x.Status)
+                    .ToDictionary(x => x.Key.ToString(), x => x.Count()),
+                ValidationStatusCounts = measureReportEntries
+                    .GroupBy(x => x.ValidationStatus)
+                    .ToDictionary(x => x.Key.ToString(), x => x.Count())
+            };
+        
+            summary.ReportMetrics = metrics;
 
             return summary;
         }

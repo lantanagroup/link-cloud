@@ -176,6 +176,13 @@ export class QueryPlanConfigFormComponent {
     this.toggleViewOnly(this.viewOnly);
   }
 
+
+  // Method to get the label based on the value
+  getLabelFromValue(value: string): string {
+    const selected = this.types.find(type => type.value === value);
+    return selected ? selected.label : 'No label found';
+  }
+
   onTypeChange(event: any) {
     console.log('Selected type:', event.value);
     this.loadQueryPlan();
@@ -184,7 +191,7 @@ export class QueryPlanConfigFormComponent {
   loadQueryPlan() {
       this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityIdControl.value, this.typeControl.value).subscribe((data: IQueryPlanModel) => {
         this.item = data;
-        this.planSelected.emit({"type" : this.typeControl.value, "exists" : true});
+        this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : true});
       }, error => {
         if (error.status == 404) {
           this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityIdControl.value}, please create one.`, '', {
@@ -202,7 +209,7 @@ export class QueryPlanConfigFormComponent {
             SupplementalQueries: '',
             Type: '0'
           } as IQueryPlanModel;
-          this.planSelected.emit({"type" : this.typeControl.value, "exists" : false});
+          this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : false});
         } else {
           this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
             duration: 3500,
