@@ -12,6 +12,14 @@ public class ScheduledReportListSummary
     public DateTime? SubmitDate { get; set; }
     public List<string> ReportTypes { get; set; } = [];
     public Frequency Frequency { get; set; }
-    public CensusCount? CensusCount { get; set; }
+    public int CensusCount { get; set; }
     public int InitialPopulationCount { get; set; }
+    public ScheduledReportMetrics? ReportMetrics { get; set; }
+}
+
+public class ScheduledReportMetrics
+{
+    public Dictionary<string, int> MeasureIpCounts { get; set; } = new();
+    public Dictionary<string, int> ReportStatusCounts { get; set; } = new();
+    public Dictionary<string, int> ValidationStatusCounts { get; set; } = new();
 }

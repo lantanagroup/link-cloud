@@ -23,7 +23,11 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
-                })
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
+                })                
             );
     }
     
@@ -32,6 +36,10 @@ export class FacilityViewService {
             .pipe(
                 map((response: IReportListSummary) => {
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -69,6 +77,10 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -90,6 +102,10 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -99,6 +115,10 @@ export class FacilityViewService {
             .pipe(
                 map((response: string[]) => {
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     } 

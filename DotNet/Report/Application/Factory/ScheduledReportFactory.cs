@@ -39,12 +39,7 @@ public class MeasureReportSummaryFactory
         
         summary.ResourceCountSummary = measureReport.ContainedResources
             .GroupBy(x => x.ResourceType)
-            .Select(x => new ResourceCountSummary()
-            {
-                ResourceType = Enum.Parse<ResourceType>(x.Key),
-                ResourceCount = x.Count()
-            })
-            .ToList();
+            .ToDictionary(x => x.Key, x => x.Count());
         
         return summary;
     }

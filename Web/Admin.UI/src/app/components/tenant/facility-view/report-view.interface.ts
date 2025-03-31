@@ -10,14 +10,22 @@ export interface IReportListSummary
     submitDate: Date;
     reportTypes: string[];
     frequency: string;
-    censusCount: ICensusCount;
+    censusCount: number;
     initialPopulationCount: number;
+    reportMetrics: IScheduledReportMetrics;
 }
 
 export interface ICensusCount
 {
     admittedPatients: number;
     dischargedPatients: number;
+}
+
+export interface IScheduledReportMetrics
+{
+  measureIpCounts: Record<string, number>;
+  reportStatusCounts: Record<string, number>;
+  validationStatusCounts: Record<string, number>;
 }
 
 export class IPagedReportListSummary {
@@ -33,13 +41,7 @@ export interface IMeasureReportSummary
   status: string;
   validationStatus: string;
   resourceCount: number;
-  resourceCountSummary: IResourceCountSummary[];
-}
-
-export interface IResourceCountSummary
-{
-  resourceType: string;
-  resourceCount: number;
+  resourceCountSummary: Record<string, number>;
 }
 
 export class IPagedMeasureReportSummary

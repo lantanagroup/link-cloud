@@ -95,7 +95,7 @@
                 </mat-chip>
               </td>
               <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
-              <td class="table-cell">{{report.censusCount?.admittedPatients}}</td>
+              <td class="table-cell">{{report.censusCount}}</td>
               <td class="table-cell">{{report.initialPopulationCount}}</td>
             </tr>
             <tr class="submission-row" *ngIf="report.submitted">
