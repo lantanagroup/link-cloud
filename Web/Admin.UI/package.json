@@ -29,6 +29,7 @@
     "jest-editor-support": "*",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.47",
+    "ngx-toastr": "^19.0.0",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
