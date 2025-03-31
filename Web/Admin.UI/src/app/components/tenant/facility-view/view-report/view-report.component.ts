@@ -53,7 +53,6 @@ export class ViewReportComponent implements OnInit {
   reportId: string = '';
 
   reportSummary: IReportListSummary | undefined;
-  measuresInSubmission: Record<string, number>[] = [];
 
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
@@ -112,11 +111,7 @@ export class ViewReportComponent implements OnInit {
     if (this.subscription) {
         this.subscription.unsubscribe();
     }
-  }
-
-  createCharts(): void {
-    //this.measuresInSubmission = this.reportSummary?..map(summary => ({ [summary.measure]: summary.submissions })) || [];
-  }
+  } 
 
   loadReportSummary(): void {
     this.facilityViewService.getReportSummary(this.facilityId, this.reportId).subscribe({

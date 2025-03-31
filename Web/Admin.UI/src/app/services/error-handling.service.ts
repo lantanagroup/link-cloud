@@ -20,7 +20,7 @@ import { throwError } from "rxjs/internal/observable/throwError";
   handleError(err: any) {
         let errorMessage = '';
 
-        if(err.error)
+        if(err.error && err.error.detail && err.error.traceId) 
         {
           errorMessage = `${this.sanitizeErrorMessage(err.error.detail)} - ${err.error.traceId}`;
         }
@@ -34,7 +34,7 @@ import { throwError } from "rxjs/internal/observable/throwError";
           }
         }      
 
-        this.toastr.error('Error', errorMessage, {
+        this.toastr.error(errorMessage, 'Error', {
           timeOut: 5000,
           positionClass: 'toast-bottom-full-width',
           closeButton: true,
