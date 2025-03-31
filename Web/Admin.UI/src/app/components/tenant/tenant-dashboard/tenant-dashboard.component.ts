@@ -40,7 +40,7 @@ export class TenantDashboardComponent implements OnInit {
   facilities: IFacilityConfigModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
 
-  displayedColumns: string[] = [ 'facilityId', 'facilityName', 'scheduledTasks', 'actions' ];
+  displayedColumns: string[] = [ 'facilityId', 'facilityName', 'scheduledTasks', 'Actions' ];
   dataSource = new MatTableDataSource<IFacilityConfigModel>(this.facilities);
 
 
