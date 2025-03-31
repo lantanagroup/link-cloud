@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		README.md = README.md
+		version.json = version.json
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit", "DotNet\Audit\Audit.csproj", "{4C933C22-D465-41EF-B790-00E7F9098963}"
@@ -104,9 +105,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{0BA1C2
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2013B-29DF-4736-9B16-CB5655C0AB26}"
 	ProjectSection(SolutionItems) = preProject
+		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
 		.github\workflows\pr-title-check.yml = .github\workflows\pr-title-check.yml
 		.github\workflows\smoke-test.yaml = .github\workflows\smoke-test.yaml
-		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"

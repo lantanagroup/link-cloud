@@ -1,11 +1,10 @@
-using System.Reflection;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Core;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Serilog;
-using List = NUnit.Framework.List;
+using System.Reflection;
+using Assert = NUnit.Framework.Assert;
 
 namespace LantanaGroup.Link.ReportTests.Core;
 

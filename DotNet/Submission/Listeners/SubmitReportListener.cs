@@ -2,6 +2,7 @@
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -16,7 +17,6 @@ using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
@@ -196,15 +196,15 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                     #region Device
 
+                                    var versionInfo = await VersionInfo.Load();
+
                                     Hl7.Fhir.Model.Device device = new Device();
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
-                                        Name = "NHSNLink"
+                                        Name = versionInfo.VersionName
                                     });
 
-                                    Assembly assembly = Assembly.GetExecutingAssembly();
-                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                                    string? version = fvi?.FileVersion;
+                                    string? version = versionInfo.VersionNumber;
 
                                     (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
                                     {

@@ -29,7 +29,6 @@
 		<PackageReference Include="Azure.Identity" Version="1.12.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-		<PackageReference Include="MediatR" Version="12.*" />
 		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.3">
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -49,6 +48,12 @@
 		<PackageReference Include="System.ServiceModel.Primitives" Version="8.0.0" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<None Update="..\Solution Items\version.json">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	
 	<ItemGroup>
 		<ProjectReference Include="..\Shared\Shared.csproj" />
 	</ItemGroup>
