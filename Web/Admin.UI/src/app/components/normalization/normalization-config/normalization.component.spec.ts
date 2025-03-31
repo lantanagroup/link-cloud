@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { NormalizationComponent } from './normalization.component';
+import { NormalizationFormComponent } from './normalization.component';
 
 describe('NormalizationComponent', () => {
-  let component: NormalizationComponent;
-  let fixture: ComponentFixture<NormalizationComponent>;
+  let component: NormalizationFormComponent;
+  let fixture: ComponentFixture<NormalizationFormComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [NormalizationComponent]
+      imports: [NormalizationFormComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(NormalizationComponent);
+    fixture = TestBed.createComponent(NormalizationFormComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

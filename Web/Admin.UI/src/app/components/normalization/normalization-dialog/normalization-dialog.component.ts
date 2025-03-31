@@ -32,7 +32,7 @@ export class NormalizationConfigDialogComponent {
   formIsInvalid: boolean = true;
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, formMode: FormMode, viewOnly: boolean, normalization: INormalizationModel },
-              private dialogRef: MatDialogRef<QueryPlanConfigFormComponent>,
+              private dialogRef: MatDialogRef<NormalizationFormComponent>,
               private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
