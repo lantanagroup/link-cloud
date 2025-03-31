@@ -31,6 +31,10 @@ import {DataAcquisitionFhirListConfigFormComponent} from '../../data-acquisition
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {QueryPlanConfigDialogComponent} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
+import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
+import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
+import {NormalizationConfigDialogComponent} from "../../normalization/normalization-dialog/normalization-dialog.component";
+import {NormalizationFormComponent} from "../../normalization/normalization-config/normalization.component";
 
 @Component({
   selector: 'app-facility-edit',
@@ -54,7 +58,8 @@ import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-co
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
     DataAcquisitionFhirListConfigDialogComponent,
-    QueryPlanConfigFormComponent
+    QueryPlanConfigFormComponent,
+    NormalizationFormComponent
   ]
 })
 export class FacilityEditComponent implements OnInit {
@@ -87,6 +92,10 @@ export class FacilityEditComponent implements OnInit {
 
   dataAcqQueryPlanNames: string[] = [];
 
+  normalizationConfig!: INormalizationModel;
+
+  noNormalizationConfigAlertMessage = 'No Normalization Config found for this facility.';
+  showNoNormalizationConfigAlert: boolean = false
 
   private _displayReportDashboard: boolean = false;
 
@@ -104,6 +113,7 @@ export class FacilityEditComponent implements OnInit {
     private tenantService: TenantService,
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
+    private normalizationService: NormalizationService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar) {
   }
@@ -152,6 +162,36 @@ export class FacilityEditComponent implements OnInit {
           if (data) {
             this.showNoCensusConfigAlert = false;
             this.censusConfig = data;
+          }
+        });
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  showNormalizationDialog(): void {
+    this.dialog.open(NormalizationConfigDialogComponent,
+      {
+        width: '75%',
+        data: {
+          dialogTitle: 'Normalization Configuration',
+          formMode: this.showNoNormalizationConfigAlert ? FormMode.Create : FormMode.Edit,
+          viewOnly: false,
+          normalization: this.normalizationConfig
+        }
+      }).afterClosed().subscribe(res => {
+      console.log(res)
+      if (res) {
+        this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: any) => {
+          if (data) {
+            console.log(data);
+            this.showNoNormalizationConfigAlert = false;
+            this.normalizationConfig = data;
           }
         });
         this.snackBar.open(`${res}`, '', {
@@ -328,7 +368,6 @@ export class FacilityEditComponent implements OnInit {
             queryPlanIds: []
           } as IDataAcquisitionQueryConfigModel;
           this.showNoDataAcqFhirQueryConfigAlert = true;
-          //this.showDataAcqFhirQueryDialog();
         } else {
           this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
             duration: 3500,
@@ -388,7 +427,7 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
-  loadQueryPlan(type: string, label:string) {
+  loadQueryPlan(type: string, label: string) {
     this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, label).subscribe((data: IQueryPlanModel) => {
       this.dataAcqQueryPlanConfig = data;
       if (this.dataAcqQueryPlanConfig) {
@@ -424,6 +463,40 @@ export class FacilityEditComponent implements OnInit {
         });
       }
     });
+  }
+
+  loadNormalization() {
+    if (!this.normalizationConfig) {
+      this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: INormalizationModel) => {
+        this.normalizationConfig = data;
+        if (this.normalizationConfig) {
+          this.showNoNormalizationConfigAlert = false;
+        } else {
+          this.showNoNormalizationConfigAlert = true;
+        }
+      }, error => {
+        if (error.status == 404) {
+          this.snackBar.open(`No current Normalization Config found for facility ${this.facilityId}, please create one.`, '', {
+            duration: 3500,
+            panelClass: 'info-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+          this.normalizationConfig = {
+            FacilityId: this.facilityConfig.facilityId,
+            OperationSequence: ''
+          } as INormalizationModel;
+          this.showNoNormalizationConfigAlert = true;
+        } else {
+          this.snackBar.open(`Failed to load Normalization Config  for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
+    }
   }
 
 }
