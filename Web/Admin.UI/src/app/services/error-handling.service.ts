@@ -1,11 +1,13 @@
-import { HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
+import { ToastrService } from "ngx-toastr";
 import { throwError } from "rxjs/internal/observable/throwError";
 
 @Injectable({
     providedIn: 'root'
   })
   export class ErrorHandlingService {
+
+  constructor(private toastr: ToastrService) { }
 
 
   private sanitizeErrorMessage(message: string): string {
@@ -18,16 +20,31 @@ import { throwError } from "rxjs/internal/observable/throwError";
   handleError(err: any) {
         let errorMessage = '';
 
-        if (err instanceof ErrorEvent) {
-          errorMessage = `An error occured: ${this.sanitizeErrorMessage(err.error.message)}`;
+        if(err.error && err.error.detail && err.error.traceId) 
+        {
+          errorMessage = `${this.sanitizeErrorMessage(err.error.detail)} - ${err.error.traceId}`;
         }
-        else {
-          errorMessage = `Server returned code: ${err.status}, error message is: ${this.sanitizeErrorMessage(err.message)}`;
-        }
+        else
+        {
+          // If err.error is not available, fallback to err.message or a generic message
+          if (err.message) {
+            errorMessage = this.sanitizeErrorMessage(err.message);
+          } else {
+            errorMessage = 'An unknown error occurred';
+          }
+        }      
+
+        this.toastr.error(errorMessage, 'Error', {
+          timeOut: 5000,
+          positionClass: 'toast-bottom-full-width',
+          closeButton: true,
+          progressBar: true,
+          tapToDismiss: false,
+          progressAnimation: 'decreasing'
+        });
 
         err.message = errorMessage;
-
-        console.error(errorMessage);
+        
         return throwError(() => err);
 
       }
