@@ -176,24 +176,55 @@ export class NormalizationFormComponent {
 
 
   submitConfiguration(): void {
+
     if (this.normalizationForm.valid) {
-      if (this.formMode == FormMode.Create) {
-        this.normalizationService.createNormalizationConfiguration(this.facilityIdControl.value, {
-          FacilityId: this.facilityIdControl.value,
-          OperationSequence: JSON.parse(this.operationSequenceControl.value)
-        } as INormalizationModel).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit({id: '', message: "Normalization Created"});
-        });
-      } else if (this.formMode == FormMode.Edit) {
-        this.normalizationService.updateNormalizationConfiguration(
-          this.facilityIdControl.value,
-          {
+      try {
+        const parsedOperation = JSON.parse(this.operationSequenceControl.value);
+        if (this.formMode == FormMode.Create) {
+          this.normalizationService.createNormalizationConfiguration(this.facilityIdControl.value, {
             FacilityId: this.facilityIdControl.value,
-            OperationSequence: JSON.parse(this.operationSequenceControl.value)
-          } as INormalizationModel).subscribe((response: IEntityCreatedResponse) => {
-            this.submittedConfiguration.emit({id: '', message: "Normalization Updated"});
-          }
-        );
+            OperationSequence: parsedOperation
+          } as INormalizationModel).subscribe({
+            next: (response: IEntityCreatedResponse) => {
+              this.submittedConfiguration.emit({id: '', message: `Normalization for ${this.facilityIdControl.value} created successfully`});
+            },
+            error: (error) => {
+              this.snackBar.open(`Failed to create normalization: ${error.message}`, '', {
+                duration: 3500,
+                panelClass: 'error-snackbar',
+                horizontalPosition: 'end',
+                verticalPosition: 'top'
+              });
+            }
+          });
+        } else if (this.formMode == FormMode.Edit) {
+          this.normalizationService.updateNormalizationConfiguration(
+            this.facilityIdControl.value,
+            {
+              FacilityId: this.facilityIdControl.value,
+              OperationSequence: parsedOperation
+            } as INormalizationModel).subscribe({
+              next: (response: IEntityCreatedResponse) => {
+                this.submittedConfiguration.emit({id:  '', message: `Normalization for ${this.facilityIdControl.value} updated successfully`});
+              },
+              error: (error) => {
+                this.snackBar.open(`Failed to update normalization: ${error.message}`, '', {
+                  duration: 3500,
+                  panelClass: 'error-snackbar',
+                  horizontalPosition: 'end',
+                  verticalPosition: 'top'
+                });
+              }
+            }
+          );
+        }
+      } catch (error) {
+        this.snackBar.open(`Invalid JSON in operation sequence: ${(error as Error).message}`, '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
       }
     } else {
       this.snackBar.open(`Invalid form, please check for errors.`, '', {

@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { NormalizationDialogComponent } from './normalization-dialog.component';
+import { NormalizationConfigDialogComponent } from './normalization-dialog.component';
 
 describe('NormalizationDialogComponent', () => {
-  let component: NormalizationDialogComponent;
-  let fixture: ComponentFixture<NormalizationDialogComponent>;
+  let component: NormalizationConfigDialogComponent;
+  let fixture: ComponentFixture<NormalizationConfigDialogComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [NormalizationDialogComponent]
+      imports: [NormalizationConfigDialogComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(NormalizationDialogComponent);
+    fixture = TestBed.createComponent(NormalizationConfigDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
