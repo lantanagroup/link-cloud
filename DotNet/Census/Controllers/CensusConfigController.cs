@@ -92,10 +92,15 @@ public class CensusConfigController : Controller
         try
         {
             var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
-            if (response == null)
+            if (response is null)
                 return NotFound();
 
-            return Ok(response);
+            CensusConfigModel model = new CensusConfigModel
+            {
+                FacilityId = response.FacilityID,
+                ScheduledTrigger = response.ScheduledTrigger
+            };
+            return Ok(model);
         }
         catch (Exception ex)
         {

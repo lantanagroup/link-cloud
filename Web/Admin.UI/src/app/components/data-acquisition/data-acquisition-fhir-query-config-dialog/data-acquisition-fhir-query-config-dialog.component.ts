@@ -55,7 +55,7 @@ export class DataAcquisitionFhirQueryConfigDialogComponent {
   }
 
   onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
-    if (outcome.id.length > 0) {
+    if (outcome.message.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {

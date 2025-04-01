@@ -21,7 +21,7 @@ import { CensusService } from 'src/app/services/gateway/census/census.service';
   imports: [
     CommonModule,
     MatButtonModule,
-    MatFormFieldModule,    
+    MatFormFieldModule,
     MatInputModule,
     MatIconModule,
     MatChipsModule,
@@ -34,7 +34,7 @@ import { CensusService } from 'src/app/services/gateway/census/census.service';
   styleUrls: ['./census-config-form.component.scss']
 })
 export class CensusConfigFormComponent implements OnInit, OnChanges {
-  @Input() item!: ICensusConfiguration;  
+  @Input() item!: ICensusConfiguration;
 
   @Input() formMode!: FormMode;
 
@@ -46,7 +46,7 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
   @Output() formValueChanged = new EventEmitter<boolean>();
 
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
- 
+
   configForm!: FormGroup;
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
@@ -59,32 +59,35 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
       scheduledTrigger: new FormControl('', Validators.required),
     });
   }
-  
+
   ngOnInit(): void {
-    this.configForm.reset(); 
+    this.configForm.reset();
 
     if(this.item) {
       //set form values
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
-      this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);     
+      this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
-    }    
-   
+    }
+
     this.configForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.configForm.invalid);
     });
   }
 
-  ngOnChanges(changes: SimpleChanges) {     
-    
+  ngOnChanges(changes: SimpleChanges) {
+
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
 
       this.scheduledTriggerControl.setValue(this.item.scheduledTrigger);
       this.scheduledTriggerControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
     }
   }
 
@@ -99,11 +102,16 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
 
   get scheduledTriggerControl(): FormControl {
     return this.configForm.get('scheduledTrigger') as FormControl;
-  }  
+  }
 
-  clearFacilityId(): void {
-    this.facilityIdControl.setValue('');
-    this.facilityIdControl.updateValueAndValidity();
+  // Dynamically disable or enable the form control based on viewOnly
+  toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
+    if (viewOnly) {
+      this.scheduledTriggerControl.disable();
+    } else {
+      this.scheduledTriggerControl.enable();
+    }
   }
 
   clearScheduledTrigger(): void {
@@ -113,14 +121,14 @@ export class CensusConfigFormComponent implements OnInit, OnChanges {
 
   submitConfiguration(): void {
     if(this.configForm.valid) {
-      if(this.formMode == FormMode.Create) {      
+      if(this.formMode == FormMode.Create) {
         this.censusService.createConfiguration(this.facilityIdControl.value, this.scheduledTriggerControl.value).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+          this.submittedConfiguration.emit({id: '', message: "Census Created"});
         });
       }
       else if(this.formMode == FormMode.Edit) {
         this.censusService.updateConfiguration(this.facilityIdControl.value, this.scheduledTriggerControl.value).subscribe((response: IEntityCreatedResponse) => {
-          this.submittedConfiguration.emit(response);
+          this.submittedConfiguration.emit({id: '', message: "Census Updated"});
         });
       }
     }
