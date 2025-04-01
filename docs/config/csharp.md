@@ -129,12 +129,6 @@ Not all services use every URL. The configuration is provided for completeness a
 | MongoDB__ConnectionString | MongoDB connection string | Yes      | None          | Yes     |
 | MongoDB__DatabaseName     | MongoDB database name     | Yes      | None          | No      |
 
-#### Auto Migration
-
-| Name        | Description                                                        | Default Value | Secret? |
-|-------------|--------------------------------------------------------------------|---------------|---------|
-| AutoMigrate | Indicates whether to automatically update the schema for databases | false         | No      |
-
 ### Example Configuration
 
 ```json
