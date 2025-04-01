@@ -5,10 +5,10 @@ import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { ResourcePieChartComponent } from '../resource-pie-chart/resource-pie-chart.component';
 import { forkJoin } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { PieChartComponent } from "../../../core/pie-chart/pie-chart.component";
 
 @Component({
   selector: 'app-view-measure-report',
@@ -16,14 +16,14 @@ import { FormsModule } from '@angular/forms';
     CommonModule,
     FormsModule,
     MatPaginatorModule,
-    ResourcePieChartComponent
-  ],
+    PieChartComponent
+],
   templateUrl: './view-measure-report.component.html',
   styleUrl: './view-measure-report.component.scss'
 })
 export class ViewMeasureReportComponent implements OnInit {
   facilityId: string = '';
-  measureReport!: IMeasureReportSummary;
+  measureReport!: IMeasureReportSummary; 
 
   defaultPageNumber: number = 0;
   defaultPageSize: number = 10;
@@ -40,6 +40,7 @@ export class ViewMeasureReportComponent implements OnInit {
   ngOnInit(): void {
     this.facilityId = this.data.facilityId;
     this.measureReport = this.data.measureReport;
+
     if (this.measureReport) {
       forkJoin({
         summary: this.facilityViewService.getMeasureReportResourceDetails(this.facilityId, this.measureReport.id, null, this.defaultPageNumber, this.defaultPageSize),

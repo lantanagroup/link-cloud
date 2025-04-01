@@ -1,6 +1,7 @@
 .table-container {
-    border: solid 1px rgba(0, 0, 0, 0.12);
+    border: solid 1px rgba(0, 0, 0, 0.5);
     margin-top: 1em;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .link-table {
@@ -33,7 +34,7 @@
     font-weight: 500;
     color: #111827; 
     white-space: nowrap;
-    border-bottom: 1px solid #e5e7eb; /* Adds a border to the bottom of each header */
+    border-bottom: 1px solid #e5e7eb;
   }
 
   .link-table tr:first-child  {
@@ -66,3 +67,65 @@
     font-size: 0.875rem;
     color: #4b5563; 
   }
+
+  // Search Filter Bar
+
+  .filter-bar {       
+    padding: 8px;
+    background-color: white;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    margin-top: 1em;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+  }
+
+  .filter-bar-header {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;   
+  }
+
+  .filter-bar-row {
+    display: flex;
+    flex-direction: row;
+    gap: 2em;
+  }
+
+  .filter-bar-col {
+    display: flex;
+    flex-direction: column;
+    gap: .5em;
+  }
+
+  .filter-bar-col:last-child {
+    margin-left: auto;
+  }
+  
+
+  .filter-bar-item {    
+    align-items: center;
+    margin-top: .5em;
+  }  
+  
+  .filter-bar label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .filter-bar select,
+  .filter-bar input {
+    padding: 8px 8px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+    width: 100%;
+    flex-grow: 1;
+  }
+
+  .filter-bar-buttons {    
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: .5em;
+  } 

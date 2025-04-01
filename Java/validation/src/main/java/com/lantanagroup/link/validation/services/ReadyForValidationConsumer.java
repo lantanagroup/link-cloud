@@ -33,7 +33,7 @@ public class ReadyForValidationConsumer {
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
     private final ResultRepository resultRepository;
-    private final KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate;
+    private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
 
     public ReadyForValidationConsumer(
@@ -42,7 +42,7 @@ public class ReadyForValidationConsumer {
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
-            KafkaTemplate<ValidationComplete.Key, ValidationComplete> validationCompleteTemplate,
+            KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics) {
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
@@ -98,8 +98,6 @@ public class ReadyForValidationConsumer {
             String patientId,
             String reportId,
             List<Result> results) {
-        ValidationComplete.Key key = new ValidationComplete.Key();
-        key.setFacilityId(facilityId);
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
@@ -108,7 +106,7 @@ public class ReadyForValidationConsumer {
                 .allMatch(Category::isAcceptable));
         org.apache.kafka.common.header.Headers headers = new RecordHeaders()
                 .add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
-        validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, key, value, headers));
+        validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers));
     }
 
     private void produceMetrics(

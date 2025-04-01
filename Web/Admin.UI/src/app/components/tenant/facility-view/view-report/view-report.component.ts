@@ -9,20 +9,25 @@ import { IMeasureReportSummary, IReportListSummary } from '../report-view.interf
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
-import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
 import { PaginationMetadata } from 'src/app/models/pagination-metadata.model';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatDialog, MatDialogConfig, MatDialogModule } from '@angular/material/dialog';
 import { ViewMeasureReportComponent } from '../view-measure-report/view-measure-report.component';
-import { Subscription } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faXmark, faRotate, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { LoaderService } from 'src/app/services/loading.service';
+import { PieChartComponent } from "../../../core/pie-chart/pie-chart.component";
 
 @Component({
   selector: 'app-view-report',
   imports: [
     CommonModule,
+    FontAwesomeModule,
     FormsModule,
     MatDialogModule,
     MatToolbarModule,
@@ -32,12 +37,17 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatButtonModule,
     MatTooltipModule,
     RouterLink,
-    ValidationResultsComponent    
-  ],
+    ValidationResultsComponent,
+    PieChartComponent
+],
   templateUrl: './view-report.component.html',
   styleUrl: './view-report.component.scss'
 })
 export class ViewReportComponent implements OnInit {
+  faXmark = faXmark;
+  faRotate = faRotate;
+  faArrowLeft = faArrowLeft;
+
   private subscription: Subscription | undefined;
   facilityId: string = '';
   reportId: string = '';
@@ -55,49 +65,53 @@ export class ViewReportComponent implements OnInit {
   selectedMeasureFilter: string = 'any';
   selectedReportStatusFilter: string = 'any';
   selectedValidationStatusFilter: string = 'any';
-
-  measures: string[] = [
-    "NHSNdQMAcuteCareHospitalInitialPopulation",
-    "NHSNGlycemicControlHypoglycemicInitialPopulation"
-  ];
-  
-  reportStatuses: string[] = [
-    "PendingEvaluation",
-    "NotReportable",
-    "ReadyForValidation",
-    "ValidationRequested",
-    "ValidationComplete",
-    "Submitted"
-  ]
-
-  validationStatuses: string[] = [
-    "Pending",
-    "Passed",
-    "Failed",
-    "Requested"
-  ]
+  measures: string[] = [];
+  reportStatuses: string[] = [];
+  validationStatuses: string[] = [];
 
   constructor(
     private location: Location,
     private route: ActivatedRoute, 
-    private tenantService: TenantService,
     private dialog: MatDialog,
-    private facilityViewService: FacilityViewService) { }
+    private facilityViewService: FacilityViewService,     
+    private loadingService: LoaderService) { }
 
-  ngOnInit(): void {
+  ngOnInit(): void {    
     this.subscription = this.route.params.subscribe(params => {
       this.facilityId = params['facilityId'];
-      this.reportId = params['reportId'];   
-      this.loadReportSummary();  
-      this.loadMeasureReports(this.defaultPageNumber, this.defaultPageSize);
-    });
+      this.reportId = params['reportId'];      
+    });         
+
+    this.loadingService.show();
+    
+    forkJoin([
+        this.facilityViewService.getReportSummary(this.facilityId, this.reportId),        
+        this.facilityViewService.getMeasureReportSummaryList(this.facilityId, this.reportId, null, null, null, null, null, this.defaultPageNumber, this.defaultPageSize),
+        this.facilityViewService.getReportSubmissionStatuses(),
+        this.facilityViewService.getReportValidationStatuses()
+      ]).subscribe({
+        next: (response) => {
+          this.reportSummary = response[0];
+          this.measureReports = response[1].records;
+          this.paginationMetadata = response[1].metadata;
+          this.measures = this.reportSummary.reportTypes;
+          this.reportStatuses = response[2];
+          this.validationStatuses = response[3];
+          this.loadingService.hide();
+        },
+        error: (error) => {
+          console.error('Error loading report summary:', error);
+          this.loadingService.hide();
+        }
+      });
+    
   }
 
   ngOnDestroy(): void {
     if (this.subscription) {
         this.subscription.unsubscribe();
     }
-  }
+  } 
 
   loadReportSummary(): void {
     this.facilityViewService.getReportSummary(this.facilityId, this.reportId).subscribe({

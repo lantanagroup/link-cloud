@@ -27,22 +27,26 @@
           </div>
         </div>
         <div class="right-pane">
-          <app-resource-pie-chart [data]="measureReport.resourceCountSummary"></app-resource-pie-chart>   
+           <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart>
         </div>
     </div> 
     
     <div *ngIf="resources.length > 0">
       <div class="filter-bar">  
         <span class="filter-bar-header">Filters</span>
-        <div class="filter-bar-inputs">
-          <label>
-            Resource Type
-          </label>
-          <select id="resourceType" [(ngModel)]="selectedResourceType" (change)="onResourceTypeChange($event)">
-            <option value="any">Any</option>
-            <option *ngFor="let type of resourceTypes" [value]="type">{{type}}</option>    
-          </select> 
-        </div>           
+        <div class="filter-bar-row">
+          <div class="filter-bar-col" style="margin-left: 0;">
+            <div>
+              <label>
+                Resource Type
+              </label>
+              <select id="resourceType" [(ngModel)]="selectedResourceType" (change)="onResourceTypeChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let type of resourceTypes" [value]="type">{{type}}</option>    
+              </select> 
+            </div>                 
+          </div>
+        </div>  
       </div>
       <div class="table-container">    
         <table class="link-table">

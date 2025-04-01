@@ -1,4 +1,15 @@
-$primary: #398eb4;
+@use 'sass:color';
+
+//$primary: #398eb4;
+$primary: #005a75;
+$secondary: #00756B;
+$light: #c4c4c4;
+$success: #007543;
+$info: #43ABCA;
+$warning: #CA8743;
+$error: #750022;
+$purple: #630075;
+
 
 .content {
   margin: 2em;
@@ -80,6 +91,103 @@ $primary: #398eb4;
 .form-section-bar button {
   margin-left: auto;
 }
-    
+
+// Cards
+.link-card{
+    padding: 1em;
+    background-color: white;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    margin-top: 1em;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.link-card .link-card-row {
+    display: flex;
+    flex-direction: row;
+    gap: 2em;
+}
+
+// Buttons
+
+.link-button {
+  cursor: pointer;
+  padding: .5em;  
+  border-radius: .5em;
+  font-size: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.link-button.btn-lg {
+  padding: .75em;  
+  border-radius: .5em;
+  font-size: 14px;
+  font-size: 14px;
+}
+
+.link-button.primary {
+  background-color: $primary;
+  border: 1px solid color.adjust($primary, $lightness: -10%);
+  color: #FFF;
+}
+
+.link-button.primary:hover {
+  background-color: color.adjust($primary, $lightness: 10%) 
+
+}
+
+.link-button.light {
+  background-color: $light;
+  border: 1px solid color.adjust($light, $lightness: -10%);
+  color: #000;
+}
+
+.link-button.light:hover {
+  background-color: color.adjust($light, $lightness: 10%);
+}
+
+.link-button.secondary {
+  background-color: $secondary;
+  border: 1px solid color.adjust($secondary, $lightness: -10%);
+  color: #fff;
+}
+
+.link-button.secondary:hover {
+  background-color: color.adjust($secondary, $lightness: 10%);
+
+}
+
+.link-button.success {
+  background-color: $success;
+  border: 1px solid color.adjust($success, $lightness: -10%);
+  color: #fff;
+}
+
+.link-button.success:hover {
+  background-color: color.adjust($success, $lightness: 10%);
+
+}
+
+.link-button.error {
+  background-color: $error;
+  border: 1px solid color.adjust($error, $lightness: -10%);
+  color: #fff;
+}
+
+.link-button.error:hover {
+  background-color: color.adjust($error, $lightness: 10%);
+
+}
+
+.link-button.purple {
+  background-color: $purple;
+  border: 1px solid color.adjust($purple, $lightness: -10%);
+  color: #fff;
+}
+
+.link-button.purple:hover {
+  background-color: color.adjust($purple, $lightness: 10%);
+}
 
 

@@ -26,17 +26,6 @@
     </mat-form-field>
   </div>
 
-  <div class="form-input">
-    <mat-form-field appearance="outline" class="subject-input form-input">
-      <mat-label>Query Plan IDs (comma separated)</mat-label>
-      <mat-select formControlName="queryPlanIds" [disabled]="viewOnly" [compareWith]="comparePlanNames" multiple>
-        <mat-option [disabled]="viewOnly" *ngFor="let plan of planNames" [value]="plan">
-          {{plan}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
-  </div>
-
   <div *ngIf="!viewOnly">
     <mat-checkbox [formControl]="isAuthEnabledControl"  (change)="toggleAuthFields()">
       Enable Authentication

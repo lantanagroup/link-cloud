@@ -23,7 +23,11 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
-                })
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
+                })                
             );
     }
     
@@ -32,6 +36,10 @@ export class FacilityViewService {
             .pipe(
                 map((response: IReportListSummary) => {
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -69,6 +77,10 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -90,6 +102,10 @@ export class FacilityViewService {
                     //revert back to zero based paging
                     response.metadata.pageNumber--;
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
     }
@@ -99,7 +115,37 @@ export class FacilityViewService {
             .pipe(
                 map((response: string[]) => {
                     return response;
+                }),                
+                catchError((error: HttpErrorResponse) => {
+                    var err = this.errorHandler.handleError(error);
+                    return err;
                 })
             );
-    }    
+    } 
+    
+    getReportSubmissionStatuses(): Observable<string[]> {
+        return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/report/report-submission-statuses`)
+            .pipe(
+                map((response: string[]) => {
+                    return response;
+                }),
+                catchError((error: HttpErrorResponse) => {
+                    this.errorHandler.handleError(error);
+                    return [];
+                })
+            );
+    } 
+
+    getReportValidationStatuses(): Observable<string[]> {
+        return this.http.get<string[]>(`${this.appConfigService.config?.baseApiUrl}/report/report-validation-statuses`)
+            .pipe(
+                map((response: string[]) => {
+                    return response;
+                }),
+                catchError((error: HttpErrorResponse) => {
+                    this.errorHandler.handleError(error);
+                    return [];
+                })
+            );
+    } 
 }

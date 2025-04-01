@@ -28,11 +28,13 @@ import {DataAcquisitionFhirQueryConfigDialogComponent} from '../../data-acquisit
 import {DataAcquisitionFhirQueryConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-query-config-form/data-acquisition-fhir-query-config-form.component';
 import {DataAcquisitionFhirListConfigDialogComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-dialog/data-acquisition-fhir-list-config-dialog.component';
 import {DataAcquisitionFhirListConfigFormComponent} from '../../data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
-import {IDataAcquisitionAuthenticationConfigModel} from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
-import {DataAcquisitionAuthenticationConfigFormComponent} from '../../data-acquisition/data-acquisition-authentication-config-form/data-acquisition-authentication-config-form.component';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {QueryPlanConfigDialogComponent} from "../../data-acquisition/query-plan-config-dialog/query-plan-config-dialog.component";
 import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-config/query-plan-config.component";
+import {INormalizationModel} from "../../../interfaces/normalization/normalization-model.interface";
+import {NormalizationService} from "../../../services/gateway/normalization/normalization.service";
+import {NormalizationConfigDialogComponent} from "../../normalization/normalization-dialog/normalization-dialog.component";
+import {NormalizationFormComponent} from "../../normalization/normalization-config/normalization.component";
 
 @Component({
   selector: 'app-facility-edit',
@@ -56,11 +58,14 @@ import {QueryPlanConfigFormComponent} from "../../data-acquisition/query-plan-co
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
     DataAcquisitionFhirListConfigDialogComponent,
-    QueryPlanConfigFormComponent
+    QueryPlanConfigFormComponent,
+    NormalizationFormComponent
   ]
 })
 export class FacilityEditComponent implements OnInit {
   @ViewChild(MatAccordion) accordion!: MatAccordion;
+
+  @ViewChild(QueryPlanConfigFormComponent) configForm!: QueryPlanConfigFormComponent;
 
   facilityId: string = '';
   facilityConfig!: IFacilityConfigModel;
@@ -87,6 +92,11 @@ export class FacilityEditComponent implements OnInit {
 
   dataAcqQueryPlanNames: string[] = [];
 
+  normalizationConfig!: INormalizationModel;
+
+  noNormalizationConfigAlertMessage = 'No Normalization Config found for this facility.';
+  showNoNormalizationConfigAlert: boolean = false
+
   private _displayReportDashboard: boolean = false;
 
   @Input() set displayReportDashboard(v: boolean) {
@@ -103,6 +113,7 @@ export class FacilityEditComponent implements OnInit {
     private tenantService: TenantService,
     private censusService: CensusService,
     private dataAcquisitionService: DataAcquisitionService,
+    private normalizationService: NormalizationService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar) {
   }
@@ -151,6 +162,36 @@ export class FacilityEditComponent implements OnInit {
           if (data) {
             this.showNoCensusConfigAlert = false;
             this.censusConfig = data;
+          }
+        });
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  showNormalizationDialog(): void {
+    this.dialog.open(NormalizationConfigDialogComponent,
+      {
+        width: '75%',
+        data: {
+          dialogTitle: 'Normalization Configuration',
+          formMode: this.showNoNormalizationConfigAlert ? FormMode.Create : FormMode.Edit,
+          viewOnly: false,
+          normalization: this.normalizationConfig
+        }
+      }).afterClosed().subscribe(res => {
+      console.log(res)
+      if (res) {
+        this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: any) => {
+          if (data) {
+            console.log(data);
+            this.showNoNormalizationConfigAlert = false;
+            this.normalizationConfig = data;
           }
         });
         this.snackBar.open(`${res}`, '', {
@@ -279,7 +320,7 @@ export class FacilityEditComponent implements OnInit {
       }).afterClosed().subscribe(res => {
       console.log(res)
       if (res) {
-        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId).subscribe((data: IQueryPlanModel) => {
+        this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, this.dataAcqQueryPlanConfig.Type).subscribe((data: IQueryPlanModel) => {
           if (data) {
             console.log(data);
             this.showNoDataAcqQueryPlanConfigAlert = false;
@@ -296,10 +337,11 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
+
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
-    this.loadQueryPlan();
+    this.loadQueryPlan("0", "Discharge");
   }
 
   loadFhirQueryConfig() {
@@ -326,7 +368,6 @@ export class FacilityEditComponent implements OnInit {
             queryPlanIds: []
           } as IDataAcquisitionQueryConfigModel;
           this.showNoDataAcqFhirQueryConfigAlert = true;
-          //this.showDataAcqFhirQueryDialog();
         } else {
           this.snackBar.open(`Failed to load FHIR query configuration for the facility, see error for details.`, '', {
             duration: 3500,
@@ -376,57 +417,84 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
-  loadQueryPlan() {
-    if (!this.dataAcqFhirQueryConfig) {
-      this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId).subscribe((data: IQueryPlanModel) => {
-        this.dataAcqQueryPlanConfig = data;
-        if (this.dataAcqQueryPlanConfig) {
-          this.showNoDataAcqQueryPlanConfigAlert = false;
+  onPlanSelected(outcome: any) {
+    this.dataAcqQueryPlanConfig.Type = outcome.type;
+    this.loadQueryPlan(outcome.type, outcome.label);
+    if (outcome.exists) {
+      this.showNoDataAcqQueryPlanConfigAlert = false;
+    } else {
+      this.showNoDataAcqQueryPlanConfigAlert = true;
+    }
+  }
+
+  loadQueryPlan(type: string, label: string) {
+    this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityId, label).subscribe((data: IQueryPlanModel) => {
+      this.dataAcqQueryPlanConfig = data;
+      if (this.dataAcqQueryPlanConfig) {
+        this.showNoDataAcqQueryPlanConfigAlert = false;
+      } else {
+        this.showNoDataAcqQueryPlanConfigAlert = true;
+      }
+    }, error => {
+      if (error.status == 404) {
+        this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId} and type ${label} , please create one.`, '', {
+          duration: 3500,
+          panelClass: 'info-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+        this.dataAcqQueryPlanConfig = {
+          FacilityId: this.facilityConfig.facilityId,
+          PlanName: '',
+          EHRDescription: '',
+          LookBack: '',
+          InitialQueries: '',
+          SupplementalQueries: '',
+          Type: type
+        } as IQueryPlanModel;
+        this.showNoDataAcqQueryPlanConfigAlert = true;
+        //this.showDataAcqFhirQueryDialog();
+      } else {
+        this.snackBar.open(`Failed to load FHIR query plan for the facility ${this.facilityId} and type ${type}, see error for details.`, '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  loadNormalization() {
+    if (!this.normalizationConfig) {
+      this.normalizationService.getNormalizationConfiguration(this.facilityId).subscribe((data: INormalizationModel) => {
+        this.normalizationConfig = data;
+        if (this.normalizationConfig) {
+          this.showNoNormalizationConfigAlert = false;
         } else {
-          this.showNoDataAcqQueryPlanConfigAlert = true;
+          this.showNoNormalizationConfigAlert = true;
         }
       }, error => {
         if (error.status == 404) {
-          this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityId}, please create one.`, '', {
+          this.snackBar.open(`No current Normalization Config found for facility ${this.facilityId}, please create one.`, '', {
             duration: 3500,
             panelClass: 'info-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
           });
-          this.dataAcqQueryPlanConfig = {
+          this.normalizationConfig = {
             FacilityId: this.facilityConfig.facilityId,
-            PlanName: '',
-            EHRDescription: '',
-            LookBack: '',
-            InitialQueries: '',
-            SupplementalQueries: '',
-            Type: '0'
-          } as IQueryPlanModel;
-          this.showNoDataAcqQueryPlanConfigAlert = true;
-          //this.showDataAcqFhirQueryDialog();
+            OperationSequence: ''
+          } as INormalizationModel;
+          this.showNoNormalizationConfigAlert = true;
         } else {
-          this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
+          this.snackBar.open(`Failed to load Normalization Config  for the facility, see error for details.`, '', {
             duration: 3500,
             panelClass: 'error-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
           });
         }
-      });
-    }
-  }
-
-  loadQueryPlanNames() {
-    if (!this.dataAcqQueryPlanNames || this.dataAcqQueryPlanNames.length === 0) {
-      this.dataAcquisitionService.getQueryPlanNames(this.facilityId).subscribe((data: string[]) => {
-        this.dataAcqQueryPlanNames = data;
-      }, error => {
-        this.snackBar.open(`Failed to load FHIR query plan names for the facility, see error for details.`, '', {
-          duration: 3500,
-          panelClass: 'error-snackbar',
-          horizontalPosition: 'end',
-          verticalPosition: 'top'
-        });
       });
     }
   }
