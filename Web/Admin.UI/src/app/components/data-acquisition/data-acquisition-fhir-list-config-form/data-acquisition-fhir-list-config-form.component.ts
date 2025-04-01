@@ -136,13 +136,12 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   // Dynamically disable or enable the form control based on viewOnly
   toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
     if (viewOnly) {
       this.fhirServerBaseUrlControl.disable();
-      this.facilityIdControl.disable();
       this.patientListControl.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
-      this.facilityIdControl.enable();
       this.patientListControl.enable();
     }
   }
@@ -157,11 +156,6 @@ export class DataAcquisitionFhirListConfigFormComponent {
 
   get patientListControl() {
     return this.configForm.get('patientListControl') as FormArray;
-  }
-
-  clearFacilityId(): void {
-    this.facilityIdControl.setValue('');
-    this.facilityIdControl.updateValueAndValidity();
   }
 
   clearFhirServerBaseUrl(): void {

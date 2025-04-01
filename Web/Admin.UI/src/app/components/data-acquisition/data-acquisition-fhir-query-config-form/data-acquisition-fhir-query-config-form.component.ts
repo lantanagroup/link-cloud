@@ -121,7 +121,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
     this.authTypeControl?.valueChanges.subscribe((value) => {
       this.updateValidators(value);
     });
-    
+
     if(this.authTypeControl?.value) {
       this.updateValidators(this.authTypeControl?.value);
     }
@@ -210,9 +210,9 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
 
   // Dynamically disable or enable the form control based on viewOnly
   toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
     if (viewOnly) {
       this.fhirServerBaseUrlControl.disable();
-      this.facilityIdControl.disable();
       this.authTypeControl.disable();
       this.authKeyControl.disable();
       this.tokenUrlControl.disable();
@@ -223,7 +223,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
       this.isAuthEnabledControl.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
-      this.facilityIdControl.enable();
       this.authTypeControl.enable();
       this.authKeyControl.enable();
       this.tokenUrlControl.enable();
@@ -287,10 +286,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent {
     return this.configForm.get('password') as FormControl;
   }
 
-  clearFacilityId(): void {
-    this.facilityIdControl.setValue('');
-    this.facilityIdControl.updateValueAndValidity();
-  }
 
   clearFhirServerBaseUrl(): void {
     this.fhirServerBaseUrlControl.setValue('');
