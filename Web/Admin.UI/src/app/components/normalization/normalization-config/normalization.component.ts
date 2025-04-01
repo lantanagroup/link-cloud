@@ -140,11 +140,6 @@ export class NormalizationFormComponent {
     return this.normalizationForm.get('facilityId') as FormControl;
   }
 
-  clearFacilityId(): void {
-    this.facilityIdControl.setValue('');
-    this.facilityIdControl.updateValueAndValidity();
-  }
-
   clearOperationSequenceControl(): void {
     this.operationSequenceControl.setValue('');
     this.operationSequenceControl.updateValueAndValidity();
@@ -165,11 +160,10 @@ export class NormalizationFormComponent {
 
 
   toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
     if (viewOnly) {
-      this.facilityIdControl.disable();
       this.operationSequenceControl.disable();
     } else {
-      this.facilityIdControl.enable();
       this.operationSequenceControl.enable();
     }
   }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
-import { Observable, tap, map, catchError } from 'rxjs';
+import {Observable, tap, map, catchError, throwError} from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
 import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
@@ -20,7 +20,9 @@ export class DataAcquisitionService {
     return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR query configuration.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error, false);
+        })
       )
   }
 
@@ -31,7 +33,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -42,7 +46,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -50,7 +56,9 @@ export class DataAcquisitionService {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
       .pipe(
         tap(_ => console.log(`Request for FHIR query configuration deletion was sent.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -58,7 +66,9 @@ export class DataAcquisitionService {
     return this.http.get<IDataAcquisitionFhirListConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
       .pipe(
         tap(_ => console.log(`Fetched FHIR list configuration.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error,false);
+        })
       )
   }
 
@@ -69,9 +79,12 @@ export class DataAcquisitionService {
         map((response: IQueryPlanModel) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error, false);
+        })
       )
   }
+
 
   createQueryPlanConfiguration(facilityId: string, queryPlan: IQueryPlanModel): Observable<IQueryPlanModel> {
     return this.http.post<IQueryPlanModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/QueryPlan`, queryPlan)
@@ -80,7 +93,9 @@ export class DataAcquisitionService {
         map((response) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -91,7 +106,9 @@ export class DataAcquisitionService {
         map((response) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -102,7 +119,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -114,7 +133,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -122,7 +143,9 @@ export class DataAcquisitionService {
     return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryList`)
       .pipe(
         tap(_ => console.log(`Request for FHIR list configuration deletion was sent.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -130,7 +153,9 @@ export class DataAcquisitionService {
     return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
     .pipe(
         tap(_ => console.log(`Fetched authentication configuration.`)),
-        catchError((error) => this.errorHandler.handleError(error))
+      catchError((error) => {
+        return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -141,7 +166,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 
@@ -152,7 +179,9 @@ export class DataAcquisitionService {
         map((response: IEntityCreatedResponse) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
       )
   }
 

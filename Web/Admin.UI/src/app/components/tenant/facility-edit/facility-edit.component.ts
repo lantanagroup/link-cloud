@@ -85,7 +85,7 @@ export class FacilityEditComponent implements OnInit {
   noDataAcqFhirListConfigAlertMessage = 'No FHIR List configuration found for this facility.';
   showNoDataAcqFhirListConfigAlert: boolean = false;
 
-  noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility.';
+  noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
   dataAcqQueryPlanConfig!: IQueryPlanModel;
