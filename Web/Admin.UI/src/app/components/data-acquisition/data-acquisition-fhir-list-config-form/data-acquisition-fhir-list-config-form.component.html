@@ -2,14 +2,7 @@
   <div class="form-input">
     <mat-form-field appearance="outline" class="subject-input form-input ">
       <mat-label>Facility Id</mat-label>
-      <input matInput formControlName="facilityId" [disabled]="viewOnly" placeholder="Facility Id">
-      <button *ngIf="facilityIdControl.value && !viewOnly" matSuffix mat-icon-button aria-label="Clear"
-              (click)="clearFacilityId()">
-        <mat-icon>close</mat-icon>
-      </button>
-      <mat-error *ngIf="!viewOnly && facilityIdControl.hasError('required')">
-        A facility id is <strong>required</strong>
-      </mat-error>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
     </mat-form-field>
   </div>
 
