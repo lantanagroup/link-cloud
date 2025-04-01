@@ -47,7 +47,7 @@ None
 
 After a new installation of the validation service, the following should be run/executed:
 
-* `/api/aritfact/$initialize` endpoint should be run to initialize load the database with artifacts that are embedded in the validation service.
+* `/api/aritfact/$initialize` endpoint should be run to initialize the database with artifacts that are embedded in the validation service.
 * `/api/category/$initialize` endpoint should be run to initialize the database with default categories stored in `/src/main/resources/categories.json` (within the code-base)
 
 PENDING: This functionality is going to be altered so that they are automatically initialized on service startup when no artifacts or categories already exist in the service's database.
