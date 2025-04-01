@@ -176,6 +176,12 @@ export class QueryPlanConfigFormComponent {
     this.toggleViewOnly(this.viewOnly);
   }
 
+  // Method to get the label based on the value
+  getLabelFromValue(value: string): string {
+    const selected = this.types.find(type => type.value === value);
+    return selected ? selected.label : 'No label found';
+  }
+
   onTypeChange(event: any) {
     console.log('Selected type:', event.value);
     this.loadQueryPlan();
@@ -184,11 +190,11 @@ export class QueryPlanConfigFormComponent {
   loadQueryPlan() {
       this.dataAcquisitionService.getQueryPlanConfiguration(this.facilityIdControl.value, this.typeControl.value).subscribe((data: IQueryPlanModel) => {
         this.item = data;
-        this.planSelected.emit({"type" : this.typeControl.value, "exists" : true});
+        this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : true});
       }, error => {
         if (error.status == 404) {
-          this.snackBar.open(`No current FHIR query plan found for facility ${this.facilityIdControl.value}, please create one.`, '', {
-            duration: 3500,
+          this.snackBar.open(`No current Query plan found for facility ${this.facilityIdControl.value} and type ${this.getLabelFromValue(this.typeControl.value)}, please create one.`, '', {
+            duration: 5000,
             panelClass: 'info-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
@@ -202,10 +208,10 @@ export class QueryPlanConfigFormComponent {
             SupplementalQueries: '',
             Type: '0'
           } as IQueryPlanModel;
-          this.planSelected.emit({"type" : this.typeControl.value, "exists" : false});
+          this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : false});
         } else {
           this.snackBar.open(`Failed to load FHIR query plan for the facility, see error for details.`, '', {
-            duration: 3500,
+            duration: 5000,
             panelClass: 'error-snackbar',
             horizontalPosition: 'end',
             verticalPosition: 'top'
@@ -241,11 +247,6 @@ export class QueryPlanConfigFormComponent {
 
   get typeControl(): FormControl {
     return this.planForm.get('type') as FormControl;
-  }
-
-  clearFacilityId(): void {
-    this.facilityIdControl.setValue('');
-    this.facilityIdControl.updateValueAndValidity();
   }
 
   clearPlanName(): void {
@@ -289,8 +290,8 @@ export class QueryPlanConfigFormComponent {
 
 
   toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
     if (viewOnly) {
-      this.facilityIdControl.disable();
       this.planNameControl.disable();
       this.ehrDescriptionControl.disable();
       this.lookBackControl.disable();
@@ -298,7 +299,6 @@ export class QueryPlanConfigFormComponent {
       this.supplementalQueriesControl.disable();
       this.typeControl.enable();
     } else {
-      this.facilityIdControl.enable();
       this.planNameControl.enable();
       this.ehrDescriptionControl.enable();
       this.lookBackControl.enable();

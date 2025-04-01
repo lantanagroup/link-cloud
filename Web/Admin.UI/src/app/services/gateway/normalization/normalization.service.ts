@@ -42,7 +42,7 @@ export class NormalizationService {
         map((response: INormalizationModel) => {
           return response;
         }),
-        catchError((error) => this.errorHandler.handleError(error))
+        catchError((error) => this.errorHandler.handleError(error, false))
       )
   }
 
