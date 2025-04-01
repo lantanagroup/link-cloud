@@ -275,6 +275,9 @@ services:
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred --replication-factor 1 --partitions 1 &
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Error --replication-factor 1 --partitions 1 &
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic AuditableEventOccurred-Retry --replication-factor 1 --partitions 1 &
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete --replication-factor 1 --partitions 1 &
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete-Error --replication-factor 1 --partitions 1 &
+        kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic ValidationComplete-Retry --replication-factor 1 --partitions 1 &
         kafka-topics --bootstrap-server kafka_b:9094 --command-config /etc/kafka-client.properties --create --if-not-exists --topic Service-Healthcheck --replication-factor 1 --partitions 1 --config retention.ms=1 &
         wait
       "

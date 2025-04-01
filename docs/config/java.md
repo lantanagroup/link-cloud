@@ -79,7 +79,9 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | springdoc.api-docs.enabled   | Enable Swagger specification generation  | true or false (default)                                                      |
 | springdoc.swagger-ui.enabled | Enable Swagger UI                        | true or false (default)                                                      |
 
-## Mongo DB
+## Databases
+
+### Mongo DB
 
 | Property Name                | Description                          | Type/Value    | Secret? |
 |------------------------------|--------------------------------------|---------------|---------|
@@ -89,7 +91,7 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | spring.data.mongodb.username | Username for the Mongo database      | \<string>     | No      |
 | spring.data.mongodb.password | Password for the Mongo database      | \<string>     | Yes     |
 
-## SQL Server
+### SQL Server
 
 | Property Name                  | Description                          | Type/Value                                         | Secret? |
 |--------------------------------|--------------------------------------|----------------------------------------------------|---------|
@@ -99,6 +101,12 @@ If using a service principal for authentication, the `AZURE_TENANT_ID` is _not_ 
 | spring.jpa.hibernate.ddl-auto  | DDL auto setting for JPA/Hibernate   | "none" (default) or "update"                       | No      |
 | spring.jpa.properties.show_sql | Show SQL statements in logs          | true (default) or false                            | No      |
 | spring.jpa.properties.dialect  | SQL dialect for the database         | "org.hibernate.dialect.SQLServerDialect" (default) | No      |
+
+### Auto Update/Migrate DBs
+
+| Property Name                 | Description                                                       | Type/Value                                          | Secret? |
+|-------------------------------|-------------------------------------------------------------------|-----------------------------------------------------|---------|
+| spring.jpa.hibernate.ddl-auto | Indicates whether how to update the schema in hibernate databases | create \| create-drop \| update \| validate \| none | No      |
 
 ## Kafka
 
