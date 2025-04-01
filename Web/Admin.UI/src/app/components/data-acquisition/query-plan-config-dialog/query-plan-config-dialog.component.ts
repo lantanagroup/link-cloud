@@ -51,7 +51,7 @@ export class QueryPlanConfigDialogComponent {
   }
 
   onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
-    if (outcome.id.length > 0 || outcome.message.length > 0) {
+    if (outcome.message.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {
