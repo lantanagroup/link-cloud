@@ -16,7 +16,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  bypassChangeEvaluation: false
+  - name: 'bypassChangeEvaluation'
+    value: false
 
   #####################
 
