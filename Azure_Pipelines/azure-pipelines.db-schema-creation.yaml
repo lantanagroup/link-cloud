@@ -15,10 +15,6 @@ pr: none
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  - name: 'bypassChangeEvaluation'
-    value: false
-
   #####################
 
 stages:
@@ -34,47 +30,50 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
+    
+            Write-Host ${env:BYPASSCHANGEEVALUATION}
+            
             #Get any changed files
             $changedFiles = git diff --name-status HEAD HEAD^ 
             
             # Account - Return $true if path has changed files
-            $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" 
 
             # Audit - Return $true if path has changed files
-            $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" 
 
             # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" 
 
             # DataAcquisition - Return $true if path has changed files
-            $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
 
             # Normalization - Return $true if path has changed files
-            $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" 
 
             # QueryDispatch - Return $true if path has changed files
-            $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" 
 
             # Report - Return $true if path has changed files
-            $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" 
 
             # Submission - Return $true if path has changed files
-            $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" 
 
             # Tenant - Return $true if path has changed files
-            $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
             
             # Validation - Return $true if path has changed files
-            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/migrations/" -AllMatches).Matches.Count -gt 0) -or $bypassChangeEvaluation
+            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/migrations/" -AllMatches).Matches.Count -gt 0) -or ${env:BYPASSCHANGEEVALUATION}
             Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
 
             Write-Host "##vso[task.setvariable variable=task.A.status]Success"
