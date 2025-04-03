@@ -12,12 +12,14 @@ This page and its references include documentation for Link's services and the f
 * [Measure Evaluation](functionality/measure_eval.md)
 * [Notifications](functionality/notifications.md)
 * [Normalization](functionality/normalization.md)
+* [Report](functionality/report.md)
 * Security
   * [Security Overview](functionality/security_overview.md)
   * [OAuth & Cookie Flow](functionality/oauth_flow.md)
 * [Submission Folder Structure](functionality/submission_folder.md)
 * [Telemetry](functionality/telemetry.md)
 * [Tenant/Facility Management](functionality/tenant_mgmt.md)
+* [Validation](functionality/validation.md)
 
 ## Service Specifications
 

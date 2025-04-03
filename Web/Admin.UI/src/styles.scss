@@ -4,6 +4,7 @@
 @use 'styles/custom-themes/blue-rose.scss';
 @use 'styles/custom-themes/purple-green.scss';
 @use 'custom-themes/zelda-blue-theme.scss' as zeldaBlue;
+@use 'ngx-toastr/toastr';
 
 /* Account for the height of the fixed position toolbar */
 html, body { height: calc(100vh - 64px); }
@@ -40,17 +41,14 @@ $color-variants: primary, secondary, tertiary, error, success, warning;
   }
 }
 
-.error-snackbar {
-  max-width: max-content !important;
-  color: white;
-  --mdc-snackbar-container-color: var(--error-color) !important;
-  border-color: #f5c6cb;
+::ng-deep .mat-mdc-snack-bar-container.error-snackbar {
+  --mdc-snackbar-container-color: #750022 !important;
+  --mdc-snackbar-supporting-text-color: #ffffff !important;
 
-  .mat-simple-snackbar-action {
-    color: white;
-  }
+  border-radius: 8px !important;
+  font-weight: 500;
+  font-size: 14px;
 }
-
 .light-success-snackbar {
   color: #155724;
   --mdc-snackbar-container-color: #d4edda !important;

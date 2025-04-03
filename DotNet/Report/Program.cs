@@ -9,6 +9,7 @@ using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Jobs;
+using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -85,6 +86,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     }
 
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
+    });
+
     var serviceInformation = builder.Configuration.GetRequiredSection(ReportConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
     if (serviceInformation != null)
     {
@@ -117,23 +123,28 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+    builder.Services.AddTransient<ScheduledReportFactory>();
+    builder.Services.AddTransient<MeasureReportSummaryFactory>();
+    builder.Services.AddTransient<ResourceSummaryFactory>();
 
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
-    
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
+
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Producers
     builder.Services.RegisterKafkaProducers(kafkaConnection);
 
     //Producers for Retry/Deadletter
-    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ReportScheduledValue>, KafkaProducerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
 
     // Add repositories
     builder.Services.AddTransient<IEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
@@ -222,14 +233,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IJobFactory, JobFactory>();
     builder.Services.AddSingleton<RetryJob>();
     builder.Services.AddSingleton<ISchedulerFactory, StdSchedulerFactory>();
-    builder.Services.AddSingleton<GenerateDataAcquisitionRequestsForPatientsToQuery>();
+    builder.Services.AddSingleton<EndOfReportPeriodJob>();
 
     // Add hosted services
+    builder.Services.AddHostedService<GenerateReportListener>();
     builder.Services.AddHostedService<ResourceEvaluatedListener>();
     builder.Services.AddHostedService<ReportScheduledListener>();
     builder.Services.AddHostedService<PatientIdsAcquiredListener>();
+    builder.Services.AddHostedService<ValidationCompleteListener>();
 
-    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.ReportSubmittedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(ReportConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.ResourceEvaluatedRetry.GetStringValue(), KafkaTopic.PatientIDsAcquiredRetry.GetStringValue(), KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
 
     builder.Services.AddHostedService<RetryScheduleService>();
@@ -237,19 +250,22 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddTransient<PatientReportSubmissionBundler>();
     builder.Services.AddTransient<MeasureReportAggregator>();
+    builder.Services.AddTransient<SubmitReportProducer>();
+    builder.Services.AddTransient<ReadyForValidationProducer>();
+    builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
     #region Exception Handling
+    //Generate Report Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, GenerateReportValue>, DeadLetterExceptionHandler<string, GenerateReportValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, GenerateReportValue>, TransientExceptionHandler<string, GenerateReportValue>>();
+
     //Report Scheduled Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, ReportScheduledValue>, TransientExceptionHandler<string, ReportScheduledValue>>();
-
-    //Report Submitted Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, DeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>, TransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue>>();
 
     //Resource Evaluated Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>, DeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
@@ -265,6 +281,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     //DataAcquisitionRequested Listener
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>, DeadLetterExceptionHandler<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
+
+    //ValidationComplete Listener
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
 
     #endregion
 

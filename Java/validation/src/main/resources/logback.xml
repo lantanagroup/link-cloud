@@ -6,7 +6,7 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%date [%-10.10thread] %-5level %-40.40logger{40} %message%n</pattern>
         </encoder>
     </appender>
 
@@ -40,12 +40,14 @@
 
     <if condition='property("loki_enabled").equalsIgnoreCase("true")'>
         <then>
+            <logger name="com.lantanagroup.link" level="DEBUG"/>
             <root level="INFO">
                 <appender-ref ref="STDOUT"/>
                 <appender-ref ref="LOKI" />
             </root>
         </then>
         <else>
+            <logger name="com.lantanagroup.link" level="DEBUG"/>
             <root level="INFO">
                 <appender-ref ref="STDOUT"/>
             </root>

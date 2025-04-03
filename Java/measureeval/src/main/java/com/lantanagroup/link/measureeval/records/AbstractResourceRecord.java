@@ -4,9 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.lantanagroup.link.measureeval.models.QueryType;
-import com.lantanagroup.link.measureeval.models.ReportableEvent;
-import com.lantanagroup.link.measureeval.serdes.FhirIdDeserializer;
+import com.lantanagroup.link.measureeval.entities.QueryType;
+import com.lantanagroup.link.measureeval.entities.ReportableEvent;
+import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -56,5 +56,6 @@ public abstract class AbstractResourceRecord {
         private Date startDate;
         private Date endDate;
         private String frequency;
+        private String reportTrackingId;
     }
 }

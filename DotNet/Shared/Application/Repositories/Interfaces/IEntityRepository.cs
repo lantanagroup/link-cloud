@@ -1,7 +1,6 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using MongoDB.Driver.Search;
 using System.Linq.Expressions;
 using Task = System.Threading.Tasks.Task;
 
@@ -34,4 +33,5 @@ public interface IEntityRepository<T>
     Task StartTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+    Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken);
 }

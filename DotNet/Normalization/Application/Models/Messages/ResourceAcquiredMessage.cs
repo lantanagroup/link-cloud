@@ -1,4 +1,4 @@
-﻿using Hl7.Fhir.Model;
+﻿using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Messages;
 

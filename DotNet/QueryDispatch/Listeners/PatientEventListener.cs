@@ -111,7 +111,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _logger.LogInformation($"Consumed Patient Event for: Facility '{HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}'. PatientId '{HtmlInputSanitizer.Sanitize(value.PatientId)}' with a event type of {HtmlInputSanitizer.Sanitize(value.EventType)}");
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    ScheduledReportEntity scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
+                                    var scheduledReport  =  await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key);
 
                                     if (scheduledReport == null)
                                     {

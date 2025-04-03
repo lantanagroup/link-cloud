@@ -1,0 +1,9 @@
+@use '../../../../styles/core.scss';
+
+.scheduled-reports-container {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 10px; /* Add some space between dropdowns */
+  margin-top: 10px
+}
+

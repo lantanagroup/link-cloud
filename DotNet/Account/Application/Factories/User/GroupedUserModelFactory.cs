@@ -16,6 +16,9 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 MiddleName = user.MiddleName ?? string.Empty,
+                IsActive = user.IsActive,
+                IsDeleted = user.IsDeleted,
+                Roles = user.UserRoles.Select(x => x.Role.Name).ToList(),
             };
 
             return model;
@@ -31,12 +34,14 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 MiddleName = user.MiddleName ?? string.Empty,
+                IsActive = user.IsActive,
+                IsDeleted = user.IsDeleted,
             };
 
             return model;
         }
 
-        public GroupedUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName)
+        public GroupedUserModel Create(Guid userId, string? username, string? email, string? firstName, string? lastName, string? middleName, bool? isActive, bool? isDeleted)
         {
             GroupedUserModel model = new()
             {
@@ -46,6 +51,8 @@ namespace LantanaGroup.Link.Account.Application.Factories.User
                 FirstName = firstName ?? string.Empty,
                 LastName = lastName ?? string.Empty,
                 MiddleName = middleName ?? string.Empty,
+                IsActive = isActive ?? true,
+                IsDeleted = isDeleted ?? false
             };
 
             return model;

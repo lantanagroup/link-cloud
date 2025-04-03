@@ -115,7 +115,6 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         var existingEntity = await GetAsync(entity.FacilityId, cancellationToken);
 
         existingEntity.Authentication = entity.Authentication;
-        existingEntity.QueryPlanIds = entity.QueryPlanIds;
         existingEntity.FhirServerBaseUrl = entity.FhirServerBaseUrl;
         existingEntity.ModifyDate = DateTime.UtcNow;
 
