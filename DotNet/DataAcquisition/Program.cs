@@ -53,6 +53,7 @@ using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -124,10 +125,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)));
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.Cache));
 
     IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
+
+    //in-memory cache
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 
     //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();

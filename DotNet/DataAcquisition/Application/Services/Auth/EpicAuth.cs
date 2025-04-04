@@ -1,5 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
+﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Crypto;
@@ -16,11 +18,15 @@ public class EpicAuth : IAuth
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
+    private readonly InMemoryCacheService _cacheService;
+    private readonly CacheSettings _cacheSettings;
 
-    public EpicAuth(HttpClient httpClient, ILogger<EpicAuth> logger)
+    public EpicAuth(HttpClient httpClient, ILogger<EpicAuth> logger, InMemoryCacheService cacheService, CacheSettings cacheSettings)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _cacheService = cacheService;
+        _cacheSettings = cacheSettings;
     }
 
     /// <summary>
@@ -29,8 +35,13 @@ public class EpicAuth : IAuth
     /// <param name="httpClient"></param>
     /// <param name="authSettings"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(AuthenticationConfiguration authSettings)
+    public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings)
     {
+        var cachedToken = _cacheService.Get<string>(facilityId);
+
+        if(!string.IsNullOrWhiteSpace(cachedToken))
+            return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
+
         string jwt = GetJwt(authSettings);
 
         try
@@ -49,6 +60,8 @@ public class EpicAuth : IAuth
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
+                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromMinutes(_cacheSettings.CacheTimeoutInMinutes));
+
                     _logger.LogInformation($"Bearer Information Acquired.");
                     return (false, new AuthenticationHeaderValue("Bearer", accessToken));
                 }
