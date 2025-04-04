@@ -11,7 +11,7 @@ See [Admin UI Functionality](../functionality/admin_ui.md) for more information 
 - **Technology**: JavaScript (TypeScript) & Angular
 - **Image Name**: link-admin-ui
 - **Port**: 80
-- **Database**: NONE
+- **Database**: N/A
 - **Scale**: 0-5
 
 ## Volumes
@@ -22,9 +22,30 @@ See [Admin UI Functionality](../functionality/admin_ui.md) for more information 
 
 ## app.config.local.json
 
+The `app.config.local.json` file is used to configure the Admin UI service at deployment time, overriding the defaults in `app.config.json`.
+
 ```json
 {
-  "baseApiUrl": "<DEMO-API-GATEWAY-BASE-URL>/api",
-  "idpIssuer": "https://oauth.nhsnlink.org/realms/NHSNLink",
-  "idpClientId": "link-botw"
+  "baseApiUrl": "<ADMIN-BFF-BASE-URL>/api",
+  "authRequired": true,
+  "oauth2": {
+    "enabled": true,
+    "issuer": "...",
+    "clientId": "...",
+    "scope": "openid profile email",
+    "responseType": "code"
+  }
 }
+```
+
+### Properties
+
+| **Property**          | **Description**                                                | **Default Value**      | **Required**      |
+|-----------------------|----------------------------------------------------------------|------------------------|-------------------|
+| `baseApiUrl`          | The base URL for the Admin BFF API.                            | `http://localhost`     | Yes               |
+| `authRequired`        | Indicates whether authentication is required for the Admin UI. | `true`                 | Yes               |
+| `oauth2.enabled`      | Indicates whether OAuth2 authentication is enabled.            | `false`                | Yes               |
+| `oauth2.issuer`       | The issuer URL for the OAuth2 provider.                        | `null`                 | If oauth2 enabled |
+| `oauth2.clientId`     | The client ID for the OAuth2 application.                      | `null`                 | If oauth2 enabled |
+| `oauth2.scope`        | The scope for the OAuth2 application.                          | `openid profile email` | If oauth2 enabled |
+| `oauth2.responseType` | The response type for the OAuth2 application.                  | `code`                 | If oauth2 enabled |

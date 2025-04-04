@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs/internal/firstValueFrom';
 import { UserProfileService } from '../../../services/user-profile.service';
 import { UserProfile } from '../../../models/user-pofile.model';
+import {AppConfigService} from "../../../services/app-config.service";
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -15,12 +16,12 @@ import { UserProfile } from '../../../models/user-pofile.model';
 export class AdminDashboardComponent {
 
   private name: string = "";
-  constructor(private http: HttpClient, private userProfileService: UserProfileService) {
+  constructor(private http: HttpClient, private userProfileService: UserProfileService, private appConfigService: AppConfigService) {
   }
 
   async ngOnInit(): Promise<void> {
 
-    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>('/api/user'));
+    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`));
     console.log('got result:', result);
 
     let profile = new UserProfile(result.email, result.firstName, result.lastName, result.roles, result.permissions);
