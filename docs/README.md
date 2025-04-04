@@ -3,7 +3,7 @@
 
 This page and its references include documentation for Link's services and the functionality those services supports.
 
-## Functionality
+## [Functionality](functionality/README.md)
 
 * [Admin UI](functionality/admin_ui.md)
 * [Census Management](functionality/census_management.md)
