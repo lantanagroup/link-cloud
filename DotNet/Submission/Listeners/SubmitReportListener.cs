@@ -170,39 +170,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
-                                var httpClient = _httpClient.CreateClient();
-                                string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-
-                                #region Census Admitted Patient List
-                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
-
-                                //TODO: add method to get key that includes looking at redis for future use case
-                                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                                    throw new Exception("Link Token Service Signing Key is missing.");
-
-                                //Add link token
-                                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
-                                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
-                                var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
-
-                                if (!censusResponse.IsSuccessStatusCode)
-                                    throw new TransientException("Response from Census service is not successful: " + censusContent);
-
-                                List? admittedPatients;
-                                try
-                                {
-                                    admittedPatients = await _fhirJsonParser.ParseAsync<List>(censusContent);   
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                                    _logger.LogDebug("Census service response: " + censusContent);
-                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-                                }
-                                #endregion
-
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
@@ -212,9 +179,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
-                                dtFormat = "yyyyMMddTHHmmss";
+                                string dtFormat = "yyyyMMdd";
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}");
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}_{value.ReportTrackingId}");
 
                                 string fileName;
                                 string contents;
@@ -232,7 +199,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     Hl7.Fhir.Model.Device device = new Device();
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
-                                        Name = "Link"
+                                        Name = "NHSNLink"
                                     });
 
                                     Assembly assembly = Assembly.GetExecutingAssembly();
@@ -264,13 +231,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #endregion
 
                                     #region Patient List
-
-                                    fileName = "patient-list.json";
-                                    contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        consumeCancellationToken);
-
+                                    await WritePatientFhirList(value.PatientIds, submissionDirectory, key.StartDate, key.EndDate);
                                     #endregion
 
                                     #region Aggregates
@@ -414,6 +375,35 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected async Task WritePatientFhirList(List<string> patientIds, string directory, DateTime startDate, DateTime endDate)
+        {
+            var admittedPatients = new List();
+            admittedPatients.Status = List.ListStatus.Current;
+            admittedPatients.Mode = ListMode.Snapshot;
+            admittedPatients.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patientIds)
+            {
+                admittedPatients.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
+                });
+            }
+
+            var fileName = "patient-list.json";
+            var contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
+
+            await File.WriteAllTextAsync(directory + "/" + fileName, contents, CancellationToken.None);
         }
 
         protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate)

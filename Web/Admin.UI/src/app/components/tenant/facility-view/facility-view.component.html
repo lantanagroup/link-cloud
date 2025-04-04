@@ -1,38 +1,122 @@
-<p><a [routerLink]="['/tenant']">Tenants</a> > Viewing {{facilityId}}</p>
+<div class="content">
 
-<mat-card appearance="outlined">
-  <mat-card-content>
-    <p><strong>Facility Id:</strong> {{facilityId}}</p>
-    <p><strong>NHSN Org Id:</strong> {{nhsnOrgId}}</p>
-  </mat-card-content>
-</mat-card>
+  <div style="width: 100%; display: flex; justify-content: flex-end;">
+    <button class="link-button light btn-lg" (click)="navBack()">
+      <fa-icon [icon]="faArrowLeft"></fa-icon>
+      Back
+    </button>
+  </div>
+  <div class="link-card">
+    <div class="split-container">
+      <div class="left-pane">
+        <div class="data-label">
+          Facility
+          <span class="data-value">{{facilityConfig?.facilityName}}</span>
+        </div>
+        <div class="data-label">
+          TimeZone
+          <span class="data-value selectable-value">{{facilityConfig?.timeZone}}</span>
+        </div>      
+      </div>
+      <div class="right-pane">          
+        <div class="table-container" style="box-shadow: none;" *ngIf="scheduledReports?.length > 0">       
+          <table class="link-table">
+            <thead class="table-head">
+              <tr>
+                <th class="header-column">Cadence</th>
+                <th class="header-column">Measures</th>              
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              <ng-container *ngFor="let report of scheduledReports">
+                <tr>
+                  <td class="table-cell">
+                    <mat-chip [ngClass]="{
+                      'daily-chip': report.cadence === 'Daily',
+                      'weekly-chip': report.cadence === 'Weekly',
+                      'monthly-chip': report.cadence === 'Monthly'
+                    }">{{report.cadence}}</mat-chip>
+                  </td>
+                  <td class="table-cell">
+                    <ul class="report-type-list no-bullets">
+                      <li *ngFor="let measure of report.measures">{{measure}}</li>
+                    </ul>
+                  </td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div> 
 
-<h3>Reports</h3>
-<div class="report-table-container">
-  <table mat-table [dataSource]="reports">
-
-    <!-- Report ID Column -->
-    <ng-container matColumnDef="reportId">
-      <th mat-header-cell *matHeaderCellDef> Report ID </th>
-      <td mat-cell *matCellDef="let report">
-        <a [routerLink]="['/tenant/facility', facilityId, 'report', report.reportId]">{{report.reportId}}</a>
-      </td>
-    </ng-container>
-
-    <!-- Reporting Period Column -->
-    <ng-container matColumnDef="reportingPeriod">
-      <th mat-header-cell *matHeaderCellDef> Reporting Period </th>
-      <td mat-cell *matCellDef="let report"> {{report.reportingPeriod}} </td>
-    </ng-container>
-
-    <!-- Measures Column -->
-    <ng-container matColumnDef="measures">
-      <th mat-header-cell *matHeaderCellDef> Measures </th>
-      <td mat-cell *matCellDef="let report"> {{report.measures}} </td>
-    </ng-container>
-
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-  </table>
+  <p>
+    <mat-toolbar class="page-header-bar page-secondary-bar">          
+      <span>Reports</span> 
+      <button class="link-button light btn-lg" (click)="onRefresh()">
+        <fa-icon [icon]="faRotate"></fa-icon>
+        Refresh
+      </button>
+    </mat-toolbar>
+  </p>
+  <div *ngIf="reportListSummary.length > 0">
+    <div class="table-container">    
+      <table class="link-table">
+        <thead>
+          <tr>
+            <th class="header-column">Report ID</th>
+            <th class="header-column">Reporting Period</th>
+            <th class="header-column">Query Plan</th>
+            <th class="header-column">Reporting Cadence</th>
+            <th class="header-column">Measures</th>
+            <th class="header-column">Patients in Census</th>
+            <th class="header-column">Patients in IP</th>
+          </tr>
+        </thead>
+        <tbody class="table-body">
+          <ng-container *ngFor="let report of reportListSummary">
+            <tr>
+              <td class="table-cell"><a [routerLink]="['/tenant/facility', facilityId, 'report', report.id]">{{report.id}}</a></td>
+              <td class="table-cell">
+                <span class="report-period-col"><label>Start</label>: {{report.reportStartDate}}</span>
+                <span class="report-period-col"><label>End</label>: &nbsp;&nbsp;{{report.reportEndDate}}</span>                
+              </td>
+              <td class="table-cell">TODO</td>
+              <td class="table-cell">
+                <mat-chip
+                    [ngClass]="{
+                        'monthly-chip': report.frequency === 'Monthly',
+                        'weekly-chip': report.frequency === 'Weekly',
+                        'daily-chip': report.frequency === 'Daily',
+                        'adhoc-chip': report.frequency === 'Adhoc'
+                    }"
+                >{{report.frequency}} 
+                </mat-chip>
+              </td>
+              <td class="table-cell"><ul class="report-type-list no-bullets"><li *ngFor="let type of report.reportTypes">{{type}}</li></ul></td>
+              <td class="table-cell">{{report.censusCount}}</td>
+              <td class="table-cell">{{report.initialPopulationCount}}</td>
+            </tr>
+            <tr class="submission-row" *ngIf="report.submitted">
+              <td class="table-cell" colspan="7">
+                Report submitted on {{report.submitDate | date}}.
+              </td>
+            </tr> 
+          </ng-container>
+        </tbody>
+      </table>     
+      <mat-paginator 
+        [length]="paginationMetadata.totalCount"
+        [pageIndex]="paginationMetadata.pageNumber"
+        [pageSize]="paginationMetadata.pageSize"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="pagedEvent($event)"
+        showFirstLastButtons
+        aria-label="Select page of report summaries">
+      </mat-paginator>
+    </div>
+  </div>
 </div>
+
+

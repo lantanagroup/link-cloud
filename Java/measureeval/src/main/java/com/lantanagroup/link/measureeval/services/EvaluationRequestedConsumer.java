@@ -8,7 +8,6 @@ import com.lantanagroup.link.measureeval.records.ResourceEvaluated;
 import com.lantanagroup.link.measureeval.repositories.AbstractResourceRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusTemplateRepository;
-import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -63,15 +62,15 @@ public class EvaluationRequestedConsumer {
     }
 
     @KafkaListener(topics = Topics.EVALUATION_REQUESTED)
-    public void consume(@Header(Headers.REPORT_TRACKING_ID) String reportTrackingID,
-                        @Header(Headers.CORRELATION_ID) String correlationId,
+    public void consume(@Header(Headers.CORRELATION_ID) String correlationId,
                         ConsumerRecord<String, EvaluationRequested> record) {
 
         Span currentSpan = Span.current();
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_ID), reportTrackingID).build();
+        var reportTrackingId = record.value().getReportTrackingId();
+        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_ID), reportTrackingId).build();
         measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
 
         String facilityId = record.key();
@@ -79,7 +78,7 @@ public class EvaluationRequestedConsumer {
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(patientReportStatus);
-            evaluateMeasures(reportTrackingID, correlationId, record.value(), patientReportStatus, bundle);
+            evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
         }
@@ -92,11 +91,6 @@ public class EvaluationRequestedConsumer {
 
         //get valid report in array
         var reports = patientStatus.getReports().stream().filter(r -> Objects.equals(r.getReportTrackingId(), value.getPreviousReportId())).toList();
-
-        if(reports.size() > 1){
-            var message = String.format("Multiple reports found with the same reportTrackingId: %s", value.getPreviousReportId());
-            throw new ValidationException(message);
-        }
 
         //create new PatientReportingEvaluationStatus and save it
         reports.forEach(r -> r.setReportTrackingId(reportTrackingId));

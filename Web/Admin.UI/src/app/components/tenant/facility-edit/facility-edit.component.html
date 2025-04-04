@@ -98,12 +98,24 @@
           </mat-action-row>
         </mat-tab>
         <mat-tab label="Query Plan">
-          -- Query Plan Configuration
+          <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
+                          *ngIf="showNoDataAcqQueryPlanConfigAlert"></app-link-alert>
+          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true" (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
+          <mat-action-row>
+            <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
+                    (click)="showDataAcqQueryPlanDialog()" *ngIf="showNoDataAcqQueryPlanConfigAlert">
+              <mat-icon>add</mat-icon>
+            </button>
+            <button mat-mini-fab aria-label="Edit Query Plan configuration" matTooltip="Edit Query Plan configuration"
+                    (click)="showDataAcqQueryPlanDialog()" *ngIf="!showNoDataAcqQueryPlanConfigAlert">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </mat-action-row>
         </mat-tab>
       </mat-tab-group>
     </mat-expansion-panel>
 
-    <mat-expansion-panel>
+    <mat-expansion-panel id="normalizationPanel" (opened)="loadNormalization()">
       <mat-expansion-panel-header>
         <mat-panel-title>
           Normalization Configuration
@@ -111,8 +123,21 @@
         <mat-panel-description>
         </mat-panel-description>
       </mat-expansion-panel-header>
-      -- stuff here
+      <app-link-alert [type]="linkNoConfigAlertType" [message]="noNormalizationConfigAlertMessage"
+                      *ngIf="showNoNormalizationConfigAlert"></app-link-alert>
+      <app-normalization-form [item]="normalizationConfig" [viewOnly]="true"></app-normalization-form>
+      <mat-action-row>
+        <button mat-mini-fab aria-label="Add Normalization configuration" matTooltip="Add Normalization configuration"
+                (click)="showNormalizationDialog()" *ngIf="showNoNormalizationConfigAlert">
+          <mat-icon>add</mat-icon>
+        </button>
+        <button mat-mini-fab aria-label="Edit Normalization configuration" matTooltip="Edit Normalization configuration"
+                (click)="showNormalizationDialog()" *ngIf="!showNoNormalizationConfigAlert">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </mat-action-row>
     </mat-expansion-panel>
+
 
     <mat-expansion-panel>
       <mat-expansion-panel-header>

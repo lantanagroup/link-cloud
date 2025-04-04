@@ -2,7 +2,10 @@
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
+using System.Security.Claims;
+using System.Text;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -13,12 +16,16 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<ReportService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
-
-        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
+        private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
+        private readonly IServiceScopeFactory _scopeFactory;
+        
+        public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+            _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
             InitHttpClient();
         }
@@ -26,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
         {            
             // HTTP GET
-            HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
+            var response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
@@ -47,6 +54,31 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _logger.LogError(ex, "Report service health check failed");
                 return new LinkServiceHealthReport { Service = "Report", Status = HealthStatus.Unhealthy };
             }
+        }
+        
+        public async Task<HttpResponseMessage> ReportSummaryList(ClaimsPrincipal user, string? facilityId, int pageNumber, int pageSize, CancellationToken cancellationToken)
+        {
+            // HTTP GET
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            
+            var queryStringBuilder = new StringBuilder("?");
+            if(facilityId is not null)
+            {
+                queryStringBuilder.Append($"facilityId={facilityId}&");
+            }
+        
+            queryStringBuilder.Append($"pageNumber={pageNumber}&pageSize={pageSize}");
+            
+            var response = await _client.GetAsync($"api/Report/summaries{queryStringBuilder}", cancellationToken);
+            
+            return response;
         }
 
         private void InitHttpClient()

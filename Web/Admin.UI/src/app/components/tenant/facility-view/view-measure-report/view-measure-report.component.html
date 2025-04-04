@@ -1,0 +1,81 @@
+<div class="content" style="overflow-y: scroll;">
+    <div class="split-container">
+        <div class="left-pane">
+          <div class="data-label">
+            Report
+            <span class="data-value selectable-value">{{measureReport.id}}</span>
+          </div>
+          <div class="data-label">
+            Facility
+            <span class="data-value">{{facilityId}}</span>
+          </div>
+          <div class="data-label">
+            Measure
+            <span class="data-value">{{measureReport.reportType}}</span>
+          </div>
+          <div class="data-label">
+            Patient
+            <span class="data-value">{{measureReport.patientId}}</span>
+          </div>
+          <div class="data-label">
+            Validation Status
+            <span class="data-value">{{measureReport.validationStatus}}</span>
+          </div>
+          <div class="data-label">
+            Submission Status
+            <span class="data-value">{{measureReport.status}}</span>
+          </div>
+        </div>
+        <div class="right-pane">
+           <app-pie-chart [data]="this.measureReport?.resourceCountSummary"></app-pie-chart>
+        </div>
+    </div> 
+    
+    <div *ngIf="resources.length > 0">
+      <div class="filter-bar">  
+        <span class="filter-bar-header">Filters</span>
+        <div class="filter-bar-row">
+          <div class="filter-bar-col" style="margin-left: 0;">
+            <div>
+              <label>
+                Resource Type
+              </label>
+              <select id="resourceType" [(ngModel)]="selectedResourceType" (change)="onResourceTypeChange($event)">
+                <option value="any">Any</option>
+                <option *ngFor="let type of resourceTypes" [value]="type">{{type}}</option>    
+              </select> 
+            </div>                 
+          </div>
+        </div>  
+      </div>
+      <div class="table-container">    
+        <table class="link-table">
+          <thead>
+            <tr>
+              <th class="header-column">Resource Type</th>
+              <th class="header-column">Fhir Id</th>            
+              <th class="header-column">Category</th>            
+            </tr>
+          </thead>
+          <tbody class="table-body">
+            <ng-container *ngFor="let resource of resources">
+              <tr>            
+                <td class="table-cell">{{resource.resourceType}}</td>
+                <td class="table-cell">{{resource.fhirId}}</td>
+                <td class="table-cell">{{resource.resourceCategory}}</td>             
+              </tr> 
+            </ng-container>
+          </tbody>
+        </table>     
+        <mat-paginator 
+          [length]="paginationMetadata.totalCount"
+          [pageIndex]="paginationMetadata.pageNumber"
+          [pageSize]="paginationMetadata.pageSize"
+          [pageSizeOptions]="[5, 10, 20]"
+          (page)="pagedEvent($event)"
+          showFirstLastButtons
+          aria-label="Select page of measure report resources">
+        </mat-paginator>
+      </div>
+    </div>    
+</div>

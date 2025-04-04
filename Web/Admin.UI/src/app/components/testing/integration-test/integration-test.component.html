@@ -11,7 +11,6 @@
             <mat-form-field class="form-select" appearance="outline">
               <mat-label>Facility</mat-label>
               <mat-select formControlName="facilityId">
-                <mat-option>None</mat-option>
                 <mat-option *ngFor="let facility of facilities" [value]="facility.facilityId">
                   {{facility.facilityName}}
                 </mat-option>

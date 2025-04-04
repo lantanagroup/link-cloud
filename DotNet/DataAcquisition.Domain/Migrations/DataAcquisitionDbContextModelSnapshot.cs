@@ -111,9 +111,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("QueryPlanIds")
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
                     b.ToTable("fhirQueryConfiguration");

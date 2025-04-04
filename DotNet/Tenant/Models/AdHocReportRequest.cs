@@ -7,6 +7,5 @@
         public DateTime? EndDate { get; set; }
         public List<string>? ReportTypes { get; set; }
         public List<string>? PatientIds { get; set; }
-
     }
 }

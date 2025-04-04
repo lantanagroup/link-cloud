@@ -24,6 +24,10 @@ import { HttpInterceptorProviders } from './interceptors/interceptor.barrel';
 import { APP_INITIALIZER } from '@angular/core';
 import { AppConfigService } from './services/app-config.service';
 import { AuthenticationService } from './services/security/authentication.service';
+import { LinkNavBarComponent } from './components/core/link-nav-bar/link-nav-bar.component';
+import { BreadcrumbComponent } from "./components/core/breadcrumb/breadcrumb.component";
+import { FooterComponent } from "./components/core/footer/footer.component";
+import { ToastrModule } from 'ngx-toastr';
 
 
 export function initConfig(appConfig: AppConfigService) {
@@ -33,7 +37,9 @@ export function initConfig(appConfig: AppConfigService) {
 @NgModule({ declarations: [
     AppComponent
   ],
-  bootstrap: [AppComponent], imports: [BrowserModule,
+  bootstrap: [AppComponent], 
+  imports: [
+    BrowserModule,
     BrowserAnimationsModule,
     AppRoutingModule,
     LayoutModule,
@@ -46,7 +52,13 @@ export function initConfig(appConfig: AppConfigService) {
     MatMenuModule,
     MatExpansionModule,
     MatNativeDateModule,
-    LoadingIndicatorComponent], providers: [
+    LoadingIndicatorComponent,
+    LinkNavBarComponent,
+    BreadcrumbComponent,
+    FooterComponent,
+    ToastrModule.forRoot()
+], 
+  providers: [
     {
       provide: APP_INITIALIZER,
       useFactory: initConfig,
@@ -57,5 +69,6 @@ export function initConfig(appConfig: AppConfigService) {
     HttpInterceptorProviders,
     AuthenticationService,
     provideHttpClient(withInterceptorsFromDi())
-  ] })
+  ] 
+})
 export class AppModule { }

@@ -123,13 +123,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
+    builder.Services.AddTransient<ScheduledReportFactory>();
+    builder.Services.AddTransient<MeasureReportSummaryFactory>();
+    builder.Services.AddTransient<ResourceSummaryFactory>();
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, GenerateReportValue>, KafkaConsumerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ReportScheduledValue>, KafkaConsumerFactory<string, ReportScheduledValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientIdsAcquiredValue>, KafkaConsumerFactory<string, PatientIdsAcquiredValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue>, KafkaConsumerFactory<ValidationCompleteKey, ValidationCompleteValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
 
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
@@ -141,7 +144,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>, KafkaProducerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientIdsAcquiredValue>, KafkaProducerFactory<string, PatientIdsAcquiredValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ValidationCompleteKey, ValidationCompleteValue>, KafkaProducerFactory<ValidationCompleteKey, ValidationCompleteValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
 
     // Add repositories
     builder.Services.AddTransient<IEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
@@ -280,8 +283,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITransientExceptionHandler<string, DataAcquisitionRequestedValue>, TransientExceptionHandler<string, DataAcquisitionRequestedValue>>();
 
     //ValidationComplete Listener
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>, DeadLetterExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>, TransientExceptionHandler<ValidationCompleteKey, ValidationCompleteValue>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ValidationCompleteValue>, DeadLetterExceptionHandler<string, ValidationCompleteValue>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, ValidationCompleteValue>, TransientExceptionHandler<string, ValidationCompleteValue>>();
 
     #endregion
 
