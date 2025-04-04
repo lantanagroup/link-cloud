@@ -47,7 +47,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
 
     public virtual T Add(T entity)
     {
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         try
         {
@@ -65,7 +65,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
     {
         if (cancellationToken.IsCancellationRequested) return null;
 
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         try
         {
@@ -139,6 +139,11 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         return result;
     }
 
+    public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _collection.CountDocumentsAsync<T>(predicate, cancellationToken: cancellationToken) > 0;
+    }
+
     public virtual T Update(T entity)
     {
         if (string.IsNullOrWhiteSpace(entity.Id))
@@ -196,7 +201,58 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         return HealthCheckResult.Unhealthy();
     }
 
-    Task<(List<T>, PaginationMetadata)> IEntityRepository<T>.SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
+    public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken)
+    {
+        if (pageNumber < 1) throw new ArgumentException("Page number must be greater than 0.", nameof(pageNumber));
+        if (pageSize < 1) throw new ArgumentException("Page size must be greater than 0.", nameof(pageSize));
+
+        var count = await _collection.CountDocumentsAsync<T>(predicate, cancellationToken: cancellationToken);
+        
+        var skip = (pageNumber - 1) * pageSize;
+        var query = _collection.Find(predicate).Skip(skip).Limit(pageSize);
+
+        if (!string.IsNullOrEmpty(sortBy))
+        {
+            var sortDefinition = sortOrder == SortOrder.Descending
+                ? Builders<T>.Sort.Descending(sortBy)
+                : Builders<T>.Sort.Ascending(sortBy);
+
+            query = query.Sort(sortDefinition);
+        }
+
+        var result = await query.ToListAsync(cancellationToken);
+        
+        var metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+        return (result, metadata);
+    }
+
+    public virtual void StartTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual void CommitTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual void RollbackTransaction()
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task StartTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public virtual Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }

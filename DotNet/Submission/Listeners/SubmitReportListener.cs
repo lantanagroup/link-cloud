@@ -12,15 +12,14 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Models;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -41,6 +40,9 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         private readonly ISubmissionServiceMetrics _submissionServiceMetrics;
 
+        private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+        private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
+
         private string Name => this.GetType().Name;
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
@@ -49,7 +51,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             IHttpClientFactory httpClient,
             ITransientExceptionHandler<SubmitReportKey, SubmitReportValue> transientExceptionHandler,
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken, 
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics)
         {
@@ -71,7 +73,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _linkTokenServiceConfig = linkTokenServiceConfig ?? throw new ArgumentNullException(nameof(linkTokenServiceConfig));
             _createSystemToken = createSystemToken ?? throw new ArgumentNullException(nameof(createSystemToken));
-            
+
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
 
             _submissionServiceMetrics = submissionServiceMetrics;
@@ -168,43 +170,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
-                                var httpClient = _httpClient.CreateClient();
-                                string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-
-                                #region Census Admitted Patient List
-                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
-
-                                //TODO: add method to get key that includes looking at redis for future use case
-                                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                                    throw new Exception("Link Token Service Signing Key is missing.");
-
-                                //Add link token
-                                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
-                                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
-                                var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
-
-                                if (!censusResponse.IsSuccessStatusCode)
-                                    throw new TransientException("Response from Census service is not successful: " + censusContent);
-
-                                List? admittedPatients;
-                                try
-                                {
-                                    admittedPatients =
-                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                            censusContent,
-                                            new JsonSerializerOptions().ForFhir());
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                                    _logger.LogDebug("Census service response: " + censusContent);
-                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-                                }
-                                #endregion
-
                                 Bundle otherResourcesBundle = new Bundle();
+                                otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
                                 string measureShortNames = value.MeasureIds
                                     .Select(GetMeasureShortName)
@@ -212,13 +179,12 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
                                 //Per 2153, don't build with the trailing timestamp
-                                dtFormat = "yyyyMMddTHHmmss";
+                                string dtFormat = "yyyyMMdd";
                                 string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}");
+                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}_{value.ReportTrackingId}");
 
                                 string fileName;
                                 string contents;
-                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -233,7 +199,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     Hl7.Fhir.Model.Device device = new Device();
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
-                                        Name = "Link"
+                                        Name = "NHSNLink"
                                     });
 
                                     Assembly assembly = Assembly.GetExecutingAssembly();
@@ -247,7 +213,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     fileName = "sending-device.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(device);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -257,7 +223,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Organization
 
                                     fileName = "sending-organization.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -265,13 +231,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #endregion
 
                                     #region Patient List
-
-                                    fileName = "patient-list.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        consumeCancellationToken);
-
+                                    await WritePatientFhirList(value.PatientIds, submissionDirectory, key.StartDate, key.EndDate);
                                     #endregion
 
                                     #region Aggregates
@@ -280,7 +240,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     {
                                         string measureShortName = this.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
-                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
+                                        contents = await _fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                             consumeCancellationToken);
@@ -300,7 +260,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                 var batchSize = _submissionConfig.PatientBundleBatchSize;
 
-                                ConcurrentBag<string> patientFilesWritten = new ConcurrentBag<string>();
+                                ConcurrentBag<PatientFile> patientFilesWritten = new ConcurrentBag<PatientFile>();
 
                                 while (patientIds.Any())
                                 {
@@ -325,9 +285,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var resultModel = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.ReportScheduleId, consumeCancellationToken);
+                                                value.ReportTrackingId, consumeCancellationToken);
 
-                                            patientFilesWritten.Add(resultModel.FilePath);
+                                            patientFilesWritten.Add(resultModel.PatientFile);
                                             otherResourcesBag.Add(resultModel.OtherResources);
                                         }));
                                     }
@@ -352,12 +312,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
+                                contents = await _fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
                                 //Generate Metrics
-                                GenerateSubmissionMetrics(otherResourcesBundle,  patientFilesWritten.ToList(), facilityId, key.StartDate, key.EndDate);
+                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), value.ReportTrackingId, facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
                             }
@@ -371,7 +331,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             }
                             catch (TimeoutException ex)
                             {
-                                var transientException = new TransientException(ex.Message,  ex.InnerException);
+                                var transientException = new TransientException(ex.Message, ex.InnerException);
 
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
@@ -395,7 +355,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                       string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+                        string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
 
                         _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
@@ -417,80 +377,252 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
         }
 
-        protected void GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<string>? patientFilesWritten, string facilityId, DateTime startDate, DateTime endDate )
+        protected async Task WritePatientFhirList(List<string> patientIds, string directory, DateTime startDate, DateTime endDate)
         {
-            if(otherResourcesBundle == null) { return; }    
+            var admittedPatients = new List();
+            admittedPatients.Status = List.ListStatus.Current;
+            admittedPatients.Mode = ListMode.Snapshot;
+            admittedPatients.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patientIds)
+            {
+                admittedPatients.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
+                });
+            }
+
+            var fileName = "patient-list.json";
+            var contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
+
+            await File.WriteAllTextAsync(directory + "/" + fileName, contents, CancellationToken.None);
+        }
+
+        protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate)
+        {
+            if (otherResourcesBundle == null) { return; }
             if (patientFilesWritten == null || patientFilesWritten.Count == 0) { return; }
 
-            var totalResources = otherResourcesBundle.GetResources().Count();
-            var resourceTypes = new Dictionary<string, int>();
-            var medicationCodes = new Dictionary<string, int>();
-            foreach (var patientFile in patientFilesWritten)
-            {
-                string contents = File.ReadAllText(patientFile);
-                var bundle = JsonSerializer.Deserialize<Bundle>(contents, new JsonSerializerOptions().ForFhir());
+            //Log metrics for "Other Resources"
+            ProcessMetricsForBundle(otherResourcesBundle, reportId, facilityId, startDate, endDate);
 
+            int batchSize = Math.Max(_submissionConfig.PatientBundleBatchSize, 5);
+
+            for (int index = patientFilesWritten.Count - 1; patientFilesWritten.Count > 0; index = Math.Max(0, index - batchSize))
+            {
+                // Calculate where to start
+                int startIndex = Math.Min(patientFilesWritten.Count - 1, index);
+
+                // Calculate where to stop
+                int endIndex = Math.Max(0, startIndex - batchSize);
+
+                var tasks = new List<Task>();
+
+                for (int subIndex = startIndex; subIndex > endIndex; subIndex--)
+                {
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        await GetBundleAndGenerateMetrics(patientFilesWritten[subIndex], reportId, facilityId, startDate, endDate);
+                    }));
+                }
+
+                //Wait for our batch to be completed
+                await Task.WhenAll(tasks);
+
+                patientFilesWritten.RemoveRange(endIndex, Math.Max(1, startIndex - endIndex));
+            }
+
+            _submissionServiceMetrics.IncrementReportSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                    });
+        }
+
+        /// <summary>
+        /// Gets Bundle Data from File, and then calls ProcessMetricsForBundle to process metrics for it.
+        /// </summary>
+        /// <param name="patientFile"></param>
+        /// <param name="reportId"></param>
+        /// <param name="facilityId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <returns></returns>
+        public async Task GetBundleAndGenerateMetrics(PatientFile patientFile, string reportId, string facilityId, DateTime startDate, DateTime endDate)
+        {
+            string contents = await File.ReadAllTextAsync(patientFile.FilePath);
+            var bundle = await _fhirJsonParser.ParseAsync<Bundle>(contents);                
+
+            if (bundle == null)
+                return;
+
+            ProcessMetricsForBundle(bundle, reportId, facilityId, startDate, endDate, patientFile.PatientId);
+        }
+
+        /// <summary>
+        /// Generate and Publish metrics for the provided bundle.
+        /// </summary>
+        /// <param name="bundle"></param>
+        /// <param name="reportId"></param>
+        /// <param name="facilityId"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="patientId"></param>
+        public void ProcessMetricsForBundle(Bundle bundle, string reportId, string facilityId, DateTime startDate, DateTime endDate, string patientId = "")
+        {
+            try
+            {
                 var resources = bundle.GetResources();
 
                 if (resources == null)
-                    continue;
+                    return;
 
-                foreach (var resource in resources)
+                resources.AsParallel().ForAll(resource =>
                 {
-                    totalResources += 1;
+                    _submissionServiceMetrics.IncrementResourcesSubmittedCounter(1, new List<KeyValuePair<string, object?>>() {
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                    });
 
                     var resType = resource.TypeName;
 
-                    if (!resourceTypes.TryAdd(resType, 1))
+                    _submissionServiceMetrics.IncrementResourceTypeCounter(1,
+                    new List<KeyValuePair<string, object?>>()
                     {
-                        resourceTypes[resType] += 1;
-                    }
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.Resource, resType)
+                    });
 
-                    if (resource is Medication)
+                    if (resource is Encounter)
+                    {
+                        var enc = (Encounter)resource;
+                        var cls = enc.Class.Code;
+                        var type = enc.Type.FirstOrDefault()?.Coding.FirstOrDefault()?.Code;
+                        _ = DateTime.TryParse(enc.Period?.Start ?? "", out DateTime sd);
+                        _ = DateTime.TryParse(enc.Period?.End ?? "", out DateTime ed);
+
+                        _submissionServiceMetrics.IncrementEncounterCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.EncounterType, type),
+                        new KeyValuePair<string, object?>(DiagnosticNames.EncounterClass, cls),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart,  sd == DateTime.MinValue ? null : sd),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, ed == DateTime.MinValue ? null : ed)
+                        });
+                    }
+                    else if (resource is DiagnosticReport)
+                    {
+                        var diag = (DiagnosticReport)resource;
+
+                        _submissionServiceMetrics.IncrementDiagnosticCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.DiagnosticReportCode, diag.Code),
+                        });
+
+                    }
+                    else if (resource is Location)
+                    {
+                        var loc = (Location)resource;
+
+                        foreach (var lType in loc.Type)
+                        {
+                            _submissionServiceMetrics.IncrementLocationCounter(1,
+                            new List<KeyValuePair<string, object?>>()
+                            {
+                            new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                            new KeyValuePair<string, object?>(DiagnosticNames.LocationType, lType.Coding.FirstOrDefault()?.Code),
+                            });
+                        }
+                    }
+                    else if (resource is Specimen)
+                    {
+                        var obs = (Specimen)resource;
+
+                        _submissionServiceMetrics.IncrementSpecimenCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.SpecimenType, obs.Type.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is Observation)
+                    {
+                        var obs = (Observation)resource;
+
+                        _submissionServiceMetrics.IncrementObservationCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.ObservationCode, obs.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is ServiceRequest)
+                    {
+                        var servReq = (ServiceRequest)resource;
+
+                        _submissionServiceMetrics.IncrementServiceRequestCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.ServiceRequestCategory, servReq.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is MedicationRequest)
+                    {
+                        var medRequest = (MedicationRequest)resource;
+
+                        _submissionServiceMetrics.IncrementMedicationRequestCounter(1,
+                        new List<KeyValuePair<string, object?>>()
+                        {
+                        new KeyValuePair<string, object?>(DiagnosticNames.ReportId, reportId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientId),
+                        new KeyValuePair<string, object?>(DiagnosticNames.MedicationRequestReasonCode, medRequest.ReasonCode.FirstOrDefault()?.Coding.FirstOrDefault()?.Code),
+                        new KeyValuePair<string, object?>(DiagnosticNames.MedicationRequestCategory, medRequest.Category.FirstOrDefault()?.Coding.FirstOrDefault()?.Code)
+                        });
+                    }
+                    else if (resource is Medication)
                     {
                         var med = (Medication)resource;
                         var code = med.Code?.Coding?.FirstOrDefault();
                         if (code != null)
                         {
-                            string val = $"{code.Display}|{code.Code}|{code.System}";
-                            if (!medicationCodes.TryAdd(val, 1))
+                            string medCode = $"{code.Code}|{code.System}";
+
+                            _submissionServiceMetrics.IncrementMedicationCounter(1,
+                            new List<KeyValuePair<string, object?>>()
                             {
-                                medicationCodes[val] += 1;
-                            }
+                            new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
+                            new KeyValuePair<string, object?>(DiagnosticNames.MedicationCode, medCode),
+                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
+                            new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                            });
                         }
                     }
-                }
+                });
             }
-
-            //Total resources submitted
-            _submissionServiceMetrics.IncrementResourcesSubmittedCounter(totalResources, new List<KeyValuePair<string, object?>>() {
-                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
-            });
-
-            //ResourceTypes
-            foreach (var resType in resourceTypes)
+            catch (Exception ex)
             {
-                _submissionServiceMetrics.IncrementResourceTypeCounter(resType.Value,
-                    new List<KeyValuePair<string, object?>>()
-                    {
-                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, resType.Key)
-                    });
-            }
-
-            //Medication Codes
-            foreach (var medication in medicationCodes)
-            {
-                _submissionServiceMetrics.IncrementMedicationCounter(medication.Value,
-                    new List<KeyValuePair<string, object?>>()
-                    {
-                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
-                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, medication.Key),
-                        new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                        new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
-                    });
+                _logger.LogError(ex, "Error Generating Metrics for Bundle");
             }
         }
 
@@ -526,11 +658,9 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <param name="endDate"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken )
+        private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
         {
             var returnModel = new CreatePatientBundleResult();
-
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
 
             var httpClient = _httpClient.CreateClient();
 
@@ -554,7 +684,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (PatientSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientSubmissionModel), cancellationToken);
+                var strContent = await response.Content.ReadAsStringAsync();
+                var patientSubmissionBundle = JsonConvert.DeserializeObject<PatientSubmissionModel>(strContent);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
@@ -565,13 +696,18 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
 
-                returnModel.OtherResources = patientSubmissionBundle.OtherResources;
+                returnModel.OtherResources = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.OtherResources);
+                
+                //Deserialize to verify that the bundle is properly constructed - discard the result.
+                //Consider removing for performance reasons after we are sure this ser/des logic is stable.
+                _ = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.PatientResources);
 
                 string fileName = $"patient-{patientId}.json";
-                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
+                string contents = patientSubmissionBundle.PatientResources;
 
-                returnModel.FilePath = submissionDirectory + "/" + fileName;
-                await File.WriteAllTextAsync(returnModel.FilePath, contents, cancellationToken);
+                returnModel.PatientFile.PatientId = patientId;
+                returnModel.PatientFile.FilePath = submissionDirectory + "/" + fileName;
+                await File.WriteAllTextAsync(returnModel.PatientFile.FilePath, contents, cancellationToken);
 
                 return returnModel;
             }
@@ -581,10 +717,16 @@ namespace LantanaGroup.Link.Submission.Listeners
             }
         }
 
+        public class PatientFile
+        {
+            public string PatientId { get; set; } = string.Empty;
+            public string FilePath { get; set; } = string.Empty;
+        }
+
         public class CreatePatientBundleResult
         {
             public Bundle OtherResources { get; set; } = new Bundle();
-            public string FilePath { get; set; } = string.Empty;
+            public PatientFile PatientFile { get; set; } = new();
         }
     }
 }

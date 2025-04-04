@@ -4,10 +4,10 @@ import { IMeasureDefinitionConfigModel } from "../../interfaces/measure-definiti
 @Injectable()
 export class BundleIdValidator {
 
-  public invalidBundleId(formGroup: any, item:IMeasureDefinitionConfigModel): boolean {
+  public invalidBundleId(formGroup: any): boolean {
     const bundle = formGroup['bundle'];
     let bundleId = formGroup['bundleId'];
-    if (!bundleId) bundleId = item?.bundleId??"";
+    //if (!bundleId) bundleId = item?.bundleId??"";
     if (!!bundle) {
       return bundleId !== bundle["id"];
     }

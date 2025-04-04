@@ -7,21 +7,12 @@ import org.hl7.fhir.r4.model.Resource;
 import java.io.InputStream;
 
 public class FhirHelper {
-    private static FhirContext context;
-    private static IParser parser;
-
     public static FhirContext getContext() {
-        if (context == null) {
-            context = FhirContext.forR4();
-        }
-        return context;
+        return FhirContext.forR4Cached();
     }
 
     public static IParser getParser() {
-        if (parser == null) {
-            parser = getContext().newJsonParser();
-        }
-        return parser;
+        return getContext().newJsonParser();
     }
 
     public static Resource deserialize(String json) {

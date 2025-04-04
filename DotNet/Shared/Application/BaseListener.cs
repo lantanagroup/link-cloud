@@ -7,7 +7,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application;
 public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType, ProduceKeyType, ProduceValueType>
@@ -104,6 +103,11 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                 catch (ConsumeException e)
                 {
                     if (e.Error.Code == ErrorCode.UnknownTopicOrPart)
+                    {
+                        throw new OperationCanceledException(e.Error.Reason, e);
+                    }
+
+                    if (consumeResult is null)
                     {
                         throw new OperationCanceledException(e.Error.Reason, e);
                     }

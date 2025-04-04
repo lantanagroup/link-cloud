@@ -86,7 +86,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
   facilities: IFacilityConfigModel[] = [];
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  intervalId!: NodeJS.Timer | null;
+  //intervalId!: NodeJS.Timer | null;
+
+  intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
 
   consumersData: Map<string, string> = new Map();
 
@@ -236,7 +238,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '').subscribe({
+    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe({
       next: (facilities: PagedFacilityConfigModel) => {
         this.facilities = facilities.records;
       },

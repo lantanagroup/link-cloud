@@ -6,7 +6,7 @@ trigger:
   paths:
     include:
     - DotNet/*/Migrations
-    - Java/validation/resources/database
+    - Java/validation/src/main/resources/database/migrations
     exclude:
     - '*'
     
@@ -20,68 +20,9 @@ pool:
 stages:
 - stage: Build
   jobs:
-  - job: getChangedFiles
-    displayName: Get Changes
-    steps: 
-      - checkout: self
-        fetchDepth: 0
-      - task: PowerShell@2
-        name: setVariables
-        inputs:
-          targetType: 'inline'
-          script: |
-            #Get any changed files
-            $changedFiles = git diff --name-status HEAD HEAD^ 
-            
-            # Account - Return $true if path has changed files
-            $accountBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Account/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=accountChanged;isOutput=true;]$accountBool" 
-
-            # Audit - Return $true if path has changed files
-            $auditBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Audit/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=auditChanged;isOutput=true;]$auditBool" 
-
-            # Census - Return $true if path has changed files
-            $censusBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Census/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=censusChanged;isOutput=true;]$censusBool" 
-
-            # DataAcquisition - Return $true if path has changed files
-            $dataBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/DataAcquisition/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=dataChanged;isOutput=true;]$dataBool" 
-
-            # Normalization - Return $true if path has changed files
-            $normBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Normalization/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=normChanged;isOutput=true;]$normBool" 
-
-            # QueryDispatch - Return $true if path has changed files
-            $queryBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/QueryDispatch/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=queryChanged;isOutput=true;]$queryBool" 
-
-            # Report - Return $true if path has changed files
-            $reportBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Report/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=reportChanged;isOutput=true;]$reportBool" 
-
-            # Submission - Return $true if path has changed files
-            $submissionBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Submission/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=submissionChanged;isOutput=true;]$submissionBool" 
-
-            # Tenant - Return $true if path has changed files
-            $tenantBool = ((Select-String -InputObject $changedFiles -Pattern "Dotnet/Tenant/Migrations/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=tenantChanged;isOutput=true;]$tenantBool"
-            
-            # Validation - Return $true if path has changed files
-            $validationBool = ((Select-String -InputObject $changedFiles -Pattern "Java/validation/src/main/resources/database/" -AllMatches).Matches.Count -gt 0) 
-            Write-Host "##vso[task.setvariable variable=validationChanged;isOutput=true;]$validationBool" 
-
-            Write-Host "##vso[task.setvariable variable=task.A.status]Success"
-  ###
   # Account
   - job: Account
     displayName: "Generate Account Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.accountChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -102,10 +43,6 @@ stages:
   # Audit
   - job: Audit
     displayName: "Generate Audit Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.auditChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -126,10 +63,6 @@ stages:
   # Census
   - job: Census
     displayName: "Generate Census Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.censusChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -146,15 +79,10 @@ stages:
          ArtifactName: 'scripts'
          publishLocation: 'container'
         displayName: Generate Tenant SQL Script  
-
   ###
   # DataAcquisition
   - job: DataAcquisition
     displayName: "Generate Data Acquisition Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.dataChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -175,10 +103,6 @@ stages:
   # Normalization
   - job: Normalization
     displayName: "Generate Normalization Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.normChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
       - task: DotNetCoreCLI@2
         displayName: Install dotnet-ef
@@ -197,36 +121,32 @@ stages:
         displayName: Generate Tenant SQL Script  
   ###
   # Notification
-  - job: Notification
-    displayName: "Generate Notification Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
-    condition: eq(variables.changed, 'True')
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c NotificationDbContext -s $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -p $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/notificationDb.sql
-      displayName: Generate Notification SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+  # - job: Notification
+  #   displayName: "Generate Notification Schema Script"
+  #   dependsOn: getChangedFiles
+  #   variables: 
+  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.notificationChanged'] ]
+  #   condition: eq(variables.changed, 'True')
+  #   steps:
+  #   - task: DotNetCoreCLI@2
+  #     displayName: Install dotnet-ef
+  #     inputs:
+  #      command: 'custom'
+  #      custom: 'tool'
+  #      arguments: 'install --global dotnet-ef'
+  #   - script: |
+  #        dotnet ef migrations script --idempotent --verbose -c NotificationDbContext -s $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -p $(build.sourcesdirectory)/DotNet/Notification/Notification.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/notificationDb.sql
+  #     displayName: Generate Notification SQL Script
+  #   - task: PublishBuildArtifacts@1
+  #     inputs:
+  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+  #      ArtifactName: 'scripts'
+  #      publishLocation: 'container'
+  #     displayName: Generate Tenant SQL Script  
   ###
   # QueryDispatch
   - job: QueryDispatch
     displayName: "Generate QueryDispatch Schema Script"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.queryChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -245,36 +165,32 @@ stages:
       displayName: Generate Tenant SQL Script  
   ###
   # Submission
-  - job: Submission
-    displayName: "Build Submission"
-    dependsOn: getChangedFiles
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
-    condition: eq(variables.changed, 'True')
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Install dotnet-ef
-      inputs:
-       command: 'custom'
-       custom: 'tool'
-       arguments: 'install --global dotnet-ef'
-    - script: |
-         dotnet ef migrations script --idempotent --verbose -c TenantSubmissionDbContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
-      displayName: Generate Submission SQL Script
-    - task: PublishBuildArtifacts@1
-      inputs:
-       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-       ArtifactName: 'scripts'
-       publishLocation: 'container'
-      displayName: Generate Tenant SQL Script  
+  # - job: Submission
+  #   displayName: "Build Submission"
+  #   dependsOn: getChangedFiles
+  #   variables: 
+  #     changed: $[ dependencies.getChangedFiles.outputs['setVariables.submissionChanged'] ]
+  #   condition: eq(variables.changed, 'True')
+  #   steps:
+  #   - task: DotNetCoreCLI@2
+  #     displayName: Install dotnet-ef
+  #     inputs:
+  #      command: 'custom'
+  #      custom: 'tool'
+  #      arguments: 'install --global dotnet-ef'
+  #   - script: |
+  #        dotnet ef migrations script --idempotent --verbose -c TenantSubmissionDbContext -s $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -p $(build.sourcesdirectory)/DotNet/Submission/Submission.csproj -o $(build.artifactstagingdirectory)/DatabaseScripts/submissionDb.sql
+  #     displayName: Generate Submission SQL Script
+  #   - task: PublishBuildArtifacts@1
+  #     inputs:
+  #      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+  #      ArtifactName: 'scripts'
+  #      publishLocation: 'container'
+  #     displayName: Generate Tenant SQL Script  
   ###
   # Tenant
   - job: Tenant
     displayName: "Build Tenant"
-    dependsOn: getChangedFiles 
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
     - task: DotNetCoreCLI@2
       displayName: Install dotnet-ef
@@ -295,17 +211,13 @@ stages:
   # Validation
   - job: Validation
     displayName: "Build Validation"
-    dependsOn: getChangedFiles 
-    variables: 
-      changed: $[ dependencies.getChangedFiles.outputs['setVariables.tenantChanged'] ]
-    condition: eq(variables.changed, 'True')
     steps:
     - task: CopyFiles@2
-      displayName: Copy Validation SQL Script to Artifact Staging Directory
+      displayName: Copy Validation SQL Scripts to Artifact Staging Directory
       inputs:
-       SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/'
+       SourceFolder: '$(build.sourcesdirectory)/Java/validation/src/main/resources/database/migrations/'
        TargetFolder: $(Build.ArtifactStagingDirectory)/DatabaseScripts
-       Contents: '**/validationDb.sql'
+       Contents: '*.sql'
     - task: PublishBuildArtifacts@1
       inputs:
        PathtoPublish: '$(Build.ArtifactStagingDirectory)'

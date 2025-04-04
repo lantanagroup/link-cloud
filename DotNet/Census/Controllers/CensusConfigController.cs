@@ -5,6 +5,7 @@ using LantanaGroup.Link.Census.Domain.Managers;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 
 namespace Census.Controllers;
 
@@ -47,6 +48,11 @@ public class CensusConfigController : Controller
             return BadRequest("ScheduledTrigger is required.");
         }
 
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
+        }
+
         try
         {
             var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
@@ -86,10 +92,15 @@ public class CensusConfigController : Controller
         try
         {
             var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
-            if (response == null)
+            if (response is null)
                 return NotFound();
 
-            return Ok(response);
+            CensusConfigModel model = new CensusConfigModel
+            {
+                FacilityId = response.FacilityID,
+                ScheduledTrigger = response.ScheduledTrigger
+            };
+            return Ok(model);
         }
         catch (Exception ex)
         {
@@ -133,6 +144,11 @@ public class CensusConfigController : Controller
         if (!string.Equals(facilityId, censusConfig.FacilityId, StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"FacilityID in request path does not match facility in request body.");
+        }
+
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
         }
 
         try

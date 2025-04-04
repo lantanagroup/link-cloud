@@ -29,13 +29,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CensusTests", "DotNet\Censu
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Account", "DotNet\Account\Account.csproj", "{909EAA22-CDB0-49A4-824B-3D759EEAF318}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Notification", "DotNet\Notification\Notification.csproj", "{1758D1B4-594C-426D-8CF3-1194155D4E31}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AuditTests", "DotNet\AuditTests\AuditTests.csproj", "{BFAF3F61-CEDC-4671-AEA3-5147440720B3}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Audit.Specification", "DotNet\Audit.Specification\Audit.Specification.csproj", "{5E02424F-6A71-4EE1-89D7-59ADF421226A}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotificationTests", "DotNet\NotificationTests\NotificationTests.csproj", "{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QueryDispatch", "DotNet\QueryDispatch\QueryDispatch.csproj", "{DC424202-1A59-436D-9849-A13925298109}"
 EndProject
@@ -65,12 +59,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAcquisition.Domain", "D
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReportTests", "DotNet\ReportTests\ReportTests.csproj", "{A0ED93DF-7502-4D26-87A4-1E09C3420C33}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SubmissionTests", "DotNet\SubmissionTests\SubmissionTests.csproj", "{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipelines", "{D88CD83D-09AC-4632-8066-4D7C36817749}"
 	ProjectSection(SolutionItems) = preProject
 		Azure_Pipelines\azure-pipelines.account.cd.yaml = Azure_Pipelines\azure-pipelines.account.cd.yaml
 		Azure_Pipelines\azure-pipelines.account.ci.yaml = Azure_Pipelines\azure-pipelines.account.ci.yaml
+		Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml = Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml = Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml = Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml
+		Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml = Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml
 		Azure_Pipelines\azure-pipelines.audit.cd.yaml = Azure_Pipelines\azure-pipelines.audit.cd.yaml
 		Azure_Pipelines\azure-pipelines.audit.ci.yaml = Azure_Pipelines\azure-pipelines.audit.ci.yaml
 		Azure_Pipelines\azure-pipelines.census.cd.yaml = Azure_Pipelines\azure-pipelines.census.cd.yaml
@@ -100,10 +98,27 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AzurePipelines", "AzurePipe
 		Azure_Pipelines\azure-pipelines.web.cd.yaml = Azure_Pipelines\azure-pipelines.web.cd.yaml
 		Azure_Pipelines\deploy_all_services.yaml = Azure_Pipelines\deploy_all_services.yaml
 		Azure_Pipelines\deploy_tags_all.yml = Azure_Pipelines\deploy_tags_all.yml
-		Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml = Azure_Pipelines\azure-pipelines.admin-bff.cd.yaml
-		Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml = Azure_Pipelines\azure-pipelines.admin-bff.ci.yaml
-		Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml = Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml
-		Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml = Azure_Pipelines\azure-pipelines.admin-ui.ci.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{0BA1C290-3881-4224-B231-BBC64740D229}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{E7B2013B-29DF-4736-9B16-CB5655C0AB26}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\pr-title-check.yml = .github\workflows\pr-title-check.yml
+		.github\workflows\smoke-test.yaml = .github\workflows\smoke-test.yaml
+		.github\workflows\autocomment-on-pr-shared.yaml = .github\workflows\autocomment-on-pr-shared.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E16-CB84-4A0E-8016-7BEBA68A0906}"
+	ProjectSection(SolutionItems) = preProject
+		.env = .env
+		create-dbs.sql = create-dbs.sql
+		docker-compose.collector.yml = docker-compose.collector.yml
+		docker-compose.dcproj = docker-compose.dcproj
+		docker-compose.grafana.yml = docker-compose.grafana.yml
+		docker-compose.prometheus.yml = docker-compose.prometheus.yml
+		docker-compose.tempo.yml = docker-compose.tempo.yml
+		kafka-client.properties = kafka-client.properties
 	EndProjectSection
 EndProject
 Global
@@ -152,22 +167,10 @@ Global
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{909EAA22-CDB0-49A4-824B-3D759EEAF318}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1758D1B4-594C-426D-8CF3-1194155D4E31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1758D1B4-594C-426D-8CF3-1194155D4E31}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1758D1B4-594C-426D-8CF3-1194155D4E31}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1758D1B4-594C-426D-8CF3-1194155D4E31}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BFAF3F61-CEDC-4671-AEA3-5147440720B3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5E02424F-6A71-4EE1-89D7-59ADF421226A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{34E13F8D-F32F-47E9-B7C1-6541836AAF8E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC424202-1A59-436D-9849-A13925298109}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -229,6 +232,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
+		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}

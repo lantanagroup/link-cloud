@@ -16,6 +16,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { ITableHeaderModel } from '../../../interfaces/table-header-model.interface';
+import { TenantService } from 'src/app/services/gateway/tenant/tenant.service';
+import { PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
 
 @Component({
   selector: 'app-audit-dashboard',
@@ -66,16 +68,17 @@ export class AuditDashboardComponent implements OnInit {
   sortBy: string = '';
 
   //filters
-  facilityFilter = ["All", "FACILITY_ORG_10001", "FACILITY_ORG_12345"];
-  serviceFilter = ["All", "Account Service", "Census Service", "Data Acquisition", "Notification Service", "Normalization Service", "Tenant Service"];
+  facilityFilter: string[] = [];
+  serviceFilter = ["All", "Account Service", "Census Service", "Data Acquisition", "Notification Service", "NormalizationService", "Tenant"];
   actionFilter = ["All", "Create", "Update", "Delete", "Query", "Submission"];
 
-  constructor(private auditService: AuditService) { }
+  constructor(private auditService: AuditService, private tenantService: TenantService) { }
 
   ngOnInit(): void {
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.paginationMetadata.pageSize = this.initPageSize;
     this.getAuditLogs();
+    this.facilityFilter = this.loadFacilityFilter();
   }
 
   pagedEvent(event: PageEvent) {
@@ -153,6 +156,16 @@ export class AuditDashboardComponent implements OnInit {
 
     this.paginationMetadata.pageNumber = this.initPageNumber;
     this.getAuditLogs();
+  }
+
+  loadFacilityFilter() : string[] {
+    var facilityList: string[] = ["All"];
+    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe((facilities: PagedFacilityConfigModel) => {
+          facilities.records.map(facility => facility.facilityId).forEach(facilityId => {
+            facilityList.push(facilityId);
+          });
+        });
+    return facilityList;
   }
 
 }
