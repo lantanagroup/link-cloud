@@ -2,6 +2,10 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Org.BouncyCastle.Crypto;
@@ -18,15 +22,20 @@ public class EpicAuth : IAuth
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
-    private readonly InMemoryCacheService _cacheService;
+    private readonly ICacheService _cacheService;
     private readonly CacheSettings _cacheSettings;
 
-    public EpicAuth(HttpClient httpClient, ILogger<EpicAuth> logger, InMemoryCacheService cacheService, CacheSettings cacheSettings)
+    public EpicAuth(
+        HttpClient httpClient, 
+        ILogger<EpicAuth> logger,
+        ICacheService cacheService, 
+        IOptions<CacheSettings> cacheSettings
+        )
     {
         _httpClient = httpClient;
         _logger = logger;
         _cacheService = cacheService;
-        _cacheSettings = cacheSettings;
+        _cacheSettings = cacheSettings.Value;
     }
 
     /// <summary>
@@ -57,10 +66,11 @@ public class EpicAuth : IAuth
 
             if (responseJson != null)
             {
+                var expirationInSeconds = responseJson.RootElement.GetProperty("expires_in").GetInt32();
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromMinutes(_cacheSettings.CacheTimeoutInMinutes));
+                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds));
 
                     _logger.LogInformation($"Bearer Information Acquired.");
                     return (false, new AuthenticationHeaderValue("Bearer", accessToken));
