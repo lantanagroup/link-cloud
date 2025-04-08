@@ -55,10 +55,10 @@ public class QueryPlanConfigController : Controller
             }
 
             var result = type.HasValue 
-                ? await _queryPlanManager.FindAsync(x => x.FacilityId == facilityId && x.Type == type, cancellationToken)
-                : await _queryPlanManager.FindAsync(x => x.FacilityId == facilityId, cancellationToken);
+                ? await _queryPlanManager.FindAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper() && x.Type == type, cancellationToken)
+                : await _queryPlanManager.FindAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), cancellationToken);
 
-            if (result == null)
+            if (result == null || result.Count == 0)
             {
                 throw new NotFoundException(
                     $"No Query Plan found for facilityId: {facilityId}.");
