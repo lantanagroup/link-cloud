@@ -25,10 +25,11 @@ public class QueryPlanConfigController : Controller
     }
 
     /// <summary>
-    /// Gets a QueryPlanConfig record for a given facilityId and type (Adhoc, Daily, Weekly, Monthly).
+    /// Gets a QueryPlanConfig record for a given facilityId and type (Discharge, Adhoc, Daily, Weekly, Monthly).
     /// If no type is provided, all records will be returned.
     /// </summary>
     /// <param name="facilityId"></param>
+    /// <param name="type"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>
     ///     Success: 200
@@ -43,7 +44,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<List<QueryPlan>>> GetQueryPlan(
         string facilityId,
-        [FromQuery]  Frequency type,
+        [FromQuery]  Frequency? type,
         CancellationToken cancellationToken)
     {
         try
@@ -53,7 +54,9 @@ public class QueryPlanConfigController : Controller
                 throw new BadRequestException("parameter facilityId is required.");
             }
 
-            var result = await _queryPlanManager.GetAsync(facilityId, type, cancellationToken);
+            var result = type.HasValue 
+                ? await _queryPlanManager.FindAsync(x => x.FacilityId == facilityId && x.Type == type, cancellationToken)
+                : await _queryPlanManager.FindAsync(x => x.FacilityId == facilityId, cancellationToken);
 
             if (result == null)
             {
