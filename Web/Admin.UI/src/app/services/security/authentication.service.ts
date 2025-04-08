@@ -31,7 +31,7 @@ export class AuthenticationService {
   }
 
   async login() {
-    if (this.appConfigService.config?.oauth2) {
+    if (this.appConfigService.config?.oauth2?.enabled) {
       await this.oauthService.tryLogin();
 
       if (!this.oauthService.hasValidAccessToken()) {
