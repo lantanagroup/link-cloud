@@ -20,8 +20,8 @@ export class AdminDashboardComponent {
   }
 
   async ngOnInit(): Promise<void> {
-
-    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${this.appConfigService.config?.baseApiUrl}/user`));
+    const baseApiUrl = this.appConfigService.config?.baseApiUrl || '/api';
+    let result: UserProfile = await firstValueFrom(this.http.get<UserProfile>(`${baseApiUrl}/user`));
     console.log('got result:', result);
 
     let profile = new UserProfile(result.email, result.firstName, result.lastName, result.roles, result.permissions);
