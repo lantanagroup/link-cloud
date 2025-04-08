@@ -34,7 +34,7 @@ export function initConfig(appConfig: AppConfigService, oauthService:OAuthServic
           clientId: config.oauth2.clientId,
           scope: config.oauth2.scope,
           responseType: config.oauth2.responseType,
-          requireHttps: config.oauth2.requireHttps || true,
+          requireHttps: config.oauth2.requireHttps ?? true,
           disablePKCE: config.oauth2.disablePKCE || false,
           skipIssuerCheck: config.oauth2.skipIssuerCheck || false,
           redirectUri: window.location.origin + '/login-oauth2'
