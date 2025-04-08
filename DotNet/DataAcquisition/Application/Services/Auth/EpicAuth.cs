@@ -24,19 +24,16 @@ public class EpicAuth : IAuth
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
     private readonly ICacheService _cacheService;
-    private readonly Models.CacheSettings _cacheSettings;
 
     public EpicAuth(
         HttpClient httpClient, 
         ILogger<EpicAuth> logger,
-        ICacheService cacheService, 
-        IOptions<Models.CacheSettings> cacheSettings
+        ICacheService cacheService
         )
     {
         _httpClient = httpClient;
         _logger = logger;
         _cacheService = cacheService;
-        _cacheSettings = cacheSettings.Value;
     }
 
     /// <summary>
