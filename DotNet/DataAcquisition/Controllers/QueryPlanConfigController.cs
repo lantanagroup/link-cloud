@@ -25,7 +25,8 @@ public class QueryPlanConfigController : Controller
     }
 
     /// <summary>
-    /// Gets a QueryPlanConfig record for a given facilityId.
+    /// Gets a QueryPlanConfig record for a given facilityId and type (Adhoc, Daily, Weekly, Monthly).
+    /// If no type is provided, all records will be returned.
     /// </summary>
     /// <param name="facilityId"></param>
     /// <param name="cancellationToken"></param>
@@ -40,7 +41,7 @@ public class QueryPlanConfigController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult> GetQueryPlan(
+    public async Task<ActionResult<List<QueryPlan>>> GetQueryPlan(
         string facilityId,
         [FromQuery]  Frequency type,
         CancellationToken cancellationToken)
