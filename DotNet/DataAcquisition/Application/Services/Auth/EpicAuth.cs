@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -23,13 +24,13 @@ public class EpicAuth : IAuth
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
     private readonly ICacheService _cacheService;
-    private readonly CacheSettings _cacheSettings;
+    private readonly Models.CacheSettings _cacheSettings;
 
     public EpicAuth(
         HttpClient httpClient, 
         ILogger<EpicAuth> logger,
         ICacheService cacheService, 
-        IOptions<CacheSettings> cacheSettings
+        IOptions<Models.CacheSettings> cacheSettings
         )
     {
         _httpClient = httpClient;
@@ -70,7 +71,7 @@ public class EpicAuth : IAuth
                 var accessToken = Sanitize(responseJson.RootElement.GetProperty("access_token").GetString());
                 if (!string.IsNullOrWhiteSpace(accessToken))
                 {
-                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds));
+                    _cacheService.Set(facilityId, accessToken, TimeSpan.FromSeconds(expirationInSeconds), ExpirationType.Absolute);
 
                     _logger.LogInformation($"Bearer Information Acquired.");
                     return (false, new AuthenticationHeaderValue("Bearer", accessToken));
