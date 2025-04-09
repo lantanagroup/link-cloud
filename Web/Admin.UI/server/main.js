@@ -1,9 +1,17 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = process.env.PORT || 80;
+
+// Basic rate limiting middleware
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later'
+});
 
 let distFolder = getDistFolder();
 console.log(`Using dist folder: ${distFolder}`);
@@ -16,7 +24,7 @@ app.get('/assets/app.config.local.json', (req, res) => {
   res.json(config); // Don't log every time the request is made
 });
 
-app.get('/*any', (req, res) => {
+app.get('/*any', apiLimiter, (req, res) => {
   res.sendFile(path.join(distFolder, 'index.html'));
 });
 
