@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const port = process.env.PORT || 80;
@@ -17,6 +18,11 @@ let distFolder = getDistFolder();
 console.log(`Using dist folder: ${distFolder}`);
 
 const config = getConfig();
+
+// Add security middleware for production use
+if (config.production) {
+  app.use(helmet());
+}
 
 app.use(express.static(distFolder));
 
