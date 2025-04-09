@@ -39,7 +39,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
 
-            var problem = (ObjectResult)result;
+            var problem = result.Result as ObjectResult;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.NotFound);
         }
 
@@ -51,7 +51,7 @@ namespace DataAcquisitionUnitTests.Controllers
 
             var result = await _controller.GetQueryPlan("", Frequency.Monthly,  CancellationToken.None);
 
-            var problem = (ObjectResult)result;
+            var problem = result.Result as ObjectResult;
             Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.BadRequest);
         }
 
