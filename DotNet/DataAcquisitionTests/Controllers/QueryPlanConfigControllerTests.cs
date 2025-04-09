@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Moq.AutoMock;
+using System.Linq.Expressions;
 using System.Net;
 
 namespace DataAcquisitionUnitTests.Controllers
@@ -19,13 +20,14 @@ namespace DataAcquisitionUnitTests.Controllers
         {
             var cancellationToken = new CancellationToken();
             _mocker = new AutoMocker();
-            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.GetAsync(It.IsAny<string>(), Frequency.Monthly, CancellationToken.None))
-                .ReturnsAsync(new QueryPlan());
+            _mocker.GetMock<IQueryPlanManager>().Setup(x => x.FindAsync(It.IsAny<Expression<Func<QueryPlan, bool>>>(), CancellationToken.None))
+                .ReturnsAsync(new List<QueryPlan>([new QueryPlan()]));
 
             var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
 
             var result = await _controller.GetQueryPlan(facilityId, Frequency.Monthly, CancellationToken.None);
-            Assert.IsType<OkObjectResult>(result);
+            var problem = result.Result as ObjectResult;
+            Assert.Equal(problem.StatusCode.Value, (int)HttpStatusCode.OK);
         }
 
         [Fact]
