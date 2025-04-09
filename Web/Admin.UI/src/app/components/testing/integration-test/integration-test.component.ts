@@ -238,7 +238,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe({
+    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 0).subscribe({
       next: (facilities: PagedFacilityConfigModel) => {
         this.facilities = facilities.records;
       },
