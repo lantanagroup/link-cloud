@@ -47,11 +47,11 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             }
 
 
-            (bool isQueryParam, object authHeader) authHeader = (false, null);
+            (bool? isQueryParam, object? authHeader) authHeader = (false, null);
 
             if (facilityConfig.Authentication != null)
             {
-                authHeader = await BuildeAuthHeader(facilityConfig.Authentication);
+                authHeader = await BuildeAuthHeader(facilityId, facilityConfig.Authentication);
             }
 
 
@@ -62,8 +62,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 {
                     try
                     {
-                        resultLists.Add(await _fhirApiManager.GetPatientList(facilityConfig.FhirBaseServerUrl, listId, facilityId,
-                            facilityConfig.Authentication));
+                        resultLists.Add(await _fhirApiManager.GetPatientList(facilityConfig.FhirBaseServerUrl, listId, facilityId, facilityConfig.Authentication));
                     }
                     catch (Exception ex)
                     {
@@ -86,7 +85,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
             return result;
         }
 
-        private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(AuthenticationConfiguration auth)
+        private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfiguration auth)
         {
             (bool isQueryParam, object authHeader) authHeader = (false, null);
             IAuth authService = _authRetrievalService.GetAuthenticationService(auth);
@@ -96,7 +95,7 @@ namespace LantanaGroup.Link.DataAcquisition.Application.Services
                 return (false, null);
             }
 
-            authHeader = await authService.SetAuthentication(auth);
+            authHeader = await authService.SetAuthentication(facilityId, auth);
             return authHeader;
         }
     }
