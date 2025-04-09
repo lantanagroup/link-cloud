@@ -8,12 +8,12 @@ const port = process.env.PORT || 80;
 let distFolder = getDistFolder();
 console.log(`Using dist folder: ${distFolder}`);
 
-getConfig(true);    // Load config and log it
+const config = getConfig();
 
 app.use(express.static(distFolder));
 
 app.get('/assets/app.config.local.json', (req, res) => {
-  res.json(getConfig(false)); // Don't log every time the request is made
+  res.json(config); // Don't log every time the request is made
 });
 
 app.get('/*any', (req, res) => {
@@ -48,7 +48,7 @@ function getDistFolder() {
   return folder;
 }
 
-function getConfig(shouldLog) {
+function getConfig() {
   const configPath = path.join(__dirname, 'src', 'assets', 'app.config.local.json');
 
   let config = {};
@@ -65,17 +65,17 @@ function getConfig(shouldLog) {
   // Apply environment variable overrides
   if (process.env.LINK_BASE_API_URL !== undefined) {
     config.baseApiUrl = process.env.LINK_BASE_API_URL;
-    !shouldLog || console.log('Found LINK_BASE_API_URL:', config.baseApiUrl);
+    console.log('Found LINK_BASE_API_URL:', config.baseApiUrl);
   }
 
   if (process.env.LINK_PRODUCTION !== undefined) {
     config.production = process.env.LINK_PRODUCTION === 'true';
-    !shouldLog || console.log('Found LINK_PRODUCTION:', config.production);
+    console.log('Found LINK_PRODUCTION:', config.production);
   }
 
   if (process.env.LINK_AUTH_REQUIRED !== undefined) {
     config.authRequired = process.env.LINK_AUTH_REQUIRED === 'true';
-    !shouldLog || console.log('Found LINK_AUTH_REQUIRED:', config.authRequired);
+    console.log('Found LINK_AUTH_REQUIRED:', config.authRequired);
   }
 
   // Ensure oauth2 block exists before assigning nested values
@@ -90,27 +90,27 @@ function getConfig(shouldLog) {
 
     if (process.env.LINK_OAUTH2_ENABLED !== undefined) {
       config.oauth2.enabled = process.env.LINK_OAUTH2_ENABLED === 'true';
-      !shouldLog || console.log('Found LINK_OAUTH2_ENABLED:', config.oauth2.enabled);
+      console.log('Found LINK_OAUTH2_ENABLED:', config.oauth2.enabled);
     }
 
     if (process.env.LINK_OAUTH2_ISSUER !== undefined) {
       config.oauth2.issuer = process.env.LINK_OAUTH2_ISSUER;
-      !shouldLog || console.log('Found LINK_OAUTH2_ISSUER:', config.oauth2.issuer);
+      console.log('Found LINK_OAUTH2_ISSUER:', config.oauth2.issuer);
     }
 
     if (process.env.LINK_OAUTH2_CLIENT_ID !== undefined) {
       config.oauth2.clientId = process.env.LINK_OAUTH2_CLIENT_ID;
-      !shouldLog || console.log('Found LINK_OAUTH2_CLIENT_ID:', config.oauth2.clientId);
+      console.log('Found LINK_OAUTH2_CLIENT_ID:', config.oauth2.clientId);
     }
 
     if (process.env.LINK_OAUTH2_SCOPE !== undefined) {
       config.oauth2.scope = process.env.LINK_OAUTH2_SCOPE;
-      !shouldLog || console.log('Found LINK_OAUTH2_SCOPE:', config.oauth2.scope);
+      console.log('Found LINK_OAUTH2_SCOPE:', config.oauth2.scope);
     }
 
     if (process.env.LINK_OAUTH2_RESPONSE_TYPE !== undefined) {
       config.oauth2.responseType = process.env.LINK_OAUTH2_RESPONSE_TYPE;
-      !shouldLog || console.log('Found LINK_OAUTH2_RESPONSE_TYPE:', config.oauth2.responseType);
+      console.log('Found LINK_OAUTH2_RESPONSE_TYPE:', config.oauth2.responseType);
     }
   }
 
