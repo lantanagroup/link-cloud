@@ -1,2 +1,5 @@
 obj/
 node_modules/
+.angular
+.vscode
+app.config.local.json
