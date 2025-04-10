@@ -20,7 +20,7 @@ console.log(`Using dist folder: ${distFolder}`);
 const config = getConfig();
 
 // Add security middleware for production use
-if (config.production) {
+if (config.production || process.env.NODE_ENV === 'production') {
   app.use(helmet());
 }
 
