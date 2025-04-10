@@ -63,7 +63,7 @@ function getDistFolder() {
 }
 
 function getConfig() {
-  const configPath = path.join(__dirname, 'src', 'assets', 'app.config.local.json');
+  const configPath = path.join(distFolder, 'assets', 'app.config.local.json');
 
   let config = {};
 
