@@ -27,127 +27,101 @@ namespace LantanaGroup.Link.Tenant.Controllers
     {
 
         private readonly IFacilityConfigurationService _facilityConfigurationService;
+try
+{
+    _logger.LogInformation("Beginning facility deletion process for facility ID: {FacilityId}", facilityId);
+    var deletionResults = new Dictionary
 
-        private readonly IMapper _mapperModelToDto;
+&lt;
 
-        private readonly IMapper _mapperDtoToModel;
+string, string
 
-        private readonly ILogger<FacilityController> _logger;
+&gt;
 
-        private readonly ISchedulerFactory _schedulerFactory;
+();
 
-        private readonly IKafkaProducerFactory<string, GenerateReportValue> _adHocKafkaProducerFactory;
-
-        private readonly IHttpClientFactory _httpClient;
-        private readonly ServiceRegistry _serviceRegistry;
-
-        public FacilityController(ILogger<FacilityController> logger, IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory, IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory, IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
+    // Loop through the registered services (skipping the Tenant service) to call DELETE endpoints
+    foreach (var service in _serviceRegistry.Services)
+    {
+        if (service.Key == "Tenant") continue;
+    
+        string deleteEndpoint = "";
+        switch (service.Key)
         {
-
-            _facilityConfigurationService = facilityConfigurationService;
-            _schedulerFactory = schedulerFactory;
-            _logger = logger;
-            _schedulerFactory = schedulerFactory;
-
-            var configModelToDto = new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<FacilityConfigModel, FacilityConfigDto>();
-                cfg.CreateMap<PagedConfigModel<FacilityConfigModel>, PagedFacilityConfigDto>();
-                cfg.CreateMap<ScheduledReportModel, ScheduledReportDto>();
-            });
-
-            var configDtoToModel = new MapperConfiguration(cfg =>
-            {
-                cfg.CreateMap<FacilityConfigDto, FacilityConfigModel>();
-                cfg.CreateMap<PagedFacilityConfigDto, PagedConfigModel<FacilityConfigModel>>();
-                cfg.CreateMap<ScheduledReportDto, ScheduledReportModel>();
-            });
-
-            _mapperModelToDto = configModelToDto.CreateMapper();
-            _mapperDtoToModel = configDtoToModel.CreateMapper();
-            _adHocKafkaProducerFactory = adHocKafkaProducerFactory;
-            _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
-            _httpClient = httpClient;
+            case "Census":
+                deleteEndpoint = $"/api/configuration/{facilityId}";
+                break;
+            case "Normalization":
+                deleteEndpoint = $"/api/normalization/tenant/{facilityId}";
+                break;
+            case "QueryDispatch":
+                deleteEndpoint = $"/api/query-dispatch/configuration/{facilityId}";
+                break;
+            case "DataAcquisition":
+                deleteEndpoint = $"/api/data-acquisition/facility/{facilityId}";
+                break;
+            case "Report":
+                deleteEndpoint = $"/api/report/configuration/{facilityId}";
+                break;
+            case "Measure":
+                deleteEndpoint = $"/api/measure/configuration/{facilityId}";
+                break;
+            case "Submission":
+                deleteEndpoint = $"/api/submission/configuration/{facilityId}";
+                break;
+            case "Notification":
+                deleteEndpoint = $"/api/notification/configuration/{facilityId}";
+                break;
+            default:
+                _logger.LogWarning("No deletion endpoint defined for service: {ServiceKey}", service.Key);
+                deletionResults[service.Key] = "Skipped - No deletion endpoint defined";
+                continue;
         }
-
-        /// <summary>
-        /// Get facilities
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <param name="facilityId"></param>
-        /// <param name="facilityName"></param>
-        /// <param name="sortBy"></param>
-        /// <param name="sortOrder"></param>
-        /// <param name="pageSize"></param>
-        /// <param name="pageNumber"></param>
-        /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityConfigModel>))]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpGet(Name = "GetFacilities")]
-        public async Task<ActionResult<PagedConfigModel<FacilityConfigModel>>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        
+        // Create an HttpClient and call the DELETE endpoint
+        try
         {
-            List<FacilityConfigDto> facilitiesDtos;
-            PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
-            _logger.LogInformation($"Get Facilities");
-
-            if (pageNumber < 1) { pageNumber = 1; }
-
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
-
-            PagedConfigModel<FacilityConfigModel> pagedFacilityConfigModel = await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
-
-            using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
+            var client = _httpClient.CreateClient();
+            var url = $"{service.Value.BaseUrl}{deleteEndpoint}";
+            _logger.LogInformation("Calling delete endpoint for service {ServiceKey}: {Url}", service.Key, url);
+            var response = await client.DeleteAsync(url, cancellationToken);
+            if (response.IsSuccessStatusCode)
             {
-                facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(pagedFacilityConfigModel.Records);
-                pagedFacilityConfigModelDto.Records = facilitiesDtos;
-                pagedFacilityConfigModelDto.Metadata = pagedFacilityConfigModel.Metadata;
+                _logger.LogInformation("Successfully deleted facility data from {ServiceKey} service", service.Key);
+                deletionResults[service.Key] = "Success";
             }
-            if (pagedFacilityConfigModelDto.Records.Count == 0)
+            else
             {
-                return NoContent();
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning("Failed to delete facility data from {ServiceKey} service. Status: {StatusCode}, Error: {Error}",
+                    service.Key, response.StatusCode, errorContent);
+                deletionResults[service.Key] = $"Failed - {response.StatusCode}";
             }
-            return Ok(pagedFacilityConfigModelDto);
         }
-
-        /// <summary>
-        /// Creates a facility configuration.
-        /// </summary>
-        /// <param name="newFacility"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityConfigDto))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPost]
-        public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility, CancellationToken cancellationToken)
+        catch (Exception ex)
         {
-            FacilityConfigModel facilityConfigModel = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(newFacility);
-
-            try
-            {
-                await _facilityConfigurationService.CreateFacility(facilityConfigModel, cancellationToken);
-
-            }
-            catch (ApplicationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Exception Encountered in FacilityController.StoreFacility");
-                return Problem("An error occurred while storing the facility", null, 500);
-            }
-
-            // create jobs for the new Facility
-            using (ServiceActivitySource.Instance.StartActivity("Add Jobs for Facility"))
-            {
-                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
-                await ScheduleService.AddJobsForFacility(facilityConfigModel, scheduler);
-            }
-
-            return CreatedAtAction(nameof(StoreFacility), new { id = facilityConfigModel.Id }, facilityConfigModel);
+            _logger.LogError(ex, "Error deleting facility data from {ServiceKey} service", service.Key);
+            deletionResults[service.Key] = $"Error - {ex.Message}";
         }
+    }
+    // After processing other services, delete the facility from the Tenant service
+    _logger.LogInformation("Deleting facility from Tenant service");
+    await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
+    deletionResults["Tenant"] = "Success";
+    // Log overall deletion results and complete the process
+    _logger.LogInformation("Facility deletion completed for {FacilityId}. Results: {@DeletionResults}", facilityId, deletionResults);
+    return NoContent();
+}
+catch (Exception ex)
+{
+    _logger.LogError(ex, "Error in facility deletion process for {FacilityId}", facilityId);
+    return StatusCode(500, new
+    {
+        error = "Failed to complete facility deletion process",
+        message = ex.Message,
+        deletionResults = deletionResults
+    });
+}
 
         /// <summary>
         /// Find a facility config by Id
@@ -258,23 +232,304 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpDelete("{facilityId}")]
-        public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
-        {
-            FacilityConfigModel existingFacility = _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken).Result;
+        public async Task
 
+        <IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
+        {
+            var deletionResults = new Dictionary<string, string>();
             try
             {
+                _logger.LogInformation("Beginning facility deletion process for facility ID: {FacilityId}", facilityId);
+                
+                // Loop through each service in the registry (skipping the Tenant service)
+                foreach (var service in _serviceRegistry.Services)
+                {
+                    if (service.Key == "Tenant") continue;
+                    
+                    string deleteEndpoint = "";
+                    switch (service.Key)
+                    {
+                        case "Census":
+                            deleteEndpoint = $"/api/configuration/{facilityId}";
+                            break;
+                        case "Normalization":
+                            deleteEndpoint = $"/api/normalization/tenant/{facilityId}";
+                            break;
+                        case "QueryDispatch":
+                            deleteEndpoint = $"/api/query-dispatch/configuration/{facilityId}";
+                            break;
+                        case "DataAcquisition":
+                            deleteEndpoint = $"/api/data-acquisition/facility/{facilityId}";
+                            break;
+                        case "Report":
+                            deleteEndpoint = $"/api/report/configuration/{facilityId}";
+                            break;
+                        case "Measure":
+                            deleteEndpoint = $"/api/measure/configuration/{facilityId}";
+                            break;
+                        case "Submission":
+                            deleteEndpoint = $"/api/submission/configuration/{facilityId}";
+                            break;
+                        case "Notification":
+                            deleteEndpoint = $"/api/notification/configuration/{facilityId}";
+                            break;
+                        default:
+                            _logger.LogWarning("No deletion endpoint defined for service: {ServiceKey}", service.Key);
+                            deletionResults[service.Key] = "Skipped - No deletion endpoint defined";
+                            continue;
+                    }
+                    
+                    // For each service call, create an HttpClient and issue a DELETE request
+                    try
+                    {
+                        var client = _httpClient.CreateClient();
+                        var url = $"{service.Value.BaseUrl}{deleteEndpoint}";
+                        _logger.LogInformation("Calling delete endpoint for service {ServiceKey}: {Url}", service.Key, url);
+                        
+                        var response = await client.DeleteAsync(url, cancellationToken);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _logger.LogInformation("Successfully deleted facility data from {ServiceKey} service", service.Key);
+                            deletionResults[service.Key] = "Success";
+                        }
+                        else
+                        {
+                            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                            _logger.LogWarning("Failed to delete facility data from {ServiceKey} service. Status: {StatusCode}, Error: {Error}",
+                                service.Key, response.StatusCode, errorContent);
+                            deletionResults[service.Key] = $"Failed - {response.StatusCode}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error deleting facility data from {ServiceKey} service", service.Key);
+                        deletionResults[service.Key] = $"Error - {ex.Message}";
+                    }
+                    // End of service loop iteration.
+                }
+                
+                // After processing all services, delete the facility from the Tenant service.
+                _logger.LogInformation("Deleting facility from Tenant service");
                 await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
-            }
-            catch (ApplicationException ex)
-            {
-                return BadRequest(ex.Message);
+                deletionResults["Tenant"] = "Success";
+                
+                // Log overall deletion results and return NoContent to indicate successful deletion
+                _logger.LogInformation("Facility deletion completed for {FacilityId}. Results: {@DeletionResults}",
+                    facilityId, deletionResults);
+                return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception Encountered in FacilityController.DeleteFacility");
-                return Problem("An error occurred while deleting the facility", null, 500);
+                _logger.LogError(ex, "Error in facility deletion process for {FacilityId}", facilityId);
+                return StatusCode(500, new 
+                { 
+                    error = "Failed to complete facility deletion process", 
+                    message = ex.Message,
+                    deletionResults = deletionResults
+                });
             }
+        }
+
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Census service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Census"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Census service");
+                    deletionResults["Census"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.NormalizationServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.NormalizationServiceApiUrl}/api/normalization/tenant/{facilityId}";
+                    _logger.LogInformation("Calling Normalization service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from Normalization service");
+                        deletionResults["Normalization"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Normalization service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Normalization"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Normalization service");
+                    deletionResults["Normalization"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.QueryDispatchServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.QueryDispatchServiceApiUrl}/api/query-dispatch/configuration/{facilityId}";
+                    _logger.LogInformation("Calling QueryDispatch service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from QueryDispatch service");
+                        deletionResults["QueryDispatch"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from QueryDispatch service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["QueryDispatch"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from QueryDispatch service");
+                    deletionResults["QueryDispatch"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.DataAcquisitionServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.DataAcquisitionServiceApiUrl}/api/data-acquisition/facility/{facilityId}";
+                    _logger.LogInformation("Calling DataAcquisition service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from DataAcquisition service");
+                        deletionResults["DataAcquisition"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from DataAcquisition service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["DataAcquisition"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from DataAcquisition service");
+                    deletionResults["DataAcquisition"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.ReportServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.ReportServiceApiUrl}/api/report/configuration/{facilityId}";
+                    _logger.LogInformation("Calling Report service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from Report service");
+                        deletionResults["Report"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Report service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Report"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Report service");
+                    deletionResults["Report"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.MeasureServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.MeasureServiceApiUrl}/api/measure/configuration/{facilityId}";
+                    _logger.LogInformation("Calling Measure service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from Measure service");
+                        deletionResults["Measure"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Measure service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Measure"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Measure service");
+                    deletionResults["Measure"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.SubmissionServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.SubmissionServiceApiUrl}/api/submission/configuration/{facilityId}";
+                    _logger.LogInformation("Calling Submission service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from Submission service");
+                        deletionResults["Submission"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Submission service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Submission"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Submission service");
+                    deletionResults["Submission"] = $"Error - {ex.Message}";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_serviceRegistry.NotificationServiceApiUrl))
+            {
+                try
+                {
+                    string deleteUrl = $"{_serviceRegistry.NotificationServiceApiUrl}/api/notification/configuration/{facilityId}";
+                    _logger.LogInformation("Calling Notification service delete endpoint: {DeleteUrl}", deleteUrl);
+                    var response = await httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deleted facility data from Notification service");
+                        deletionResults["Notification"] = "Success";
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        _logger.LogWarning("Failed to delete facility data from Notification service. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
+                        deletionResults["Notification"] = $"Failed - {response.StatusCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting facility data from Notification service");
+                    deletionResults["Notification"] = $"Error - {ex.Message}";
+                }
+            }
+
+            _logger.LogInformation("Deleting facility from Tenant service");
+            await _facilityService.DeleteFacilityAsync(facilityId, cancellationToken);
+            deletionResults["Tenant"] = "Success";
+
+            _logger.LogInformation("Facility deletion completed for {FacilityId}. Results: {@DeletionResults}", facilityId, deletionResults);
 
             using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
             {
@@ -283,6 +538,71 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
 
             return NoContent();
+        }
+
+                        case "DataAcquisition":
+                            deleteEndpoint = $"/api/data-acquisition/facility/{facilityId}";
+                            break;
+                        case "Report":
+                            deleteEndpoint = $"/api/report/configuration/{facilityId}";
+                            break;
+                        case "Measure":
+                            deleteEndpoint = $"/api/measure/configuration/{facilityId}";
+                            break;
+                        case "Submission":
+                            deleteEndpoint = $"/api/submission/configuration/{facilityId}";
+                            break;
+                        case "Notification":
+                            deleteEndpoint = $"/api/notification/configuration/{facilityId}";
+                            break;
+                        default:
+                            _logger.LogWarning("No deletion endpoint defined for service: {ServiceKey}", service.Key);
+                            deletionResults[service.Key] = "Skipped - No deletion endpoint defined";
+                            continue;
+                    }
+
+                    try
+                    {
+                        var client = _httpClient.CreateClient();
+                        var url = $"{service.Value.BaseUrl}{deleteEndpoint}";
+                        _logger.LogInformation("Calling delete endpoint for service {ServiceKey}: {Url}", service.Key, url);
+                        var response = await client.DeleteAsync(url, cancellationToken);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _logger.LogInformation("Successfully deleted facility data from {ServiceKey} service", service.Key);
+                            deletionResults[service.Key] = "Success";
+                        }
+                        else
+                        {
+                            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                            _logger.LogWarning("Failed to delete facility data from {ServiceKey} service. Status: {StatusCode}, Error: {Error}", service.Key, response.StatusCode, errorContent);
+                            deletionResults[service.Key] = $"Failed - {response.StatusCode}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error deleting facility data from {ServiceKey} service", service.Key);
+                        deletionResults[service.Key] = $"Error - {ex.Message}";
+                    }
+                }
+                
+                _logger.LogInformation("Deleting facility from Tenant service");
+                await _facilityConfigurationService.RemoveFacility(facilityId, cancellationToken);
+                deletionResults["Tenant"] = "Success";
+
+                _logger.LogInformation("Facility deletion completed for {FacilityId}. Results: {@DeletionResults}", facilityId, deletionResults);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in facility deletion process for {FacilityId}", facilityId);
+                return StatusCode(500, new
+                {
+                    error = "Failed to complete facility deletion process",
+                    message = ex.Message,
+                    deletionResults = deletionResults
+                });
+            }
         }
 
         /// <summary>
