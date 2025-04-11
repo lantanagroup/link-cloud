@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <Folder Include="Application\Factories\" />
+    <Folder Include="Presentation\Endpoints\Aggregation\Handlers\Tenant\" />
   </ItemGroup>
 
   <ItemGroup>

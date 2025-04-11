@@ -72,42 +72,5 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _client.DefaultRequestHeaders.Accept.Clear();
             _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
-
-
-        public async Task<HttpResponseMessage> GenerateAdHocReport(ClaimsPrincipal user, string facilityId, AdHocReportRequest request)
-        {
-            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-            {
-                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-
-                //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            HttpContent content = JsonContent.Create(request);
-
-            var response = await _client.PostAsync($"api/Facility/{facilityId}/AdHocReport", content);
-
-            return response;
-        }
-
-        public async Task<HttpResponseMessage> RegenerateReport(ClaimsPrincipal user, string facilityId, RegenerateReportRequest request)
-        {
-            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
-            {
-                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-
-                //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-
-            HttpContent content = JsonContent.Create(request);
-
-            var response = await _client.PostAsync($"api/Facility/{facilityId}/RegenerateReport", content);
-
-            return response;
-        }
     }
 }
