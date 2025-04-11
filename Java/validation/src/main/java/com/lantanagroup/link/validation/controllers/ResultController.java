@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/result")
+@RequestMapping("/api/validation/result")
 @SecurityRequirement(name = "bearer-key")
 public class ResultController {
     private final ResultRepository resultRepository;
