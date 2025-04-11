@@ -31,7 +31,6 @@ public static class GetSystemHealth
             reportService.LinkServiceHealthCheck(context.RequestAborted),
             submissionService.LinkServiceHealthCheck(context.RequestAborted),
             tenantService.LinkServiceHealthCheck(context.RequestAborted),
-            tenantService.LinkServiceHealthCheck(context.RequestAborted),
             validationService.LinkServiceHealthCheck(context.RequestAborted)
         };
 
