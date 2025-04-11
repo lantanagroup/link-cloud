@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Tenant.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
     public class RegenerateReportRequest
     {

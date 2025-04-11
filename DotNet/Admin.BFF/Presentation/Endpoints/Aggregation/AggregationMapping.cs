@@ -13,7 +13,7 @@ public static class AggregationMapping
         {
             Tags = new List<OpenApiTag> { new() { Name = "Service Aggregation" } }
         });
-        
+
         routes.MapGet("/reports/summaries", GetReportSummaries.Handle)
             .RequireAuthorization(LinkAuthorizationConstants.LinkBearerService.AuthenticatedUserPolicyName)
             .Produces<List<ScheduledReportListSummary>>()
@@ -25,7 +25,7 @@ public static class AggregationMapping
                 Summary = "Get Report Summaries",
                 Description = "Retrieves a list of report summaries."
             });
-        
+
         return routes;
     }
 }

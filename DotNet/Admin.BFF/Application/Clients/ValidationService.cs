@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
@@ -34,5 +36,22 @@ public class ValidationService
         _client.DefaultRequestHeaders.Accept.Clear();
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
-    
+
+    public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
+    {
+        // HTTP GET
+        try
+        {
+            var response = await _client.GetAsync($"api/validation/health", cancellationToken);
+            var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
+            if (healthResult is not null) healthResult.Service = "Validation";
+
+            return healthResult;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Validation service health check failed");
+            return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Unhealthy };
+        }
+    }
 }
