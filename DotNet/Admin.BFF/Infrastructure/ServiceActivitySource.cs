@@ -2,7 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Diagnostics;
 
-namespace LantanaGroup.Link.Submission.Application.Services
+namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure
 {
     public static class ServiceActivitySource
     {
