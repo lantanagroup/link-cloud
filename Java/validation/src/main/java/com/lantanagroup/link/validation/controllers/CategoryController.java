@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/category")
+@RequestMapping("/api/validation/category")
 @SecurityRequirement(name = "bearer-key")
 public class CategoryController {
     private final CategoryRepository categoryRepository;
