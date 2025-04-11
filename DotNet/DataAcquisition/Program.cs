@@ -350,7 +350,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddDbContextCheck<DataAcquisitionDbContext>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();

@@ -249,7 +249,7 @@ var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, Quer
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<QueryDispatchDbContext>()
-    .AddKafka(kafkaHealthOptions);
+    .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
 // Logging using Serilog
 builder.Logging.AddSerilog();
