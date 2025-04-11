@@ -17,9 +17,7 @@ using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -56,8 +54,6 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics)
         {
-
-            Console.WriteLine($"********* PRODUCT VERSION : {ServiceActivitySource.ProductVersion} *********");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _submissionConfig = submissionConfig.Value;
@@ -206,6 +202,9 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     string? version = ServiceActivitySource.ProductVersion;
+
+                                    if (string.IsNullOrEmpty(version))
+                                        version = ServiceActivitySource.Instance.Version;
 
                                     (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
                                     {
