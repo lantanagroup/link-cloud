@@ -4,6 +4,6 @@ namespace LantanaGroup.Link.DataAcquisition.Services.Interfaces;
 
 public interface IAuth
 {
-    Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(AuthenticationConfiguration authSettings);
+    Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfiguration authSettings);
 }
 
