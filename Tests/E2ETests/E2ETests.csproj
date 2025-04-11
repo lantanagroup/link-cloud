@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <EnableMSTestRunner>true</EnableMSTestRunner>
+        <OutputType>Exe</OutputType>
+        <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+        <!--
+          Displays error on console in addition to the log file. Note that this feature comes with a performance impact.
+          For more information, visit https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-integration-dotnet-test#show-failure-per-test
+          -->
+        <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
+        <RootNamespace>LantanaGroup.Link.Tests.E2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Hl7.Fhir.R4" Version="6.0.0-alpha1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1"/>
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="17.12.6"/>
+        <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" Version="1.4.0"/>
+        <PackageReference Include="MSTest" Version="3.6.1"/>
+        <PackageReference Include="NUnit" Version="4.3.2" />
+        <PackageReference Include="RestSharp" Version="112.1.1-alpha.0.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="data\17ba069b-5738-4f14-9ccb-120860ec3dc2.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="data\Patient-ACHMarch1.json" />
+      <EmbeddedResource Include="data\Patient-ACHMarch1.json" />
+      <None Remove="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
+      <EmbeddedResource Include="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
+    </ItemGroup>
+
+</Project>

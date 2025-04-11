@@ -1,6 +1,7 @@
 version: '3.4'
 
 #### services and ports
+## fhir: 6157
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017
@@ -28,6 +29,34 @@ version: '3.4'
 ## validation: 8075
 
 services:
+  
+  ###########################################
+  ### FHIR Server (HAPI) - For testing
+  ###########################################
+  fhir_server:
+    image: hapiproject/hapi:latest
+    container_name: fhir-server
+    ports:
+      - "6157:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+      - hapi.fhir.allow_external_references=true
+      - hapi.fhir.allow_cascading_deletes=true
+      - hapi.fhir.delete_enabled=true
+      - hapi.fhir.expunge_enabled=true
+      - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.delete_expunge_enabled=true
+      - hapi.fhir.reuse_cached_search_results_millis=0
+      - hapi.fhir.subscription_enabled=false
+    volumes:
+      - fhir_data:/data
+      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+    healthcheck:
+      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
       
   ###########################################
   ### Redis Cache
@@ -937,4 +966,6 @@ volumes:
   mongo_data:
     driver: local
   submission_data:
+    driver: local
+  fhir_data:
     driver: local

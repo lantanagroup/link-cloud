@@ -121,6 +121,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E
 		kafka-client.properties = kafka-client.properties
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "E2ETests", "Tests\E2ETests\E2ETests.csproj", "{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{554985B2-5CA6-49D3-8F07-08080C4EACEA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -225,6 +229,10 @@ Global
 		{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8EA05322-2C58-4781-A0C2-6F1FC58FD2FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -233,6 +241,7 @@ Global
 		{C4070261-D248-4CA5-A532-6AAA71AACC35} = {37C302AB-8C98-4CC8-828E-0647AF098586}
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
 		{E7B2013B-29DF-4736-9B16-CB5655C0AB26} = {0BA1C290-3881-4224-B231-BBC64740D229}
+		{2F7CB3EA-297A-4240-AB54-874EA5A75FD3} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}
