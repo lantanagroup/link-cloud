@@ -1,10 +1,15 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Configuration;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Security.Claims;
+using System.Text;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -13,12 +18,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<TenantService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
+        private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public TenantService(ILogger<TenantService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
+        public TenantService(ILogger<TenantService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
+
+            _authenticationSchemaConfig = authenticationSchemaConfig;
+            _scopeFactory = scopeFactory;
 
             InitHttpClient();
         }
@@ -61,6 +71,43 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _client.BaseAddress = new Uri(_serviceRegistry.Value.TenantService.TenantServiceUrl);
             _client.DefaultRequestHeaders.Accept.Clear();
             _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        }
+
+
+        public async Task<HttpResponseMessage> GenerateAdHocReport(ClaimsPrincipal user, string facilityId, AdHocReportRequest request)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            HttpContent content = JsonContent.Create(request);
+
+            var response = await _client.PostAsync($"api/Facility/{facilityId}/AdHocReport", content);
+
+            return response;
+        }
+
+        public async Task<HttpResponseMessage> RegenerateReport(ClaimsPrincipal user, string facilityId, RegenerateReportRequest request)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+
+                //create a bearer token for the system account
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            HttpContent content = JsonContent.Create(request);
+
+            var response = await _client.PostAsync($"api/Facility/{facilityId}/RegenerateReport", content);
+
+            return response;
         }
     }
 }

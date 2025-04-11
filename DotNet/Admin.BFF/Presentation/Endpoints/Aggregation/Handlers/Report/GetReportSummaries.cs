@@ -1,8 +1,7 @@
-using System.Net;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
-using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using System.Net;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Report;
 
@@ -12,7 +11,6 @@ public static class GetReportSummaries
         ILoggerFactory loggerFactory,
         HttpContext context,
         ReportService reportService,
-        CensusService censusService,
         string? facilityId,
         int pageNumber = 1,
         int pageSize = 10

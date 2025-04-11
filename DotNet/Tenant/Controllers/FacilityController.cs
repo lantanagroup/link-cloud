@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Models;
@@ -294,7 +295,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPost("AdHocReport")]
+        [HttpPost("{facilityId}/AdHocReport")]
         public async Task<IActionResult> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) || await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
@@ -383,7 +384,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        [HttpPost("RegenerateReport")]
+        [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
             if (string.IsNullOrEmpty(facilityId) || await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
