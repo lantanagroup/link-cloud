@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
+using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -55,6 +56,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics)
         {
+
+            Console.WriteLine($"********* PRODUCT VERSION : {ServiceActivitySource.ProductVersion} *********");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _submissionConfig = submissionConfig.Value;
@@ -202,9 +205,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         Name = "NHSNLink"
                                     });
 
-                                    Assembly assembly = Assembly.GetExecutingAssembly();
-                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                                    string? version = fvi?.FileVersion;
+                                    string? version = ServiceActivitySource.ProductVersion;
 
                                     (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
                                     {
