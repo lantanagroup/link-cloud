@@ -35,6 +35,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
 using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,8 +77,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
+    var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    ServiceActivitySource.Initialize(serviceInformation);
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -375,7 +376,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Instance.Version;                
     });
 
     builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
