@@ -16,7 +16,7 @@ import org.springframework.web.server.ServerErrorException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/artifact")
+@RequestMapping("/api/validation/artifact")
 @SecurityRequirement(name = "bearer-key")
 public class ArtifactController {
     private final ArtifactRepository artifactRepository;
