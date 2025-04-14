@@ -29,7 +29,6 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
-import {throwError} from "rxjs";
 
 
 const listAnimation = trigger('listAnimation', [
@@ -238,7 +237,7 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 1).subscribe({
+    this.tenantService.listFacilities('', '', "facilityId", 0, 1000, 0).subscribe({
       next: (facilities: PagedFacilityConfigModel) => {
         this.facilities = facilities.records;
       },

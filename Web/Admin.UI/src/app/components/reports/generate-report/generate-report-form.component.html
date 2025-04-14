@@ -1,0 +1,84 @@
+<form class="report-form" [formGroup]="generateReportForm">
+  <h2 class="mat-headline">Generate New Report</h2>
+
+  <!-- Row 1: Facility, Report Type, Bypass Submission -->
+  <div class="row">
+    <mat-form-field class="form-select" appearance="outline">
+      <mat-label>Facility</mat-label>
+      <mat-select formControlName="facilityId">
+        <mat-option *ngFor="let facility of facilities" [value]="facility.facilityId">
+          {{facility.facilityName}}
+        </mat-option>
+      </mat-select>
+      <mat-error
+        *ngIf="facilityIdControl.hasError('required') && (generateReportForm.get('facilityId')?.touched || formSubmitted)">
+        Facility is <strong>required</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Report Types -->
+    <mat-form-field class="form-select" appearance="outline" class="full-width">
+      <mat-label>Report Types</mat-label>
+      <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
+        <mat-option *ngFor="let reportType of reportTypes" [value]="reportType">
+          {{ reportType }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+  </div>
+
+  <!-- Row 2: Dates -->
+  <div class="row">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Start Date</mat-label>
+      <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
+      <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+      <mat-datepicker #startPicker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>End Date</mat-label>
+      <input matInput [matDatepicker]="endPicker" formControlName="endDate" required/>
+      <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endPicker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <!-- File Upload Form -->
+  <div class="row">
+    <div>
+      <h3>Census Patients</h3>
+      <div>
+        <mat-form-field appearance="outline">
+          <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients"/>
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">Add</button>
+      </div>
+      <div class="input-container">
+        <thead>
+        <tr *ngIf="patients.length > 0">
+          <th class="header-cell">Patient</th>
+          <th class="header-cell">Delete</th>
+        </tr>
+        </thead>
+        <tr *ngFor="let patient of patients; let i = index">
+          <td class="header-cell">{{ patient }}</td>
+          <td class="header-cell">
+            <button mat-icon-button color="warn" *ngIf="patients.length > 0" (click)="removePatient(i)">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          </td>
+        </tr>
+      </div>
+    </div>
+  </div>
+  <!-- Button -->
+  <div class="text-center mt-6" style="margin-top: 50px;">
+    <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
+            (click)="generateReport()">Generate Report
+    </button>
+  </div>
+
+</form>
