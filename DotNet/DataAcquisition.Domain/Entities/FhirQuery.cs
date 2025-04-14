@@ -13,6 +13,9 @@ public class FhirQuery : BaseEntityExtended
     public FhirQueryType QueryType { get; set; }
     public List<ResourceType> ResourceTypes { get; set; }
     public List<string> QueryParameters { get; set; } = new List<string>();
-    public List<ResourceReferenceTypeEntity> ResourceReferenceType { get; set; }
+    public List<ResourceReferenceType> ResourceReferenceTypes { get; set; }
     public int? Paged { get; set; }
+    public DataAcquisitionLog DataAcquisitionLog { get; set; }
+    public string DataAcquisitionLogId { get; set; }
+
 }

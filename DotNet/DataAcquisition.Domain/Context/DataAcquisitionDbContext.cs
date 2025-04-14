@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+﻿using DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -94,6 +95,11 @@ public class DataAcquisitionDbContext : DbContext
                 v => v.ToString()
             );
 
+        modelBuilder.Entity<ReferenceResources>()
+            .Property(b => b.QueryPhase)
+            .HasConversion<string>();
+            
+
         //-------------------Retry Repository//-------------------
         modelBuilder.Entity<RetryEntity>()
             .Property(x => x.Headers)
@@ -108,6 +114,38 @@ public class DataAcquisitionDbContext : DbContext
                 v => new Guid(v),
                 v => v.ToString()
             );
+
+        modelBuilder.Entity<FhirQuery>()
+            .Property(b => b.QueryType)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<FhirQuery>()
+            .HasMany(x => x.ResourceReferenceTypes)
+            .WithOne(x => x.FhirQueryRef)
+            .HasForeignKey(x => x.FhirQueryId)
+            .HasPrincipalKey(x => x.Id);
+
+        //-------------------DataAcquisitionLog-------------------
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(b => b.Id)
+            .HasConversion(
+                v => new Guid(v),
+                v => v.ToString()
+            );
+
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .HasMany(x => x.FhirQuery)
+            .WithOne(x => x.DataAcquisitionLog)
+            .HasForeignKey(x => x.DataAcquisitionLogId)
+            .HasPrincipalKey(x => x.Id);
+
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(d => d.ScheduledReport)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
+            );
+
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

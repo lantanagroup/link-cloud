@@ -11,6 +11,5 @@ public class ReferenceResources : BaseEntityExtended
     public string ResourceId { get; set; }
     public string ResourceType { get; set; }
     public string ReferenceResource { get; set; }
-    
     public QueryPhase QueryPhase { get; set; }
 }
