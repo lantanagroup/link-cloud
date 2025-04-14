@@ -26,13 +26,13 @@ public class ValidationService
     private void InitHttpClient()
     {
         //check if the service uri is set
-        if (string.IsNullOrEmpty(_serviceRegistry.Value.MeasureServiceUrl))
+        if (string.IsNullOrEmpty(_serviceRegistry.Value.ValidationServiceUrl))
         {
             _logger.LogGatewayServiceUriException("ValidationService", "Validation service uri is not set");
             throw new ArgumentNullException("Validation Service URL is missing.");
         }
 
-        _client.BaseAddress = new Uri(_serviceRegistry.Value.MeasureServiceUrl);
+        _client.BaseAddress = new Uri(_serviceRegistry.Value.ValidationServiceUrl);
         _client.DefaultRequestHeaders.Accept.Clear();
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
@@ -42,7 +42,7 @@ public class ValidationService
         // HTTP GET
         try
         {
-            var response = await _client.GetAsync($"api/validation/health", cancellationToken);
+            var response = await _client.GetAsync($"health", cancellationToken);
             var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
             if (healthResult is not null) healthResult.Service = "Validation";
 
