@@ -15,6 +15,12 @@ public class MeasureLoader
     public string measureId;
     private Bundle evaluationBundle;
     private Bundle validationBundle;
+    private readonly RestClient adminBffClient;
+
+    public MeasureLoader(RestClient adminBffClient)
+    {
+        this.adminBffClient = adminBffClient;
+    }
 
     private async Task<string> GetMeasureBundleJsonAsync()
     {
@@ -79,17 +85,15 @@ public class MeasureLoader
         };
     }
 
-    public async Task LoadAsync(string adminBffBaseUrl)
+    public async Task LoadAsync()
     {
-        var client = new RestClient(adminBffBaseUrl);
-        
         Console.WriteLine("Getting measure bundle...");
         await this.GetMeasureBundleAsync();
         
         Console.WriteLine("Loading measure bundle for evaluation...");
-        var request = new RestRequest($"measure-definition/{this.measureId}", Method.Get);
-        request.AddBody(this.evaluationBundle.ToJson());
-        var response = client.ExecuteAsync(request);
+        var request = new RestRequest($"measure-definition/{this.measureId}", Method.Put);
+        request.AddJsonBody(this.evaluationBundle.ToJson());
+        var response = adminBffClient.ExecuteAsync(request);
         
         if (response.Result.StatusCode != System.Net.HttpStatusCode.OK)
         {
