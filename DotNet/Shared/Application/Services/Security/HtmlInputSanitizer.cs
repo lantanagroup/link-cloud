@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         public static string SanitizeAndRemove(string input)
         {
             var sanitizedInput = Sanitize(input);
-            sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\\-\\_ ]", string.Empty, RegexOptions.Compiled);
+            sanitizedInput = Regex.Replace(sanitizedInput, @"[^a-zA-Z0-9\-_ ]", string.Empty, RegexOptions.Compiled);
             return sanitizedInput;
         }
     }
