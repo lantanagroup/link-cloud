@@ -28,7 +28,6 @@ import {
 import {TenantService} from "../../../services/gateway/tenant/tenant.service";
 import {MeasureDefinitionService} from "../../../services/gateway/measure-definition/measure.service";
 import {PatientAcquiredFormComponent} from "../../testing/patient-acquired-form/patient-acquired-form.component";
-import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 import {IMeasureDefinitionConfigModel} from "../../../interfaces/measure-definition/measure-definition-config-model.interface";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
 import {forkJoin, Observable} from "rxjs";
@@ -56,7 +55,6 @@ import {MatRadioModule} from "@angular/material/radio";
         MatProgressSpinnerModule,
         MatDatepickerModule,
         PatientAcquiredFormComponent,
-        FileUploadComponent,
         MatRadioModule
     ],
     templateUrl: './generate-report-form.component.html',
