@@ -12,13 +12,12 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
+using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -202,9 +201,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         Name = "NHSNLink"
                                     });
 
-                                    Assembly assembly = Assembly.GetExecutingAssembly();
-                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                                    string? version = fvi?.FileVersion;
+                                    string? version = ServiceActivitySource.ProductVersion;
+
+                                    if (string.IsNullOrEmpty(version))
+                                        version = ServiceActivitySource.Instance.Version;
 
                                     (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
                                     {

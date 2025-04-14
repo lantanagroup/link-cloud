@@ -29,7 +29,6 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
-import {throwError} from "rxjs";
 
 
 const listAnimation = trigger('listAnimation', [

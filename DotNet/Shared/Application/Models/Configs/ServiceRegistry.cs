@@ -16,6 +16,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string QueryDispatchServiceUrl { get; set; } = null!;
         public string ReportServiceUrl { get; set; } = null!;
         public string SubmissionServiceUrl { get; set; } = null!;
+        public string ValidationServiceUrl { get; set; } = null!;
         public TenantServiceRegistration TenantService { get; set; } = null!;
 
         public string AccountServiceApiUrl
