@@ -593,6 +593,9 @@ services:
       - "8066:80"
     build:
       context: Web/Admin.UI
+    environment:
+      LINK_AUTH_REQUIRED: false
+      LINK_BASE_API_URL: http://localhost:8063/api
     networks:
       - link-nw
     depends_on:
