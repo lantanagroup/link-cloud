@@ -180,8 +180,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, ReportConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Add swagger
     builder.Services.AddEndpointsApiExplorer();

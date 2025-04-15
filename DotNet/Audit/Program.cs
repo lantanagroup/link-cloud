@@ -185,8 +185,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AuditConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     //configure CORS
     builder.Services.AddLinkCorsService(options => {

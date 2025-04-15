@@ -223,8 +223,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddSwaggerGen(c =>
     {
