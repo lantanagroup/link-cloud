@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
@@ -34,16 +35,16 @@ public static class LinkServiceHealthReportExtensions
             Service = report.Service,
             Status = report.Status,
             KafkaConnection = 
-                report.Entries.ContainsKey("kafka") ?
-                    report.Entries.Any(x => x.Key.Equals("kafka", StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                report.Entries.ContainsKey(HealthCheckType.Kafka.ToString()) ?
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Kafka.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable,
             DatabaseConnection = 
-                report.Entries.ContainsKey("Database") ?
-                    report.Entries.Any(x => x.Key.Equals("Database", StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                report.Entries.ContainsKey(HealthCheckType.Database.ToString()) ?
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Database.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable,
             CacheConnection = 
-                report.Entries.ContainsKey("Cache") ?
-                    report.Entries.Any(x => x.Key.Equals("Cache", StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                report.Entries.ContainsKey(HealthCheckType.Cache.ToString()) ?
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Cache.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable
         };
     }

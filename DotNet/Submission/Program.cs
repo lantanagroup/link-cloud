@@ -154,7 +154,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddKafka(kafkaHealthOptions);
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
 
     // Add repositories
