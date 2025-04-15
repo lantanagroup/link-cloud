@@ -46,32 +46,49 @@
     </mat-form-field>
   </div>
 
+  <div class="row">
+    <mat-radio-group formControlName="selectedForm">
+      <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
+      <mat-radio-button value="censusPatients">Census Patients</mat-radio-button>
+    </mat-radio-group>
+  </div>
   <!-- File Upload Form -->
   <div class="row">
-    <div>
+    <div *ngIf="selectedFormControl.value === 'fileUpload'">
+      <h3>File Upload</h3>
+      <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+      <div *ngIf="errorMessage" class="text-red-600 mt-2">
+        {{ errorMessage }}
+      </div>
+    </div>
+
+    <!-- Census Patients Form -->
+    <div *ngIf="selectedFormControl.value === 'censusPatients'">
       <h3>Census Patients</h3>
       <div>
         <mat-form-field appearance="outline">
           <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients"/>
         </mat-form-field>
-        <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">Add</button>
+        <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">
+          Add
+        </button>
       </div>
-      <div class="input-container">
-        <thead>
-        <tr *ngIf="patients.length > 0">
-          <th class="header-cell">Patient</th>
-          <th class="header-cell">Delete</th>
-        </tr>
-        </thead>
-        <tr *ngFor="let patient of patients; let i = index">
-          <td class="header-cell">{{ patient }}</td>
-          <td class="header-cell">
-            <button mat-icon-button color="warn" *ngIf="patients.length > 0" (click)="removePatient(i)">
-              <mat-icon>remove_circle</mat-icon>
-            </button>
-          </td>
-        </tr>
-      </div>
+    </div>
+    <div class="input-container">
+      <thead>
+      <tr *ngIf="patients.length > 0">
+        <th class="header-cell">Patient</th>
+        <th class="header-cell">Delete</th>
+      </tr>
+      </thead>
+      <tr *ngFor="let patient of patients; let i = index">
+        <td class="header-cell">{{ patient }}</td>
+        <td class="header-cell">
+          <button mat-icon-button color="warn" *ngIf="patients.length > 0" (click)="removePatient(i)">
+            <mat-icon>remove_circle</mat-icon>
+          </button>
+        </td>
+      </tr>
     </div>
   </div>
   <!-- Button -->

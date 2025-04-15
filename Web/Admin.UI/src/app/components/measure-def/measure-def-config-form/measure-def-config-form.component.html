@@ -12,7 +12,7 @@
     <div class="form-input">
       <mat-form-field appearance="outline" class="subject-input form-input">
         <mat-label>Bundle Id</mat-label>
-        <input matInput formControlName="bundleId" >
+        <input matInput formControlName="bundleId">
         <mat-error *ngIf="bundleId.hasError('required') && configForm.get('bundleId')?.touched">
           A Bundle id is <strong>required</strong>
         </mat-error>
@@ -23,9 +23,12 @@
     </mat-error>
   </form>
   <div mat-dialog-actions align="end">
-    <button  mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
+    <button mat-raised-button color="primary" [disabled]="this.configForm.invalid" (click)="submitConfiguration()">
       <mat-icon>save</mat-icon>
       Upload Measure Definition Bundle
     </button>
+  </div>
+  <div *ngIf="errorMessage" class="text-red-600 mt-2">
+    {{ errorMessage }}
   </div>
 </div>
