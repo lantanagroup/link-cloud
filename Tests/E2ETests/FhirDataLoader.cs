@@ -8,7 +8,7 @@ public class FhirDataLoader(string fhirServerBaseUrl)
 {
     private readonly List<string> _createdResources = new List<string>();
 
-    public void LoadEmbeddedTransactionBundles()
+    public async Task LoadEmbeddedTransactionBundles()
     {
         Console.WriteLine("Loading data onto FHIR server...");
         var assembly = Assembly.GetExecutingAssembly();
@@ -19,15 +19,15 @@ public class FhirDataLoader(string fhirServerBaseUrl)
 
         foreach (var resourceName in resourceNames)
         {
-            using var stream = assembly.GetManifestResourceStream(resourceName);
+            await using var stream = assembly.GetManifestResourceStream(resourceName);
             using var reader = new StreamReader(stream);
-            var bundleJson = reader.ReadToEnd();
+            var bundleJson = await reader.ReadToEndAsync();
 
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
             request.AddStringBody(bundleJson, DataFormat.Json);
 
-            var response = client.Execute(request);
+            var response = await client.ExecuteAsync(request);
 
             Console.WriteLine($"Posted {resourceName} => Status: {response.StatusCode}");
 

@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Runtime.InteropServices.JavaScript;
 using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -8,22 +9,26 @@ using RestSharp;
 [TestClass]
 public sealed class SmokeTest
 {
-    private static readonly string facilityId = "smoke-test-facility";
-    private static RestClient adminBffClient = new RestClient(TestConfig.AdminBffBase);
-    private static FhirDataLoader fhirDataLoader = new FhirDataLoader(TestConfig.FhirServerBase);
+    private const string FacilityId = "smoke-test-facility";
+    private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
+    private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.FhirServerBase);
     
     [ClassInitialize]
-    public static void ClassInitialize(TestContext context)
+    public static async Task ClassInitialize(TestContext context)
     {
         // Load data onto FHIR server
-        fhirDataLoader.LoadEmbeddedTransactionBundles();
+        await FhirDataLoader.LoadEmbeddedTransactionBundles();
+        
+        // Initialize validation artifacts and categories
+        await InitializeValidationArtifacts();
+        await InitializeValidationCategories();
     }
     
     [ClassCleanup]
     public static async Task ClassCleanup()
     {
         // Clear all data from the FHIR server
-        fhirDataLoader.DeleteResourcesWithExpunge();
+        FhirDataLoader.DeleteResourcesWithExpunge();
         
         // Cleanup
         await DeleteFacility();
@@ -33,7 +38,7 @@ public sealed class SmokeTest
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
-        MeasureLoader measureLoader = new MeasureLoader(adminBffClient);
+        var measureLoader = new MeasureLoader(AdminBffClient);
         await measureLoader.LoadAsync();
         
         await this.CreateFacilityAsync(measureLoader.measureId);
@@ -43,9 +48,44 @@ public sealed class SmokeTest
         await this.CreateQueryPlan(measureLoader.measureId, "Epic");
 
         await this.CreateQueryConfig();
+        
+        await this.GenerateReport(measureLoader.measureId);
     }
 
-    public async Task<RestResponse> CreateFacilityAsync(string measure)
+    private async Task GenerateReport(string measureId)
+    {
+        var request = new RestRequest($"facility/{FacilityId}/AdhocReport", Method.Post);
+        var body = new
+        {
+            BypassSubmission = false,
+            StartDate = "2025-03-01T00:00:00Z",
+            EndDate = "2025-03-24T23:59:59.99Z",
+            ReportTypes = new[] { measureId },
+            PatientIds = new[] { "Patient-ACHMarch1" }
+        };
+        request.AddJsonBody(body);
+        
+        var response = await AdminBffClient.ExecuteAsync(request);
+        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+    }
+
+    private static async Task InitializeValidationArtifacts()
+    {
+        Console.WriteLine("Initializing validation artifacts...");
+        var request = new RestRequest("validation/artifact/$initialize", Method.Post);
+        var response = AdminBffClient.Execute(request);
+        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+    }
+
+    private static async Task InitializeValidationCategories()
+    {
+        Console.WriteLine("Initializing validation categories...");
+        var request = new RestRequest("validation/category/$initialize", Method.Post);
+        var response = AdminBffClient.Execute(request);
+        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+    }
+
+    private async Task<RestResponse> CreateFacilityAsync(string measure)
     {
         Console.WriteLine("Creating facility...");
         var request = new RestRequest("/Facility", Method.Post);
@@ -53,8 +93,8 @@ public sealed class SmokeTest
 
         var body = new
         {
-            FacilityId = facilityId,
-            FacilityName = facilityId,
+            FacilityId = FacilityId,
+            FacilityName = FacilityId,
             TimeZone = "America/Chicago",
             ScheduledReports = new
             {
@@ -66,7 +106,7 @@ public sealed class SmokeTest
 
         request.AddJsonBody(body);
 
-        var response = await adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         
         Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
         
@@ -77,19 +117,19 @@ public sealed class SmokeTest
     {
         Console.WriteLine("Creating normalization config...");
         var request = new RestRequest("normalization", Method.Post);
-        string conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.E2ETests.test_data.smoke_test.concept-map.json");
+        var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.E2ETests.test_data.smoke_test.concept-map.json");
 
         // Construct the request body with dynamic facilityId
         var body = new JObject
         {
-            ["FacilityId"] = facilityId,
+            ["FacilityId"] = FacilityId,
             ["OperationSequence"] = new JObject
             {
                 ["0"] = new JObject
                 {
                     ["$type"] = "ConceptMapOperation",
-                    ["FacilityId"] = facilityId,
-                    ["name"] = $"{facilityId} Concept Map example",
+                    ["FacilityId"] = FacilityId,
+                    ["name"] = $"{FacilityId} Concept Map example",
                     ["FhirConceptMap"] = JObject.Parse(conceptMapJson),
                     ["FhirPath"] = null,
                     ["FhirContext"] = "Encounter"
@@ -102,7 +142,7 @@ public sealed class SmokeTest
                 ["2"] = new JObject
                 {
                     ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = facilityId,
+                    ["facilityId"] = FacilityId,
                     ["name"] = "PeriodDateFixer",
                     ["conditions"] = new JArray(),
                     ["transformResource"] = "",
@@ -112,7 +152,7 @@ public sealed class SmokeTest
                 ["3"] = new JObject
                 {
                     ["$type"] = "ConditionalTransformationOperation",
-                    ["facilityId"] = facilityId,
+                    ["facilityId"] = FacilityId,
                     ["name"] = "EncounterStatusTransformation",
                     ["conditions"] = new JArray(),
                     ["transformResource"] = "Encounter",
@@ -126,7 +166,7 @@ public sealed class SmokeTest
         request.AddJsonBody(body.ToString(), "application/json");
 
         // Execute and assert
-        var response = await adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 200 OK {response.StatusCode}: {response.Content}");
     }
 
@@ -136,25 +176,25 @@ public sealed class SmokeTest
         var request = new RestRequest($"data/fhirQueryConfiguration", Method.Post);
         var body = new JObject
         {
-            ["FacilityId"] = facilityId,
+            ["FacilityId"] = FacilityId,
             ["FhirServerBaseUrl"] = TestConfig.FhirServerBase
         };
         request.AddJsonBody(body.ToString(), "application/json");
         
-        var response = await adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.IsTrue(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryPlan(string measureId, string ehrDescription)
     {
         Console.WriteLine("Creating query plan...");
-        var request = new RestRequest($"data/{facilityId}/QueryPlan", Method.Post);
+        var request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
 
         var body = new JObject
         {
             ["PlanName"] = measureId,
             ["ReportType"] = measureId,
-            ["FacilityId"] = facilityId,
+            ["FacilityId"] = FacilityId,
             ["EHRDescription"] = ehrDescription,
             ["LookBack"] = "P0D",
             ["InitialQueries"] = new JObject
@@ -275,9 +315,11 @@ public sealed class SmokeTest
 
         request.AddJsonBody(body.ToString(), "application/json");
 
-        var response = await adminBffClient.ExecuteAsync(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.IsTrue(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
+    
+    #region Delete Facility Methods
 
     private static async Task DeleteFacility()
     {
@@ -288,8 +330,8 @@ public sealed class SmokeTest
         );
         
         Console.WriteLine("Deleting facility...");
-        var deleteFacilityRequest = new RestRequest($"/Facility/{facilityId}", Method.Delete);
-        var deleteFacilityResponse = await adminBffClient.ExecuteAsync(deleteFacilityRequest);
+        var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
+        var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
 
         if (deleteFacilityResponse.StatusCode != HttpStatusCode.NoContent)
             Console.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
@@ -298,8 +340,8 @@ public sealed class SmokeTest
     private static async Task DeleteFacilityNormalization()
     {
         Console.WriteLine("Deleting facility normalization...");
-        var deleteNormalizationRequest = new RestRequest($"/normalization/{facilityId}", Method.Delete);
-        var deleteNormalizationResponse = await adminBffClient.ExecuteAsync(deleteNormalizationRequest);
+        var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
+        var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
             Console.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
@@ -307,10 +349,9 @@ public sealed class SmokeTest
 
     private static async Task DeleteFacilityQueryPlan()
     {
-        
         Console.WriteLine("Deleting facility query plan...");
-        var deleteQueryPlanRequest = new RestRequest($"/data/{facilityId}/QueryPlan", Method.Delete);
-        var deleteQueryPlanResponse = await adminBffClient.ExecuteAsync(deleteQueryPlanRequest);
+        var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan", Method.Delete);
+        var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
             Console.WriteLine($"Expected HTTP 204 No Content for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
@@ -319,10 +360,12 @@ public sealed class SmokeTest
     private static async Task DeleteFacilityQueryConfig()
     {
         Console.WriteLine("Deleting facility query config...");
-        var deleteQueryConfigRequest = new RestRequest($"/data/{facilityId}/fhirQueryConfiguration", Method.Delete);
-        var deleteQueryConfigResponse = await adminBffClient.ExecuteAsync(deleteQueryConfigRequest);
+        var deleteQueryConfigRequest = new RestRequest($"/data/{FacilityId}/fhirQueryConfiguration", Method.Delete);
+        var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
             Console.WriteLine($"Expected HTTP 204 No Content for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
+    
+    #endregion
 }

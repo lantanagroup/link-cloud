@@ -12,6 +12,7 @@ public class HtmlInputSanitizerTest
     [InlineData("123-456_789", "123-456_789")]
     [InlineData("!@#$%^&*()", "amp")]       // Sanitizer class converts & to &amp; then regex removes & and ;
     [InlineData("", "")]
+    [InlineData("smoke-test-facility", "smoke-test-facility")]
     [InlineData(null, "")]
     public void TestSanitizeAndRemove(string input, string expected)
     {

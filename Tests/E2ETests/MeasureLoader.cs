@@ -100,5 +100,20 @@ public class MeasureLoader
             Console.WriteLine($"Failed to load measure definition: {response.Result.Content}");
             throw new Exception("Failed to load measure definition.");
         }
+
+        Console.WriteLine("Loading profile artifacts for validation...");
+        foreach (var validationEntry in this.validationBundle.Entry)
+        {
+            var resource = validationEntry.Resource;
+            var requestValidation = new RestRequest($"validation/artifact/RESOURCE/{resource.TypeName}-{resource.Id}", Method.Put);
+            requestValidation.AddJsonBody(resource.ToJson());
+            var responseValidation = adminBffClient.ExecuteAsync(requestValidation);
+            
+            if (responseValidation.Result.StatusCode != System.Net.HttpStatusCode.OK)
+            {
+                Console.WriteLine($"Failed to load validation resource: {responseValidation.Result.Content}");
+                throw new Exception("Failed to load validation resource.");
+            }
+        }
     }
 }

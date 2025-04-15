@@ -246,11 +246,6 @@
       "resource": {
         "resourceType": "Medication",
         "id": "Medication-ACHMarch1",
-        "meta": {
-          "versionId": "1",
-          "lastUpdated": "2025-04-10T14:57:02.340+00:00",
-          "source": "#e16465b3f73f4850"
-        },
         "text": {
           "status": "generated",
           "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div class=\"hapiHeaderText\"> insulin aspart protamine, human / insulin aspart, human </div></div>"
