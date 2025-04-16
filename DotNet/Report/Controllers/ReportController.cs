@@ -437,7 +437,6 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public ActionResult<List<string>> GetReportSubmissionStatuses()
         {
-
             try
             {
                 var submissionStatuses = Enum.GetNames(typeof(PatientSubmissionStatus)).ToList();
@@ -464,13 +463,11 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public ActionResult<List<string>> GetReportValidationStatuses()
         {
-
             try
             {
                 var submissionStatuses = Enum.GetNames(typeof(ValidationStatus)).ToList();
 
                 return Ok(submissionStatuses);
-
             }
             catch (Exception ex)
             {
@@ -479,7 +476,5 @@ namespace LantanaGroup.Link.Report.Controllers
                     statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
-        
-        
     }
 }

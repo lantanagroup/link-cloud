@@ -20,6 +20,8 @@ using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Submission.KafkaProducers;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -43,6 +45,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
         private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
         private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly ReportSubmittedProducer _reportSubmittedProducer;
 
         private string Name => this.GetType().Name;
 
@@ -55,7 +58,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics,
-            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
+            ReportSubmittedProducer reportSubmittedProducer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -80,6 +84,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
             _submissionServiceMetrics = submissionServiceMetrics;
             _linkBearerServiceOptions = linkBearerServiceOptions;
+            _reportSubmittedProducer = reportSubmittedProducer ?? throw new ArgumentNullException(nameof(reportSubmittedProducer));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -324,6 +329,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), value.ReportTrackingId, facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
+                                
+                                byte[] correlationIdBytes = result.Message.Headers.GetLastBytes(KafkaConstants.HeaderConstants.CorrelationId);
+                                string? correlationId = correlationIdBytes == null ? null : Encoding.UTF8.GetString(correlationIdBytes);
+                                
+                                _logger.LogInformation($"Submitted report for tenant {result.Message.Key.FacilityId} at {DateTime.UtcNow} with report tracking id {value.ReportTrackingId} and correlation id {correlationId}. Producing {nameof(KafkaTopic.ReportSubmitted)} message.");
+                                _reportSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, result.Message.Key.StartDate, result.Message.Key.EndDate, value.ReportTrackingId);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -336,7 +347,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                             catch (TimeoutException ex)
                             {
                                 var transientException = new TransientException(ex.Message, ex.InnerException);
-
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -359,9 +369,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-
-                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+                        if (ex.ConsumerRecord != null)
+                        {
+                            string facilityId =
+                                KafkaHeaderHelper.GetExceptionFacilityId(ex.ConsumerRecord.Message.Headers);
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+                        }
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                         consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });

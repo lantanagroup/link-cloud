@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
@@ -23,6 +24,7 @@ using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Factories;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Services;
+using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -133,12 +135,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
-
-    // Add commands
-    // TODO
-
-    // Add queries
-    // TODO
+    
+    // Add kafka producers
+    builder.Services.AddTransient<ReportSubmittedProducer>();
 
     // Add factories
     builder.Services.AddTransient<IKafkaConsumerFactory<SubmitReportKey, SubmitReportValue>, KafkaConsumerFactory<SubmitReportKey, SubmitReportValue>>();
@@ -146,8 +145,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitReportKey, SubmitReportValue>, KafkaProducerFactory<SubmitReportKey, SubmitReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-
 
     //Add health checks
     var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
@@ -155,10 +154,14 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHealthChecks()
         .AddKafka(kafkaHealthOptions);
-
-
-    // Add repositories
-    // TODO
+    
+    // Producers
+    var reportSubmittedConfig = new ProducerConfig()
+    {
+        ClientId = "Submission_ReportSubmitted"
+    };
+    var reportSubmittedProducer = new KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>(kafkaConnection).CreateProducer(reportSubmittedConfig);
+    builder.Services.AddSingleton(reportSubmittedProducer);
 
     #region Exception Handling
     //Report Scheduled Listener
