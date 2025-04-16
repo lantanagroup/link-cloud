@@ -19,6 +19,7 @@ using Newtonsoft.Json;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -41,6 +42,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
         private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
 
         private string Name => this.GetType().Name;
 
@@ -52,7 +54,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
-            ISubmissionServiceMetrics submissionServiceMetrics)
+            ISubmissionServiceMetrics submissionServiceMetrics,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -76,6 +79,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
 
             _submissionServiceMetrics = submissionServiceMetrics;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -660,6 +664,8 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <returns></returns>
         private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
         {
+            _logger.LogDebug("Creating Patient Bundle for PatientId: {0}", patientId);
+            
             var returnModel = new CreatePatientBundleResult();
 
             var httpClient = _httpClient.CreateClient();
@@ -668,9 +674,24 @@ namespace LantanaGroup.Link.Submission.Listeners
             if (_linkTokenServiceConfig.Value.SigningKey is null)
                 throw new Exception("Link Token Service Signing Key is missing.");
 
-            //Add link token
-            var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (this._linkBearerServiceOptions == null || this._linkBearerServiceOptions.Value == null)
+            {
+                _logger.LogError("Link Bearer Service Options is missing.");
+                throw new Exception("Link bearer service options are missing.");
+            }
+
+            //Add link bearer token
+            if (!this._linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            if (String.IsNullOrEmpty(_serviceRegistry.ReportServiceApiUrl))
+            {
+                _logger.LogError("Report Service API URL is missing from configuration.");
+                throw new Exception("Report Service API URL is missing from configuration.");
+            }
 
             string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
@@ -708,6 +729,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                 returnModel.PatientFile.PatientId = patientId;
                 returnModel.PatientFile.FilePath = submissionDirectory + "/" + fileName;
                 await File.WriteAllTextAsync(returnModel.PatientFile.FilePath, contents, cancellationToken);
+                
+                _logger.LogInformation("Created Patient Bundle for PatientId: {0} at {1}", patientId, returnModel.PatientFile.FilePath);
 
                 return returnModel;
             }

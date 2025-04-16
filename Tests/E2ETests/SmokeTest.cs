@@ -11,7 +11,7 @@ public sealed class SmokeTest
 {
     private const string FacilityId = "smoke-test-facility";
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
-    private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.FhirServerBase);
+    private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
     
     [ClassInitialize]
     public static async Task ClassInitialize(TestContext context)
@@ -177,7 +177,7 @@ public sealed class SmokeTest
         var body = new JObject
         {
             ["FacilityId"] = FacilityId,
-            ["FhirServerBaseUrl"] = TestConfig.FhirServerBase
+            ["FhirServerBaseUrl"] = TestConfig.InternalFhirServerBase
         };
         request.AddJsonBody(body.ToString(), "application/json");
         

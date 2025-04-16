@@ -13,7 +13,7 @@ public class FhirDataLoader(string fhirServerBaseUrl)
         Console.WriteLine("Loading data onto FHIR server...");
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
-                                    .Where(name => name.Contains(".data.") && name.EndsWith(".json"));
+                                    .Where(name => name.Contains(".fhir_server_data.") && name.EndsWith(".json"));
 
         var client = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
 
