@@ -5,7 +5,6 @@ using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
-using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 {
@@ -31,7 +30,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             {
                 var headers = new Headers
                 {
-                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) },
+                    { "X-ReportTracking-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
 
                 string Key = string.IsNullOrEmpty(model.FacilityId) ? throw new ArgumentException("FacilityId cannot be null or empty", nameof(model.FacilityId)) : model.FacilityId;
@@ -71,7 +71,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 {
                     throw new ArgumentException("Start date must be earlier than end date", nameof(model.StartDate));
                 }
-                
+
                 var message = new Message<string, object>
                 {
                     Key = model.FacilityId,
@@ -82,8 +82,8 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                         Frequency = model.Frequency.ToString(),
                         StartDate = model.StartDate,
                         EndDate = normalizedEndDate,
-
-                    },
+                        ReportTrackingId = correlationId
+                    }
                 };
 
                 await _producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);

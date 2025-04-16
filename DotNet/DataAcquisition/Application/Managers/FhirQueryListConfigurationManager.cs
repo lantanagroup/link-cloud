@@ -119,7 +119,21 @@ public class FhirQueryListConfigurationManager : IFhirQueryListConfigurationMana
 
     public async Task<FhirListConfiguration> UpdateAsync(FhirListConfiguration entity, CancellationToken cancellationToken = default)
     {
-        return await _database.FhirListConfigurationRepository.UpdateAsync(entity, cancellationToken);
+        if (string.IsNullOrWhiteSpace(entity.FacilityId))
+            throw new ArgumentNullException(nameof(entity.FacilityId));
+
+        var existingEntity = await _database.FhirListConfigurationRepository.FirstOrDefaultAsync(x => x.FacilityId == entity.FacilityId, cancellationToken);
+
+        if (existingEntity == null)
+            throw new MissingFacilityConfigurationException();
+
+        existingEntity.Authentication = entity.Authentication;
+        existingEntity.EHRPatientLists = entity.EHRPatientLists;
+        existingEntity.FacilityId = entity.FacilityId;
+        existingEntity.FhirBaseServerUrl = entity.FhirBaseServerUrl;
+        existingEntity.ModifyDate = DateTime.UtcNow;
+
+        return await _database.FhirListConfigurationRepository.UpdateAsync(existingEntity, cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default)

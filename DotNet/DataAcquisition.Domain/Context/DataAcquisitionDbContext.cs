@@ -20,6 +20,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<QueryPlan> QueryPlan { get; set; }
     public DbSet<ReferenceResources> ReferenceResources { get; set; }
     public DbSet<FhirQuery> FhirQueries { get; set; }
+    public DbSet<RetryEntity> RetryEntities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -31,7 +31,11 @@ using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Health;
-using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Caching;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation;
+using LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,8 +77,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Serilog.Debugging.SelfLog.Enable(Console.Error);
 
     //Initialize activity source
-    var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
-    ServiceActivitySource.Initialize(version);
+    var serviceInformation = builder.Configuration.GetRequiredSection(LinkAdminConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
+    ServiceActivitySource.Initialize(serviceInformation);
 
     // Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -123,7 +127,6 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddTransient<ICreateLinkBearerToken, CreateLinkBearerToken>();
         builder.Services.AddTransient<IRefreshSigningKey, RefreshSigningKey>();
     }
-
    
     builder.Services.AddTransient<KafkaConsumerManager>();
     builder.Services.AddTransient<KafkaConsumerService>();
@@ -145,7 +148,6 @@ static void RegisterServices(WebApplicationBuilder builder)
             options.ConnectionString = redisConnection;
             options.Password = builder.Configuration.GetValue<string>("Redis:Password");
 
-            options.Enabled = builder.Configuration.GetValue<string>("Cache:Type") == "Redis";
             if (builder.Configuration.GetValue<int>("Cache:Timeout") > 0)
             {
                 options.Timeout = builder.Configuration.GetValue<int>("Cache:Timeout");
@@ -184,6 +186,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     else
     {
         Log.Logger.Information("Enabling anonymous access for the Link Admin API.");
+        
+        builder.Services.Configure<AuthenticationSchemaConfig>(options =>
+        {
+            options.EnableAnonymousAccess = allowAnonymousAccess;
+        });
+        
         //create anonymous access
         builder.Services.AddAuthorizationBuilder()        
             .AddPolicy("AuthenticatedUser", pb =>
@@ -243,21 +251,21 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (monitorBackend)
     {
         healthCheckBuilder
-            .AddCheck<AccountServiceHealthCheck>("Account Service")
-            .AddCheck<AuditServiceHealthCheck>("Audit Service")
-            .AddCheck<CensusServiceHealthCheck>("Census Service")
-            .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
-            .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
-            .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
-            .AddCheck<NotificationServiceHealthCheck>("Notification Service")
-            .AddCheck<ReportServiceHealthCheck>("Report Service")
-            .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
-            .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+            .AddCheck<AccountServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<AuditServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<CensusServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<DataAcquisitionHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<MeasureEvaluationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<NormalizationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<NotificationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<ReportServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<SubmissionServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<TenantServiceHealthCheck>(HealthCheckType.Service.ToString());
     }
 
-    if (builder.Configuration.GetValue<bool>("Cache:Enabled"))
+    if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString());
     }
 
 
@@ -352,6 +360,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.HmacKey = builder.Configuration.GetValue<string>("Logging:HmacKey");
     });    
+    
+    // builder.Services.ConfigureHttpJsonOptions(options =>
+    // {
+    //     options.SerializerOptions.Converters.Add(new HealthStatusJsonConverter());
+    // });
 
     // Add YARP (reverse proxy)
     Log.Logger.Information("Registering YARP for the Link Admin API.");
@@ -363,7 +376,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Environment = builder.Environment;
         options.ServiceName = LinkAdminConstants.ServiceName;
-        options.ServiceVersion = ServiceActivitySource.Version; //TODO: Get version from assembly?                
+        options.ServiceVersion = ServiceActivitySource.Instance.Version;                
     });
 
     builder.Services.AddSingleton<ILinkAdminMetrics, LinkAdminMetrics>();    
@@ -424,6 +437,8 @@ static void SetupMiddleware(WebApplication app)
     }    
 
     // Map health check middleware
+    app.MapGroup("/api/monitor").MapMonitorEndpoints();
+    app.MapGroup("/api/aggregate/").MapAggregationEndpoints();
     app.MapHealthChecks("/api/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse

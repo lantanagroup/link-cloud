@@ -4,12 +4,12 @@ import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
-import com.lantanagroup.link.measureeval.serdes.Views;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
 import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
 import com.lantanagroup.link.measureeval.utils.CqlUtils;
 import com.lantanagroup.link.shared.auth.PrincipalUser;
+import com.lantanagroup.link.shared.serdes.Views;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -69,6 +69,7 @@ public class MeasureDefinitionController {
     }
 
     @GetMapping("/{id}")
+    @JsonView(Views.Detail.class)
     @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
     public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
 

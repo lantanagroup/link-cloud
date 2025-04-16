@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.ResourceCategories;
 using LantanaGroup.Link.Report.Domain;
@@ -6,6 +7,7 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Report.Core
 {
@@ -50,7 +52,7 @@ namespace LantanaGroup.Link.Report.Core
                 schedule.Id == e.ReportScheduleId);
 
             Bundle patientResources = CreateNewBundle();
-            Bundle otherResources = CreateNewBundle();  
+            Bundle otherResources = CreateNewBundle();
             foreach (var entry in entries)
             {
                 if (entry.MeasureReport == null) 
@@ -119,6 +121,7 @@ namespace LantanaGroup.Link.Report.Core
                 });
             }
 
+            var serializer = new FhirJsonSerializer();
             PatientSubmissionModel patientSubmissionModel = new PatientSubmissionModel()
             {
                 FacilityId = facilityId,
@@ -126,8 +129,8 @@ namespace LantanaGroup.Link.Report.Core
                 ReportScheduleId = reportScheduleId,
                 StartDate = schedule.ReportStartDate,
                 EndDate = schedule.ReportEndDate,
-                PatientResources = patientResources,
-                OtherResources = otherResources
+                PatientResources = await serializer.SerializeToStringAsync(patientResources),
+                OtherResources = await serializer.SerializeToStringAsync(otherResources)                
             };
 
             return patientSubmissionModel;
