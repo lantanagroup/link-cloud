@@ -30,22 +30,6 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
             {
                 model.ServiceName = AccountConstants.ServiceName;
 
-                // send the Audit Event
-                Headers headers = [];
-                Headers headers2 = [];
-
-                if(!string.IsNullOrEmpty(model.CorrelationId))
-                {
-                    headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
-                }
-
-                await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, object>
-                {
-                    Key = model.FacilityId ?? string.Empty,
-                    Headers = headers,
-                    Value = model,
-                }, cancellationToken);
-
                 _logger.LogAuditEventCreated(model);
 
                 return true;
