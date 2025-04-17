@@ -6,7 +6,7 @@
 
 | Property       | Description                | Required | Default Value | Secret? |
 |----------------|----------------------------|----------|---------------|---------|
-| EnableSwagger  | Enable Swagger spec and UI | No       | false         | No      |
+| EnableSwagger  | Enable Swagger spec and UI | No       | true         | No      |
 
 ## Azure App Config Environment Variables
 
