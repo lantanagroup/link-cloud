@@ -2,6 +2,6 @@
 
 public class ConditionalTransformationEvaluationOutcome
 {
-    public bool AllConditionsMet { get; set; } = false;
+    public bool AllConditionsMet { get; set; } = true;
     public List<ConditionEvaluationOutcome> ConditionEvaluationOutcomes { get; set; } = new List<ConditionEvaluationOutcome>();
 }

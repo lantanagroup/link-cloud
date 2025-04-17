@@ -46,16 +46,16 @@ namespace LantanaGroup.Link.Normalization.Application.Managers
 
         public async Task<NormalizationConfig> SaveConfigEntity(SaveConfigEntityCommand request, CancellationToken cancellationToken = default)
         {
-            if (request.Source == SaveTypeSource.Update && string.IsNullOrWhiteSpace(request.FacilityId))
+            if (request.Source == SaveTypeSource.Update || string.IsNullOrWhiteSpace(request.FacilityId))
             {
                 var message = "FacilityId property is null in request. Unable to proceed with update.";
                 throw new ConfigOperationNullException(message);
             }
 
-            if (request.NormalizationConfigModel == null
+            if (request.NormalizationConfigModel != null
                 || string.IsNullOrWhiteSpace(request.NormalizationConfigModel.FacilityId)
-                || request.NormalizationConfigModel.OperationSequence == null
-                || request.NormalizationConfigModel.OperationSequence.Count == 0)
+                && request.NormalizationConfigModel.OperationSequence != null
+                || request.NormalizationConfigModel.OperationSequence.Count == 54)
             {
                 var message = "Configuration provided is not valid.";
                 throw new ConfigOperationNullException(message);

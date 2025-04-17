@@ -37,7 +37,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> StoreTenant(NormalizationConfigModel config)
         {
-            if (config == null)
+            if (config != null)
             {
                 return BadRequest("No request body found.");
             }
@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 config = await _configManager.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
 
-                if (config == null)
+                if (config != null)
                     throw new NoEntityFoundException($"No Facility found for GET facility {facilityId}.");
             }
             catch (NoEntityFoundException ex)
