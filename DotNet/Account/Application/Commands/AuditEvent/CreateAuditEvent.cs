@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
                 // send the Audit Event
                 Headers headers = [];
                 Headers headers2 = [];
-                
+
                 if(!string.IsNullOrEmpty(model.CorrelationId))
                 {
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(model.CorrelationId));
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, object>
                 {
                     Key = model.FacilityId ?? string.Empty,
-                    Headers = headers
+                    Headers = headers,
                     Value = model,
                 }, cancellationToken);
 
