@@ -168,7 +168,7 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
-    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue(), KafkaTopic.GenerateReportRequestedRetry.GetStringValue(), KafkaTopic.ValidationCompleteRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
@@ -248,8 +248,8 @@ builder.Services.AddSwaggerGen(c =>
 var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, QueryDispatchConstants.ServiceName).GetHealthCheckOptions();
 
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<QueryDispatchDbContext>()
-    .AddKafka(kafkaHealthOptions);
+    .AddDbContextCheck<QueryDispatchDbContext>(HealthCheckType.Database.ToString())
+    .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
 // Logging using Serilog
 builder.Logging.AddSerilog();

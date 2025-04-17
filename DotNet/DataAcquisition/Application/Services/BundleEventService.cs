@@ -9,14 +9,14 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
-public record ResourceRequiredMessageRequest(string facilityId, string patientId, string queryType, string correlationId, ReportableEvent ReportableEvent, List<ScheduledReport> scheduledReports);
+public record ResourceAcquiredMessageGenerationRequest(string facilityId, string patientId, string queryType, string correlationId, ReportableEvent ReportableEvent, List<ScheduledReport> scheduledReports);
 
 public interface IBundleEventService<EventKey, EventValue, EventRequest>
 {
     Task GenerateEventAsync(Bundle bundle, EventRequest request, CancellationToken cancellationToken = default);
 }
 
-public class BundleResourceAcquiredEventService : IBundleEventService<string, ResourceAcquired, ResourceRequiredMessageRequest>
+public class BundleResourceAcquiredEventService : IBundleEventService<string, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>
 {
     private readonly ILogger<BundleResourceAcquiredEventService> _logger;
     private readonly IProducer<string, ResourceAcquired> _producer;
@@ -27,7 +27,7 @@ public class BundleResourceAcquiredEventService : IBundleEventService<string, Re
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
     }
 
-    public async Task GenerateEventAsync(Bundle bundle, ResourceRequiredMessageRequest request, CancellationToken cancellationToken = default)
+    public async Task GenerateEventAsync(Bundle bundle, ResourceAcquiredMessageGenerationRequest request, CancellationToken cancellationToken = default)
     {
         foreach (var e in bundle.Entry)
         {

@@ -2,12 +2,11 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lantanagroup.link.measureeval.exceptions.FhirParseException;
-import com.lantanagroup.link.measureeval.exceptions.ValidationException;
-import com.lantanagroup.link.measureeval.kafka.ErrorHandler;
-import com.lantanagroup.link.measureeval.kafka.Topics;
+import com.lantanagroup.link.shared.exceptions.FhirParseException;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
+import com.lantanagroup.link.shared.kafka.ErrorHandler;
+import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.measureeval.records.*;
-import com.lantanagroup.link.shared.config.TelemetryConfig;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -60,7 +59,10 @@ public class KafkaConfig {
                 Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED, new StringDeserializer(),
                 Topics.RESOURCE_NORMALIZED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer());
+                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer(),
+                Topics.EVALUATION_REQUESTED, new StringDeserializer(),
+                Topics.EVALUATION_REQUESTED_ERROR, new StringDeserializer(),
+                Topics.EVALUATION_REQUESTED_RETRY, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new StringDeserializer()));
     }
@@ -87,6 +89,18 @@ public class KafkaConfig {
                 Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceNormalized.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.EVALUATION_REQUESTED, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.EVALUATION_REQUESTED_ERROR, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
+                        .typeResolver(KafkaConfig::resolveType),
+                Topics.EVALUATION_REQUESTED_RETRY, new JsonDeserializer<>(EvaluationRequested.class, objectMapper)
+                        .trustedPackages("*")
+                        .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType));
 
         return new ErrorHandlingDeserializer<>(
@@ -101,6 +115,9 @@ public class KafkaConfig {
             case Topics.RESOURCE_EVALUATED -> new ObjectMapper().constructType(ResourceEvaluated.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
+            case Topics.EVALUATION_REQUESTED -> new ObjectMapper().constructType(EvaluationRequested.class);
+            case Topics.EVALUATION_REQUESTED_ERROR -> new ObjectMapper().constructType(EvaluationRequested.class);
+            case Topics.EVALUATION_REQUESTED_RETRY -> new ObjectMapper().constructType(EvaluationRequested.class);
             default -> new ObjectMapper().constructType(Object.class);
         };
     }
@@ -140,6 +157,7 @@ public class KafkaConfig {
                 DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
                 ResourceEvaluated.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.class), objectMapper).noTypeInfo(),
                 AbstractResourceRecord.class, new JsonSerializer<>(objectMapper.constructType(AbstractResourceRecord.class), objectMapper).noTypeInfo(),
+                EvaluationRequested.class, new JsonSerializer<>(objectMapper.constructType(EvaluationRequested.class), objectMapper).noTypeInfo(),
                 String.class, new StringSerializer(),
                 byte[].class, new ByteArraySerializer(),
                 LinkedHashMap.class, new JsonSerializer<>(objectMapper.constructType(LinkedHashMap.class), objectMapper).noTypeInfo()
@@ -157,6 +175,7 @@ public class KafkaConfig {
         producerProperties.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, TracingProducerInterceptor.class.getName());
         return  new DefaultKafkaProducerFactory<>(producerProperties, keySerializer, valueSerializer);
     }
+
     @Bean
     public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, ResourceNormalized> template) {
         return RetryTopicConfigurationBuilder
@@ -173,6 +192,21 @@ public class KafkaConfig {
                 .create(template);
     }
 
+    @Bean
+    public RetryTopicConfiguration evaluationRequestedRetryTopic(@Qualifier("compressedKafkaTemplate")KafkaTemplate<String, EvaluationRequested> template) {
+        return RetryTopicConfigurationBuilder
+                .newInstance()
+                .fixedBackOff(KafkaRetryConfig.getRetryBackoffMs())
+                .maxAttempts(KafkaRetryConfig.getMaxAttempts())
+                .concurrency(1)
+                .includeTopic(Topics.EVALUATION_REQUESTED)
+                .retryTopicSuffix("-Retry")
+                .dltSuffix("-Error")
+                .notRetryOn(ValidationException.class).notRetryOn(FhirParseException.class).notRetryOn(MessageHandlingException.class)
+                .useSingleTopicForSameIntervals()
+                .doNotAutoCreateRetryTopics()
+                .create(template);
+    }
 
     @Bean
     public KafkaTemplate<?, ?> compressedKafkaTemplate(KafkaProperties properties,

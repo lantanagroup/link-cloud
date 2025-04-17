@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
@@ -22,11 +23,13 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Caching
             return default(T);
         }
 
-        public void Set<T>(string key, T value, TimeSpan expiration)
+        public void Set<T>(string key, T value, TimeSpan expiration, ExpirationType expirationType = ExpirationType.Sliding)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
             
-            var options = new MemoryCacheEntryOptions().SetSlidingExpiration(expiration).SetSize(1); 
+            var options = expirationType == ExpirationType.Sliding 
+                ? new MemoryCacheEntryOptions().SetSlidingExpiration(expiration).SetSize(1) 
+                : new MemoryCacheEntryOptions().SetAbsoluteExpiration(expiration).SetSize(1);
             
             _cache.Set(key, value, options);
         }
