@@ -777,6 +777,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
     ports:
       - "8072:8072"
     build:

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Runtime.InteropServices.JavaScript;
+using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -10,6 +11,8 @@ using RestSharp;
 public sealed class SmokeTest
 {
     private const string FacilityId = "smoke-test-facility";
+    private const int PollingIntervalSeconds = 5;
+    private const int MaxRetryCount = 10;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
     
@@ -67,6 +70,19 @@ public sealed class SmokeTest
         
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        
+        // Check that the response is JSON
+        Assert.IsNotNull(response.ContentType, $"Expected Content-Type to be set but received {response.ContentType}");
+        Assert.IsTrue(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
+        
+        var generateReportResponse = JObject.Parse(response.Content);
+        
+        // Check that the response includes a ReportId
+        Assert.IsTrue(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
+        
+        var reportId = generateReportResponse["reportId"].ToString();
+        var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
+        Assert.IsTrue(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
     }
 
     private static async Task InitializeValidationArtifacts()
@@ -368,4 +384,43 @@ public sealed class SmokeTest
     }
     
     #endregion
+    
+    /// <summary>
+    /// Asynchronously checks the submission status of a report.
+    /// </summary>
+    /// <param name="facilityId">The facility ID to query.</param>
+    /// <param name="reportId">The report ID to match.</param>
+    /// <returns>A Task<bool> indicating if the report is submitted.</returns>
+    public async Task<bool> CheckReportSubmissionStatusAsync(string facilityId, string reportId)
+    {
+        for (var retry = 0; retry < MaxRetryCount; retry++)
+        {
+            var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
+            var response = await AdminBffClient.ExecuteAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.OK && response.ContentType.Contains("application/json"))
+            {
+                var jsonResponse = JObject.Parse(response.Content);
+                var records = jsonResponse["records"] as JArray;
+
+                if (records != null)
+                {
+                    var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
+                    
+                    if (foundReport == null)
+                        Console.WriteLine("Report not found, yet.");
+                    else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
+                        return true;
+                    else
+                        Console.WriteLine("Report not submitted, yet.");
+                }
+            }
+
+            Console.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            await Task.Delay(PollingIntervalSeconds * 1000); // Wait for 5 seconds before the next retry.
+        }
+
+        Console.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
+        return false; // Return false if the loop completes without finding the submitted report.
+    }
 }

@@ -127,6 +127,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var startDate = value.StartDate;
                                 var endDate = value.EndDate;
                                 var reportTypes = value.ReportTypes;
+                                var reportId = value.ReportId ?? Guid.NewGuid().ToString();
 
                                 facilityId = key;
 
@@ -137,8 +138,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
 
                                 //If we are re-running an existing report, fetch the details from the database and replace the Values retrieved from the message
-                                if (value.ReportId != null)
+                                if (value is { Regenerate: true, ReportId: not null })
                                 {
+                                    _logger.LogDebug(
+                                        $"Finding existing report for facility {facilityId} with ID {value.ReportId} at {DateTime.UtcNow}");
                                     var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
                                     if (existing == null)
@@ -191,7 +194,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportScheduleModel
                                 {
-                                    Id = Guid.NewGuid().ToString(),
+                                    Id = reportId,
                                     FacilityId = facilityId,
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
@@ -205,12 +208,18 @@ namespace LantanaGroup.Link.Report.Listeners
                                 await measureReportScheduledManager.AddAsync(reportSchedule, cancellationToken);
 
                                 var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
-
-                                if (value.ReportId != null)
+                                
+                                if (value.Regenerate)
                                 {
-                                    var pids = (await submissionEntryManager.FindAsync(p => p.ReportScheduleId == value.ReportId, cancellationToken)).Select(p => p.PatientId);
+                                    _logger.LogInformation($"Re-generating report for facility {facilityId} with ID {reportId} at {DateTime.UtcNow}");
+                                    
+                                    var scheduledReports = await submissionEntryManager.FindAsync(
+                                            p => p.ReportScheduleId == reportId, cancellationToken);
+                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId);
+                                    
+                                    _logger.LogDebug($"Found {patientMeasureReports.Count()} patients to re-generate for facility {facilityId} from {startDate} to {endDate} with ID {reportId}");
 
-                                    pids.AsParallel().ForAll(async p =>
+                                    patientMeasureReports.AsParallel().ForAll(async p =>
                                     {
                                         foreach (var reportType in reportTypes)
                                         {
@@ -243,11 +252,17 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
+                                    _logger.LogInformation($"Generating new Adhoc report for facility {facilityId} with ID {value.ReportId} at {DateTime.UtcNow}");
+                                    
                                     // Get Patient List if none was provided
                                     if (value.PatientIds == null || value.PatientIds.Count == 0)
                                     {
-                                        value.PatientIds = await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                                        _logger.LogDebug($"Getting Patient List from Census Service for facility {facilityId} from {startDate} to {endDate}");
+                                        value.PatientIds =
+                                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
                                     }
+
+                                    _logger.LogDebug($"Found {value.PatientIds.Count} patients to re-generate for facility {facilityId} from {startDate} to {endDate}");
 
                                     value.PatientIds.AsParallel().ForAll(async patient =>
                                     {

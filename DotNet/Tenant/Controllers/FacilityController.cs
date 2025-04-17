@@ -26,7 +26,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
     [ApiController]
     public class FacilityController : ControllerBase
     {
-
         private readonly IFacilityConfigurationService _facilityConfigurationService;
 
         private readonly IMapper _mapperModelToDto;
@@ -42,9 +41,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IHttpClientFactory _httpClient;
         private readonly ServiceRegistry _serviceRegistry;
 
-        public FacilityController(ILogger<FacilityController> logger, IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory, IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory, IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
+        public FacilityController(ILogger<FacilityController> logger,
+            IFacilityConfigurationService facilityConfigurationService, ISchedulerFactory schedulerFactory,
+            IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
+            IOptions<ServiceRegistry> serviceRegistry, IHttpClientFactory httpClient)
         {
-
             _facilityConfigurationService = facilityConfigurationService;
             _schedulerFactory = schedulerFactory;
             _logger = logger;
@@ -86,28 +87,39 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
-        public async Task<ActionResult<PagedConfigModel<FacilityConfigModel>>> GetFacilities(string? facilityId, string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<PagedConfigModel<FacilityConfigModel>>> GetFacilities(string? facilityId,
+            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1,
+            CancellationToken cancellationToken = default)
         {
             List<FacilityConfigDto> facilitiesDtos;
             PagedFacilityConfigDto pagedFacilityConfigModelDto = new PagedFacilityConfigDto();
             _logger.LogInformation($"Get Facilities");
 
-            if (pageNumber < 1) { pageNumber = 1; }
+            if (pageNumber < 1)
+            {
+                pageNumber = 1;
+            }
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            PagedConfigModel<FacilityConfigModel> pagedFacilityConfigModel = await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize, pageNumber, cancellationToken);
+            PagedConfigModel<FacilityConfigModel> pagedFacilityConfigModel =
+                await _facilityConfigurationService.GetFacilities(facilityId, facilityName, sortBy, sortOrder, pageSize,
+                    pageNumber, cancellationToken);
 
             using (ServiceActivitySource.Instance.StartActivity("Map List Results"))
             {
-                facilitiesDtos = _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(pagedFacilityConfigModel.Records);
+                facilitiesDtos =
+                    _mapperModelToDto.Map<List<FacilityConfigModel>, List<FacilityConfigDto>>(pagedFacilityConfigModel
+                        .Records);
                 pagedFacilityConfigModelDto.Records = facilitiesDtos;
                 pagedFacilityConfigModelDto.Metadata = pagedFacilityConfigModel.Metadata;
             }
+
             if (pagedFacilityConfigModelDto.Records.Count == 0)
             {
                 return NoContent();
             }
+
             return Ok(pagedFacilityConfigModelDto);
         }
 
@@ -121,14 +133,15 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
-        public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility, CancellationToken cancellationToken)
+        public async Task<IActionResult> StoreFacility(FacilityConfigDto newFacility,
+            CancellationToken cancellationToken)
         {
-            FacilityConfigModel facilityConfigModel = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(newFacility);
+            FacilityConfigModel facilityConfigModel =
+                _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(newFacility);
 
             try
             {
                 await _facilityConfigurationService.CreateFacility(facilityConfigModel, cancellationToken);
-
             }
             catch (ApplicationException ex)
             {
@@ -161,7 +174,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet("{facilityId}")]
-        public async Task<ActionResult<FacilityConfigDto>> LookupFacilityById(string facilityId, CancellationToken cancellationToken)
+        public async Task<ActionResult<FacilityConfigDto>> LookupFacilityById(string facilityId,
+            CancellationToken cancellationToken)
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility By Facility Id");
 
@@ -195,7 +209,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFacility(string id, FacilityConfigDto updatedFacility, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateFacility(string id, FacilityConfigDto updatedFacility,
+            CancellationToken cancellationToken)
         {
             FacilityConfigModel dest = _mapperDtoToModel.Map<FacilityConfigDto, FacilityConfigModel>(updatedFacility);
 
@@ -205,9 +220,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest($" {id} in the url and the {updatedFacility.Id} in the payload mismatch");
             }
 
-             FacilityConfigModel oldFacility = await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
+            FacilityConfigModel oldFacility =
+                await _facilityConfigurationService.GetFacilityById(id, cancellationToken);
 
-             FacilityConfigModel clonedFacility = oldFacility?.ShallowCopy();
+            FacilityConfigModel clonedFacility = oldFacility?.ShallowCopy();
 
             try
             {
@@ -261,7 +277,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
-            FacilityConfigModel existingFacility = _facilityConfigurationService.GetFacilityByFacilityId(facilityId, cancellationToken).Result;
+            FacilityConfigModel existingFacility = _facilityConfigurationService
+                .GetFacilityByFacilityId(facilityId, cancellationToken).Result;
 
             try
             {
@@ -292,13 +309,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <param name="facilityId"></param>
         /// <param name="request"></param>
         /// <returns></returns>
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(GenerateAdhocReportResponse))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost("{facilityId}/AdHocReport")]
-        public async Task<IActionResult> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
+        public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) || await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
+            if (string.IsNullOrEmpty(facilityId) ||
+                await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
             {
                 return BadRequest("Facility does not exist.");
             }
@@ -323,6 +341,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest("EndDate must be after StartDate.");
             }
 
+            var reportId = Guid.NewGuid().ToString();
+            
             try
             {
                 foreach (var rt in request.ReportTypes)
@@ -345,7 +365,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     DateTimeKind.Utc
                 );
 
-               var endDate = new DateTime(
+                var endDate = new DateTime(
                     request.EndDate.Value.Year,
                     request.EndDate.Value.Month,
                     request.EndDate.Value.Day,
@@ -361,15 +381,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Headers = new Headers(),
                     Value = new GenerateReportValue
                     {
+                        ReportId = reportId,
                         StartDate = startDate,
                         EndDate = endDate,
                         ReportTypes = request.ReportTypes,
                         PatientIds = request.PatientIds,
-                        BypassSubmission = request.BypassSubmission?? false
+                        BypassSubmission = request.BypassSubmission ?? false
                     },
                 };
 
-                await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message, CancellationToken.None);
+                await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message,
+                    CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -377,7 +399,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return Problem("An internal server error occurred.", statusCode: 500);
             }
 
-            return Ok();
+            return Ok(new GenerateAdhocReportResponse(reportId));
         }
 
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -387,7 +409,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<IActionResult> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) || await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
+            if (string.IsNullOrEmpty(facilityId) ||
+                await _facilityConfigurationService.GetFacilityByFacilityId(facilityId, CancellationToken.None) == null)
             {
                 return BadRequest("Facility does not exist.");
             }
@@ -402,7 +425,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var httpClient = _httpClient.CreateClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-                string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Schedule?FacilityId={facilityId}&reportScheduleId={request.ReportId}";
+                string requestUrl =
+                    $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Schedule?FacilityId={facilityId}&reportScheduleId={request.ReportId}";
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var response = await httpClient.GetAsync(requestUrl, cts.Token);
@@ -413,11 +437,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(CancellationToken.None)} | Query URL: {requestUrl}");
                 }
 
-                var reportScheduleSummary = (ReportScheduleSummaryModel?)await response.Content.ReadFromJsonAsync(typeof(ReportScheduleSummaryModel), CancellationToken.None);
+                var reportScheduleSummary =
+                    (ReportScheduleSummaryModel?)await response.Content.ReadFromJsonAsync(
+                        typeof(ReportScheduleSummaryModel), CancellationToken.None);
 
                 if (reportScheduleSummary == null)
                 {
-                    return Problem("No ReportSchedule found for the provided ReportScheduleId", statusCode: (int)HttpStatusCode.NotFound);
+                    return Problem("No ReportSchedule found for the provided ReportScheduleId",
+                        statusCode: (int)HttpStatusCode.NotFound);
                 }
 
                 var producerConfig = new ProducerConfig();
@@ -431,11 +458,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Value = new GenerateReportValue()
                     {
                         ReportId = reportScheduleSummary.ReportId,
+                        Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false
                     },
                 };
 
-                await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message, CancellationToken.None);
+                await producer.ProduceAsync(KafkaTopic.GenerateReportRequested.ToString(), message,
+                    CancellationToken.None);
             }
             catch (Exception ex)
             {
