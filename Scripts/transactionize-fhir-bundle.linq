@@ -28,9 +28,9 @@
     - Use LINQPad's "Dump()" method to review processing information and output errors in the LINQPad Result pane.
 */
 
-
 // Specify the directory containing the FHIR JSON bundles
-const string BundleDirectory = @"D:\Code\link-cloud\Tests\E2ETests\fhir_server_data";
+string BundleDirectory = Util.ReadLine("Directory:", @"D:\Code\link-cloud\Tests\E2ETests\fhir_server_data");
+string BundleType = Util.ReadLine("Bundle Type:", "batch");
 
 // Loop through the JSON files in the directory
 foreach (var file in Directory.GetFiles(BundleDirectory, "*.json"))
@@ -48,7 +48,7 @@ foreach (var file in Directory.GetFiles(BundleDirectory, "*.json"))
 		}
 
 		// 1. Set type to "batch"
-		root["type"] = "batch";
+		root["type"] = BundleType;
 
 		// 5. Remove bundle.link, bundle.meta, and bundle.id
 		root.Remove("link");
@@ -95,6 +95,7 @@ foreach (var file in Directory.GetFiles(BundleDirectory, "*.json"))
 
 		// Save modified file
 		File.WriteAllText(file, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+		Console.WriteLine("Done!");
 	}
 	catch (Exception ex)
 	{
