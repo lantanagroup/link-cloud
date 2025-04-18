@@ -1,61 +1,65 @@
-﻿using System.Net;
-using System.Runtime.InteropServices.JavaScript;
-using Hl7.Fhir.Model;
-using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
-using Newtonsoft.Json.Linq;
-using Task = System.Threading.Tasks.Task;
+﻿using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
+using System.Net;
+using Hl7.Fhir.Model;
+using Newtonsoft.Json.Linq;
+using Xunit;
+using Task = System.Threading.Tasks.Task;
 using RestSharp;
 
-[TestClass]
-public sealed class SmokeTest
+public sealed class SmokeTest : IAsyncLifetime
 {
+    private readonly ITestOutputHelper _output;
+    
     private const string FacilityId = "smoke-test-facility";
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 10;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
-    
-    [ClassInitialize]
-    public static async Task ClassInitialize(TestContext context)
+
+    public SmokeTest(ITestOutputHelper output)
+    {
+        this._output = output;
+    }
+
+    public async Task InitializeAsync()
     {
         // Load data onto FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles();
-        
+
         // Initialize validation artifacts and categories
         await InitializeValidationArtifacts();
         await InitializeValidationCategories();
     }
-    
-    [ClassCleanup]
-    public static async Task ClassCleanup()
+
+    public async Task DisposeAsync()
     {
         // Clear all data from the FHIR server
         FhirDataLoader.DeleteResourcesWithExpunge();
-        
+
         // TODO: Delete report
-        
+
         // Cleanup
         await DeleteFacility();
     }
-    
-    [TestMethod]
+
+    [Fact]
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
         var measureLoader = new MeasureLoader(AdminBffClient);
         await measureLoader.LoadAsync();
-        
+
         await this.CreateFacilityAsync(measureLoader.measureId);
-        
+
         await this.CreateNormalizationConfig();
-        
+
         await this.CreateQueryPlan(measureLoader.measureId, "Epic");
 
         await this.CreateQueryConfig();
-        
+
         await this.GenerateReport(measureLoader.measureId);
     }
 
@@ -73,47 +77,48 @@ public sealed class SmokeTest
         request.AddJsonBody(body);
         
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
         
         // Check that the response is JSON
-        Assert.IsNotNull(response.ContentType, $"Expected Content-Type to be set but received {response.ContentType}");
-        Assert.IsTrue(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
+        Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
+        Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
         
         var generateReportResponse = JObject.Parse(response.Content);
         
         // Check that the response includes a ReportId
-        Assert.IsTrue(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
+        Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
         
         var reportId = generateReportResponse["reportId"].ToString();
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
-        Assert.IsTrue(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
+        Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
         
         // Download the report
         var downloadedResources = this.DownloadReport(reportId);
         
         // Confirm that there is a file called "sending-org.json"
-        Assert.IsTrue(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
+        Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "patient-list.json"
-        Assert.IsTrue(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
+        Assert.True(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "sending-device.json"
-        Assert.IsTrue(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
+        Assert.True(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "aggregate-HYPO.json"
         // TODO: This should actually be "aggregate-ACH.json"
-        Assert.IsTrue(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
+        Assert.True(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "other-resources.json"
-        Assert.IsTrue(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
+        Assert.True(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
         // TODO: Validate that it is correct
         
         // Confirm that there is a file called "patient-Patient-ACHMarch1.json"
-        Assert.IsTrue(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
+        Assert.True(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
         // TODO: Validate that it is correct
     }
     
@@ -121,10 +126,10 @@ public sealed class SmokeTest
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
         var response = AdminBffClient.Execute(request);
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
         
         // Expect the response to be a ZIP archive
-        Assert.IsTrue(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
+        Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
         
         var responseDictionary = new Dictionary<string, Object>();
     
@@ -158,25 +163,25 @@ public sealed class SmokeTest
         return responseDictionary;
     }
 
-    private static async Task InitializeValidationArtifacts()
+    private async Task InitializeValidationArtifacts()
     {
-        Console.WriteLine("Initializing validation artifacts...");
+        _output.WriteLine("Initializing validation artifacts...");
         var request = new RestRequest("validation/artifact/$initialize", Method.Post);
         var response = AdminBffClient.Execute(request);
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
-    private static async Task InitializeValidationCategories()
+    private async Task InitializeValidationCategories()
     {
-        Console.WriteLine("Initializing validation categories...");
+        _output.WriteLine("Initializing validation categories...");
         var request = new RestRequest("validation/category/$initialize", Method.Post);
         var response = AdminBffClient.Execute(request);
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task<RestResponse> CreateFacilityAsync(string measure)
     {
-        Console.WriteLine("Creating facility...");
+        _output.WriteLine("Creating facility...");
         var request = new RestRequest("/Facility", Method.Post);
         request.AddHeader("Content-Type", "application/json");
 
@@ -197,14 +202,14 @@ public sealed class SmokeTest
 
         var response = await AdminBffClient.ExecuteAsync(request);
         
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, "Expected HTTP 201 Created for facility creation");
         
         return response;
     }
 
     private async Task CreateNormalizationConfig()
     {
-        Console.WriteLine("Creating normalization config...");
+        _output.WriteLine("Creating normalization config...");
         var request = new RestRequest("normalization", Method.Post);
         var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.E2ETests.test_data.smoke_test.concept-map.json");
 
@@ -256,12 +261,12 @@ public sealed class SmokeTest
 
         // Execute and assert
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 200 OK {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, $"Response was not 201 Created {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryConfig()
     {
-        Console.WriteLine("Creating query config...");
+        _output.WriteLine("Creating query config...");
         var request = new RestRequest($"data/fhirQueryConfiguration", Method.Post);
         var body = new JObject
         {
@@ -271,12 +276,12 @@ public sealed class SmokeTest
         request.AddJsonBody(body.ToString(), "application/json");
         
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.IsTrue(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
     private async Task CreateQueryPlan(string measureId, string ehrDescription)
     {
-        Console.WriteLine("Creating query plan...");
+        _output.WriteLine("Creating query plan...");
         var request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
 
         var body = new JObject
@@ -405,12 +410,12 @@ public sealed class SmokeTest
         request.AddJsonBody(body.ToString(), "application/json");
 
         var response = await AdminBffClient.ExecuteAsync(request);
-        Assert.IsTrue(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
     
     #region Delete Facility Methods
 
-    private static async Task DeleteFacility()
+    private async Task DeleteFacility()
     {
         await Task.WhenAll(
             DeleteFacilityNormalization(),
@@ -418,42 +423,42 @@ public sealed class SmokeTest
             DeleteFacilityQueryConfig()
         );
         
-        Console.WriteLine("Deleting facility...");
+        _output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
         var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
 
         if (deleteFacilityResponse.StatusCode != HttpStatusCode.NoContent)
-            Console.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
+            _output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
     }
 
-    private static async Task DeleteFacilityNormalization()
+    private async Task DeleteFacilityNormalization()
     {
-        Console.WriteLine("Deleting facility normalization...");
+        _output.WriteLine("Deleting facility normalization...");
         var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
         var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
-            Console.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
+            _output.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
     }
 
-    private static async Task DeleteFacilityQueryPlan()
+    private async Task DeleteFacilityQueryPlan()
     {
-        Console.WriteLine("Deleting facility query plan...");
+        _output.WriteLine("Deleting facility query plan...");
         var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan", Method.Delete);
         var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
-            Console.WriteLine($"Expected HTTP 204 No Content for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
+            _output.WriteLine($"Expected HTTP 204 No Content for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
     }
 
-    private static async Task DeleteFacilityQueryConfig()
+    private async Task DeleteFacilityQueryConfig()
     {
-        Console.WriteLine("Deleting facility query config...");
+        _output.WriteLine("Deleting facility query config...");
         var deleteQueryConfigRequest = new RestRequest($"/data/{FacilityId}/fhirQueryConfiguration", Method.Delete);
         var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
-            Console.WriteLine($"Expected HTTP 204 No Content for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
+            _output.WriteLine($"Expected HTTP 204 No Content for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
     
     #endregion
@@ -481,19 +486,19 @@ public sealed class SmokeTest
                     var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
                     
                     if (foundReport == null)
-                        Console.WriteLine("Report not found, yet.");
+                        _output.WriteLine("Report not found, yet.");
                     else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
                         return true;
                     else
-                        Console.WriteLine("Report not submitted, yet.");
+                        _output.WriteLine("Report not submitted, yet.");
                 }
             }
 
-            Console.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            _output.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
             await Task.Delay(PollingIntervalSeconds * 1000); // Wait for 5 seconds before the next retry.
         }
 
-        Console.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
+        _output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
         return false; // Return false if the loop completes without finding the submitted report.
     }
 }
