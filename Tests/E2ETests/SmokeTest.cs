@@ -1,7 +1,9 @@
 ﻿using System.Net;
 using System.Runtime.InteropServices.JavaScript;
+using Hl7.Fhir.Model;
 using Microsoft.VisualStudio.TestTools.UnitTesting.Logging;
 using Newtonsoft.Json.Linq;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -32,6 +34,8 @@ public sealed class SmokeTest
     {
         // Clear all data from the FHIR server
         FhirDataLoader.DeleteResourcesWithExpunge();
+        
+        // TODO: Delete report
         
         // Cleanup
         await DeleteFacility();
@@ -83,6 +87,75 @@ public sealed class SmokeTest
         var reportId = generateReportResponse["reportId"].ToString();
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
         Assert.IsTrue(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
+        
+        // Download the report
+        var downloadedResources = this.DownloadReport(reportId);
+        
+        // Confirm that there is a file called "sending-org.json"
+        Assert.IsTrue(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
+        // TODO: Validate that it is correct
+        
+        // Confirm that there is a file called "patient-list.json"
+        Assert.IsTrue(downloadedResources.ContainsKey("patient-list.json"), $"Expected report to include patient-list.json but it was not");
+        // TODO: Validate that it is correct
+        
+        // Confirm that there is a file called "sending-device.json"
+        Assert.IsTrue(downloadedResources.ContainsKey("sending-device.json"), $"Expected report to include sending-device.json but it was not");
+        // TODO: Validate that it is correct
+        
+        // Confirm that there is a file called "aggregate-HYPO.json"
+        // TODO: This should actually be "aggregate-ACH.json"
+        Assert.IsTrue(downloadedResources.ContainsKey("aggregate-HYPO.json"), $"Expected report to include aggregate-HYPO.json but it was not");
+        // TODO: Validate that it is correct
+        
+        // Confirm that there is a file called "other-resources.json"
+        Assert.IsTrue(downloadedResources.ContainsKey("other-resources.json"), $"Expected report to include other-resources.json but it was not");
+        // TODO: Validate that it is correct
+        
+        // Confirm that there is a file called "patient-Patient-ACHMarch1.json"
+        Assert.IsTrue(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
+        // TODO: Validate that it is correct
+    }
+    
+    private Dictionary<string, Object> DownloadReport(string reportId)
+    {
+        var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
+        var response = AdminBffClient.Execute(request);
+        Assert.IsTrue(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
+        
+        // Expect the response to be a ZIP archive
+        Assert.IsTrue(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
+        
+        var responseDictionary = new Dictionary<string, Object>();
+    
+        // Open the ZIP archive and extract in memory
+        using var zipStream = new MemoryStream(response.RawBytes ?? Array.Empty<byte>());
+        using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
+        var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
+    
+        foreach (var entry in archive.Entries)
+        {
+            // Skip directories and non-JSON files
+            if (entry.Length == 0)
+                continue;
+    
+            using var entryStream = entry.Open();
+            using var reader = new StreamReader(entryStream);
+            var fileContent = reader.ReadToEnd();
+
+            if (entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                // Parse the content as a FHIR resource and add to dictionary
+                var resource = jsonParser.Parse<Resource>(fileContent);
+                responseDictionary[entry.FullName] = resource;
+            }
+            else
+            {
+                responseDictionary[entry.FullName] = fileContent;
+            }
+        }
+    
+        return responseDictionary;
     }
 
     private static async Task InitializeValidationArtifacts()
