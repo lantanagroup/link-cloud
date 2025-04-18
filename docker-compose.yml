@@ -649,8 +649,8 @@ services:
       authentication.anonymous: true
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
-      loki.enabled: false  
-      LOGGING_LEVEL_COM_LANTANAGROUP_LINK: DEBUG
+      loki.enabled: false
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8067:8067"
     build:
@@ -831,7 +831,9 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true  
+      Authentication__EnableAnonymousAccess: true
+      Features__DownloadReportEnabled: true
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8073:8073"
     build:
@@ -914,7 +916,7 @@ services:
       loki.enabled: false
       loki.url: http://loki:3100
       LINK_REPORT_BASE-URL: http://report:8072
-      LOGGING_LEVEL_COM_LANTANAGROUP_LINK: DEBUG
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8075:8075"
     build:

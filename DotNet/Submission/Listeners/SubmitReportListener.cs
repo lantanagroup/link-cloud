@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
         private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
         private readonly ReportSubmittedProducer _reportSubmittedProducer;
+        private readonly PathNamingService _pathNamingService;
 
         private string Name => this.GetType().Name;
 
@@ -59,7 +60,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IOptions<ServiceRegistry> serviceRegistry,
             ISubmissionServiceMetrics submissionServiceMetrics,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
-            ReportSubmittedProducer reportSubmittedProducer)
+            ReportSubmittedProducer reportSubmittedProducer,
+            PathNamingService pathNamingService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -85,33 +87,12 @@ namespace LantanaGroup.Link.Submission.Listeners
             _submissionServiceMetrics = submissionServiceMetrics;
             _linkBearerServiceOptions = linkBearerServiceOptions;
             _reportSubmittedProducer = reportSubmittedProducer ?? throw new ArgumentNullException(nameof(reportSubmittedProducer));
+            _pathNamingService = pathNamingService ?? throw new ArgumentNullException(nameof(pathNamingService));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
-        }
-
-        private string GetMeasureShortName(string measure)
-        {
-            // If a URL, may contain |0.1.2 representing the version at the end of the URL
-            // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
-            string measureWithoutVersion = measure.Contains("|") ?
-                measure.Substring(0, measure.LastIndexOf("|", System.StringComparison.Ordinal)) :
-                measure;
-
-            var urlShortName = _submissionConfig.MeasureNames.FirstOrDefault(x => x.Url == measureWithoutVersion || x.MeasureId == measureWithoutVersion)?.ShortName;
-
-            if (!string.IsNullOrWhiteSpace(urlShortName))
-            {
-                return urlShortName;
-            }
-            else
-            {
-                _logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
-            }
-
-            return $"{measure.GetHashCode():X}";
         }
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
@@ -181,15 +162,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
-                                string measureShortNames = value.MeasureIds
-                                    .Select(GetMeasureShortName)
-                                    .Aggregate((a, b) => $"{a}+{b}");
-
-                                //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
-                                //Per 2153, don't build with the trailing timestamp
-                                string dtFormat = "yyyyMMdd";
-                                string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}_{value.ReportTrackingId}");
+                                string submissionDirectoryName = _pathNamingService.GetSubmissionDirectoryName(
+                                    facilityId,
+                                    value.MeasureIds,
+                                    key.StartDate,
+                                    key.EndDate,
+                                    value.ReportTrackingId);
+                                string submissionDirectory = Path.Combine(
+                                    _submissionConfig.SubmissionDirectory, 
+                                    submissionDirectoryName);
 
                                 string fileName;
                                 string contents;
@@ -247,7 +228,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                                     foreach (var aggregate in value.Aggregates)
                                     {
-                                        string measureShortName = this.GetMeasureShortName(aggregate.Measure);
+                                        string measureShortName = _pathNamingService.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
                                         contents = await _fhirSerializer.SerializeToStringAsync(aggregate);
 
