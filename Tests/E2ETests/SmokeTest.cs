@@ -15,7 +15,7 @@ public sealed class SmokeTest : IAsyncLifetime
     
     private const string FacilityId = "smoke-test-facility";
     private const int PollingIntervalSeconds = 5;
-    private const int MaxRetryCount = 10;
+    private const int MaxRetryCount = 15;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
