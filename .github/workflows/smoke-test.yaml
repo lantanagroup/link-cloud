@@ -1,4 +1,4 @@
-name: Docker Build and Run
+name: "Build, Run, E2E Tests"
 
 on:
 #  schedule:
@@ -37,6 +37,15 @@ jobs:
         run: |
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+          
+      - name: Run E2E Tests
+        run: dotnet test ./Tests/E2ETests/E2ETests.csproj --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: ./Tests/E2ETests/TestResults/test-results.trx
 
       - name: Shutdown Services
         run: docker compose -p $PROJECT_NAME down --volumes
