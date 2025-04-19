@@ -49,22 +49,25 @@ public sealed class SmokeTest : IAsyncLifetime
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(AdminBffClient);
+        var measureLoader = new MeasureLoader(AdminBffClient, _output);
         await measureLoader.LoadAsync();
 
-        await this.CreateFacilityAsync(measureLoader.measureId);
+        await this.CreateFacilityAsync(measureLoader.MeasureId);
 
         await this.CreateNormalizationConfig();
 
-        await this.CreateQueryPlan(measureLoader.measureId, "Epic");
+        await this.CreateQueryPlan(measureLoader.MeasureId, "Epic");
 
         await this.CreateQueryConfig();
 
-        await this.GenerateReport(measureLoader.measureId);
+        await this.GenerateReport(measureLoader.MeasureId);
     }
 
-    private async Task GenerateReport(string measureId)
+    private async Task GenerateReport(string? measureId)
     {
+        if (measureId == null)
+            throw new ArgumentNullException(nameof(measureId));
+        
         var request = new RestRequest($"facility/{FacilityId}/AdhocReport", Method.Post);
         var body = new
         {
@@ -83,18 +86,21 @@ public sealed class SmokeTest : IAsyncLifetime
         // Check that the response is JSON
         Assert.True(response.ContentType != null, $"Expected Content-Type to be set but received {response.ContentType}");
         Assert.True(response.ContentType.Contains("application/json"), $"Expected Content-Type to be application/json but received {response.ContentType}");
+        Assert.False(string.IsNullOrWhiteSpace(response.Content), $"Expected Content to be set but received {response.Content}");
         
         var generateReportResponse = JObject.Parse(response.Content);
         
         // Check that the response includes a ReportId
         Assert.True(generateReportResponse.ContainsKey("reportId"), $"Expected response to include ReportId but received {generateReportResponse}");
         
-        var reportId = generateReportResponse["reportId"].ToString();
+        var reportId = generateReportResponse["reportId"]?.ToString();
+        Assert.False(string.IsNullOrWhiteSpace(reportId), $"Expected ReportId to be set but received {reportId}");
+        
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
         Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
         
         // Download the report
-        var downloadedResources = this.DownloadReport(reportId);
+        var downloadedResources = await this.DownloadReport(reportId);
         
         // Confirm that there is a file called "sending-org.json"
         Assert.True(downloadedResources.ContainsKey("sending-organization.json"), $"Expected report to include sending-org.json but it was not");
@@ -122,10 +128,10 @@ public sealed class SmokeTest : IAsyncLifetime
         // TODO: Validate that it is correct
     }
     
-    private Dictionary<string, Object> DownloadReport(string reportId)
+    private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
     {
         var request = new RestRequest($"submission/{FacilityId}/{reportId}", Method.Get);
-        var response = AdminBffClient.Execute(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
         
         // Expect the response to be a ZIP archive
@@ -167,7 +173,7 @@ public sealed class SmokeTest : IAsyncLifetime
     {
         _output.WriteLine("Initializing validation artifacts...");
         var request = new RestRequest("validation/artifact/$initialize", Method.Post);
-        var response = AdminBffClient.Execute(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
@@ -175,11 +181,11 @@ public sealed class SmokeTest : IAsyncLifetime
     {
         _output.WriteLine("Initializing validation categories...");
         var request = new RestRequest("validation/category/$initialize", Method.Post);
-        var response = AdminBffClient.Execute(request);
+        var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
     }
 
-    private async Task<RestResponse> CreateFacilityAsync(string measure)
+    private async Task<RestResponse> CreateFacilityAsync(string? measure)
     {
         _output.WriteLine("Creating facility...");
         var request = new RestRequest("/Facility", Method.Post);
@@ -192,7 +198,7 @@ public sealed class SmokeTest : IAsyncLifetime
             TimeZone = "America/Chicago",
             ScheduledReports = new
             {
-                monthly = new[] { measure },
+                monthly = measure != null ? new[] { measure } : Array.Empty<string>(),
                 daily = Array.Empty<string>(),
                 weekly = Array.Empty<string>()
             }
@@ -279,7 +285,7 @@ public sealed class SmokeTest : IAsyncLifetime
         Assert.True(response.StatusCode == HttpStatusCode.Created, $"Expected HTTP 201 Created but received {response.StatusCode}: {response.Content}");
     }
 
-    private async Task CreateQueryPlan(string measureId, string ehrDescription)
+    private async Task CreateQueryPlan(string? measureId, string ehrDescription)
     {
         _output.WriteLine("Creating query plan...");
         var request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
@@ -476,7 +482,7 @@ public sealed class SmokeTest : IAsyncLifetime
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
             var response = await AdminBffClient.ExecuteAsync(request);
 
-            if (response.StatusCode == HttpStatusCode.OK && response.ContentType.Contains("application/json"))
+            if (response.StatusCode == HttpStatusCode.OK && response.ContentType != null && response.ContentType.Contains("application/json") && response.Content != null)
             {
                 var jsonResponse = JObject.Parse(response.Content);
                 var records = jsonResponse["records"] as JArray;

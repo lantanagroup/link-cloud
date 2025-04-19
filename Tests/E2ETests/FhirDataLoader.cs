@@ -20,7 +20,7 @@ public class FhirDataLoader(string fhirServerBaseUrl)
         foreach (var resourceName in resourceNames)
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName);
-            using var reader = new StreamReader(stream);
+            using var reader = new StreamReader(stream ?? throw new InvalidOperationException());
             var bundleJson = await reader.ReadToEndAsync();
 
             var request = new RestRequest("", Method.Post);

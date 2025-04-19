@@ -1,3 +1,5 @@
+using Xunit.Abstractions;
+
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 using System.Reflection;
@@ -9,18 +11,12 @@ using Hl7.Fhir.Serialization;
 using System.Linq;
 using Task = System.Threading.Tasks.Task;
 
-public class MeasureLoader
+public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
 {
     private readonly FhirJsonParser _parser = new FhirJsonParser();
-    public string measureId;
-    private Bundle evaluationBundle;
-    private Bundle validationBundle;
-    private readonly RestClient adminBffClient;
-
-    public MeasureLoader(RestClient adminBffClient)
-    {
-        this.adminBffClient = adminBffClient;
-    }
+    public string? MeasureId;
+    private Bundle? _evaluationBundle;
+    private Bundle? _validationBundle;
 
     private async Task<string> GetMeasureBundleJsonAsync()
     {
@@ -33,7 +29,7 @@ public class MeasureLoader
         {
             var resourceName = TestConfig.MeasureBundleLocation
                 .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
-            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+            await using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
             
             if (stream == null)
                 throw new FileNotFoundException($"Embedded resource '{resourceName}' not found.");
@@ -66,9 +62,9 @@ public class MeasureLoader
         var validationTypes = new[] { "ImplementationGuide", "StructureDefinition", "SearchParameter", "ValueSet", "CodeSystem" };
 
         Measure measure = originalBundle.Entry.FirstOrDefault(e => e.Resource?.TypeName == "Measure")?.Resource as Measure ?? throw new InvalidOperationException("Measure not found in bundle.");
-        this.measureId = measure.Id;
+        this.MeasureId = measure.Id;
         
-        this.evaluationBundle = new Bundle
+        this._evaluationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
             Entry = originalBundle.Entry
@@ -76,7 +72,7 @@ public class MeasureLoader
                 .ToList()
         };
 
-        this.validationBundle = new Bundle
+        this._validationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
             Entry = originalBundle.Entry
@@ -87,33 +83,40 @@ public class MeasureLoader
 
     public async Task LoadAsync()
     {
-        Console.WriteLine("Getting measure bundle...");
+        output.WriteLine("Getting measure bundle...");
         await this.GetMeasureBundleAsync();
         
-        Console.WriteLine("Loading measure bundle for evaluation...");
-        var request = new RestRequest($"measure-definition/{this.measureId}", Method.Put);
-        request.AddJsonBody(this.evaluationBundle.ToJson());
+        output.WriteLine("Loading measure bundle for evaluation...");
+        var request = new RestRequest($"measure-definition/{this.MeasureId}", Method.Put);
+        request.AddJsonBody(this._evaluationBundle.ToJson());
         var response = adminBffClient.ExecuteAsync(request);
         
         if (response.Result.StatusCode != System.Net.HttpStatusCode.OK)
         {
-            Console.WriteLine($"Failed to load measure definition: {response.Result.Content}");
+            output.WriteLine($"Failed to load measure definition: {response.Result.Content}");
             throw new Exception("Failed to load measure definition.");
         }
 
-        Console.WriteLine("Loading profile artifacts for validation...");
-        foreach (var validationEntry in this.validationBundle.Entry)
+        if (this._validationBundle != null)
         {
-            var resource = validationEntry.Resource;
-            var requestValidation = new RestRequest($"validation/artifact/RESOURCE/{resource.TypeName}-{resource.Id}", Method.Put);
-            requestValidation.AddJsonBody(resource.ToJson());
-            var responseValidation = adminBffClient.ExecuteAsync(requestValidation);
-            
-            if (responseValidation.Result.StatusCode != System.Net.HttpStatusCode.OK)
+            output.WriteLine("Loading profile artifacts for validation...");
+                
+            var validationTasks = this._validationBundle.Entry.Select(async validationEntry =>
             {
-                Console.WriteLine($"Failed to load validation resource: {responseValidation.Result.Content}");
-                throw new Exception("Failed to load validation resource.");
-            }
+                var resource = validationEntry.Resource;
+                var requestValidation = new RestRequest($"validation/artifact/RESOURCE/{resource.TypeName}-{resource.Id}", Method.Put);
+                requestValidation.AddJsonBody(await resource.ToJsonAsync());
+                var responseValidation = await adminBffClient.ExecuteAsync(requestValidation);
+                
+                if (responseValidation.StatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    output.WriteLine($"Failed to load validation resource: {responseValidation.Content}");
+                    throw new Exception("Failed to load validation resource.");
+                }
+            });
+            
+            await Task.WhenAll(validationTasks);
+            output.WriteLine($"{this._validationBundle.Entry.Count} validation resources successfully loaded.");
         }
     }
 }
