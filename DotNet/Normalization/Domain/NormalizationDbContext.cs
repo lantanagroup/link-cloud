@@ -59,8 +59,7 @@ public partial class NormalizationDbContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.OperationJson)
                 .IsRequired()
-                .IsUnicode(false)
-                .HasColumnName("Operation");
+                .IsUnicode(false);
             entity.Property(e => e.OperationType)
                 .IsRequired()
                 .HasMaxLength(255)

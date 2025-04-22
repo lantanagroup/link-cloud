@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Normalization.Migrations
 {
     [DbContext(typeof(NormalizationDbContext))]
-    [Migration("20250422172838_Add_Operation")]
+    [Migration("20250422184753_Add_Operation")]
     partial class Add_Operation
     {
         /// <inheritdoc />
@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         .IsRequired()
                         .IsUnicode(false)
                         .HasColumnType("varchar(max)")
-                        .HasColumnName("Operation");
+                        .HasColumnName("OperationJson");
 
                     b.Property<string>("OperationType")
                         .IsRequired()

@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                         .IsRequired()
                         .IsUnicode(false)
                         .HasColumnType("varchar(max)")
-                        .HasColumnName("Operation");
+                        .HasColumnName("OperationJson");
 
                     b.Property<string>("OperationType")
                         .IsRequired()

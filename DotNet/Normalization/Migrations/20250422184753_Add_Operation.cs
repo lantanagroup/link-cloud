@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "(newid())"),
                     FacilityId = table.Column<string>(type: "varchar(255)", unicode: false, maxLength: 255, nullable: true),
-                    Operation = table.Column<string>(type: "varchar(max)", unicode: false, nullable: false),
+                    OperationJson = table.Column<string>(type: "varchar(max)", unicode: false, nullable: false),
                     OperationType = table.Column<string>(type: "varchar(255)", unicode: false, maxLength: 255, nullable: false),
                     Description = table.Column<string>(type: "varchar(max)", unicode: false, nullable: true),
                     IsDisabled = table.Column<bool>(type: "bit", nullable: false),
