@@ -33,6 +33,8 @@ import {IEntityCreatedResponse} from "../../../interfaces/entity-created-respons
 import {forkJoin, Observable} from "rxjs";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatRadioModule} from "@angular/material/radio";
+import * as Papa from 'papaparse';
+import {FileUploadComponent} from "../../core/file-upload/file-upload.component";
 
 @Component({
   selector: 'generate-report-form',
@@ -55,7 +57,8 @@ import {MatRadioModule} from "@angular/material/radio";
     MatProgressSpinnerModule,
     MatDatepickerModule,
     PatientAcquiredFormComponent,
-    MatRadioModule
+    MatRadioModule,
+    FileUploadComponent
   ],
   templateUrl: './generate-report-form.component.html',
   styleUrls: ['./generate-report-form.component.scss']
@@ -68,6 +71,7 @@ export class GenerateReportFormComponent {
   facilityId: string = '';
   patients: string[] = [];
   formSubmitted = false; // Flag to track form submission
+  errorMessage: string = '';
 
   @Output() formValueChanged = new EventEmitter<boolean>();
 
@@ -151,13 +155,7 @@ export class GenerateReportFormComponent {
           horizontalPosition: 'end',
           verticalPosition: 'top'
         });
-        this.patients = [];
-        this.generateReportForm.controls['startDate'].reset();
-        this.generateReportForm.controls['endDate'].reset();
-        this.generateReportForm.controls['facilityId'].reset();
-        this.generateReportForm.controls['reportTypes'].reset();
-        this.generateReportForm.controls['patients'].reset();
-        this.generateReportForm.controls['bypassSubmission'].reset();
+        this.resetForm();
 
       });
     } else {
@@ -168,6 +166,16 @@ export class GenerateReportFormComponent {
         verticalPosition: 'top'
       });
     }
+  }
+
+  private resetForm() {
+    this.patients = [];
+    this.generateReportForm.controls['startDate'].reset();
+    this.generateReportForm.controls['endDate'].reset();
+    this.generateReportForm.controls['facilityId'].reset();
+    this.generateReportForm.controls['reportTypes'].reset();
+    this.generateReportForm.controls['patients'].reset();
+    this.generateReportForm.controls['bypassSubmission'].reset();
   }
 
   getReportTypes(): Observable<IMeasureDefinitionConfigModel[]> {
@@ -203,6 +211,31 @@ export class GenerateReportFormComponent {
         patientNameControl.reset(); // Reset the input field
       }
     }
+  }
+
+  loadFile(file: any) {
+    const reader = new FileReader();
+    reader.readAsText(file);
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.csv')) {
+      this.errorMessage = '';
+    } else {
+      this.errorMessage = 'Please upload a valid CSV file (with .csv extension).';
+      return;
+    }
+    reader.onload = () => {
+      const csvData = reader.result as string;
+      Papa.parse(csvData, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (result) => {
+          this.patients = (result.data as string[][]).map(row => row[0]);
+        },
+      });
+    };
+    reader.onerror = () => {
+      throw new Error('Error reading the file.');
+    };
   }
 
   parseString(patient: string): string[] {

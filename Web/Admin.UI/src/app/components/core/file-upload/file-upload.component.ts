@@ -23,10 +23,8 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 
 export class FileUploadComponent {
 
-   file: any;
-
-   fileName = '';
-
+  file: any;
+  fileName = '';
   disabled: boolean = false;
 
   @Output() fileChange = new EventEmitter<any>();
@@ -44,33 +42,11 @@ export class FileUploadComponent {
 
 
   onFileSelected(event: any) {
-
     const file: File = event.target.files[0];
-
     if (file) {
-
-      const reader = new FileReader();
-
-      reader.onload = (e: any) => {
-
-        const result = e.target.result;
-
-        try {
-          this.file = JSON.parse(result);
-
-          this.fileChange.emit(this.file);
-        }
-        catch (ex) {
-          console.error(ex);
-        }
-      }
-
-      reader.readAsText(file);
-
+      this.file = file;
+      this.fileChange.emit(this.file);
       this.fileName = file.name;
-
     }
-
   }
-
 }

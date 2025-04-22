@@ -251,21 +251,21 @@ static void RegisterServices(WebApplicationBuilder builder)
     if (monitorBackend)
     {
         healthCheckBuilder
-            .AddCheck<AccountServiceHealthCheck>("Account Service")
-            .AddCheck<AuditServiceHealthCheck>("Audit Service")
-            .AddCheck<CensusServiceHealthCheck>("Census Service")
-            .AddCheck<DataAcquisitionHealthCheck>("Data Acquisition Service")
-            .AddCheck<MeasureEvaluationServiceHealthCheck>("Measure Evaluation Service")
-            .AddCheck<NormalizationServiceHealthCheck>("Normalization Service")
-            .AddCheck<NotificationServiceHealthCheck>("Notification Service")
-            .AddCheck<ReportServiceHealthCheck>("Report Service")
-            .AddCheck<SubmissionServiceHealthCheck>("Submission Service")
-            .AddCheck<TenantServiceHealthCheck>("Tenant Service");
+            .AddCheck<AccountServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<AuditServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<CensusServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<DataAcquisitionHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<MeasureEvaluationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<NormalizationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<NotificationServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<ReportServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<SubmissionServiceHealthCheck>(HealthCheckType.Service.ToString())
+            .AddCheck<TenantServiceHealthCheck>(HealthCheckType.Service.ToString());
     }
 
     if (builder.Configuration.GetValue<string>("Cache:Type") == "Redis")
     {
-        healthCheckBuilder.AddCheck<CacheHealthCheck>("Cache");
+        healthCheckBuilder.AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString());
     }
 
 

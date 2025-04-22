@@ -187,8 +187,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, CensusConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
