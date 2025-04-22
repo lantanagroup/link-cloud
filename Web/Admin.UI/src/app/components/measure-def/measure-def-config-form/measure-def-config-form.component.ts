@@ -15,10 +15,11 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 import {IEntityCreatedResponse} from '../../../interfaces/entity-created-response.model';
 import {IMeasureDefinitionConfigModel} from '../../../interfaces/measure-definition/measure-definition-config-model.interface';
 import {MeasureDefinitionService} from '../../../services/gateway/measure-definition/measure.service';
-import {FileUploadComponent} from '../../file-upload/file-upload.component';
+import {FileUploadComponent} from '../../core/file-upload/file-upload.component';
 import {BundleIdValidator} from '../../validators/BundleIdValidator';
 import {UrlOrBundleValidator} from '../../validators/UrlOrBundleValidator';
 import {MatButtonModule} from "@angular/material/button";
+import * as Papa from "papaparse";
 
 @Component({
   selector: 'app-measure-def-config-form',
@@ -51,9 +52,8 @@ import {MatButtonModule} from "@angular/material/button";
 export class MeasureDefinitionFormComponent implements OnInit {
 
   configForm!: any;
-
   fileName = "";
-
+  errorMessage: string = '';
 
   constructor(private formBuilder: FormBuilder, private measureDefinitionService: MeasureDefinitionService, private bundleIdValidator: BundleIdValidator, private snackBar: MatSnackBar) {
 
@@ -81,10 +81,31 @@ export class MeasureDefinitionFormComponent implements OnInit {
     return this.configForm.controls['bundle'];
   }
 
-  loadFile(file: any) {
+  loadFile(file: File | null) {
     if (file) {
-      this.bundle.setValue(file);
-      this.bundleId.setValue(file["id"]);
+      const reader = new FileReader();
+      reader.readAsText(file);
+      const fileName = file.name.toLowerCase();
+      if (fileName.endsWith('.json')) {
+        this.errorMessage = '';
+      } else {
+        this.errorMessage = 'Please upload a valid JSON file (with .json extension).';
+        return;
+      }
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        try {
+          const fileContent = reader.result as string;
+          const jsonData = JSON.parse(fileContent);
+
+          this.bundle.setValue(jsonData);
+          this.bundleId.setValue(jsonData.id || '');
+        } catch (error) {
+            throw new Error('Invalid JSON file format.');
+        }
+      };
+      reader.onerror = () => {
+        throw new Error('Error reading the file.');
+      };
     } else {
       this.fileName = '';
       this.bundleId.setValue('');

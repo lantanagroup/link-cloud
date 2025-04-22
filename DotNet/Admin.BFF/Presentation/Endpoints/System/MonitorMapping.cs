@@ -11,14 +11,6 @@ public static class MonitorMapping
         {
             Tags = new List<OpenApiTag> { new() { Name = "System Information" } }
         });
-
-        // routes.MapGet("", SearchQueryLogs.Handle)
-        //     .ProducesProblem(StatusCodes.Status500InternalServerError)
-        //     .WithOpenApi(x => new OpenApiOperation(x)
-        //     {
-        //         Summary = "Search Patient Acquisition Logs",
-        //         Description = "Search all acquisition logs."
-        //     });
         
         routes.MapGet("/health", GetSystemHealth.Handle)
             .Produces(StatusCodes.Status200OK)
