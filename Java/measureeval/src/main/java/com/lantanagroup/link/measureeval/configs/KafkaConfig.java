@@ -171,21 +171,21 @@ public class KafkaConfig {
 
 
     @Bean
-    public ProducerFactory<?, ?> producerFactory(
+    public <K, V> ProducerFactory<K, V> producerFactoryWithOverrides(
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
-            Serializer<?> keySerializer,
-            Serializer<?> valueSerializer) {
+            Serializer<K> keySerializer,
+            Serializer<V> valueSerializer) {
 
         return producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, Collections.emptyMap());
     }
 
 
-    public ProducerFactory<?, ?> producerFactoryWithOverrides(
+    public <K, V> ProducerFactory<K, V> producerFactoryWithOverrides(
             KafkaProperties properties,
             ObjectProvider<SslBundles> sslBundles,
-            Serializer<?> keySerializer,
-            Serializer<?> valueSerializer,
+            Serializer<K> keySerializer,
+            Serializer<V> valueSerializer,
             Map<String, Object> customOverrides) {
 
         Map<String, Object> producerProperties = new HashMap<>(properties.buildProducerProperties(sslBundles.getIfAvailable()));
@@ -255,6 +255,6 @@ public class KafkaConfig {
         overrides.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, Properties.MAX_BLOCK_MS_CONFIG);
         overrides.put(ProducerConfig.RETRIES_CONFIG, 0);
 
-        return new KafkaTemplate<>((ProducerFactory<String, String>)producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
+        return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
     }
 }
