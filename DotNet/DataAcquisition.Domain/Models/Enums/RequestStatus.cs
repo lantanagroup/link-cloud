@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DataAcquisition.Domain.Models.Enums;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 public enum RequestStatus
 {
     [StringValue("Pending")]

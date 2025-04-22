@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System;
 using System.Collections.Generic;

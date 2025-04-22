@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+﻿using DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 
 namespace DataAcquisition.Domain
@@ -10,6 +11,7 @@ namespace DataAcquisition.Domain
         IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
         IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
+        IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
     }
     public class Database : IDatabase
     {
@@ -18,19 +20,22 @@ namespace DataAcquisition.Domain
         public IEntityRepository<FhirListConfiguration> FhirListConfigurationRepository { get; set; }
         public IEntityRepository<FhirQuery> FhirQueryRepository { get; set; }
         public IEntityRepository<ReferenceResources> ReferenceResourcesRepository { get; set; }
+        public IEntityRepository<DataAcquisitionLog> DataAcquisitionLogRepository { get; set; }
 
         public Database(
             IEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
             IEntityRepository<FhirListConfiguration> fhirListQueryListConfigurationRepository,
             IEntityRepository<FhirQuery> fhirQueryRepository,
             IEntityRepository<ReferenceResources> referenceResourcesRepository,
-            IEntityRepository<QueryPlan> queryPlans)
+            IEntityRepository<QueryPlan> queryPlans,
+            IEntityRepository<DataAcquisitionLog> dataAcquisitionLogRepository)
         {
             QueryPlanRepository = queryPlans;
             FhirQueryConfigurationRepository = queryConfigurationRepository;
             FhirListConfigurationRepository = fhirListQueryListConfigurationRepository;
             FhirQueryRepository = fhirQueryRepository;
             ReferenceResourcesRepository = referenceResourcesRepository;
+            DataAcquisitionLogRepository = dataAcquisitionLogRepository;
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using Hl7.Fhir.Model;
+﻿using DataAcquisition.Domain.Entities;
+using DataAcquisition.Domain.Models.Enums;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Application.Factories.Auth;
@@ -18,6 +20,10 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions; 
+using DAEnums = LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
+using System.Diagnostics;
+using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 
@@ -104,7 +110,7 @@ public class FhirApiService : IFhirApiService
     private readonly ILogger<FhirApiService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
-    private readonly IFhirQueryManager _fhirQueryManager;
+    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly BundleResourceAcquiredEventService _bundleResourceAcquiredEventService;
     private readonly IReferenceResourcesManager _referenceResourceManager;
@@ -113,18 +119,18 @@ public class FhirApiService : IFhirApiService
         ILogger<FhirApiService> logger,
         HttpClient httpClient,
         IAuthenticationRetrievalService authenticationRetrievalService,
-        IFhirQueryManager fhirQueryManager,
         IDataAcquisitionServiceMetrics metrics,
         BundleResourceAcquiredEventService bundleResourceAcquiredEventService,
-        IReferenceResourcesManager referenceResourceManager)
+        IReferenceResourcesManager referenceResourceManager,
+        IDataAcquisitionLogManager dataAcquisitionLogManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentException(nameof(authenticationRetrievalService));
-        _fhirQueryManager = fhirQueryManager ?? throw new ArgumentNullException(nameof(fhirQueryManager));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _bundleResourceAcquiredEventService = bundleResourceAcquiredEventService ?? throw new ArgumentNullException(nameof(bundleResourceAcquiredEventService));
         _referenceResourceManager = referenceResourceManager ?? throw new ArgumentNullException(nameof(referenceResourceManager));
+        _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
     }
 
     public async Task<Bundle> GetPagedBundledResultsAsync(
@@ -190,7 +196,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (query.opType == OperationType.Read)
+        if (query.opType == Domain.Models.QueryConfig.OperationType.Read)
         {
             if (query?.ResourceId == null)
             {
@@ -311,18 +317,57 @@ public class FhirApiService : IFhirApiService
 
             List<ResourceReference> references = new List<ResourceReference>();
 
-            var resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+            Stopwatch stopWatch = new Stopwatch();
+            stopWatch.Start();
 
-
-            await _fhirQueryManager.AddAsync(new FhirQuery
+            var log = await _dataAcquisitionLogManager.CreateAsync(new DataAcquisitionLog
             {
-                ResourceType = resourceType,
-                CorrelationId = correlationId,
-                PatientId = patientId.SplitReference(),
                 FacilityId = facilityId,
-                SearchParams = JsonSerializer.Serialize(searchParams),
+                Priority = AcquisitionPriority.Normal,
+                PatientId = patientId,
+                FhirVersion = "R4",
+                QueryType = FhirQueryType.Search,
+                QueryPhase = queryType.TranslateToQueryPhase(),
+                FhirQuery = new List<FhirQuery>
+                {
+                    new FhirQuery
+                    {
+                        ResourceReferenceTypes = referenceTypes.ConvertAll(x => new ResourceReferenceType
+                        {
+                            FacilityId = facilityId,
+                            CreateDate = DateTime.UtcNow,
+                            ModifyDate = DateTime.UtcNow,
+                            QueryPhase = queryType.TranslateToQueryPhase(),
+                            ResourceType = x,
+                        }),
+                    }
+                },
+                Status = DAEnums.RequestStatus.Processing,
+                ExecutionDate = DateTime.UtcNow,
+                TimeZone = TimeZoneInfo.Utc.DisplayName,
+                RetryAttempts = 0,
+                CompletionDate = null,
+                CompletionTimeMilliseconds = null,
+                ResourceAcquiredIds = new List<string>(),
+                ScheduledReport = reports?[0],
             }, cancellationToken);
-            
+
+            Bundle? resultBundle = null;
+            try
+            {
+                resultBundle = await fhirClient.SearchAsync(searchParams, resourceType, ct: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                stopWatch.Stop();
+                log.CompletionDate = DateTime.UtcNow;
+                log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
+                log.Status = DAEnums.RequestStatus.Failed;
+                log.ResourceAcquiredIds = new List<string>();
+                await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+                throw;
+            }
 
             if (resultBundle != null)
             {
@@ -432,6 +477,14 @@ public class FhirApiService : IFhirApiService
                     }
                 }
             }
+            
+            stopWatch.Stop();
+            log.CompletionDate = DateTime.UtcNow;
+            log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
+            log.Status = DAEnums.RequestStatus.Completed;
+            log.ResourceAcquiredIds = resultBundle.Entry.Select(x => x.Resource.Id).ToList();
+
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
             return (newResultBundle, references);
         }
@@ -466,6 +519,28 @@ public class FhirApiService : IFhirApiService
 
         DomainResource? readResource = null;
 
+        var log = await _dataAcquisitionLogManager.CreateAsync(new DataAcquisitionLog
+        {
+            FacilityId = facilityId,
+            Priority = AcquisitionPriority.Normal,
+            PatientId = patientId,
+            FhirVersion = "R4",
+            QueryType = FhirQueryType.Search,
+            QueryPhase = queryType.TranslateToQueryPhase(),
+            FhirQuery = new List<FhirQuery>(),
+            Status = DAEnums.RequestStatus.Processing,
+            ExecutionDate = DateTime.UtcNow,
+            TimeZone = TimeZoneInfo.Utc.DisplayName,
+            RetryAttempts = 0,
+            CompletionDate = null,
+            CompletionTimeMilliseconds = null,
+            ResourceAcquiredIds = new List<string>(),
+            ScheduledReport = report,
+        }, cancellationToken);
+
+        var stopWatch = new Stopwatch();
+        stopWatch.Start();
+
         try
         {
             readResource = resourceType switch
@@ -487,17 +562,23 @@ public class FhirApiService : IFhirApiService
         }
         catch (Exception ex)
         {
+            stopWatch.Stop();
+            log.CompletionDate = DateTime.UtcNow;
+            log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
+            log.Status = DAEnums.RequestStatus.Failed;
+            log.ResourceAcquiredIds = new List<string>();
+            await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
             _logger.LogError(ex, "error encountered retrieving fhir resource. ResourceType: {ResourceType}; PatientId: {PatientId}", resourceType, patientId);
             throw;
         }
 
-        await _fhirQueryManager.AddAsync(new Domain.Entities.FhirQuery
-        {
-            ResourceType = resourceType,
-            CorrelationId = correlationId,
-            PatientId = patientId.SplitReference(),
-            FacilityId = facilityId,
-        }, cancellationToken);
+        stopWatch.Stop();
+        log.CompletionDate = DateTime.UtcNow;
+        log.CompletionTimeMilliseconds = stopWatch.ElapsedMilliseconds;
+        log.Status = DAEnums.RequestStatus.Completed;
+        log.ResourceAcquiredIds = new List<string> { readResource?.Id };
+        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
         if (readResource != null)
         {
@@ -535,7 +616,7 @@ public class FhirApiService : IFhirApiService
 
         List<DomainResource> domainResources = new List<DomainResource>();
 
-        if(config.OperationType == OperationType.Read)
+        if(config.OperationType == Domain.Models.QueryConfig.OperationType.Read)
         {
             var refIdResult = GetRefId(referenceId, resourceType);
 
@@ -650,7 +731,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (query.opType == OperationType.Read)
+        if (query.opType == Domain.Models.QueryConfig.OperationType.Read)
         {
             if (query?.ResourceId == null)
             {
@@ -716,7 +797,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        if (config.OperationType == OperationType.Read)
+        if (config.OperationType == Domain.Models.QueryConfig.OperationType.Read)
         {
             var refIdResult = GetRefId(referenceId, resourceType);
 
