@@ -444,7 +444,7 @@ public sealed class SmokeTest : IAsyncLifetime
         var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 204 No Content for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
+            _output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
     }
 
     private async Task DeleteFacilityQueryPlan()
@@ -454,7 +454,7 @@ public sealed class SmokeTest : IAsyncLifetime
         var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 204 No Content for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
+            _output.WriteLine($"Expected HTTP 202 Accepted for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
     }
 
     private async Task DeleteFacilityQueryConfig()
@@ -464,7 +464,7 @@ public sealed class SmokeTest : IAsyncLifetime
         var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 204 No Content for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
+            _output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
     
     #endregion
