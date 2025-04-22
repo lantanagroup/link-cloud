@@ -19,7 +19,7 @@ public partial class Operation
     [Required]
     [Column("Operation")]
     [Unicode(false)]
-    public string Operation1 { get; set; }
+    public string OperationJson { get; set; }
 
     [Required]
     [StringLength(255)]

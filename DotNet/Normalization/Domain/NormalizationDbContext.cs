@@ -52,12 +52,12 @@ public partial class NormalizationDbContext : DbContext
             entity.ToTable("Operation");
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutdate())");
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.Description).IsUnicode(false);
             entity.Property(e => e.FacilityId)
                 .HasMaxLength(255)
                 .IsUnicode(false);
-            entity.Property(e => e.Operation1)
+            entity.Property(e => e.OperationJson)
                 .IsRequired()
                 .IsUnicode(false)
                 .HasColumnName("Operation");

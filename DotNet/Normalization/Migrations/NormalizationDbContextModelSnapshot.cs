@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime>("CreateDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasDefaultValueSql("(getutcdate())");
 
                     b.Property<string>("Description")
                         .IsUnicode(false)
@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Operation1")
+                    b.Property<string>("OperationJson")
                         .IsRequired()
                         .IsUnicode(false)
                         .HasColumnType("varchar(max)")

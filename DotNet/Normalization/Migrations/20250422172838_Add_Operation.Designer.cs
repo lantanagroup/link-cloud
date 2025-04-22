@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Normalization.Migrations
 {
     [DbContext(typeof(NormalizationDbContext))]
-    [Migration("20250422165219_Add_Operation")]
+    [Migration("20250422172838_Add_Operation")]
     partial class Add_Operation
     {
         /// <inheritdoc />
@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime>("CreateDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasDefaultValueSql("(getutcdate())");
 
                     b.Property<string>("Description")
                         .IsUnicode(false)
@@ -77,7 +77,7 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Operation1")
+                    b.Property<string>("OperationJson")
                         .IsRequired()
                         .IsUnicode(false)
                         .HasColumnType("varchar(max)")
