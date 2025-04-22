@@ -189,8 +189,8 @@ namespace Tenant
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
             builder.Services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>("Database")
-                .AddKafka(kafkaHealthOptions);
+                .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+                .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();

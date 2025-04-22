@@ -119,6 +119,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E
 		docker-compose.prometheus.yml = docker-compose.prometheus.yml
 		docker-compose.tempo.yml = docker-compose.tempo.yml
 		kafka-client.properties = kafka-client.properties
+		topics.txt = topics.txt
 	EndProjectSection
 EndProject
 Global
