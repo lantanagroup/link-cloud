@@ -25,7 +25,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.NormalizationConfig", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
@@ -46,6 +45,50 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("NormalizationConfig");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<DateTime>("CreateDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("Description")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)");
+
+                    b.Property<string>("FacilityId")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Operation1")
+                        .IsRequired()
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("Operation");
+
+                    b.Property<string>("OperationType")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Operation", (string)null);
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
