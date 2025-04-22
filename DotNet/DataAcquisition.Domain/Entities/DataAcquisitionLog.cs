@@ -13,18 +13,20 @@ public class DataAcquisitionLog : BaseEntityExtended
     public string FacilityId { get; set; }
     public AcquisitionPriority Priority { get; set; }
     public string PatientId { get; set; }
-    public string FhirVersion { get; set; }
-    public FhirQueryType QueryType { get; set; }
-    public QueryPhase QueryPhase { get; set; }
+    public string? CorrelationId { get; set; }
+    public string? ReportTrackingId { get; set; }
+    public string? FhirVersion { get; set; }
+    public FhirQueryType? QueryType { get; set; }
+    public QueryPhase? QueryPhase { get; set; }
     public ICollection<FhirQuery> FhirQuery { get; set; }
-    public RequestStatus Status { get; set; }
-    public DateTime ExecutionDate { get; set; }
-    public string TimeZone { get; set; }
-    public int RetryAttempts { get; set; } = 0;
+    public RequestStatus? Status { get; set; }
+    public DateTime? ExecutionDate { get; set; }
+    public string? TimeZone { get; set; }
+    public int? RetryAttempts { get; set; } = 0;
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
-    public List<string> ResourceAcquiredIds { get; set; } = new List<string>();
+    public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
     public ICollection<ReferenceResources> ReferenceResources { get; set; }
-    public List<string> Notes { get; set; } = new List<string>();
+    public List<string>? Notes { get; set; } = new List<string>();
     public ScheduledReport ScheduledReport { get; set; }
 }

@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    partial class DataAcquisitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250422191026_dataacquisitionlogUpdate1")]
+    partial class dataacquisitionlogUpdate1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,13 +36,10 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<long?>("CompletionTimeMilliseconds")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("CorrelationId")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("ExecutionDate")
+                    b.Property<DateTime>("ExecutionDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("FacilityId")
@@ -47,12 +47,14 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FhirVersion")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Notes")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PatientId")
@@ -62,29 +64,28 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
-                    b.Property<int?>("QueryPhase")
+                    b.Property<int>("QueryPhase")
                         .HasColumnType("int");
 
-                    b.Property<int?>("QueryType")
+                    b.Property<int>("QueryType")
                         .HasColumnType("int");
-
-                    b.Property<string>("ReportTrackingId")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceAcquiredIds")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("RetryAttempts")
+                    b.Property<int>("RetryAttempts")
                         .HasColumnType("int");
 
                     b.Property<string>("ScheduledReport")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("Status")
+                    b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.Property<string>("TimeZone")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");

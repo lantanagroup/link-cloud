@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LinqKit;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
@@ -44,17 +45,17 @@ public class FhirQueryManager : IFhirQueryManager
 
         if (!string.IsNullOrEmpty(correlationId))
         {
-            predicate = predicate.And(x => x.CorrelationId == correlationId);
+            predicate = predicate.And(x => x.DataAcquisitionLog.CorrelationId == correlationId);
         }
 
         if (!string.IsNullOrEmpty(patientId))
         {
-            predicate = predicate.And(x => x.PatientId == patientId);
+            predicate = predicate.And(x => x.DataAcquisitionLog.PatientId == patientId);
         }
 
         if (!string.IsNullOrEmpty(resourceType))
         {
-            predicate = predicate.And(x => x.ResourceType == resourceType);
+            predicate = predicate.And(x => x.DataAcquisitionLog.FhirQuery.Any(y => y.ResourceTypes.Any(z => z.Equals(resourceType))));
         }
 
         return new FhirQueryResultModel { Queries = (await _database.FhirQueryRepository.FindAsync(predicate, cancellationToken)).ToList() };

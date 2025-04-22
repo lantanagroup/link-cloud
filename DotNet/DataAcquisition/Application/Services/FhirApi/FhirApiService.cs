@@ -388,24 +388,18 @@ public class FhirApiService : IFhirApiService
 
                         var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
                         var currentDateTime = DateTime.UtcNow;
-                        var fhirDateTime = new FhirDateTime(
-                            currentDateTime.Year,
-                            currentDateTime.Month,
-                            currentDateTime.Day,
-                            currentDateTime.Hour,
-                            currentDateTime.Minute,
-                            currentDateTime.Second,
-                            TimeSpan.Zero);
 
                         var refResource = new ReferenceResources
                         {
                             FacilityId = facilityId,
                             ResourceId = resource.Id,
-                            ReferenceResource = System.Text.Json.JsonSerializer.Serialize(resource, jsonOptions),
+                            ReferenceResource = JsonSerializer.Serialize(resource, jsonOptions),
                             ResourceType = resourceType,
                             CreateDate = currentDateTime,
                             ModifyDate = currentDateTime,
                         };
+
+                        log.ReferenceResources.Add(refResource);
 
                         await _referenceResourceManager.AddAsync(refResource);
                     }
@@ -447,14 +441,6 @@ public class FhirApiService : IFhirApiService
 
                                 var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
                                 var currentDateTime = DateTime.UtcNow;
-                                var fhirDateTime = new FhirDateTime(
-                                    currentDateTime.Year,
-                                    currentDateTime.Month,
-                                    currentDateTime.Day,
-                                    currentDateTime.Hour,
-                                    currentDateTime.Minute,
-                                    currentDateTime.Second,
-                                    TimeSpan.Zero);
 
                                 var refResource = new ReferenceResources
                                 {
@@ -465,6 +451,8 @@ public class FhirApiService : IFhirApiService
                                     CreateDate = currentDateTime,
                                     ModifyDate = currentDateTime,
                                 };
+
+                                log.ReferenceResources.Add(refResource);
 
                                 await _referenceResourceManager.AddAsync(refResource);
                             }
@@ -830,14 +818,6 @@ public class FhirApiService : IFhirApiService
 
             var jsonOptions = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
             var currentDateTime = DateTime.UtcNow;
-            var fhirDateTime = new FhirDateTime(
-                currentDateTime.Year,
-                currentDateTime.Month,
-                currentDateTime.Day,
-                currentDateTime.Hour,
-                currentDateTime.Minute,
-                currentDateTime.Second,
-                TimeSpan.Zero);
 
             var refResource = new ReferenceResources
             {
