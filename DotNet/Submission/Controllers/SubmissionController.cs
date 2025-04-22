@@ -76,14 +76,29 @@ public class SubmissionController(
         
         DateTime reportStartDate = reportStartDateElement.GetDateTime();
         DateTime reportEndDate = reportEndDateElement.GetDateTime();
+        
+        // Validate facilityId to prevent path traversal
+        if (facilityId.Contains("..") || facilityId.Contains("/") || facilityId.Contains("\\"))
+        {
+            logger.LogError("Invalid facilityId: {FacilityId}", facilityId);
+            return BadRequest("Invalid facilityId.");
+        }
 
         string reportDirectoryName =
             pathNamingService.GetSubmissionDirectoryName(facilityId, reportTypes, reportStartDate, reportEndDate,
                 reportId);
         string fullPath = Path.Join(config.Value.SubmissionDirectory, reportDirectoryName);
+        string normalizedBaseDirectory = Path.GetFullPath(config.Value.SubmissionDirectory);
+        string normalizedFullPath = Path.GetFullPath(fullPath);
+        
+        if (!normalizedFullPath.StartsWith(normalizedBaseDirectory + Path.DirectorySeparatorChar))
+        {
+            logger.LogError("Attempted access outside of base directory: {FullPath}", fullPath);
+            return BadRequest("Invalid path.");
+        }
 
         // TODO: Consider changing this to store the ZIP on disk, instead, and check if the ZIP already exists
-        var compressedData = this.CompressDirectory(fullPath);
+        var compressedData = this.CompressDirectory(normalizedFullPath);
         
         return File(compressedData, "application/zip", $"{reportDirectoryName}.zip");
     }
