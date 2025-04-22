@@ -49,21 +49,8 @@ public partial class NormalizationDbContext : DbContext
                                                  );
         modelBuilder.Entity<Operation>(entity =>
         {
-            entity.ToTable("Operation");
-
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.Description).IsUnicode(false);
-            entity.Property(e => e.FacilityId)
-                .HasMaxLength(255)
-                .IsUnicode(false);
-            entity.Property(e => e.OperationJson)
-                .IsRequired()
-                .IsUnicode(false);
-            entity.Property(e => e.OperationType)
-                .IsRequired()
-                .HasMaxLength(255)
-                .IsUnicode(false);
         });
 
         OnModelCreatingPartial(modelBuilder);
