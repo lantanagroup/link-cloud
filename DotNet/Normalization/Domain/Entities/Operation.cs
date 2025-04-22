@@ -17,7 +17,6 @@ public partial class Operation
     public string FacilityId { get; set; }
 
     [Required]
-    [Column("Operation")]
     [Unicode(false)]
     public string OperationJson { get; set; }
 
