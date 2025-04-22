@@ -33,6 +33,13 @@ public class SubmissionController(
     [HttpGet("{facilityId}/{reportId}")]
     public async Task<IActionResult> DownloadReport([FromRoute] string facilityId, [FromRoute] string reportId)
     {
+        string sanitizedFacilityId = facilityId
+            .Replace("\n", "")
+            .Replace("\r", "")
+            .Replace("\\", "")
+            .Replace("/", "")
+            .Replace("..", "");
+        
         if (string.IsNullOrEmpty(serviceRegistry.Value?.ReportServiceApiUrl))
         {
             logger.LogError("Report Service API Url is missing from Service Registry.");
@@ -51,7 +58,7 @@ public class SubmissionController(
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         
-        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{facilityId}?reportId={reportId}";
+        string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={reportId}";
         var reportResponse = await client.GetAsync(reportUrl);
         var jsonResponse = System.Text.Json.JsonDocument.Parse(
             await reportResponse.Content.ReadAsStringAsync());
@@ -76,16 +83,8 @@ public class SubmissionController(
         
         DateTime reportStartDate = reportStartDateElement.GetDateTime();
         DateTime reportEndDate = reportEndDateElement.GetDateTime();
-        
-        // Validate facilityId to prevent path traversal
-        if (facilityId.Contains("..") || facilityId.Contains("/") || facilityId.Contains("\\"))
-        {
-            logger.LogError("Invalid facilityId: {FacilityId}", facilityId);
-            return BadRequest("Invalid facilityId.");
-        }
-
         string reportDirectoryName =
-            pathNamingService.GetSubmissionDirectoryName(facilityId, reportTypes, reportStartDate, reportEndDate,
+            pathNamingService.GetSubmissionDirectoryName(sanitizedFacilityId, reportTypes, reportStartDate, reportEndDate,
                 reportId);
         string fullPath = Path.Join(config.Value.SubmissionDirectory, reportDirectoryName);
         string normalizedBaseDirectory = Path.GetFullPath(config.Value.SubmissionDirectory);
