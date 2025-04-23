@@ -47,50 +47,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("NormalizationConfig");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.Operation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<DateTime>("CreateDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<string>("Description")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)");
-
-                    b.Property<string>("FacilityId")
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<bool>("IsDisabled")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("ModifyDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("OperationJson")
-                        .IsRequired()
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)")
-                        .HasColumnName("OperationJson");
-
-                    b.Property<string>("OperationType")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Operation", (string)null);
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.Shared.Application.Models.RetryEntity", b =>
                 {
                     b.Property<string>("Id")
