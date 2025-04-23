@@ -18,6 +18,9 @@ public partial class NormalizationDbContext : DbContext
     public virtual DbSet<NormalizationConfig> NormalizationConfigs { get; set; }
     public virtual DbSet<RetryEntity> EventRetries { get; set; }
     public virtual DbSet<Operation> Operations { get; set; }
+    public virtual DbSet<OperationResourceType> OperationResourceTypes { get; set; }
+    public virtual DbSet<ResourceType> ResourceTypes { get; set; }
+    public virtual DbSet<OperationSequence> OperationSequences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +54,34 @@ public partial class NormalizationDbContext : DbContext
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+        });
+
+        modelBuilder.Entity<OperationResourceType>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedNever();
+
+            entity.HasOne(d => d.Operation).WithMany(p => p.OperationResourceTypes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_OperationResourceTypes_Operation");
+
+            entity.HasOne(d => d.ResourceType).WithMany(p => p.OperationResourceTypes)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_OperationResourceTypes_ResourceType");
+        });
+
+        modelBuilder.Entity<OperationSequence>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.OperationResourceType).WithMany(p => p.OperationSequences)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_OperationSequence_OperationResourceTypes");
+        });
+
+        modelBuilder.Entity<ResourceType>(entity =>
+        {
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
         });
 
         OnModelCreatingPartial(modelBuilder);

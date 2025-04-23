@@ -33,4 +33,7 @@ public partial class Operation
     public DateTime CreateDate { get; set; }
 
     public DateTime? ModifyDate { get; set; }
+
+    [InverseProperty("Operation")]
+    public virtual ICollection<OperationResourceType> OperationResourceTypes { get; set; } = new List<OperationResourceType>();
 }
