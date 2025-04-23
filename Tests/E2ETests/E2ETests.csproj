@@ -16,6 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.11.4" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">
@@ -27,8 +28,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Hl7.Fhir.R4" Version="6.0.0-alpha1" />
-        <PackageReference Include="RestSharp" Version="112.1.1-alpha.0.4" />
+        <PackageReference Include="RestSharp" Version="112.1.0" />
     </ItemGroup>
 
     <ItemGroup>

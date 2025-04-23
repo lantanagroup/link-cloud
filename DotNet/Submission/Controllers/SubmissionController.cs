@@ -56,6 +56,13 @@ public class SubmissionController(
         
         string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/Report/summaries/{sanitizedFacilityId}?reportId={reportId}";
         var reportResponse = await client.GetAsync(reportUrl);
+
+        if (!reportResponse.IsSuccessStatusCode)
+        {
+            logger.LogError($"Report service return {reportResponse.StatusCode} for {reportUrl}: {reportResponse.ReasonPhrase}");
+            return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
+        }
+        
         var jsonResponse = System.Text.Json.JsonDocument.Parse(
             await reportResponse.Content.ReadAsStringAsync());
         

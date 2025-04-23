@@ -277,8 +277,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpDelete("{facilityId}")]
         public async Task<IActionResult> DeleteFacility(string facilityId, CancellationToken cancellationToken)
         {
-            FacilityConfigModel existingFacility = _facilityConfigurationService
-                .GetFacilityByFacilityId(facilityId, cancellationToken).Result;
+            FacilityConfigModel existingFacility = await _facilityConfigurationService
+                .GetFacilityByFacilityId(facilityId, cancellationToken);
 
             try
             {

@@ -11,25 +11,32 @@ public class ReportSubmittedProducer(IProducer<ReportSubmittedKey, ReportSubmitt
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
-        
-        producer.Produce(nameof(KafkaTopic.ReportSubmitted), new Message<ReportSubmittedKey, ReportSubmittedValue>
+
+        try
         {
-            Key = new ReportSubmittedKey()
+            producer.Produce(nameof(KafkaTopic.ReportSubmitted), new Message<ReportSubmittedKey, ReportSubmittedValue>
             {
-                FacilityId = facilityId,
-                StartDate = startDate,
-                EndDate = endDate
-            },
-            Value = new ReportSubmittedValue()
-            {
-                ReportTrackingId = reportTrackingId
-            },
-            Headers = new Headers()
-            {
-                { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
-            }
-        });
-        
-        producer.Flush();
+                Key = new ReportSubmittedKey()
+                {
+                    FacilityId = facilityId,
+                    StartDate = startDate,
+                    EndDate = endDate
+                },
+                Value = new ReportSubmittedValue()
+                {
+                    ReportTrackingId = reportTrackingId
+                },
+                Headers = new Headers()
+                {
+                    { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) }
+                }
+            });
+
+            producer.Flush();
+        }
+        catch (ProduceException<ReportSubmittedKey, ReportSubmittedValue> ex)
+        {
+            throw new Exception($"Failed to produce ReportSubmitted message for facility: {facilityId}: {ex.Message}");
+        }
     }
 }
