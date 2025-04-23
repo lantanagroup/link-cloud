@@ -1,10 +1,9 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
+using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models;
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 {
@@ -24,13 +23,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {            
+        {
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -48,7 +47,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 return new LinkServiceHealthReport { Service = "Tenant", Status = HealthStatus.Unhealthy };
             }
         }
-        
+
         private void InitHttpClient()
         {
             //check if the service uri is set

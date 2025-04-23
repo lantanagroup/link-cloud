@@ -71,9 +71,7 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "proxyConfig": "proxyconfig.json",
-            "port": 4200,
-            "buildTarget": "proxy-for-angular:build"
+            "port": 4200
           },
           "configurations": {
             "production": {

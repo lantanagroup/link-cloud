@@ -25,6 +25,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
@@ -209,9 +210,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, AccountConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddCheck<CacheHealthCheck>("Cache")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddCheck<CacheHealthCheck>(HealthCheckType.Cache.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     // Add tenant API service
     builder.Services.AddHttpClient();

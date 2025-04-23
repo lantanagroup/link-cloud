@@ -67,9 +67,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             _submissionReportProducer.Flush();
 
-            schedule.SubmitReportDateTime = DateTime.UtcNow;
-            await _database.ReportScheduledRepository.UpdateAsync(schedule);
-
             foreach (var e in submissionEntries)
             {
                 e.Status = PatientSubmissionStatus.Submitted;

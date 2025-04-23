@@ -3,7 +3,7 @@
 
 This page and its references include documentation for Link's services and the functionality those services supports.
 
-## Functionality
+## [Functionality](functionality/README.md)
 
 * [Admin UI](functionality/admin_ui.md)
 * [Census Management](functionality/census_management.md)
@@ -37,6 +37,15 @@ This page and its references include documentation for Link's services and the f
 * [Submission](service_specs/submission.md)
 * [Tenant](service_specs/tenant.md)
 * [Validation](service_specs/validation.md)
+
+### Development
+
+The following documentation is specific to development practices and tools used in the Link project.
+
+* [Authorization Policies](development/authorization_policies.md)
+* [API Guidance](development/api_guidance.md)
+* [Logging and Error Handling](development/logging_error_handling.md)
+* [Open Telemetry](./development/otel.md)
 
 ### Service Swagger Specifications
 

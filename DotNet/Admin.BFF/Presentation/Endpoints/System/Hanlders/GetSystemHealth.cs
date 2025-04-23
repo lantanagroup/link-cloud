@@ -16,7 +16,8 @@ public static class GetSystemHealth
         ReportService reportService,
         SubmissionService submissionService,
         TenantService tenantService,
-        MeasureEvalService measureEvalService)
+        MeasureEvalService measureEvalService,
+        ValidationService validationService)
     {
         
         var dotNetHealthCheckTasks = new List<Task<LinkServiceHealthReport>>
@@ -30,6 +31,7 @@ public static class GetSystemHealth
             reportService.LinkServiceHealthCheck(context.RequestAborted),
             submissionService.LinkServiceHealthCheck(context.RequestAborted),
             tenantService.LinkServiceHealthCheck(context.RequestAborted),
+            validationService.LinkServiceHealthCheck(context.RequestAborted)
         };
 
         //if we upgrade to .NET 9, we can use Task.WhenEach
