@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -12,6 +13,7 @@ namespace LantanaGroup.Link.Report.Listeners;
 
 public class ReportSubmittedListener(
     IKafkaConsumerFactory<ReportSubmittedKey, ReportSubmittedValue> kafkaConsumerFactory,
+    ITransientExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> transientExceptionHandler,
     IDeadLetterExceptionHandler<ReportSubmittedKey, ReportSubmittedValue> deadLetterExceptionHandler,
     ILogger<ReportSubmittedListener> logger,
     IDatabase database)
@@ -42,6 +44,16 @@ public class ReportSubmittedListener(
                 try
                 {
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
+                    {
+                        if (result == null)
+                        {
+                            consumer.Commit();
+                            return;
+                        }
+                        
+                        var facilityId = result.Message.Key.FacilityId;
+                        
+                        try
                         {
                             var reportTrackingId = result.Message.Value.ReportTrackingId;
                             var reportSchedule = await database.ReportScheduledRepository
@@ -57,8 +69,30 @@ public class ReportSubmittedListener(
                             
                             reportSchedule.SubmitReportDateTime = DateTime.UtcNow;
                             await database.ReportScheduledRepository.UpdateAsync(reportSchedule, consumeCancellationToken);
-                        },
-                        cancellationToken);
+                        }
+                        catch (DeadLetterException ex)
+                        {
+                            deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                        }
+                        catch (TransientException ex)
+                        {
+                            transientExceptionHandler.HandleException(result, ex, facilityId);
+                        }
+                        catch (TimeoutException ex)
+                        {
+                            var transientException = new TransientException(ex.Message, ex.InnerException);
+                            transientExceptionHandler.HandleException(result, transientException, facilityId);
+                        }
+                        catch (Exception ex)
+                        {
+                            transientExceptionHandler.HandleException(result, ex, facilityId);
+                        }
+                        finally
+                        {
+                            consumer.Commit(result);
+                        }
+                    },
+                    cancellationToken);
                 }
                 catch (ConsumeException ex)
                 {
