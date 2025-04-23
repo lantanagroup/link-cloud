@@ -1,3 +1,6 @@
+GenerateReportRequested:1:1
+GenerateReportRequested-Error:1:1
+GenerateReportRequested-Retry:1:1
 ReportScheduled:1:1
 ReportScheduled-Error:1:1
 ReportScheduled-Retry:1:1

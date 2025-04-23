@@ -1,0 +1,396 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "Patient-ACHMarch1",
+        "text": {
+          "status": "generated",
+          "div": "\u003Cdiv xmlns=\u0022http://www.w3.org/1999/xhtml\u0022\u003E\u003Cdiv class=\u0022hapiHeaderText\u0022\u003EAmy \u003Cb\u003EJACKSON \u003C/b\u003E\u003C/div\u003E\u003Ctable class=\u0022hapiPropertyTable\u0022\u003E\u003Ctbody\u003E\u003Ctr\u003E\u003Ctd\u003EIdentifier\u003C/td\u003E\u003Ctd\u003EMRN-456\u003C/td\u003E\u003C/tr\u003E\u003Ctr\u003E\u003Ctd\u003EDate of birth\u003C/td\u003E\u003Ctd\u003E\u003Cspan\u003E04 April 1964\u003C/span\u003E\u003C/td\u003E\u003C/tr\u003E\u003C/tbody\u003E\u003C/table\u003E\u003C/div\u003E"
+        },
+        "identifier": [
+          {
+            "system": "http://example.org/fhir/identifiers",
+            "value": "MRN-456"
+          }
+        ],
+        "active": true,
+        "name": [
+          {
+            "family": "Jackson",
+            "given": [
+              "Amy"
+            ]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "1964-04-04"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Patient/Patient-ACHMarch1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "Encounter-ACHMarch1",
+        "status": "triaged",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "IMP",
+          "display": "inpatient encounter"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "183452005",
+                "display": "hospital admission (procedure)"
+              }
+            ],
+            "text": "hospital admission (procedure)"
+          }
+        ],
+        "subject": {
+          "reference": "Patient/Patient-ACHMarch1"
+        },
+        "period": {
+          "start": "2025-03-01T19:53:13.000Z",
+          "end": "2025-03-31T15:12:08.000Z"
+        },
+        "location": [
+          {
+            "location": {
+              "reference": "Location/Location-March1"
+            },
+            "status": "active",
+            "period": {
+              "start": "2025-03-01T19:53:13.000Z",
+              "end": "2025-03-31T15:12:08.000Z"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Encounter/Encounter-ACHMarch1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "MR-ACHMarch1",
+        "status": "active",
+        "intent": "order",
+        "medicationReference": {
+          "reference": "Medication/Medication-ACHMarch1"
+        },
+        "subject": {
+          "reference": "Patient/Patient-ACHMarch1"
+        },
+        "authoredOn": "2025-03-02T00:00:00.000Z"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "MedicationRequest/MR-ACHMarch1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "Condition-ACHMarch1",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "resolved",
+              "display": "Resolved"
+            }
+          ],
+          "text": "Resolved"
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "confirmed",
+              "display": "Confirmed"
+            }
+          ],
+          "text": "Confirmed"
+        },
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                "code": "encounter-diagnosis",
+                "display": "Encounter Diagnosis"
+              }
+            ],
+            "text": "Encounter Diagnosis"
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "442311008",
+              "display": "Liveborn born in hospital"
+            }
+          ],
+          "text": "Single liveborn, born in hospital"
+        },
+        "subject": {
+          "reference": "Patient/Patient-ACHMarch1"
+        },
+        "onsetDateTime": "2025-03-03T10:00:00.000Z"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Condition/Condition-ACHMarch1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-ACH-MARCH",
+        "status": "current",
+        "mode": "working",
+        "title": "All Admitted Patients",
+        "code": {
+          "text": "PatientList"
+        },
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/Patient-March1"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/Patient-ACHMarch1"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-ACH-MARCH"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-MARCH-Adhoc",
+        "status": "current",
+        "mode": "working",
+        "title": "All Admitted Patients",
+        "code": {
+          "text": "PatientList"
+        },
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/Patient-March1"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/Patient-ACHMarch1"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-MARCH-Adhoc"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "Patient-March1",
+        "text": {
+          "status": "generated",
+          "div": "\u003Cdiv xmlns=\u0022http://www.w3.org/1999/xhtml\u0022\u003E\u003Cdiv class=\u0022hapiHeaderText\u0022\u003EAmy \u003Cb\u003EJACKSON \u003C/b\u003E\u003C/div\u003E\u003Ctable class=\u0022hapiPropertyTable\u0022\u003E\u003Ctbody\u003E\u003Ctr\u003E\u003Ctd\u003EIdentifier\u003C/td\u003E\u003Ctd\u003EMRN-456\u003C/td\u003E\u003C/tr\u003E\u003Ctr\u003E\u003Ctd\u003EDate of birth\u003C/td\u003E\u003Ctd\u003E\u003Cspan\u003E04 April 1964\u003C/span\u003E\u003C/td\u003E\u003C/tr\u003E\u003C/tbody\u003E\u003C/table\u003E\u003C/div\u003E"
+        },
+        "identifier": [
+          {
+            "system": "http://example.org/fhir/identifiers",
+            "value": "MRN-456"
+          }
+        ],
+        "active": true,
+        "name": [
+          {
+            "family": "Jackson",
+            "given": [
+              "Amy"
+            ]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "1964-04-04"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Patient/Patient-March1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Medication",
+        "id": "Medication-ACHMarch1",
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div class=\"hapiHeaderText\"> insulin aspart protamine, human / insulin aspart, human </div></div>"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "206765",
+              "display": "Prinivil 10 MG Oral Tablet"
+            }
+          ]
+        },
+        "amount": {
+          "numerator": {
+            "value": 1,
+            "unit": "ml",
+            "system": "http://unitsofmeasure.org",
+            "code": "ml"
+          },
+          "denominator": {
+            "value": 1,
+            "system": "http://terminology.hl7.org/CodeSystem/medicationknowledge-package-type",
+            "code": "vial"
+          }
+        },
+        "ingredient": [
+          {
+            "itemCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+                  "code": "206765",
+                  "display": "Prinivil 10 MG Oral Tablet"
+                }
+              ]
+            },
+            "strength": {
+              "numerator": {
+                "value": 2,
+                "system": "http://unitsofmeasure.org",
+                "code": "mg"
+              },
+              "denominator": {
+                "value": 1,
+                "system": "http://unitsofmeasure.org",
+                "code": "mL"
+              }
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Medication/Medication-ACHMarch1"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Location",
+        "id": "Location-March1",
+        "extension": [
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-hospital-beds",
+            "valueInteger": 99
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-adult-hospital-beds",
+            "valueInteger": 85
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-inpatient-beds",
+            "valueInteger": 90
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-adult-inpatient-beds",
+            "valueInteger": 89
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-inpatient-bed-occupancy",
+            "valueInteger": 78
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/all-adult-inpatient-bed-occupancy",
+            "valueInteger": 75
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/icu-beds",
+            "valueInteger": 12
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/icu-adult-beds",
+            "valueInteger": 8
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/icu-bed-occupancy",
+            "valueInteger": 9
+          },
+          {
+            "url": "http://cdc.org/fhir/us/impact/StructureDefinition/icu-adult-bed-occupancy",
+            "valueInteger": 7
+          }
+        ],
+        "identifier": [
+          {
+            "value": "Hospital Location"
+          }
+        ],
+        "status": "active",
+        "name": "Any Hospital",
+        "description": "This is the physical location of Any Hospital",
+        "mode": "instance",
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                "code": "HOSP",
+                "display": "Hospital"
+              }
+            ]
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-555-5555",
+            "use": "work"
+          }
+        ],
+        "address": {
+          "use": "work",
+          "line": [
+            "101 Main St."
+          ],
+          "city": "Denver",
+          "state": "CO",
+          "postalCode": "9105 PZ",
+          "country": "US"
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Location/Location-March1"
+      }
+    }
+  ]
+}
