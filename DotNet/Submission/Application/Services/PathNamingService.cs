@@ -1,4 +1,5 @@
 using Hl7.FhirPath.Sprache;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Submission.Application.Config;
 using Microsoft.Extensions.Options;
 
@@ -48,8 +49,10 @@ public class PathNamingService(IOptions<SubmissionServiceConfig> config, ILogger
     public string GetSubmissionDirectoryName(string facilityId, IEnumerable<string> measures, DateTime startDate,
         DateTime endDate, string reportId)
     {
+        string sanitizedReportId = reportId.SanitizeAndRemove();
+        
         //Per 2153, don't build with the trailing timestamp
         string measureShortNames = GetMeasuresShortName(measures);
-        return $"{facilityId}-{measureShortNames}-{startDate.ToString(DirectoryDateFormat)}-{endDate.ToString(DirectoryDateFormat)}_{reportId}";
+        return $"{facilityId}-{measureShortNames}-{startDate.ToString(DirectoryDateFormat)}-{endDate.ToString(DirectoryDateFormat)}_{sanitizedReportId}";
     }
 }

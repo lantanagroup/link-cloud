@@ -17,7 +17,7 @@ public class HtmlInputSanitizerTest
     public void TestSanitizeAndRemove(string input, string expected)
     {
         // Act
-        var result = HtmlInputSanitizer.SanitizeAndRemove(input);
+        var result = input.SanitizeAndRemove();
 
         // Assert
         Assert.Equal(expected, result);

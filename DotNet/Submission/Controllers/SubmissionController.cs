@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Services;
 using Link.Authorization.Policies;
@@ -33,12 +34,7 @@ public class SubmissionController(
     [HttpGet("{facilityId}/{reportId}")]
     public async Task<IActionResult> DownloadReport([FromRoute] string facilityId, [FromRoute] string reportId)
     {
-        string sanitizedFacilityId = facilityId
-            .Replace("\n", "")
-            .Replace("\r", "")
-            .Replace("\\", "")
-            .Replace("/", "")
-            .Replace("..", "");
+        string sanitizedFacilityId = facilityId.SanitizeAndRemove();
         
         if (string.IsNullOrEmpty(serviceRegistry.Value?.ReportServiceApiUrl))
         {
