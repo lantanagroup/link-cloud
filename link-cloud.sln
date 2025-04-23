@@ -129,7 +129,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{554985B2
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedTests", "DotNet\SharedTests\SharedTests.csproj", "{B409C886-429B-4DF2-9F32-00347FDAF99B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Terminology", "Terminology\Terminology.csproj", "{DE64D1E3-0B99-47D9-978D-14639A2019BE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Terminology", "DotNet\Terminology\Terminology.csproj", "{DE64D1E3-0B99-47D9-978D-14639A2019BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

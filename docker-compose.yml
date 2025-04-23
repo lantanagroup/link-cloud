@@ -27,6 +27,7 @@ version: '3.4'
 ## submission: 8073
 ## tenant: 8074
 ## validation: 8075
+## terminology: 8076
 
 services:
   
@@ -935,6 +936,37 @@ services:
       timeout: 10s
       retries: 15
 
+  terminology:
+    image: link-terminology
+    container_name: link-terminology
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Terminology__Path: "/data"
+      ServiceInformation__Name: Link Terminology
+      ServiceInformation__Version: 1.1.00-dev
+      Serilog__WriteTo__0__Args__uri: http://loki:3100
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      EnableSwagger: true
+      Authentication__EnableAnonymousAccess: true
+    volumes:
+      - terminology_data:/data
+    ports:
+      - "8076:8076"
+    build:
+      context: .
+      dockerfile: DotNet/Terminology/Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8074/health"]
+
 networks:
   link-nw:
      
@@ -950,4 +982,6 @@ volumes:
   submission_data:
     driver: local
   fhir_data:
+    driver: local
+  terminology_data:
     driver: local

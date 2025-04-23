@@ -1,8 +1,13 @@
 using System.Reflection;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -17,6 +22,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     
     builder.Services.AddHttpClient();
 
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
+
     builder.Services.AddControllers(options =>
     {
         options.ModelBinderProviders.Insert(0, new FhirModelBinderProvider());
@@ -29,6 +46,41 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        if (!allowAnonymousAccess)
+        {
+            #region Authentication Schemas
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+
+            #endregion
+        }
+
+        c.EnableAnnotations();
+        //c.SwaggerDoc("v1", new OpenApiInfo { Title = "Link Terminology", Version = "3.1.0" });
+        
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
@@ -80,9 +132,23 @@ static void SetupMiddleware(WebApplication app)
 {
     // Configure the HTTP request pipeline.
     app.ConfigureSwagger();
+
+    //map health check middleware
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+    });
     
     app.UseRouting();            
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
+    
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
     
     app.MapControllers();
 }

@@ -156,7 +156,7 @@ public class CodeGroupCacheService(
         }
                     
         SetCodeGroup(codeGroup);
-        logger.LogInformation("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
+        logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
 
     private void ProcessCodeSystemCsv(CodeGroup codeGroup, CsvReader csv)
@@ -180,7 +180,7 @@ public class CodeGroupCacheService(
         }
             
         SetCodeGroup(codeGroup);
-        logger.LogInformation("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+        logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
 
     public async void LoadCache()
@@ -194,17 +194,21 @@ public class CodeGroupCacheService(
         }
         
         var directories = Directory.GetDirectories(_terminologyConfig.Path);
+        int loadedValueSets = 0;
+        int loadedCodeSystems = 0;
+        List<string> notLoadedDirectories = new List<string>();
 
         foreach (var directory in directories)
         {
             var jsonFilePaths = Directory.GetFiles(directory, "*.json");
             var csvFilePaths = Directory.GetFiles(directory, "*.csv");
             
-            logger.LogInformation("Loading code group from {Directory}", directory);
+            logger.LogDebug("Loading code group from {Directory}", directory);
             
             if (jsonFilePaths.Length == 0 || csvFilePaths.Length == 0)
             {
                 logger.LogWarning("Directory {Directory} does not contain a JSON or CSV file", directory);
+                notLoadedDirectories.Add(directory);
                 continue;
             }
             
@@ -222,12 +226,14 @@ public class CodeGroupCacheService(
                     switch (codeGroup.Type)
                     {
                         case CodeGroup.CodeGroupTypes.CodeSystem:
-                            logger.LogInformation("Processing code system CSV for {CodeSystem}", codeGroup.Id);
+                            logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
                             this.ProcessCodeSystemCsv(codeGroup, csv);
+                            loadedCodeSystems++;
                             break;
                         case CodeGroup.CodeGroupTypes.ValueSet:
-                            logger.LogInformation("Processing value set CSV for {ValueSet}", codeGroup.Id);
+                            logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
                             this.ProcessValueSetCsv(codeGroup, csv);
+                            loadedValueSets++;
                             break;
                         default:
                             logger.LogWarning("Code group type {Type} is not supported", codeGroup.Type);
@@ -240,5 +246,10 @@ public class CodeGroupCacheService(
                 logger.LogError(ex, "Error loading code group from {JsonFilePath}", jsonFilePath);
             }
         }
+        
+        logger.LogInformation($"Loaded {loadedValueSets} value sets and {loadedCodeSystems} code systems for a total of {loadedValueSets + loadedCodeSystems} code groups.");
+        
+        if (notLoadedDirectories.Count > 0)
+            logger.LogWarning($"{notLoadedDirectories.Count} code groups were not loaded from the directory:\n- {String.Join("\n- ", notLoadedDirectories)}");
     }
 }
