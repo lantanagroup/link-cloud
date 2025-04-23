@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
         public DateTime? EndDate { get; set; }
         public List<string>? ReportTypes { get; set; }
         public List<string>? PatientIds { get; set; }
+        public bool Regenerate { get; set; } = false;
         public bool BypassSubmission { get; set; }
     }
 }

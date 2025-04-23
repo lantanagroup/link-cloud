@@ -16,7 +16,7 @@ while true; do
   unhealthy_services=0
 
   # Get correct container names (avoids JSON formatting issues)
-  containers=$(docker ps --filter "name=${PROJECT_NAME}-" --format '{{.Names}}')
+  containers=$(docker ps --filter "name=${PROJECT_NAME}|fhir-" --format '{{.Names}}')
   
   for container in $containers; do
     if [[ "$container" == "${PROJECT_NAME}-admin-ui" ]]; then
