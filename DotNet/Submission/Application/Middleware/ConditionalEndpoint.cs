@@ -36,6 +36,7 @@ public class ConditionalEndpoint(RequestDelegate next, IConfiguration configurat
                     {
                         logger.LogWarning("Request to download report is rejected due to configuration.");
                         await this.SetResponseNotEnabled(context);
+                        return;
                     }
                 }
             }

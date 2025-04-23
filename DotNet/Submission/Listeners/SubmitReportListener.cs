@@ -20,6 +20,7 @@ using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using Task = System.Threading.Tasks.Task;
@@ -163,7 +164,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
                                 string submissionDirectoryName = _pathNamingService.GetSubmissionDirectoryName(
-                                    facilityId,
+                                    facilityId.SanitizeAndRemove(),
                                     value.MeasureIds,
                                     key.StartDate,
                                     key.EndDate,
