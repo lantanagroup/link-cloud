@@ -1,3 +1,26 @@
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    discover-composite:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+    diskspace:
+      enabled: false
+    mongo:
+      enabled: false
+    kafka:
+      enabled: true  # Ensures Kafka health is checked
+
 logging:
   level:
     com.lantanagroup.link: debug
@@ -20,6 +43,10 @@ springdoc:
     enabled: false
 
 spring:
+
+  cloud:
+    discovery:
+      enabled: false
 
   application:
     name: measureeval
