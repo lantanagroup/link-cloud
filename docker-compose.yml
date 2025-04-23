@@ -1,6 +1,7 @@
 version: '3.4'
 
 #### services and ports
+## fhir_server: 6157
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017
@@ -28,6 +29,36 @@ version: '3.4'
 ## validation: 8075
 
 services:
+  
+  ###########################################
+  ### FHIR Server (HAPI) - For testing
+  ###########################################
+  fhir_server:
+    image: hapiproject/hapi:latest
+    container_name: fhir-server
+    ports:
+      - "6157:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.allow_multiple_delete=true
+      - hapi.fhir.allow_external_references=true
+      - hapi.fhir.allow_cascading_deletes=true
+      - hapi.fhir.delete_enabled=true
+      - hapi.fhir.expunge_enabled=true
+      - hapi.fhir.enforce_referential_integrity_on_delete=false
+      - hapi.fhir.delete_expunge_enabled=true
+      - hapi.fhir.reuse_cached_search_results_millis=0
+      - hapi.fhir.subscription_enabled=false
+    volumes:
+      - fhir_data:/data
+      - ./healthcheck-1.0.0.jar:/app/healthcheck.jar:ro
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
+      interval: 3s
+      timeout: 10s
+      retries: 15
       
   ###########################################
   ### Redis Cache
@@ -619,6 +650,7 @@ services:
       link.data-acquisition.base-url: http://dataacquisition:8065
       spring_profiles_active: dev
       loki.enabled: false
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8067:8067"
     build:
@@ -635,6 +667,9 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
+      interval: 3s
+      timeout: 10s
+      retries: 15  
       
   normalization:
     image: link-normalization
@@ -742,6 +777,7 @@ services:
       ServiceRegistry__TenantService__GetTenantRelativeEndpoint: facility/
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Logging__LogLevel__LantanaGroup.Link.Report: DEBUG
     ports:
       - "8072:8072"
     build:
@@ -778,10 +814,8 @@ services:
       # DatabaseProvider: SqlServer
       # AutoMigrate: true
       # ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      SubmissionServiceConfig__ReportServiceUrl: http://report:8072/api/Report
-      SubmissionServiceConfig__CensusUrl: http://census:8064/api/Census
-      SubmissionServiceConfig__DataAcquisitionUrl: http://dataacquisition:8065/api
-      SubmissionServiceConfig__SubmissionDirectory: submissions
+      ServiceRegistry__ReportServiceUrl: http://report:8072
+      SubmissionServiceConfig__SubmissionDirectory: /data/submission
       SubmissionServiceConfig__PatientBundleBatchSize: 5
       SubmissionServiceConfig__MeasureNames__0__Url: http://www.cdc.gov/nhsn/fhirportal/dqm/ig/Measure/NHSNdQMAcuteCareHospitalInitialPopulation
       SubmissionServiceConfig__MeasureNames__0__MeasureId: NHSNdQMAcuteCareHospitalInitialPopulation
@@ -798,6 +832,8 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
       Authentication__EnableAnonymousAccess: true
+      Features__DownloadReportEnabled: true
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8073:8073"
     build:
@@ -806,7 +842,7 @@ services:
     networks:
       - link-nw
     volumes: 
-      - submission_data:/data/Submission
+      - submission_data:/data/submission
     depends_on:
       kafka_init:
         condition: service_completed_successfully
@@ -879,6 +915,8 @@ services:
       spring_profiles_active: dev
       loki.enabled: false
       loki.url: http://loki:3100
+      LINK_REPORT_BASE-URL: http://report:8072
+      Logging__LogLevel__LantanaGroup.Link: DEBUG
     ports:
       - "8075:8075"
     build:
@@ -893,6 +931,9 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
+      interval: 3s
+      timeout: 10s
+      retries: 15
 
 networks:
   link-nw:
@@ -907,4 +948,6 @@ volumes:
   mongo_data:
     driver: local
   submission_data:
+    driver: local
+  fhir_data:
     driver: local

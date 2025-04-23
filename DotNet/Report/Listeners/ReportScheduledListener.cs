@@ -186,7 +186,6 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 _logger.LogError(oce, $"Operation Canceled: {oce.Message}");
                 consumer.Close();
-                consumer.Dispose();
             }
 
         }
