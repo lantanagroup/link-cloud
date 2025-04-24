@@ -75,9 +75,10 @@ steps:
         # echo "Pipeline.Workspace"
         # echo $(Pipeline.Workspace)
         # ls $(Pipeline.Workspace)
-        cd /home/vsts/work/1/a
+        cd "/home/vsts/work/1/a"
         ls
-        dir
+        cd "/home/vsts/work/1/s"
+        ls
 
 #   - task: PowerShell@2
 #     inputs:
