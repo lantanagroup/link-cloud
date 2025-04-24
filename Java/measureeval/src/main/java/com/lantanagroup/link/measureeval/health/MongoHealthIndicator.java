@@ -1,4 +1,4 @@
-package com.lantanagroup.link.shared.health;
+package com.lantanagroup.link.measureeval.health;
 
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
