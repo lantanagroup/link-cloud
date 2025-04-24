@@ -168,7 +168,7 @@ if (consumerSettings != null && !consumerSettings.DisableConsumer)
 
 if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
 {
-    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue(), KafkaTopic.GenerateReportRequestedRetry.GetStringValue(), KafkaTopic.ValidationCompleteRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(QueryDispatchConstants.ServiceName, [KafkaTopic.ReportScheduledRetry.GetStringValue(), KafkaTopic.PatientEventRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<RetryJob>();
