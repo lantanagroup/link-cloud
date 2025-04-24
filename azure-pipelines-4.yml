@@ -80,8 +80,8 @@ steps:
         echo CD
         cd "/home/vsts/work/1/s"
         ls
-        $old = get-content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json" | select-string -pattern "GitComm"
-        $new = '    "GitCommit": "11115"'
+        ${old} = get-content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json" | select-string -pattern "GitComm"
+        ${new} = '    "GitCommit": "11115"'
         (Get-Content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json") | ForEach-Object { $_ -replace ${old}, ${new} } | Set-Content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json"
         
         echo "Getting Contents"
