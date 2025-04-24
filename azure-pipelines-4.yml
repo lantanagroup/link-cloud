@@ -37,7 +37,7 @@ variables:
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 - name: colon
-  value: ': '
+  value: '": ${GIT_COMMIT}"'
   
 steps:
 
@@ -86,7 +86,7 @@ steps:
         $gitcommit = '"GitCommit"'
 
         $plus2 = '"${GIT_COMMIT}"'
-        $new = $gitcommit + ${colon} + $plus2
+        $new = $gitcommit + ${colon}
         (Get-Content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json") | ForEach-Object { $_ -replace ${old}, ${new} } | Set-Content -Path "/home/vsts/work/1/s/DotNet/Account/appsettings.json"
         
         echo "Getting Contents"
