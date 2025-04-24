@@ -69,8 +69,12 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
+        echo "Build.ArtifactStagingDirectory"
         echo $(Build.ArtifactStagingDirectory)
         ls $(Build.ArtifactStagingDirectory)
+        echo "Pipeline.Workspace"
+        echo $(Pipeline.Workspace)
+        ls $(Pipeline.Workspace)
 
 #   - task: PowerShell@2
 #     inputs:
