@@ -37,7 +37,7 @@ variables:
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
 - name: colon
-  value: '": ${GIT_COMMIT}"'
+  value: "':' ${GIT_COMMIT}"
   
 steps:
 
