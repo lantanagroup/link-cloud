@@ -69,14 +69,15 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        # echo "Build.ArtifactStagingDirectory"
+        echo BSD
+        echo $(Build.SourcesDirectory)
+        ls
         # echo $(Build.ArtifactStagingDirectory)
         # ls $(Build.ArtifactStagingDirectory)
         # echo "Pipeline.Workspace"
         # echo $(Pipeline.Workspace)
         # ls $(Pipeline.Workspace)
-        cd "/home/vsts/work/1/a"
-        ls
+        echo CD
         cd "/home/vsts/work/1/s"
         ls
 
