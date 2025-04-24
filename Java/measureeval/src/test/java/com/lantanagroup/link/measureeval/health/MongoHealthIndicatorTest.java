@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.health;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.actuate.health.Status;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.boot.actuate.health.Health;
 
@@ -29,7 +30,7 @@ public class MongoHealthIndicatorTest {
         Health health = mongoHealthIndicator.health();
 
         // Assert
-        //assertEquals(Status.UP, health.getStatus());
+        assertEquals(Status.UP, health.getStatus());
         assertEquals("{Database=Available}", health.getDetails().toString());
     }
 
@@ -43,7 +44,7 @@ public class MongoHealthIndicatorTest {
         Health health = mongoHealthIndicator.health();
 
         // Assert
-       // assertEquals(Status.DOWN, health.getStatus());
+        assertEquals(Status.DOWN, health.getStatus());
         assertEquals("{Database=Unavailable}", health.getDetails().toString());
     }
 }
