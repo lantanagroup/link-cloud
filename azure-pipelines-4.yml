@@ -86,12 +86,11 @@ steps:
         # Load the JSON file
         echo "Load the JSON file"
         $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
-
+        $json.ServiceInformation.GitCommit = $newCommit
 
         $newCommit = "123"
         
         
-        ``$json.ServiceInformation.GitCommit = $newCommit
         $json | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
 
         
