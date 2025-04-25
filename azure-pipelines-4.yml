@@ -87,6 +87,7 @@ steps:
         echo "Load the JSON file"
         $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
 
+
         $newCommit = $env:GIT_COMMIT
         $json.ServiceInformation.GitCommit = $newCommit
         $json | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
