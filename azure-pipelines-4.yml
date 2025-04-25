@@ -66,6 +66,14 @@ steps:
 #     displayName: 'Run Tests'
 
   - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        cd $(Build.SourcesDirectory)
+        ls
+
+
+  - task: PowerShell@2
     displayName: "Run git_commit.ps1 Script"
     inputs:
       targetType: 'filePath'
