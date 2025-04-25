@@ -33,6 +33,8 @@ variables:
   value: '**/DotNet/Admin.BFF/Dockerfile'
 - name: containerRegistry
   value: 'NHSNLink ACR Premium'
+- name: serviceName
+  value: 'Admin.BFF'
 
 steps:
   - task: DotNetCoreCLI@2
