@@ -77,7 +77,7 @@ steps:
     displayName: "Run git_commit.ps1 Script"
     inputs:
       targetType: 'filePath'
-      filePath: '$(Build.SourcesDirectory)/Azure_Pipelines/scripts/git_commit.ps1'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
       pwsh: true
 
 
