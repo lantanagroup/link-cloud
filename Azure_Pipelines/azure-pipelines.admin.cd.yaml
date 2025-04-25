@@ -69,7 +69,7 @@ steps:
         Write-Host "Set MyTag to: $myTag1"  
 
   - task: PowerShell@2
-    displayName: "Run git_commit.ps1 Script"
+    displayName: "AppSettings Injection"
     inputs:
       targetType: 'filePath'
       filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
