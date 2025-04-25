@@ -929,6 +929,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      report:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
       interval: 3s
