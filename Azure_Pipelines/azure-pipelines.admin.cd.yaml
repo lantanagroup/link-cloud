@@ -67,6 +67,14 @@ steps:
         }
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"  
+
+  - task: PowerShell@2
+    displayName: "Run git_commit.ps1 Script"
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
+      pwsh: true
+
   - task: Docker@2
     displayName: "Build & Push Docker Image"
     condition: always()
