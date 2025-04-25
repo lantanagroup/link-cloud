@@ -57,7 +57,7 @@ services:
     healthcheck:
       test: ["CMD", "java", "-jar", "/app/healthcheck.jar", "http://localhost:8080/fhir/metadata"]
       interval: 3s
-      timeout: 10s
+      timeout: 3s
       retries: 15
       
   ###########################################
@@ -103,7 +103,7 @@ services:
       interval: 10s
       retries: 50
       start_period: 30s
-      timeout: 30s
+      timeout: 10s
     networks:
       - link-nw
       
@@ -254,7 +254,7 @@ services:
      healthcheck:
       test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka-broker:9092 --command-config /etc/kafka-client.properties --list" ]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 5
      
   kafka_init:
@@ -668,7 +668,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8067/health"]
       interval: 3s
-      timeout: 10s
+      timeout: 3s
       retries: 15  
       
   normalization:
@@ -932,7 +932,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
       interval: 3s
-      timeout: 10s
+      timeout: 3s
       retries: 15
 
 networks:
