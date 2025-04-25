@@ -1,5 +1,7 @@
 ﻿using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -15,12 +17,12 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 public class LogController : Controller
 {
     private readonly ILogger<LogController> _logger;
-    private readonly IDataAcquisitionLogManager _logManager;
+    private readonly IDataAcquisitionLogService _logService;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogManager logManager)
+    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
     }
 
     /// <summary>
@@ -37,13 +39,13 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<DataAcquisitionLog>> GetLogEntryById(
+    public async Task<ActionResult<DataAcquisitionLogModel>> GetLogEntryById(
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
         try
         {
-            var logEntry = await _logManager.GetAsync(id, cancellationToken);
+            var logEntry = await _logService.GetLogEntryById(id, cancellationToken);
             if (logEntry == null)
             {
                 return NotFound();

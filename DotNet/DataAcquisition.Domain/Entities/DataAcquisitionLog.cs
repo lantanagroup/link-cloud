@@ -1,7 +1,7 @@
-﻿using DataAcquisition.Domain.Models.Enums;
+﻿using DataAcquisition.Domain.Models;
+using DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Domain.Entities;
 using System.ComponentModel.DataAnnotations.Schema;
 
