@@ -10,4 +10,4 @@ $new = "12344"
 
 (Get-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/Account/appsettings.json") | ForEach-Object { $_ -replace $old, $new } | Set-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/Account/appsettings.json"
 
-Write-Host $json
+echo $json
