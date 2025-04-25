@@ -57,6 +57,20 @@
       </li>
       <li class="nav-item dropdown">
         <a href="#">
+          <span class="material-icons nav-icon">folder_open</span>
+          Reports
+        </a>
+        <ul class="dropdown-menu">
+          <li>
+            <a [routerLink]="['/reports/generate-report']" routerLinkActive="active">
+              <span class="material-icons nav-icon">edit</span>
+              Generate new report
+            </a>
+          </li>
+        </ul>
+      </li>
+      <li class="nav-item dropdown">
+        <a href="#">
             <span class="material-icons nav-icon">monitor_heart</span>
             Link Monitor
         </a>
