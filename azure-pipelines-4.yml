@@ -88,7 +88,7 @@ steps:
         $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
 
 
-        $newCommit = $env:GIT_COMMIT
+        $newCommit = "123"
         
         
         ``$json.ServiceInformation.GitCommit = $newCommit
