@@ -11,6 +11,6 @@ $old = $json.ServiceInformation.GitCommit
 
 $new = "$env:GIT_COMMIT"
 
-(Get-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/$env:SERVICENAME/appsettings.json") | ForEach-Object { $_ -replace $old, $new } | Set-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/Account/appsettings.json"
+(Get-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/$env:SERVICENAME/appsettings.json") | ForEach-Object { $_ -replace $old, $new } | Set-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/$env:SERVICENAME/appsettings.json"
 
 Get-Content -Path "$env:BUILD_SOURCESDIRECTORY/DotNet/$env:SERVICENAME/appsettings.json"
