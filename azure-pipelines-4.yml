@@ -88,7 +88,7 @@ steps:
         $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
 
         #Current Value
-        $json.ServiceInformation.PSObject.Properties["GitCommit"].Value = $newCommit
+        ``$json.ServiceInformation.PSObject.Properties["GitCommit"].Value = $newCommit
         echo $newCommit
 
         #New Value
