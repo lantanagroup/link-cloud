@@ -74,7 +74,7 @@ steps:
 
 
   - task: PowerShell@2
-    displayName: "Run git_commit.ps1 Script"
+    displayName: "Updating APPSETTINGS.JSON with GitCommit"
     inputs:
       targetType: 'filePath'
       filePath: '$(Build.SourcesDirectory)/Scripts/git_commit.ps1'
