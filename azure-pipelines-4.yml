@@ -66,40 +66,13 @@ steps:
 #     displayName: 'Run Tests'
 
   - task: PowerShell@2
+    displayName: "Run git_commit.ps1 Script"
     inputs:
-      targetType: 'inline'
-      script: |
-        echo BSD
-        echo $(Build.SourcesDirectory)
-        ls
-        # echo $(Build.ArtifactStagingDirectory)
-        # ls $(Build.ArtifactStagingDirectory)
-        # echo "Pipeline.Workspace"
-        # echo $(Pipeline.Workspace)
-        # ls $(Pipeline.Workspace)
-        echo CD
-        cd "/home/vsts/work/1/s"
-        ls
-        # Path to your JSON file
-        $jsonPath = "$(Build.SourcesDirectory)/DotNet/Account/appsettings.json"
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/Azure_Pipelines/scripts/git_commit.ps1'
+      pwsh: true
 
-        # Load the JSON file
-        echo "Load the JSON file"
-        $json = Get-Content $jsonPath -Raw | ConvertFrom-Json
 
-        #Current Value
-        ``$json.ServiceInformation.PSObject.Properties["GitCommit"].Value = $newCommit
-        echo $newCommit
-
-        #New Value
-        $newCommit = "123"
-        echo $newCommit
-        
-        $json | ConvertTo-Json -Depth 10 | Set-Content $jsonPath
-
-        
-        echo "Getting Contents"
-        Get-Content -Path "$(Build.SourcesDirectory)/DotNet/Account/appsettings.json
 
 #   - task: PowerShell@2
 #     inputs:
