@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -79,8 +80,8 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<QueryLogSummaryModelResponse>> GetQueryLogSummariesForFacility(
-        [FromRoute] string id,
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
+        [FromRoute] string facilityId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string sortBy = "ExecutionDate",
@@ -89,7 +90,7 @@ public class LogController : Controller
     {
         try
         {
-            var summary = await _logService.GetLogEntryById(id, cancellationToken);
+            var summary = await _logService.GetQueryLogSummariesForFacility(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
             if (summary == null)
             {
                 return NotFound();

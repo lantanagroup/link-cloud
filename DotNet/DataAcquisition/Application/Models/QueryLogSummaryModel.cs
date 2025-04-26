@@ -1,6 +1,7 @@
 ﻿using DataAcquisition.Domain.Entities;
 using DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Models;
@@ -38,8 +39,8 @@ public record QueryLogSummaryModel
     }
 }
 
-public record QueryLogSummaryModelResponse
+public class QueryLogSummaryModelResponse : IPagedModel<QueryLogSummaryModel>
 {
-    public PaginationMetadata PaginationMetadata { get; init; } = null!;
-    public List<QueryLogSummaryModel> QueryLogSummaries { get; init; } = null!;
+    public List<QueryLogSummaryModel> Records { get; set; }
+    public PaginationMetadata Metadata { get; set; }
 }
