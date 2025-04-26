@@ -1,7 +1,9 @@
 ﻿using DataAcquisition.Domain;
 using DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
-
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
 
@@ -11,6 +13,7 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<(List<DataAcquisitionLog>, PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -20,7 +23,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
     {
-        if(log == null)
+        if (log == null)
         {
             throw new ArgumentNullException(nameof(log));
         }
@@ -37,6 +40,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default)
     {
         return await _database.DataAcquisitionLogRepository.GetAsync(id, cancellationToken);
+    }
+
+    public async Task<(List<DataAcquisitionLog>,PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
+    {
+        return await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower(), sortBy, sortOrder, page, pageSize, cancellationToken);
     }
 
     public async Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)

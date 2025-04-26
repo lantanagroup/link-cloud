@@ -1,11 +1,13 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
 public interface IDataAcquisitionLogService
 {
     Task<DataAcquisitionLogModel> GetLogEntryById(string id, CancellationToken cancellationToken = default);
+    Task<QueryLogSummaryModelResponse> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -22,5 +24,15 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     public async Task<DataAcquisitionLogModel> GetLogEntryById(string id, CancellationToken cancellationToken = default)
     {
         return DataAcquisitionLogModel.FromDomain(await _dataAcquisitionLogManager.GetAsync(id, cancellationToken));
+    }
+
+    public async Task<QueryLogSummaryModelResponse> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
+    {
+        var result = await _dataAcquisitionLogManager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
+        return new QueryLogSummaryModelResponse
+        {
+            QueryLogSummaries = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
+            PaginationMetadata = result.Item2
+        };
     }
 }

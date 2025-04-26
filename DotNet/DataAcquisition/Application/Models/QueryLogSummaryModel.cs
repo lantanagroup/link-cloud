@@ -1,0 +1,45 @@
+﻿using DataAcquisition.Domain.Entities;
+using DataAcquisition.Domain.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+
+namespace LantanaGroup.Link.DataAcquisition.Application.Models;
+
+public record QueryLogSummaryModel
+{
+    public string Id { get; init; } = null!;
+    public AcquisitionPriorityModel Priority { get; init; }
+    public string FacilityId { get; init; } = null!;
+    public string PatientId { get; init; } = null!;
+    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; init; } = null!;
+    public string? ResourceId { get; init; } = null!;
+    public string FhirVersion { get; init; } = null!;
+    public FhirQueryTypeModel QueryType { get; init; }
+    public QueryPhaseModel QueryPhase { get; init; }
+    public DateTime? ExecutionDate { get; init; }
+    public RequestStatusModel Status { get; init; }
+
+    public static QueryLogSummaryModel FromDomain(DataAcquisitionLog log)
+    {
+        return new QueryLogSummaryModel
+        {
+            Id = log.Id,
+            Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
+            FacilityId = log.FacilityId,
+            PatientId = log.PatientId,
+            ResourceTypes = log.FhirQuery.FirstOrDefault()?.ResourceTypes,
+            ResourceId = log.FhirQuery.FirstOrDefault().ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient ? log.PatientId : log.QueryType == FhirQueryType.Read ? log.FhirQuery.FirstOrDefault().QueryParameters[0] : string.Empty,
+            FhirVersion = log.FhirVersion,
+            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.Value),
+            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.Value),
+            ExecutionDate = log.ExecutionDate,
+            Status = RequestStatusModelUtilities.FromDomain(log.Status.Value)
+        };
+    }
+}
+
+public record QueryLogSummaryModelResponse
+{
+    public PaginationMetadata PaginationMetadata { get; init; } = null!;
+    public List<QueryLogSummaryModel> QueryLogSummaries { get; init; } = null!;
+}

@@ -7,6 +7,7 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
@@ -26,7 +27,7 @@ public class LogController : Controller
     }
 
     /// <summary>
-    /// Get a list of data acquisition logs.
+    /// Get a data acquisition log entry.
     /// </summary>
     /// <remarks>
     /// This endpoint retrieves a list of data acquisition logs.
@@ -52,6 +53,49 @@ public class LogController : Controller
             }
 
             return Ok(logEntry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+    }
+
+    /// <summary>
+    /// Get a list of data acquisition logs for a facility.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint retrieves a list of data acquisition logs.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="id"> The ID of the log entry to retrieve.</param>
+    /// <param name="page">The page number to retrieve.</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="sortBy">The field to sort by.</param>
+    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
+    /// <returns>A list of data acquisition logs.</returns>
+    [HttpGet("facility/{facilityId}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<QueryLogSummaryModelResponse>> GetQueryLogSummariesForFacility(
+        [FromRoute] string id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string sortBy = "ExecutionDate",
+        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var summary = await _logService.GetLogEntryById(id, cancellationToken);
+            if (summary == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(summary);
         }
         catch (Exception ex)
         {
