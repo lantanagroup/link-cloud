@@ -1,11 +1,8 @@
 ﻿using DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
@@ -45,6 +42,11 @@ public class LogController : Controller
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return BadRequest("ID cannot be null or empty.");
+        }
+
         try
         {
             var logEntry = await _logService.GetLogEntryById(id, cancellationToken);
@@ -58,7 +60,7 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 
@@ -88,6 +90,11 @@ public class LogController : Controller
         [FromQuery] SortOrder sortOrder = SortOrder.Descending,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest($"{nameof(facilityId)} cannot be null or empty.");
+        }
+
         try
         {
             var summary = await _logService.GetQueryLogSummariesForFacility(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
@@ -101,7 +108,7 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
-            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 }
