@@ -34,8 +34,8 @@ variables:
   value: 'link-account'
 - name: dockerPath
   value: '**/DotNet/Account/Dockerfile'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
+# - name: containerRegistry
+#   value: 'NHSNLink ACR'
   
 steps:
 
