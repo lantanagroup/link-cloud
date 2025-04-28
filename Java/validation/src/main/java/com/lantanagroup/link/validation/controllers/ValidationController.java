@@ -7,21 +7,18 @@ import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.entities.ResultSummary;
 import com.lantanagroup.link.validation.services.CategorizationService;
+import com.lantanagroup.link.validation.services.MetricService;
 import com.lantanagroup.link.validation.services.ValidationService;
-import io.opentelemetry.api.common.Attributes;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import io.opentelemetry.api.metrics.LongCounter;
-import io.opentelemetry.api.metrics.Meter;
-import io.opentelemetry.api.metrics.DoubleHistogram;
 
 import java.util.List;
 import java.util.Map;
@@ -37,24 +34,17 @@ public class ValidationController {
     private final FhirContext fhirContext;
     private final ValidationService validationService;
     private final CategorizationService categorizationService;
-    private final LongCounter validationResultsCounter;
-    private final DoubleHistogram validationDurationHistogram;
+    private final MetricService metricService;
 
     public ValidationController(
             FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
-            Meter meter) {
+            MetricService metricService) {
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
-        this.validationResultsCounter = meter.counterBuilder("validation.results.count")
-                .setDescription("Number of validation results")
-                .build();
-        this.validationDurationHistogram = meter.histogramBuilder("validation.duration")
-                .setDescription("Time taken to validate resource")
-                .setUnit("s")
-                .build();
+        this.metricService = metricService;
     }
 
     private List<ResultSummary> summarize(List<Result> results, Function<Result, Stream<String>> mapper) {
@@ -101,15 +91,15 @@ public class ValidationController {
         try (Timer timer = Timer.start()) {
             results = validationService.validate(resource);
 
-            validationResultsCounter.add(results.size());
-            validationDurationHistogram.record(timer.getSeconds());
+            metricService.getValidationResultsCounter().add(results.size());
+            metricService.getValidationDurationUpDown().add((long) timer.getSeconds());
             logger.info("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
         }
 
         if (categorize) {
             try (Timer timer = Timer.start()) {
                 categorizationService.categorize(results);
-                validationDurationHistogram.record(timer.getSeconds());
+                metricService.getCategorizationDurationUpDown().add((long) timer.getSeconds());
                 logger.info("Categorization completed in {} seconds", String.format("%.2f", timer.getSeconds()));
             }
 
