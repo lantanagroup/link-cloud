@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
 
@@ -9,6 +10,7 @@ public interface IDataAcquisitionLogService
 {
     Task<DataAcquisitionLogModel> GetLogEntryById(string id, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
+    Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -30,6 +32,16 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     public async Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
         var result = await _dataAcquisitionLogManager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, cancellationToken);
+        return new QueryLogSummaryModelResponse
+        {
+            Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
+            Metadata = result.Item2
+        };
+    }
+
+    public async Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
+    {
+        var result = await _dataAcquisitionLogManager.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower() && x.PatientId.ToLower() == patientId.ToLower(), page, pageSize, sortBy, sortOrder, cancellationToken);
         return new QueryLogSummaryModelResponse
         {
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),

@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
 
@@ -14,6 +15,7 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default);
     Task<(List<DataAcquisitionLog>, PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
+    Task<(List<DataAcquisitionLog>, PaginationMetadata)> SearchAsync(Expression<Func<DataAcquisitionLog, bool>> predicate, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -45,6 +47,11 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task<(List<DataAcquisitionLog>,PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
         return await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower(), sortBy, sortOrder, page, pageSize, cancellationToken);
+    }
+
+    public async Task<(List<DataAcquisitionLog>, PaginationMetadata)> SearchAsync(Expression<Func<DataAcquisitionLog, bool>> predicate, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
+    {
+        return await _database.DataAcquisitionLogRepository.SearchAsync(predicate, sortBy, sortOrder, page, pageSize, cancellationToken);
     }
 
     public async Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)

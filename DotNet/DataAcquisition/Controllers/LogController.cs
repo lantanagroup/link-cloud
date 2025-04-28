@@ -111,4 +111,58 @@ public class LogController : Controller
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
+
+    /// <summary>
+    /// Get a list of data acquisition logs for a patient.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint retrieves a list of data acquisition logs.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="id"> The ID of the log entry to retrieve.</param>
+    /// <param name="page">The page number to retrieve.</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="sortBy">The field to sort by.</param>
+    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
+    /// <returns>A list of data acquisition logs.</returns>
+    [HttpGet("facility/{facilityId}/patient/{patientId}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionLog))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
+        [FromRoute] string facilityId,
+        [FromRoute] string patientId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string sortBy = "ExecutionDate",
+        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return BadRequest($"{nameof(facilityId)} cannot be null or empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            return BadRequest($"{nameof(patientId)} cannot be null or empty.");
+        }
+
+        try
+        {
+            var summary = await _logService.GetQueryLogSummariesByFacilityAndPatient(facilityId, patientId, page, pageSize, sortBy, sortOrder, cancellationToken);
+            if (summary == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
 }
