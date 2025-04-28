@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.OpenApi.Services;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -54,6 +55,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
+
+        Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -76,22 +79,22 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
         }
-        
+
         public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
             var searchResults = await _database.ReportScheduledRepository.SearchAsync(
-                predicate, 
+                predicate,
                 sortBy: sortBy,
-                sortOrder: sortOrder, 
+                sortOrder: sortOrder,
                 pageSize: pageSize, pageNumber: pageNumber, cancellationToken);
-            
+
             var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
-            
+
             // Get Census and IP information from individual measure report entries
             var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
             var reportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken); 
-            
+                .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken);
+
             foreach (var summary in summaries)
             {
                 // Get the initial population count for each report
@@ -103,29 +106,29 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                                  x.Status != PatientSubmissionStatus.PendingEvaluation &&
                                  x.Status != PatientSubmissionStatus.NotReportable
                         );
-                
+
                 // Get census information for each report
                 summary.CensusCount = reportEntries.Where(x => x.ReportScheduleId == summary.Id)
                     .DistinctBy(x => x.PatientId).Count();
             }
-            
+
             return new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2);
         }
-        
+
         public async Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId, CancellationToken cancellationToken = default)
         {
-           var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
-           
+            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+
             if (scheduledReport is null)
                 throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
-           
+
             var summary = _scheduledReportFactory.FromDomain(scheduledReport);
             if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
-            
+
             //TODO: Eventually may need to check validation results
             // Get individual measure report entries for this report
             var measureReportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken); 
+                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
 
             // Get the initial population count for each report
             summary.InitialPopulationCount =
@@ -134,16 +137,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                          x.Status != PatientSubmissionStatus.PendingEvaluation &&
                          x.Status != PatientSubmissionStatus.NotReportable
                 );
-            
+
             // Get census information for each report
             summary.CensusCount = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
                 .DistinctBy(x => x.PatientId).Count();
-            
+
             // Get the metrics for the scheduled report
             var metrics = new ScheduledReportMetrics
             {
                 MeasureIpCounts = measureReportEntries
-                    .Where(x => 
+                    .Where(x =>
                         x.ReportScheduleId == summary.Id &&
                         x.Status != PatientSubmissionStatus.PendingEvaluation &&
                         x.Status != PatientSubmissionStatus.NotReportable)
@@ -156,28 +159,82 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     .GroupBy(x => x.ValidationStatus)
                     .ToDictionary(x => x.Key.ToString(), x => x.Count())
             };
-        
+
             summary.ReportMetrics = metrics;
 
             return summary;
         }
-        
+
+        public async Task<PatientReportSummary> GetPatients(string facilityId, string reportId, int page, int count, CancellationToken cancellationToken = default)
+        {
+            var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
+
+            if (scheduledReport is null) throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
+
+            var measureReportEntries = await _database.SubmissionEntryRepository.FindAsync(x => x.ReportScheduleId == reportId, cancellationToken);
+
+            var patientIds = measureReportEntries.Select(x => x.PatientId).Distinct().ToList();
+
+            var pagedPatients = patientIds.Skip((page - 1) * count).Take(count).ToList();
+
+            var patientSummaries = new List<PatientSummary>();
+
+            foreach (var patientId in pagedPatients)
+            {
+                try
+                {
+                    var patientResource = (await _database.PatientResourceRepository.FindAsync(r => r.FacilityId == facilityId && r.PatientId == patientId && r.ResourceId == patientId && r.ResourceType == "Patient", cancellationToken)).SingleOrDefault();
+
+                    if (patientResource?.GetResource() is not Patient patient)
+                    {
+                        patientSummaries.Add(new PatientSummary { id = patientId, name = string.Empty });
+                        continue;
+                    }
+
+                    var name = patient.Name?.FirstOrDefault();
+                    var fullName = name != null ? $"{string.Join(" ", name.Given ?? Enumerable.Empty<string>())} {name.Family}".Trim() : string.Empty;
+
+                    patientSummaries.Add(new PatientSummary
+                    {
+                        id = patientId,
+                        name = fullName
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Handle exception if GetResource fails
+                    patientSummaries.Add(new PatientSummary
+                    {
+                        id = patientId,
+                        name = string.Empty
+                    });
+                }
+            }
+
+            PatientReportSummary patientReportSummary = new PatientReportSummary();
+            patientReportSummary.total = patientIds.Count;
+            patientReportSummary.Patients = patientSummaries;
+
+            return patientReportSummary;
+        }
+
+
         public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
         {
-            
+
             // Get individual measure report entries for this report
             var searchResults = await _database.SubmissionEntryRepository
                 .SearchAsync(
                     predicate,
                     sortBy: sortBy,
-                    sortOrder: sortOrder, 
-                    pageSize: pageSize, pageNumber: pageNumber, 
-                    cancellationToken); 
-            
-            
+                    sortOrder: sortOrder,
+                    pageSize: pageSize, pageNumber: pageNumber,
+                    cancellationToken);
+
+
             // Build patient report summaries
             var measureReports = searchResults.Item1.Select(_measureReportSummaryFactory.FromDomain).ToList();
-            
+
             return new PagedConfigModel<MeasureReportSummary>(measureReports, searchResults.Item2);
         }
 
@@ -185,14 +242,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, ResourceType? resourceType, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default)
         {
-            
-            
+
+
             var measureReport = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(
                 x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
             if (measureReport is null)
                 return new PagedConfigModel<ResourceSummary>();
-            
+
             var resourceQuery = measureReport.ContainedResources.AsQueryable();
 
             if (resourceType.HasValue)
@@ -204,9 +261,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 .OrderBy(x => x.ResourceType)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize).ToList();
-            
+
             var resourceSummaries = pagedResources.Select(x => _resourceSummaryFactory.FromDomain(facilityId, reportId, measureReport.PatientId, x)).ToList();
-            
+
             return new PagedConfigModel<ResourceSummary>(resourceSummaries, new PaginationMetadata()
             {
                 PageSize = pageSize,
@@ -214,7 +271,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 TotalCount = resourceQuery.ToList().Count
             });
         }
-        
+
         public async Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default)
         {
@@ -223,9 +280,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             if (measureReport is null || measureReport.ContainedResources.Count == 0)
                 return [];
-                
+
             var resourceList = measureReport.ContainedResources.Select(x => x.ResourceType).Distinct().Order().ToList();
-            
+
             return resourceList;
         }
 
