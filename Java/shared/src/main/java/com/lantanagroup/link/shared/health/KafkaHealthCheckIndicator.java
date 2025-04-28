@@ -20,8 +20,8 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
 
     private final String serviceName;
 
-    public KafkaHealthCheckIndicator(KafkaTemplate<String, String> kafkaTemplate, @Value(" ${spring.application.name}") String serviceName) {
-        this.kafkaTemplate = kafkaTemplate;
+    public KafkaHealthCheckIndicator(KafkaTemplate<String, String> healthKafkaTemplate, @Value(" ${spring.application.name}") String serviceName) {
+        this.kafkaTemplate = healthKafkaTemplate;
         this.serviceName = serviceName;
     }
 
