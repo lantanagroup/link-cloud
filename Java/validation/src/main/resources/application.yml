@@ -58,6 +58,7 @@ authentication:
   authority: ''
 
 link:
+  terminology-service-url: ''
   report:
     base-url: http://localhost:5110
     routes:

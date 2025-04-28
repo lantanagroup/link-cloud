@@ -1,3 +1,4 @@
+using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Microsoft.AspNetCore.Mvc;
@@ -406,6 +407,92 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         }
 
         return CreateValidationParameters(false, "Code not found in code system");
+    }
+
+    [HttpGet("metadata")]
+    public CapabilityStatement GetMetaData()
+    {
+        var codeSystemResource = new CapabilityStatement.ResourceComponent()
+        {
+            Type = "CodeSystem",
+            Interaction = new List<CapabilityStatement.ResourceInteractionComponent>()
+            {
+                new CapabilityStatement.ResourceInteractionComponent()
+                {
+                    Code = CapabilityStatement.TypeRestfulInteraction.Read,
+                    Documentation = "Read a code system"
+                }
+            },
+            Operation = new AutoConstructedList<CapabilityStatement.OperationComponent>()
+            {
+                new CapabilityStatement.OperationComponent()
+                {
+                    Name = "validate-code",
+                    Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-validate-code",
+                    Documentation = "Validate a code in a code system"
+                }
+            }
+        };
+        var valueSetResource = new CapabilityStatement.ResourceComponent()
+        {
+            Type = "ValueSet",
+            Interaction =
+            [
+                new CapabilityStatement.ResourceInteractionComponent()
+                {
+                    Code = CapabilityStatement.TypeRestfulInteraction.Read,
+                    Documentation = "Read a value set"
+                }
+            ],
+            Operation = new AutoConstructedList<CapabilityStatement.OperationComponent>()
+            {
+                new CapabilityStatement.OperationComponent()
+                {
+                    Name = "validate-code",
+                    Definition = "http://hl7.org/fhir/OperationDefinition/ValueSet-validate-code",
+                    Documentation = "Validate a code in a value set"
+                },
+                new CapabilityStatement.OperationComponent()
+                {
+                    Name = "expand",
+                    Definition = "http://hl7.org/fhir/OperationDefinition/ValueSet-expand",
+                    Documentation = "Expands a value set using the codes cached in memory"
+                }
+            }
+        };
+        
+        return new CapabilityStatement()
+        {
+            Id = "link-tx-service",
+            Version = "1.0.0",          // TODO: Replace with assembly/package version
+            Name = "Link Terminology Service",
+            Title = "Link Terminology Service",
+            Status = PublicationStatus.Active,
+            DateElement = FhirDateTime.Now(),
+            Instantiates = new List<string>() { "http://hl7.org/fhir/CapabilityStatement/terminology-server", "http://hl7.org/fhir/CapabilityStatement/terminology-server-example" },
+            Software = new CapabilityStatement.SoftwareComponent()
+            {
+                Name = "Link",
+                Version = "1.0.0"       // TODO: Replace with product/business version
+            },
+            Format = new List<string>() { "application/fhir+json" },
+            Rest =
+            [
+                new CapabilityStatement.RestComponent()
+                {
+                    Mode = CapabilityStatement.RestfulCapabilityMode.Server,
+                    Security = new CapabilityStatement.SecurityComponent()
+                    {
+                        Cors = true
+                    },
+                    Resource =
+                    [
+                        codeSystemResource,
+                        valueSetResource
+                    ]
+                }
+            ]
+        };
     }
 
     private static Parameters CreateValidationParameters(bool result, string? message = null)
