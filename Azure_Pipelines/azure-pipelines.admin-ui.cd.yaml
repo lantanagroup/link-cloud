@@ -31,8 +31,6 @@ variables:
   value: 'Web/Admin.UI/'
 - name: serviceName
   value: 'Admin.UI'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: NodeTool@0
@@ -86,7 +84,7 @@ steps:
     displayName: "Build & Push DemoApiGateway Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
