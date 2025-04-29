@@ -1,7 +1,10 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Managers;
+﻿using DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Application.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LinqKit;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services;
@@ -11,6 +14,8 @@ public interface IDataAcquisitionLogService
     Task<DataAcquisitionLogModel> GetLogEntryById(string id, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
+    Task<QueryLogSummaryModel> UpdateLogEntry(string id, UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken);
+    Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -42,6 +47,50 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     public async Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
         var result = await _dataAcquisitionLogManager.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower() && x.PatientId.ToLower() == patientId.ToLower(), page, pageSize, sortBy, sortOrder, cancellationToken);
+        return new QueryLogSummaryModelResponse
+        {
+            Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
+            Metadata = result.Item2
+        };
+    }
+
+    public async Task<QueryLogSummaryModel> UpdateLogEntry(string id, UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken)
+    {
+        if (updateLog == null)
+        {
+            throw new ArgumentNullException(nameof(updateLog));
+        }
+
+        var log = await _dataAcquisitionLogManager.GetAsync(id, cancellationToken);
+        if (log == null)
+        {
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {id} not found.");
+        }
+
+        log.ExecutionDate = updateLog.ScheduledExecutionDate;
+        await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
+
+        return QueryLogSummaryModel.FromDomain(log);
+    }
+
+    public async Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default)
+    {
+        if(string.IsNullOrEmpty(patientId) && string.IsNullOrEmpty(facilityId))
+        {
+            throw new ArgumentException("Either patientId or facilityId must be provided.");
+        }
+
+        Expression<Func<DataAcquisitionLog, bool>> predicate = x => true;
+        if (!string.IsNullOrEmpty(patientId))
+        {
+            predicate = predicate.And(x => x.PatientId.ToLower() == patientId.ToLower());
+        }
+        if (!string.IsNullOrEmpty(facilityId))
+        {
+            predicate = predicate.And(x => x.FacilityId.ToLower() == facilityId.ToLower());
+        }
+
+        var result =  await _dataAcquisitionLogManager.SearchAsync(predicate, page, pageSize, sortBy, sortOrder, cancellationToken);
         return new QueryLogSummaryModelResponse
         {
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),

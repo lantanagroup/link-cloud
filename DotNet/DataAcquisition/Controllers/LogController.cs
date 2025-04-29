@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -22,6 +23,83 @@ public class LogController : Controller
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+    }
+
+    /// <summary>
+    /// Get a list of data acquisition logs.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint retrieves a list of data acquisition logs.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="facilityId">The ID of the facility.</param>
+    /// <param name="patientId">The ID of the patient.</param>
+    /// <param name="queryPhase">The phase of the query.</param>
+    /// <param name="status">The status of the request.</param>
+    /// <param name="priority">The priority of the acquisition.</param>
+    /// <param name="page">The page number to retrieve.</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="sortBy">The field to sort by.</param>
+    /// <param name="sortOrder">The order to sort by (ascending or descending).</param>
+    /// <returns>A list of data acquisition logs.</returns>
+    /// <response code="200">Returns a list of data acquisition logs.</response>
+    /// <response code="400">If the request is invalid.</response>
+    /// <response code="404">If no data acquisition logs are found.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IPagedModel<QueryLogSummaryModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
+        [FromQuery] string? facilityId,
+        [FromQuery] string? patientId,
+        [FromQuery] QueryPhaseModel queryPhase = QueryPhaseModel.Initial,
+        [FromQuery] RequestStatusModel status = RequestStatusModel.Pending,
+        [FromQuery] AcquisitionPriorityModel priority = AcquisitionPriorityModel.Normal,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string sortBy = "ExecutionDate",
+        [FromQuery] SortOrder sortOrder = SortOrder.Descending,
+        CancellationToken cancellationToken = default
+        ) 
+    {
+        if(string.IsNullOrWhiteSpace(facilityId) && string.IsNullOrWhiteSpace(patientId))
+        {
+            return BadRequest("Either facilityId or patientId must be provided.");
+        }
+
+        try
+        {
+            var result = await _logService.Search(page, pageSize, sortBy, sortOrder, patientId, facilityId, cancellationToken);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(result);
+        }
+        catch (ArgumentNullException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
     }
 
     /// <summary>
@@ -158,6 +236,68 @@ public class LogController : Controller
             }
 
             return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Update a data acquisition log entry.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint updates a data acquisition log entry.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="id"> The ID of the log entry to update.</param>
+    /// <param name="updateModel">The model containing the updated data acquisition log entry.</param>
+    /// <returns>The updated data acquisition log entry.</returns>
+    /// <response code="202">Returns the updated data acquisition log entry.</response>
+    /// <response code="400">If the ID is null or empty.</response>
+    /// <response code="404">If the data acquisition log entry is not found.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UpdateLogEntry(
+    [FromRoute] string id,
+    [FromBody] UpdateDataAcquisitionLogModel updateModel,
+    CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return BadRequest("ID cannot be null or empty.");
+        }
+
+        try
+        {
+            var updatedLog = await _logService.UpdateLogEntry(id, updateModel, cancellationToken);
+
+            return Accepted(updatedLog);
+        }
+        catch (DataAcquisitionLogNotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentNullException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

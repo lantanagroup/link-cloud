@@ -54,6 +54,8 @@ using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.DataAcquisition.Application.Validators;
+using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -204,6 +206,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, DataAcquisitionRequested>, KafkaConsumerFactory<string, DataAcquisitionRequested>>();
     builder.Services.AddScoped<IKafkaConsumerFactory<string, PatientCensusScheduled>, KafkaConsumerFactory<string, PatientCensusScheduled>>();
+
+    //Validation
+    builder.Services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
+
 
     //Factories - Producer
     builder.Services.RegisterKafkaProducer<string, object>(
