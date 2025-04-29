@@ -34,8 +34,6 @@ variables:
   value: '**/DotNet/PatientList/Dockerfile'
 - name: serviceName
   value: 'PatientList'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - template: ../azure-nuget-package-source.yml
@@ -91,7 +89,7 @@ steps:
     displayName: "Build & Push PatientList Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)

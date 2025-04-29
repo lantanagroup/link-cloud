@@ -34,8 +34,6 @@ variables:
   value: '**/DotNet/Normalization/Dockerfile'
 - name: serviceName
   value: 'Normalization'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
 
 steps:
   - task: DotNetCoreCLI@2
@@ -87,7 +85,7 @@ steps:
     displayName: "Build & Push Normalization Docker Image"
     condition: always()
     inputs:
-      containerRegistry: $(containerRegistry)
+      containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
       command: 'buildAndPush'
       Dockerfile: $(dockerPath)
