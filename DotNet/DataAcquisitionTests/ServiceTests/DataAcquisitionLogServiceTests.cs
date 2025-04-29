@@ -85,10 +85,10 @@ public class DataAcquisitionLogServiceTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(2, result.QueryLogSummaries.Count);
-        Assert.Equal("1", result.QueryLogSummaries[0].Id);
-        Assert.Equal("2", result.QueryLogSummaries[1].Id);
-        Assert.Equal(2, result.PaginationMetadata.TotalCount);
+        Assert.Equal(2, result.Records.Count);
+        Assert.Equal("1", result.Records[0].Id);
+        Assert.Equal("2", result.Records[1].Id);
+        Assert.Equal(2, result.Metadata.TotalCount);
         _mockLogManager.Verify(manager => manager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -111,8 +111,8 @@ public class DataAcquisitionLogServiceTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Empty(result.QueryLogSummaries);
-        Assert.Equal(0, result.PaginationMetadata.TotalCount);
+        Assert.Empty(result.Records);
+        Assert.Equal(0, result.Metadata.TotalCount);
         _mockLogManager.Verify(manager => manager.GetByFacilityIdAsync(facilityId, page, pageSize, sortBy, sortOrder, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
