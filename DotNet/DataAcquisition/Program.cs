@@ -56,6 +56,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using FluentValidation;
+using DataAcquisition.Domain.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -180,6 +181,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IEntityRepository<QueryPlan>, DataEntityRepository<QueryPlan>>();
     builder.Services.AddTransient<IEntityRepository<ReferenceResources>, DataEntityRepository<ReferenceResources>>();
     builder.Services.AddTransient<IEntityRepository<FhirQuery>, DataEntityRepository<FhirQuery>>();
+    builder.Services.AddTransient<IEntityRepository<DataAcquisitionLog>, DataEntityRepository<DataAcquisitionLog>>();
 
     builder.Services.AddScoped<IEntityRepository<RetryEntity>, DataEntityRepository<RetryEntity>>();
 
@@ -191,6 +193,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IQueryPlanManager, QueryPlanManager>();
     builder.Services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
     builder.Services.AddTransient<IFhirQueryManager, FhirQueryManager>();
+    builder.Services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
 
     //Services
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
@@ -201,6 +204,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
     builder.Services.AddTransient<IQueryListProcessor, QueryListProcessor>();
     builder.Services.AddTransient<BundleResourceAcquiredEventService, BundleResourceAcquiredEventService>();
+    builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
     //Factories - Consumer
     builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();

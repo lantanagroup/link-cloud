@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAcquisition.Domain.Migrations
 {
     [DbContext(typeof(DataAcquisitionDbContext))]
-    [Migration("20250414175054_dataacquisitionlog")]
-    partial class dataacquisitionlog
+    [Migration("20250429212732_dataacquisitionlog_implemenation")]
+    partial class dataacquisitionlog_implemenation
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -36,10 +36,13 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<long?>("CompletionTimeMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("ExecutionDate")
+                    b.Property<DateTime?>("ExecutionDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("FacilityId")
@@ -47,45 +50,41 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FhirVersion")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Notes")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PatientId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Priority")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
+                    b.Property<string>("QueryPhase")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("QueryPhase")
-                        .HasColumnType("int");
-
-                    b.Property<int>("QueryType")
-                        .HasColumnType("int");
+                    b.Property<string>("QueryType")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceAcquiredIds")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("RetryAttempts")
+                    b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
 
                     b.Property<string>("ScheduledReport")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TimeZone")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -111,8 +110,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("QueryPhase")
-                        .HasColumnType("int");
+                    b.Property<string>("QueryPhase")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceType")
                         .HasColumnType("nvarchar(max)");
@@ -375,9 +375,11 @@ namespace DataAcquisition.Domain.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Entities.ReferenceResources", b =>
                 {
-                    b.HasOne("DataAcquisition.Domain.Entities.DataAcquisitionLog", null)
+                    b.HasOne("DataAcquisition.Domain.Entities.DataAcquisitionLog", "DataAcquisitionLog")
                         .WithMany("ReferenceResources")
                         .HasForeignKey("DataAcquisitionLogId");
+
+                    b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("DataAcquisition.Domain.Entities.DataAcquisitionLog", b =>

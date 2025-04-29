@@ -12,9 +12,8 @@ public class DataAcquisitionLog : BaseEntityExtended
 {
     public string FacilityId { get; set; }
     public AcquisitionPriority Priority { get; set; }
-    public string PatientId { get; set; }
-    public string? CorrelationId { get; set; }
-    public string? ReportTrackingId { get; set; }
+    public string? PatientId { get; set; }
+    public string? CorrelationId { get; set; } = default;
     public string? FhirVersion { get; set; }
     public FhirQueryType? QueryType { get; set; }
     public QueryPhase? QueryPhase { get; set; }
@@ -26,7 +25,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
-    public ICollection<ReferenceResources> ReferenceResources { get; set; }
+    public ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
     public List<string>? Notes { get; set; } = new List<string>();
-    public ScheduledReport ScheduledReport { get; set; }
+    public LantanaGroup.Link.Shared.Application.Models.ScheduledReport ScheduledReport { get; set; }
 }

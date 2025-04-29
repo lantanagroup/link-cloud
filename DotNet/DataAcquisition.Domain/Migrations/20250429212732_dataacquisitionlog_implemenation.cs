@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DataAcquisition.Domain.Migrations
 {
     /// <inheritdoc />
-    public partial class dataacquisitionlog : Migration
+    public partial class dataacquisitionlog_implemenation : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -104,19 +104,20 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Priority = table.Column<int>(type: "int", nullable: false),
-                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FhirVersion = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    QueryType = table.Column<int>(type: "int", nullable: false),
-                    QueryPhase = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    ExecutionDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    TimeZone = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    RetryAttempts = table.Column<int>(type: "int", nullable: false),
+                    Priority = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PatientId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CorrelationId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FhirVersion = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    QueryType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    QueryPhase = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ExecutionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    TimeZone = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RetryAttempts = table.Column<int>(type: "int", nullable: true),
                     CompletionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CompletionTimeMilliseconds = table.Column<long>(type: "bigint", nullable: true),
-                    ResourceAcquiredIds = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResourceAcquiredIds = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ScheduledReport = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ModifyDate = table.Column<DateTime>(type: "datetime2", nullable: true)
@@ -132,7 +133,7 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     FacilityId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    QueryPhase = table.Column<int>(type: "int", nullable: false),
+                    QueryPhase = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ResourceType = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     FhirQueryId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -149,139 +150,47 @@ namespace DataAcquisition.Domain.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ReferenceResources_DataAcquisitionLogId",
-                table: "ReferenceResources",
+                name: "IX_FhirQuery_DataAcquisitionLogId",
+                table: "FhirQuery",
                 column: "DataAcquisitionLogId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_FhirQuery_DataAcquisitionLogId",
-                table: "FhirQuery",
+                name: "IX_ReferenceResources_DataAcquisitionLogId",
+                table: "ReferenceResources",
                 column: "DataAcquisitionLogId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ResourceReferenceType_FhirQueryId",
                 table: "ResourceReferenceType",
                 column: "FhirQueryId");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_FhirQuery_DataAcquisitionLog_DataAcquisitionLogId",
-                table: "FhirQuery",
-                column: "DataAcquisitionLogId",
-                principalTable: "DataAcquisitionLog",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_ReferenceResources_DataAcquisitionLog_DataAcquisitionLogId",
-                table: "ReferenceResources",
-                column: "DataAcquisitionLogId",
-                principalTable: "DataAcquisitionLog",
-                principalColumn: "Id");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_FhirQuery_DataAcquisitionLog_DataAcquisitionLogId",
-                table: "FhirQuery");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_ReferenceResources_DataAcquisitionLog_DataAcquisitionLogId",
-                table: "ReferenceResources");
+            migrationBuilder.DropTable(
+                name: "EventRetries");
 
             migrationBuilder.DropTable(
-                name: "DataAcquisitionLog");
+                name: "fhirListConfiguration");
+
+            migrationBuilder.DropTable(
+                name: "fhirQueryConfiguration");
+
+            migrationBuilder.DropTable(
+                name: "queryPlan");
+
+            migrationBuilder.DropTable(
+                name: "ReferenceResources");
 
             migrationBuilder.DropTable(
                 name: "ResourceReferenceType");
 
-            migrationBuilder.DropPrimaryKey(
-                name: "PK_ReferenceResources",
-                table: "ReferenceResources");
+            migrationBuilder.DropTable(
+                name: "FhirQuery");
 
-            migrationBuilder.DropIndex(
-                name: "IX_ReferenceResources_DataAcquisitionLogId",
-                table: "ReferenceResources");
-
-            migrationBuilder.DropPrimaryKey(
-                name: "PK_FhirQuery",
-                table: "FhirQuery");
-
-            migrationBuilder.DropIndex(
-                name: "IX_FhirQuery_DataAcquisitionLogId",
-                table: "FhirQuery");
-
-            migrationBuilder.DropColumn(
-                name: "DataAcquisitionLogId",
-                table: "ReferenceResources");
-
-            migrationBuilder.DropColumn(
-                name: "QueryPhase",
-                table: "ReferenceResources");
-
-            migrationBuilder.DropColumn(
-                name: "DataAcquisitionLogId",
-                table: "FhirQuery");
-
-            migrationBuilder.DropColumn(
-                name: "Paged",
-                table: "FhirQuery");
-
-            migrationBuilder.DropColumn(
-                name: "QueryParameters",
-                table: "FhirQuery");
-
-            migrationBuilder.DropColumn(
-                name: "QueryType",
-                table: "FhirQuery");
-
-            migrationBuilder.RenameTable(
-                name: "ReferenceResources",
-                newName: "referenceResources");
-
-            migrationBuilder.RenameTable(
-                name: "FhirQuery",
-                newName: "fhirQuery");
-
-            migrationBuilder.RenameColumn(
-                name: "ResourceTypes",
-                table: "fhirQuery",
-                newName: "ResourceType");
-
-            migrationBuilder.AddColumn<string>(
-                name: "CorrelationId",
-                table: "fhirQuery",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PatientId",
-                table: "fhirQuery",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "RequestBody",
-                table: "fhirQuery",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "SearchParams",
-                table: "fhirQuery",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_referenceResources",
-                table: "referenceResources",
-                column: "Id");
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_fhirQuery",
-                table: "fhirQuery",
-                column: "Id");
+            migrationBuilder.DropTable(
+                name: "DataAcquisitionLog");
         }
     }
 }

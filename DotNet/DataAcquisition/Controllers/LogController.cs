@@ -208,7 +208,7 @@ public class LogController : Controller
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacility(
+    public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> GetQueryLogSummariesForFacilityAndPatient(
         [FromRoute] string facilityId,
         [FromRoute] string patientId,
         [FromQuery] int page = 1,
@@ -295,6 +295,62 @@ public class LogController : Controller
             return BadRequest(ex.Message);
         }
         catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Delete a data acquisition log entry.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint deletes a data acquisition log entry by its ID.
+    /// </remarks>
+    /// <param name="id">The ID of the log entry to delete.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A response indicating the result of the deletion.</returns>
+    /// <response code="204">If the log entry was successfully deleted.</response>
+    /// <response code="400">If the ID is null or empty.</response>
+    /// <response code="404">If the log entry is not found.</response>
+    /// <response code="500">If there is an internal server error.</response>
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteLogEntry(
+        [FromRoute] string id,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return BadRequest("ID cannot be null or empty.");
+        }
+
+        try
+        {
+            var logEntry = await _logService.GetLogEntryById(id, cancellationToken);
+            if (logEntry == null)
+            {
+                return NotFound($"Log entry with ID '{id}' not found.");
+            }
+
+            await _logService.DeleteLogEntry(id, cancellationToken);
+
+            return NoContent();
+        }
+        catch (DataAcquisitionLogNotFoundException ex)
+        {
+            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentNullException ex)
         {
             _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
             return BadRequest(ex.Message);

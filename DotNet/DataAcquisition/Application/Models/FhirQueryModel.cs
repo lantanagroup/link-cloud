@@ -8,7 +8,7 @@ public class FhirQueryModel
 {
     public string FacilityId { get; set; }
     public FhirQueryTypeModel QueryType { get; set; }
-    public List<ResourceTypeModel> ResourceTypes { get; set; }
+    public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; set; }
     public List<string> QueryParameters { get; set; } = new List<string>();
     public List<ResourceReferenceTypeModel> ResourceReferenceTypes { get; set; }
     public int? Paged { get; set; }
@@ -20,9 +20,9 @@ public class FhirQueryModel
         {
             FacilityId = fhirQuery.FacilityId,
             QueryType = FhirQueryTypeModelUtilities.FromDomain(fhirQuery.QueryType),
-            ResourceTypes = fhirQuery.ResourceTypes.Select(ResourceTypeModelUtilities.FromDomain).ToList(),
+            ResourceTypes = fhirQuery.ResourceTypes,
             QueryParameters = fhirQuery.QueryParameters,
-            ResourceReferenceTypes = fhirQuery.ResourceReferenceTypes.Select(ResourceReferenceTypeModelUtilities.FromDomain).ToList(),
+            ResourceReferenceTypes = fhirQuery.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.FromDomain).ToList(),
             Paged = fhirQuery.Paged,
             DataAcquisitionLogId = fhirQuery.DataAcquisitionLogId
         };
@@ -34,9 +34,9 @@ public class FhirQueryModel
         {
             FacilityId = model.FacilityId,
             QueryType = FhirQueryTypeModelUtilities.ToDomain(model.QueryType),
-            ResourceTypes = model.ResourceTypes.Select(ResourceTypeModelUtilities.ToDomain).ToList(),
+            ResourceTypes = model.ResourceTypes,
             QueryParameters = model.QueryParameters,
-            ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModelUtilities.ToDomain).ToList(),
+            ResourceReferenceTypes = model.ResourceReferenceTypes.Select(ResourceReferenceTypeModel.ToDomain).ToList(),
             Paged = model.Paged,
             DataAcquisitionLogId = model.DataAcquisitionLogId
         };

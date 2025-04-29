@@ -56,19 +56,16 @@ namespace DataAcquisition.Domain.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PatientId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Priority")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
+                    b.Property<string>("QueryPhase")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("QueryPhase")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("QueryType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ReportTrackingId")
+                    b.Property<string>("QueryType")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceAcquiredIds")
@@ -81,8 +78,8 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("Status")
-                        .HasColumnType("int");
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TimeZone")
                         .HasColumnType("nvarchar(max)");
@@ -110,8 +107,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime?>("ModifyDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("QueryPhase")
-                        .HasColumnType("int");
+                    b.Property<string>("QueryPhase")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResourceType")
                         .HasColumnType("nvarchar(max)");

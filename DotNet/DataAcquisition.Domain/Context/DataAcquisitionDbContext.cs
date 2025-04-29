@@ -146,6 +146,28 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
             );
 
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(d => d.Priority)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(d => d.QueryPhase)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(d => d.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<DataAcquisitionLog>()
+            .Property(d => d.QueryType)
+            .HasConversion<string>();
+
+        
+        //-------------------ResourceReferenceType-------------------
+        modelBuilder.Entity<ResourceReferenceType>()
+            .Property(b => b.QueryPhase)
+            .HasConversion<string>();
+
     }
 
     public class DataAcquisitionDbContextFactory : IDesignTimeDbContextFactory<DataAcquisitionDbContext>

@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
@@ -14,6 +15,7 @@ public interface IDataAcquisitionLogManager
     Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default);
     Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<(List<DataAcquisitionLog>, PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<(List<DataAcquisitionLog>, PaginationMetadata)> SearchAsync(Expression<Func<DataAcquisitionLog, bool>> predicate, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
 }
@@ -22,6 +24,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 {
     public readonly ILogger<DataAcquisitionLogManager> _logger;
     public readonly IDatabase _database;
+
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _database = database ?? throw new ArgumentNullException(nameof(database));
+    }
 
     public async Task<DataAcquisitionLog> CreateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
     {
@@ -39,6 +47,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return log;
     }
 
+    public async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    { 
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new ArgumentNullException(nameof(id));
+        }
+
+        await _database.DataAcquisitionLogRepository.DeleteAsync(id, cancellationToken);
+    }
+
     public async Task<DataAcquisitionLog?> GetAsync(string id, CancellationToken cancellationToken = default)
     {
         return await _database.DataAcquisitionLogRepository.GetAsync(id, cancellationToken);
@@ -46,12 +64,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<(List<DataAcquisitionLog>,PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
-        return await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower(), sortBy, sortOrder, page, pageSize, cancellationToken);
+        var result = await _database.DataAcquisitionLogRepository.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper(), sortBy, sortOrder, page, pageSize, cancellationToken);
+        return result;
     }
 
     public async Task<(List<DataAcquisitionLog>, PaginationMetadata)> SearchAsync(Expression<Func<DataAcquisitionLog, bool>> predicate, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
-        return await _database.DataAcquisitionLogRepository.SearchAsync(predicate, sortBy, sortOrder, page, pageSize, cancellationToken);
+        var result = await _database.DataAcquisitionLogRepository.SearchAsync(predicate, sortBy, sortOrder, page, pageSize, cancellationToken);
+        return result;
     }
 
     public async Task<DataAcquisitionLog?> UpdateAsync(DataAcquisitionLog log, CancellationToken cancellationToken = default)
@@ -83,6 +103,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         existingLog.ReferenceResources = log.ReferenceResources;
         existingLog.Notes = log.Notes;
         existingLog.ScheduledReport = log.ScheduledReport;
+        existingLog.FhirQuery = log.FhirQuery;
+        existingLog.FacilityId = log.FacilityId;
 
         existingLog.ModifyDate = DateTime.UtcNow;
 

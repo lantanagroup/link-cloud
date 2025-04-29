@@ -16,6 +16,7 @@ public interface IDataAcquisitionLogService
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<QueryLogSummaryModel> UpdateLogEntry(string id, UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken);
     Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
+    Task DeleteLogEntry(string id, CancellationToken cancellationToken);
 }
 
 public class DataAcquisitionLogService : IDataAcquisitionLogService
@@ -46,7 +47,7 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
     public async Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default)
     {
-        var result = await _dataAcquisitionLogManager.SearchAsync(x => x.FacilityId.ToLower() == facilityId.ToLower() && x.PatientId.ToLower() == patientId.ToLower(), page, pageSize, sortBy, sortOrder, cancellationToken);
+        var result = await _dataAcquisitionLogManager.SearchAsync(x => x.FacilityId.ToUpper() == facilityId.ToUpper() && x.PatientId.ToUpper() == patientId.ToUpper(), page, pageSize, sortBy, sortOrder, cancellationToken);
         return new QueryLogSummaryModelResponse
         {
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
@@ -67,7 +68,10 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {id} not found.");
         }
 
-        log.ExecutionDate = updateLog.ScheduledExecutionDate;
+        if(updateLog.ScheduledExecutionDate != default)
+            log.ExecutionDate = updateLog.ScheduledExecutionDate;
+
+        log.Status = RequestStatusModelUtilities.ToDomain(updateLog.Status.Value);
         await _dataAcquisitionLogManager.UpdateAsync(log, cancellationToken);
 
         return QueryLogSummaryModel.FromDomain(log);
@@ -96,5 +100,22 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
             Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
             Metadata = result.Item2
         };
+    }
+
+    public async Task DeleteLogEntry(string id, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new ArgumentNullException(nameof(id));
+        }
+
+        var log = await _dataAcquisitionLogManager.GetAsync(id, cancellationToken);
+        if (log == null)
+        {
+            throw new DataAcquisitionLogNotFoundException($"Data acquisition log with ID {id} not found.");
+        }
+
+        // Logic to delete the log entry from the database
+        await _dataAcquisitionLogManager.DeleteAsync(id, cancellationToken);
     }
 }

@@ -68,6 +68,7 @@ public class PatientDataService : IPatientDataService
             Guid.NewGuid().ToString(),
             request.FacilityId,
             authenticationConfig,
+            request.ConsumeResult.Value.ScheduledReports.FirstOrDefault(),
             cancellationToken) ?? throw new NotFoundException("Patient not found.");
         var queryPlan = (
             await _queryPlanManager.FindAsync(
@@ -153,7 +154,9 @@ public class PatientDataService : IPatientDataService
                 fhirQueryConfiguration.FhirServerBaseUrl,
                 patientId, request.CorrelationId,
                 request.FacilityId,
-                fhirQueryConfiguration.Authentication, cancellationToken);
+                fhirQueryConfiguration.Authentication, 
+                dataAcqRequested.ScheduledReports.FirstOrDefault(),
+                cancellationToken);
 
             await _kafkaProducer.ProduceAsync(
                 KafkaTopic.ResourceAcquired.ToString(),

@@ -75,6 +75,7 @@ public interface IFhirApiService
         string correlationId,
         string facilityId,
         AuthenticationConfiguration authConfig,
+        ScheduledReport report,
         CancellationToken cancellationToken = default);
 
     Task<List> GetPatientList(
@@ -253,6 +254,7 @@ public class FhirApiService : IFhirApiService
         string correlationId,
         string facilityId,
         AuthenticationConfiguration authConfig,
+        ScheduledReport report,
         CancellationToken cancellationToken = default)
     {
         using var _ = _metrics.MeasureDataRequestDuration([
@@ -273,7 +275,7 @@ public class FhirApiService : IFhirApiService
             fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
         }
 
-        return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString());
+        return (Patient)await ReadFhirEndpointAsync(fhirClient, nameof(Patient), patientId, patientId, correlationId, facilityId, QueryPlanType.Initial.ToString(), report: report);
     }
 
     public async Task<List> GetPatientList(string baseUrl, string listId, string facilityId, AuthenticationConfiguration authConfig, CancellationToken cancellationToken = default)
@@ -319,7 +321,7 @@ public class FhirApiService : IFhirApiService
 
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
-
+            
             var log = await _dataAcquisitionLogManager.CreateAsync(new DataAcquisitionLog
             {
                 FacilityId = facilityId,
@@ -332,8 +334,16 @@ public class FhirApiService : IFhirApiService
                 {
                     new FhirQuery
                     {
-                        ResourceReferenceTypes = referenceTypes.ConvertAll(x => new ResourceReferenceType
+                        Id = Guid.NewGuid().ToString(),
+                        FacilityId = facilityId,
+                        CreateDate = DateTime.UtcNow,
+                        ModifyDate = DateTime.UtcNow,
+                        QueryType = FhirQueryType.Search,
+                        QueryParameters = searchParams.ToUriParamList().Select(x => $"{x.Item1}={x.Item2}").ToList(),
+                        ResourceTypes = new List<Hl7.Fhir.Model.ResourceType> { ResourceTypeModelUtilities.ToDomain(resourceType) },
+                        ResourceReferenceTypes = referenceTypes?.ConvertAll(x => new ResourceReferenceType
                         {
+                            Id = Guid.NewGuid().ToString(),
                             FacilityId = facilityId,
                             CreateDate = DateTime.UtcNow,
                             ModifyDate = DateTime.UtcNow,
@@ -350,6 +360,7 @@ public class FhirApiService : IFhirApiService
                 CompletionTimeMilliseconds = null,
                 ResourceAcquiredIds = new List<string>(),
                 ScheduledReport = reports?[0],
+                CorrelationId = correlationId,
             }, cancellationToken);
 
             Bundle? resultBundle = null;
@@ -524,6 +535,7 @@ public class FhirApiService : IFhirApiService
             CompletionTimeMilliseconds = null,
             ResourceAcquiredIds = new List<string>(),
             ScheduledReport = report,
+            CorrelationId = correlationId,
         }, cancellationToken);
 
         var stopWatch = new Stopwatch();
