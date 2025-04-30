@@ -8,6 +8,8 @@ import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
+import com.lantanagroup.link.validation.providers.LinkRemoteTermServiceValidation;
+import com.lantanagroup.link.validation.providers.UnknownCodeSystemWarningValidationSupport;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -28,10 +30,9 @@ public class ValidationService {
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
-                new SnapshotGeneratingValidationSupport(fhirContext),
-                new CommonCodeSystemsTerminologyService(fhirContext),
-                getUnknownCodeSystemWarningValidationSupport(fhirContext),
-                getTerminologyValidationSupport(fhirContext, linkConfig));
+                new SnapshotGeneratingValidationSupport(fhirContext));
+
+        loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain);
 
         CachingValidationSupport cachingValidationSupport = new CachingValidationSupport(validationSupportChain);
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
@@ -41,25 +42,27 @@ public class ValidationService {
         fhirValidator.setExecutorService(ForkJoinPool.commonPool());
     }
 
-    private static IValidationSupport getTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig) {
+    private static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain) {
         if (linkConfig.getFhirTerminologyServiceUrl() != null && !linkConfig.getFhirTerminologyServiceUrl().isEmpty()) {
-            return new RemoteTerminologyServiceValidationSupport(fhirContext, linkConfig.getFhirTerminologyServiceUrl());
+            var remoteTerm = new LinkRemoteTermServiceValidation(fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
+            validationSupportChain.addValidationSupport(remoteTerm);
         } else if (linkConfig.getTerminologyServiceUrl() != null && !linkConfig.getTerminologyServiceUrl().isEmpty()) {
             // RemoteTerminologyServiceValidationSupport expects the base url to be the root of a FHIR interface
             // Append /api/terminology/fhir to the terminology service URL since this is the link terminology service.
             String terminologyServiceUrl = (linkConfig.getTerminologyServiceUrl().endsWith("/") ? linkConfig.getTerminologyServiceUrl() : linkConfig.getTerminologyServiceUrl() + "/") + "api/terminology/fhir";
-            return new RemoteTerminologyServiceValidationSupport(fhirContext, terminologyServiceUrl);
+            var remoteTerm = new LinkRemoteTermServiceValidation(fhirContext, terminologyServiceUrl, linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
+            validationSupportChain.addValidationSupport(remoteTerm);
         } else {
-            return new InMemoryTerminologyServerValidationSupport(fhirContext);
-        }
-    }
+            var commonCodeSystemsTerminologyService = new CommonCodeSystemsTerminologyService(fhirContext);
+            var inMemTerm = new InMemoryTerminologyServerValidationSupport(fhirContext);
 
-    private static UnknownCodeSystemWarningValidationSupport getUnknownCodeSystemWarningValidationSupport(
-            FhirContext fhirContext) {
-        UnknownCodeSystemWarningValidationSupport validationSupport =
-                new UnknownCodeSystemWarningValidationSupport(fhirContext);
+            validationSupportChain.addValidationSupport(commonCodeSystemsTerminologyService);
+            validationSupportChain.addValidationSupport(inMemTerm);
+        }
+
+        UnknownCodeSystemWarningValidationSupport validationSupport = new UnknownCodeSystemWarningValidationSupport(fhirContext, linkConfig.getWhiteListCodeSystemRegex());
         validationSupport.setNonExistentCodeSystemSeverity(IValidationSupport.IssueSeverity.WARNING);
-        return validationSupport;
+        validationSupportChain.addValidationSupport(validationSupport);
     }
 
     public List<Result> validate(IBaseResource resource) {

@@ -13,6 +13,7 @@ public class CodeGroup
     public string Version { get; set; }
     public string Name { get; set; }
     public string Url { get; set; }
+    public List<Identifier> Identifiers { get; set; } = new List<Identifier>();
     public Resource Resource;
     
     // Key is code system URI, value is list of codes

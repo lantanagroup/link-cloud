@@ -42,7 +42,7 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         var codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
 
         if (codeGroup == null)
-            return NotFound("Value set not found");
+            return NotFound($"Value set not found with ID {id}");
 
         return Ok(codeGroup.Resource as ValueSet);
     }
@@ -64,29 +64,55 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         [FromQuery(Name = "_summary")] SummaryType? summary)
     {
         if (string.IsNullOrEmpty(url) && summary == null)
+        {
+            logger.LogError("No url or summary parameter specified while searching for all value sets (no url specified)");
             return BadRequest("Must specify url if summary is not requested");
+        }
         
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var bundle = new Bundle
+        {
+            Type = Bundle.BundleType.Searchset
+        };
 
         if (!string.IsNullOrEmpty(url))
         {
             var codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
 
-            var bundle = new Bundle
-            {
-                Type = Bundle.BundleType.Searchset
-            };
-
             if (codeGroup != null)
-                bundle.AddResourceEntry(codeGroup.Resource as ValueSet, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
+            {
+                ValueSet clone = (ValueSet)codeGroup.Resource.DeepCopy();
+                bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
 
-            return Ok(bundle);
+                // If not summary mode, then enumerate each code in the value set as part of the the expansion.contains property
+                if (summary != SummaryType.True)
+                {
+                    clone.Expansion = new ValueSet.ExpansionComponent();
+                    
+                    foreach (var codeGroupSystem in codeGroup.Codes)
+                    {
+                        ValueSet.ContainsComponent contains = new ValueSet.ContainsComponent()
+                        {
+                            System = codeGroupSystem.Key
+                        };
+                        
+                        clone.Expansion.Contains.Add(contains);
+                        
+                        foreach (var codeGroupCode in codeGroupSystem.Value)
+                        {
+                            contains.Contains.Add(new ValueSet.ContainsComponent()
+                            {
+                                Code = codeGroupCode.Value,
+                                Display = codeGroupCode.Display
+                            });
+                        }
+                    }
+                }
+            }
         }
         else
         {
             var codeGroups = cacheService.GetAllCodeGroups(CodeGroup.CodeGroupTypes.ValueSet);
-            var bundle = new Bundle();
-            bundle.Type = Bundle.BundleType.Searchset;
 
             foreach (var codeGroup in codeGroups)
             {
@@ -100,9 +126,9 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
 
                 bundle.AddResourceEntry(vs, baseUrl + "/api/fhir/ValueSet/" + codeGroup.Id);
             }
-
-            return bundle;
         }
+
+        return Ok(bundle);
     }
 
     /// <summary>
@@ -128,7 +154,7 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
 
         if (codeGroup == null)
-            return NotFound("Value set not found");
+            return NotFound($"Value set not found with ID {id}");
 
         var valueSet = codeGroup.Resource as ValueSet;
 
@@ -186,7 +212,7 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
         CodeGroup? codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id);
         
         if (codeGroup == null)
-            return NotFound("Code system not found");
+            return NotFound($"Code system not found with ID {id}");
 
         return Ok(codeGroup.Resource as CodeSystem);
     }
@@ -208,29 +234,44 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
     public ActionResult<Bundle> GetCodeSystems([FromQuery] string url, [FromQuery(Name = "_summary")] SummaryType? summary)
     {
         if (string.IsNullOrEmpty(url) && (summary == null))
+        {
+            logger.LogError("No url or summary parameter specified while searching for all code systems (no url specified)");
             return BadRequest("Must specify url if summary is not requested");
+        }
 
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        Bundle bundle = new Bundle
+        {
+            Type = Bundle.BundleType.Searchset
+        };
 
         if (!string.IsNullOrEmpty(url))
         {
             CodeGroup? codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url);
 
-            Bundle bundle = new Bundle
-            {
-                Type = Bundle.BundleType.Searchset
-            };
-
             if (codeGroup != null)
-                bundle.AddResourceEntry(codeGroup.Resource as CodeSystem, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
+            {
+                CodeSystem clone = (CodeSystem)codeGroup.Resource.DeepCopy();
+                bundle.AddResourceEntry(clone, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
 
-            return Ok(bundle);
+                if (summary != SummaryType.True)
+                {
+                    logger.LogDebug($"Search performed without summary mode for code system {url}");
+                    
+                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
+                    {
+                        clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
+                        {
+                            Code = codeGroupCode.Value,
+                            Display = codeGroupCode.Display
+                        });
+                    }
+                }
+            }
         }
         else
         {
             List<CodeGroup> codeGroups = cacheService.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem);
-            Bundle bundle = new Bundle();
-            bundle.Type = Bundle.BundleType.Searchset;
 
             foreach (var codeGroup in codeGroups)
             {
@@ -244,9 +285,9 @@ public class FhirController(CodeGroupCacheService cacheService, ILogger<FhirCont
                 
                 bundle.AddResourceEntry(cs, baseUrl + "/api/fhir/CodeSystem/" + codeGroup.Id);
             }
-
-            return bundle;
         }
+                
+        return Ok(bundle);
     }
 
     /// <summary>

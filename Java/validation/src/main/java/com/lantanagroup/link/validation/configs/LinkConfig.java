@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.configs;
 
+import com.azure.core.annotation.Get;
 import com.lantanagroup.link.validation.services.ReportClient;
 import lombok.Getter;
 import lombok.Setter;
@@ -7,6 +8,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 @ConfigurationProperties("link")
@@ -28,4 +32,10 @@ public class LinkConfig {
      */
     @Getter @Setter
     private String fhirTerminologyServiceUrl;
+
+    @Getter @Setter
+    private List<String> whiteListCodeSystemRegex = new ArrayList<>();
+
+    @Getter @Setter
+    private List<String> whiteListValueSetRegex = new ArrayList<>();
 }

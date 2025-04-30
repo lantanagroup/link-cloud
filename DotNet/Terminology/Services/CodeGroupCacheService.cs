@@ -21,19 +21,17 @@ public class CodeGroupCacheService(
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
 
-    public void SetCodeGroup(CodeGroup codeGroup)
-    {
-        CacheKey key = new CacheKey(codeGroup);
-        cache.Set(key.Key, codeGroup, _cacheOptions);
-        
-        if (!_cacheKeys.Contains(key))
-            _cacheKeys.Add(key);
-    }
-
+    /// <summary>
+    /// Retrieves a specific code group from the cache based on its type, identifier, and optional version.
+    /// </summary>
+    /// <param name="type">The type of the code group to retrieve (e.g., CodeSystem, ValueSet).</param>
+    /// <param name="id">The unique identifier of the code group.</param>
+    /// <param name="version">The version of the code group. If null, the latest version is retrieved.</param>
+    /// <returns>The requested code group if it exists in the cache; otherwise, null.</returns>
     public CodeGroup? GetCodeGroupById(CodeGroup.CodeGroupTypes type, string id, string? version = null)
     {
         CacheKey? key = null;
-        
+
         if (version == null)
             key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version).FirstOrDefault();
         else
@@ -46,14 +44,50 @@ public class CodeGroupCacheService(
         return codeGroup;
     }
 
-    public CodeGroup? GetCodeGroup(CodeGroup.CodeGroupTypes type, string url, string? version = null)
+    /// <summary>
+    /// Retrieves a specific code group from the cache based on its type, identifier, and optional version.
+    /// </summary>
+    /// <param name="type">The type of code group to retrieve (e.g., CodeSystem, ValueSet).</param>
+    /// <param name="identifier">The unique identifier of the code group.</param>
+    /// <param name="version">The version of the code group. If null, the latest version is retrieved.</param>
+    /// <returns>The requested code group if it exists in the cache; otherwise, null.</returns>
+    public CodeGroup? GetCodeGroup(CodeGroup.CodeGroupTypes type, string identifier, string? version = null)
     {
         CacheKey? key = null;
-        
+
         if (version == null)
-            key = _cacheKeys.Where(k => k.Type == type && string.Equals(k.Url, url, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(k => k.Version).FirstOrDefault();
+        {
+            key = _cacheKeys
+                .Where(k => k.Type == type)
+                .Where(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase))
+                .OrderByDescending(k => k.Version)
+                .FirstOrDefault();
+
+            if (key == null)
+            {
+                key = _cacheKeys
+                    .Where(k => k.Type == type)
+                    .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)))
+                    .OrderByDescending(k => k.Version)
+                    .FirstOrDefault();
+            }
+        }
         else
-            key = _cacheKeys.FirstOrDefault(k => k.Type == type && string.Equals(k.Url, url, StringComparison.CurrentCultureIgnoreCase) && string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
+        {
+            
+            var keys = _cacheKeys
+                .Where(k => k.Type == type)
+                .Where(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase))
+                .ToList();
+
+            key = keys
+                .FirstOrDefault(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase));
+
+            if (key == null)
+                key = keys.FirstOrDefault(k =>
+                    k.Identifiers.Any(i =>
+                        string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)));
+        }
         
         if (key == null)
             return null;
@@ -61,7 +95,13 @@ public class CodeGroupCacheService(
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
     }
-    
+
+    /// <summary>
+    /// Retrieves all code groups of the specified type from the cache, ensuring only the latest version
+    /// of each unique code group is included in the result.
+    /// </summary>
+    /// <param name="type">The type of code groups to retrieve (e.g., CodeSystem, ValueSet).</param>
+    /// <returns>A list of code groups of the specified type, each containing only the latest version.</returns>
     public List<CodeGroup> GetAllCodeGroups(CodeGroup.CodeGroupTypes type)
     {
         List<CodeGroup> codeGroups = _cacheKeys
@@ -79,11 +119,25 @@ public class CodeGroupCacheService(
         return codeGroups;
     }
 
+    /// <summary>
+    /// Clears all items from the cache, including associated keys.
+    /// Iterates through the stored cache keys, removing each item from the memory cache.
+    /// After removing all items, the list of cache keys is cleared to ensure no residual references.
+    /// </summary>
     public void ClearCache()
     {
         foreach (var key in _cacheKeys)
             cache.Remove(key.Key);
         _cacheKeys.Clear();
+    }
+    
+    private void SetCodeGroup(CodeGroup codeGroup)
+    {
+        CacheKey urlKey = new CacheKey(codeGroup.Type, codeGroup.Url, codeGroup.Version, codeGroup.Id, codeGroup.Identifiers);
+        cache.Set(urlKey.Key, codeGroup, _cacheOptions);
+        
+        if (!_cacheKeys.Contains(urlKey))
+            _cacheKeys.Add(urlKey);
     }
 
     private async Task<CodeGroup> GetCodeGroup(string jsonFilePath)
@@ -100,6 +154,7 @@ public class CodeGroupCacheService(
             codeGroup.Type = CodeGroup.CodeGroupTypes.CodeSystem;
             codeGroup.Url = codeSystem.Url;
             codeGroup.Version = codeSystem.Version;
+            codeGroup.Identifiers = codeSystem.Identifier;
         }
         else if (codeGroup.Resource is ValueSet valueSet)
         {
@@ -107,6 +162,7 @@ public class CodeGroupCacheService(
             codeGroup.Type = CodeGroup.CodeGroupTypes.ValueSet;
             codeGroup.Url = valueSet.Url;
             codeGroup.Version = valueSet.Version;
+            codeGroup.Identifiers = valueSet.Identifier;
         }
         else 
         {
