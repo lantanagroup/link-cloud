@@ -124,6 +124,33 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         /// <summary>
+        /// Get a list of all facilities
+        /// </summary>
+        /// <returns></returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Dictionary<string, string>))]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpGet("list")]
+        public async Task<IActionResult> GetFacilityList()
+        {
+            var facilities = await _facilityConfigurationService.GetAllFacilities(HttpContext.RequestAborted);
+            
+            if (facilities.Count == 0)
+            {
+                return NoContent();
+            }
+            
+            var facilityList = new Dictionary<string, string>();
+            foreach (var facility in facilities)
+            {
+                if (facility.FacilityName is not null) 
+                    facilityList.TryAdd(facility.FacilityId, facility.FacilityName);
+            }
+            
+            return Ok(facilityList);
+        }
+
+        /// <summary>
         /// Creates a facility configuration.
         /// </summary>
         /// <param name="newFacility"></param>
