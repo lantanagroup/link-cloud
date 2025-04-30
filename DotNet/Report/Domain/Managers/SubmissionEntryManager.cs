@@ -1,13 +1,13 @@
-﻿using LantanaGroup.Link.Report.Entities;
-using System.Linq.Expressions;
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Census;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using System.Linq.Expressions;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -54,6 +54,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
+
+        Task UpdateStatusToValidationRequested(string patientSubmissionId);
+        Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -258,6 +261,28 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<MeasureReportSubmissionEntryModel> UpdateAsync(MeasureReportSubmissionEntryModel entity, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
+        }
+
+        public async Task UpdateStatusToValidationRequested(string patientSubmissionId)
+        {
+            var patientSub = await _database.SubmissionEntryRepository.GetAsync(patientSubmissionId, CancellationToken.None);
+
+            patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
+            patientSub.ValidationStatus = ValidationStatus.Requested;
+
+            await _database.SubmissionEntryRepository.UpdateAsync(patientSub);
+        }
+
+        public async Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds)
+        {
+            var patientSubs = await _database.SubmissionEntryRepository.FindAsync(s => patientSubmissionIds.Contains(s.Id), CancellationToken.None);
+
+            foreach (var patientSub in patientSubs)
+            {
+                patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
+                patientSub.ValidationStatus = ValidationStatus.Requested;
+                await _database.SubmissionEntryRepository.UpdateAsync(patientSub);
+            }            
         }
     }
 }

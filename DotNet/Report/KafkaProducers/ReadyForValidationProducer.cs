@@ -1,7 +1,5 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
@@ -12,21 +10,21 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
 
-        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
+        public ReadyForValidationProducer( IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
         {
             _readyForValidationProducer = readyForValidationProducer;
         }
 
 
-        public async Task Produce(IDatabase database, ReportScheduleModel schedule, IEnumerable<MeasureReportSubmissionEntryModel> needValidation)
+        public void Produce(ReportScheduleModel schedule, IEnumerable<MeasureReportSubmissionEntryModel> needValidation)
         {
             foreach (var entry in needValidation)
             {
-                await Produce(database, schedule, entry);
+                Produce(schedule, entry);
             }
         }
 
-        public async Task Produce(IDatabase database, ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry)
+        public void Produce(ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry)
         {
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
@@ -49,10 +47,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 });
 
             _readyForValidationProducer.Flush();
-
-            entry.ValidationStatus = ValidationStatus.Requested;
-            entry.Status = PatientSubmissionStatus.ValidationRequested;
-            await database.SubmissionEntryRepository.UpdateAsync(entry);
         }
     }
 }

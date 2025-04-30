@@ -101,7 +101,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             var scope = _serviceScopeFactory.CreateScope();
                             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
                             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+                            var patientSubEntryManager = scope.ServiceProvider.GetRequiredService<SubmissionEntryManager>();
 
                             try
                             {
@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
-                                var entry = await database.SubmissionEntryRepository.SingleAsync(e =>
+                                var entry = await patientSubEntryManager.SingleAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
@@ -178,11 +178,12 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
-                                await database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+                                await patientSubEntryManager.UpdateAsync(entry, cancellationToken);
 
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
-                                    await _readyForValidationProducer.Produce(database, schedule, entry);
+                                    _readyForValidationProducer.Produce(schedule, entry);
+                                    await patientSubEntryManager.UpdateStatusToValidationRequested(entry.Id!);
                                 }
                             }
                             catch (DeadLetterException ex)
