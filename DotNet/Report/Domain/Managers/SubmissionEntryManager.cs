@@ -55,7 +55,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
-        Task UpdateStatusToValidationRequested(string patientSubmissionId);
+        Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds);
     }
 
