@@ -15,6 +15,7 @@ public interface IDataAcquisitionLogService
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesForFacility(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> GetQueryLogSummariesByFacilityAndPatient(string facilityId, string patientId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<QueryLogSummaryModel> UpdateLogEntry(string id, UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken);
+    Task<IPagedModel<QueryLogSummaryModel>> Search(QueryPhaseModel? queryPhase, RequestStatusModel? status, AcquisitionPriorityModel? priority, int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task<IPagedModel<QueryLogSummaryModel>> Search(int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = default, string? facilityId = default, CancellationToken cancellationToken = default);
     Task DeleteLogEntry(string id, CancellationToken cancellationToken);
 }
@@ -117,5 +118,41 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
         // Logic to delete the log entry from the database
         await _dataAcquisitionLogManager.DeleteAsync(id, cancellationToken);
+    }
+
+    public async Task<IPagedModel<QueryLogSummaryModel>> Search(QueryPhaseModel? queryPhase, RequestStatusModel? status, AcquisitionPriorityModel? priority, int page, int pageSize, string sortBy, SortOrder sortOrder, string? patientId = null, string? facilityId = null, CancellationToken cancellationToken = default)
+    {
+        Expression<Func<DataAcquisitionLog, bool>> predicate = PredicateBuilder.New<DataAcquisitionLog>();
+        if (queryPhase.HasValue)
+        {
+            predicate = predicate.And(x => x.QueryPhase == QueryPhaseModelUtilities.ToDomain(queryPhase.Value));
+        }
+
+        if (status.HasValue)
+        {
+            predicate = predicate.And(x => x.Status == RequestStatusModelUtilities.ToDomain(status.Value));
+        }
+
+        if (priority.HasValue)
+        {
+            predicate = predicate.And(x => x.Priority == AcquisitionPriorityModelUtilities.ToDomain(priority.Value));
+        }
+
+        if (!string.IsNullOrEmpty(patientId))
+        {
+            predicate = predicate.And(x => x.PatientId.ToLower() == patientId.ToLower());
+        }
+
+        if (!string.IsNullOrEmpty(facilityId))
+        {
+            predicate = predicate.And(x => x.FacilityId.ToLower() == facilityId.ToLower());
+        }
+
+        var result = await _dataAcquisitionLogManager.SearchAsync(predicate, page, pageSize, sortBy, sortOrder, cancellationToken);
+        return new QueryLogSummaryModelResponse
+        {
+            Records = result.Item1.Select(QueryLogSummaryModel.FromDomain).ToList(),
+            Metadata = result.Item2
+        };
     }
 }

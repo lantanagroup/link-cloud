@@ -54,9 +54,9 @@ public class LogController : Controller
     public async Task<ActionResult<IPagedModel<QueryLogSummaryModel>>> Search(
         [FromQuery] string? facilityId,
         [FromQuery] string? patientId,
-        [FromQuery] QueryPhaseModel queryPhase = QueryPhaseModel.Initial,
-        [FromQuery] RequestStatusModel status = RequestStatusModel.Pending,
-        [FromQuery] AcquisitionPriorityModel priority = AcquisitionPriorityModel.Normal,
+        [FromQuery] QueryPhaseModel? queryPhase,
+        [FromQuery] RequestStatusModel? status,
+        [FromQuery] AcquisitionPriorityModel? priority,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string sortBy = "ExecutionDate",
@@ -71,7 +71,7 @@ public class LogController : Controller
 
         try
         {
-            var result = await _logService.Search(page, pageSize, sortBy, sortOrder, patientId, facilityId, cancellationToken);
+            var result = await _logService.Search(queryPhase, status, priority, page, pageSize, sortBy, sortOrder, patientId, facilityId, cancellationToken);
 
             if (result == null)
             {
