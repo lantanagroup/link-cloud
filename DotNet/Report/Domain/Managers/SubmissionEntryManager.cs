@@ -263,14 +263,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        public async Task UpdateStatusToValidationRequested(string patientSubmissionId)
+        public async Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         {
-            var patientSub = await _database.SubmissionEntryRepository.GetAsync(patientSubmissionId, CancellationToken.None);
+            var patientSub = await _database.SubmissionEntryRepository.GetAsync(patientSubmissionId, cancellationToken);
+            
+            if (patientSub == null)
+            {
+                throw new ArgumentException($"Patient submission with ID {patientSubmissionId} not found.");
+            }
 
             patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
             patientSub.ValidationStatus = ValidationStatus.Requested;
 
-            await _database.SubmissionEntryRepository.UpdateAsync(patientSub);
+            await _database.SubmissionEntryRepository.UpdateAsync(patientSub, cancellationToken);
         }
 
         public async Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds)
