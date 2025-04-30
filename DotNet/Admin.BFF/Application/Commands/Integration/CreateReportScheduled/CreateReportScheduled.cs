@@ -28,14 +28,17 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
             try
             {
+                if (string.IsNullOrEmpty(model.FacilityId))
+                {
+                    throw new ArgumentException("FacilityId cannot be null or empty");
+                }
+                
                 var headers = new Headers
                 {
                     { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) },
                     { "X-ReportTracking-Id", System.Text.Encoding.ASCII.GetBytes(correlationId) }
                 };
-
-                //var Key = string.IsNullOrEmpty(model.FacilityId) ? throw new ArgumentException("FacilityId cannot be null or empty", nameof(model.FacilityId)) : model.FacilityId;
-
+                
                 DateTime endDate;
 
                 if (double.TryParse(model.Delay, out double delay))

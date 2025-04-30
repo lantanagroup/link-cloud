@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using Quartz;
 using System.Diagnostics;
 using System.Net;
+using OpenTelemetry.Trace;
 
 namespace LantanaGroup.Link.Tenant.Controllers
 {
@@ -133,21 +134,31 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpGet("list")]
         public async Task<IActionResult> GetFacilityList()
         {
-            var facilities = await _facilityConfigurationService.GetAllFacilities(HttpContext.RequestAborted);
-            
-            if (facilities.Count == 0)
+            try
             {
-                return NoContent();
-            }
+                var facilities = await _facilityConfigurationService.GetAllFacilities(HttpContext.RequestAborted);
             
-            var facilityList = new Dictionary<string, string>();
-            foreach (var facility in facilities)
+                if (facilities.Count == 0)
+                {
+                    return NoContent();
+                }
+            
+                var facilityList = new Dictionary<string, string>();
+                foreach (var facility in facilities)
+                {
+                    if (facility.FacilityName is not null) 
+                        facilityList.TryAdd(facility.FacilityId, facility.FacilityName);
+                }
+            
+                return Ok(facilityList);
+            }
+            catch (Exception ex)
             {
-                if (facility.FacilityName is not null) 
-                    facilityList.TryAdd(facility.FacilityId, facility.FacilityName);
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                Activity.Current?.RecordException(ex);
+                _logger.LogError(ex, "Exception Encountered in FacilityController.GetFacilityList");
+                return Problem("An error occurred while getting all facilities", null, 500);
             }
-            
-            return Ok(facilityList);
         }
 
         /// <summary>
