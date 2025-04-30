@@ -275,13 +275,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds)
         {
-            var patientSubs = await _database.SubmissionEntryRepository.FindAsync(s => patientSubmissionIds.Contains(s.Id), CancellationToken.None);
-
-            foreach (var patientSub in patientSubs)
+            foreach (var patientSub in patientSubmissionIds)
             {
-                patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
-                patientSub.ValidationStatus = ValidationStatus.Requested;
-                await _database.SubmissionEntryRepository.UpdateAsync(patientSub);
+                await UpdateStatusToValidationRequested(patientSub);
             }            
         }
     }
