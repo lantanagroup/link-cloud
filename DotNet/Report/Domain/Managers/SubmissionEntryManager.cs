@@ -269,7 +269,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             
             if (patientSub == null)
             {
-                throw new ArgumentException($"Patient submission with ID {patientSubmissionId} not found.");
+                throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
             }
 
             patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
