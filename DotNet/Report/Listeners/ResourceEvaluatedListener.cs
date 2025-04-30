@@ -4,6 +4,7 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
@@ -100,7 +101,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             var scope = _serviceScopeFactory.CreateScope();
                             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
                             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
 
                             try
                             {
@@ -130,7 +131,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                             throw new TransientException($"{Name}: report schedule not found for Facility {key.FacilityId} and reportId: {value.ReportTrackingId}");
 
 
-                                var entry = await submissionEntryManager.SingleAsync(e =>
+                                var entry = await database.SubmissionEntryRepository.SingleAsync(e =>
                                     e.ReportScheduleId == schedule.Id
                                     && e.PatientId == value.PatientId
                                     && e.ReportType == value.ReportType, consumeCancellationToken);
@@ -177,11 +178,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
-                                await submissionEntryManager.UpdateAsync(entry, cancellationToken);
+                                await database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
 
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
-                                    await _readyForValidationProducer.Produce(schedule, entry);
+                                    await _readyForValidationProducer.Produce(database, schedule, entry);
                                 }
                             }
                             catch (DeadLetterException ex)
