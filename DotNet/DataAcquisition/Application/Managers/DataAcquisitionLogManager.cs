@@ -1,10 +1,8 @@
 ﻿using DataAcquisition.Domain;
 using DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;

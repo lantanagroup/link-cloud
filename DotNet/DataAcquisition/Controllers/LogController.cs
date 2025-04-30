@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using LantanaGroup.Link.Shared.Application.Enums;
 using System.Net;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
-using MongoDB.Driver;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 

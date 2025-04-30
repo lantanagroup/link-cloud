@@ -20,10 +20,9 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Extensions; 
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using DAEnums = LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using System.Diagnostics;
-using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
 

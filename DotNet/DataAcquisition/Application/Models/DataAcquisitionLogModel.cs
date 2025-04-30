@@ -27,17 +27,22 @@ public class DataAcquisitionLogModel
 
     public static DataAcquisitionLogModel FromDomain(DataAcquisitionLog log)
     {
+        if (log == null)
+        {
+            throw new ArgumentNullException(nameof(log));
+        }
+
         return new DataAcquisitionLogModel
         {
             Id = log.Id,
             Priority = AcquisitionPriorityModelUtilities.FromDomain(log.Priority),
             FacilityId = log.FacilityId,
-            PatientId = log.PatientId,
-            FhirVersion = log.FhirVersion,
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.Value),
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.Value),
+            PatientId = log?.PatientId,
+            FhirVersion = log?.FhirVersion,
+            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
+            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             FhirQuery = log.FhirQuery?.Select(FhirQueryModel.FromDomain).ToList(),
-            Status = RequestStatusModelUtilities.FromDomain(log.Status.Value),
+            Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
             TimeZone = log.TimeZone,
             RetryAttempts = log.RetryAttempts,

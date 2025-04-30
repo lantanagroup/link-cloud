@@ -1,15 +1,11 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Services;
 using Moq;
 using LantanaGroup.Link.Shared.Application.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
 using Microsoft.Extensions.Logging;
 using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace DataAcquisitionTests.ServiceTests;
 public class DataAcquisitionLogServiceTests
@@ -30,7 +26,9 @@ public class DataAcquisitionLogServiceTests
     {
         // Arrange
         var logId = "123";
-        var domainLog = new DataAcquisitionLog { Id = logId, Notes = new List<string> { "Test Log" } };
+        var facilityId = "Facility1";
+        var scheduledReport = new ScheduledReport { ReportTypes = new List<string> { "Report1" }, StartDate = DateTime.UtcNow, EndDate = DateTime.UtcNow, Frequency = Frequency.Discharge, ReportTrackingId = Guid.NewGuid().ToString() };
+        var domainLog = new DataAcquisitionLog { Id = logId, FacilityId = facilityId, Notes = new List<string> { "Test Log" }, ScheduledReport = scheduledReport };
         _mockLogManager
             .Setup(manager => manager.GetAsync(logId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(domainLog);
@@ -68,11 +66,12 @@ public class DataAcquisitionLogServiceTests
         var pageSize = 10;
         var sortBy = "Date";
         var sortOrder = SortOrder.Ascending;
-
+        var scheduledReport = new ScheduledReport { ReportTypes = new List<string> { "Report1" }, StartDate = DateTime.UtcNow, EndDate = DateTime.UtcNow, Frequency = Frequency.Discharge, ReportTrackingId = Guid.NewGuid().ToString() };
+        
         var domainLogs = new List<DataAcquisitionLog>
             {
-                new DataAcquisitionLog { Id = "1", Notes = new List<string> { "Test Log 1" } },
-                new DataAcquisitionLog { Id = "2", Notes = new List<string> { "Test Log 2" } }
+                new DataAcquisitionLog { Id = "1", Notes = new List<string> { "Test Log 1" }, FacilityId = facilityId, ScheduledReport = scheduledReport },
+                new DataAcquisitionLog { Id = "2", Notes = new List<string> { "Test Log 2" }, FacilityId = facilityId, ScheduledReport = scheduledReport }
             };
         var paginationMetadata = new PaginationMetadata { TotalCount = 2, PageSize = 10, PageNumber = 1, TotalPages = 1 };
 

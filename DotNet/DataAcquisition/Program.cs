@@ -47,7 +47,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Model;

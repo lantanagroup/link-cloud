@@ -1,6 +1,5 @@
 ﻿using DataAcquisition.Domain.Entities;
 using DataAcquisition.Domain.Models.Enums;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -11,7 +10,7 @@ public record QueryLogSummaryModel
     public string Id { get; init; } = null!;
     public AcquisitionPriorityModel Priority { get; init; }
     public string FacilityId { get; init; } = null!;
-    public string PatientId { get; init; } = null!;
+    public string? PatientId { get; init; } = null!;
     public List<Hl7.Fhir.Model.ResourceType> ResourceTypes { get; init; } = null!;
     public string? ResourceId { get; init; } = null!;
     public string FhirVersion { get; init; } = null!;
@@ -31,10 +30,10 @@ public record QueryLogSummaryModel
             ResourceTypes = log.FhirQuery?.FirstOrDefault()?.ResourceTypes,
             ResourceId = log.FhirQuery?.FirstOrDefault().ResourceTypes.FirstOrDefault() == Hl7.Fhir.Model.ResourceType.Patient ? log.PatientId : log.QueryType == FhirQueryType.Read ? log.FhirQuery.FirstOrDefault().QueryParameters[0] : string.Empty,
             FhirVersion = log.FhirVersion,
-            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.Value),
-            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.Value),
+            QueryType = FhirQueryTypeModelUtilities.FromDomain(log.QueryType.GetValueOrDefault()),
+            QueryPhase = QueryPhaseModelUtilities.FromDomain(log.QueryPhase.GetValueOrDefault()),
             ExecutionDate = log.ExecutionDate,
-            Status = RequestStatusModelUtilities.FromDomain(log.Status.Value)
+            Status = RequestStatusModelUtilities.FromDomain(log.Status.GetValueOrDefault())
         };
     }
 }

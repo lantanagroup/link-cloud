@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.Shared.Application.Models;
-using ScheduledReport = DataAcquisition.Domain.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Models;
 
