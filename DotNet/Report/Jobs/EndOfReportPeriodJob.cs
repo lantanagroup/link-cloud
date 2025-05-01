@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Report.Jobs
         
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
-        private readonly SubmissionEntryManager _submissionEntryManager;
+        private readonly ISubmissionEntryManager _submissionEntryManager;
 
         private readonly SubmitReportProducer _submitReportProducer;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Report.Jobs
             ILogger<EndOfReportPeriodJob> logger,
             ISchedulerFactory schedulerFactory,
             IDatabase database,
-            SubmissionEntryManager submissionEntryManager,
+            ISubmissionEntryManager submissionEntryManager,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
             SubmitReportProducer submitReportProducer)
