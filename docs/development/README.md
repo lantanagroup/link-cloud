@@ -54,3 +54,39 @@ The above requires the following:
 ## Deployment Validation and Testing
 
 Guidance on basic tests to validate that Link is running correctly can be found [here](./testing.md).
+
+## Docker Networking and Local Debugging
+
+Docker Compose creates its own isolated network for containers to communicate with each other. When running services
+locally in an IDE while other services are running in Docker, this network isolation can cause connectivity issues.
+
+To enable local debugging against Docker services, Link provides a PowerShell script
+`Scripts/update-windows-docker-hosts.ps1` that:
+
+1. Identifies all running Link Docker containers
+2. Updates your Windows hosts file to map service hostnames (e.g., `link-validation`) to localhost (127.0.0.1)
+
+### Using the Script
+
+1. First ensure all Link services are running in Docker using `docker compose up -d`
+2. Run PowerShell as Administrator
+3. Execute `Scripts/update-windows-docker-hosts.ps1`
+4. The hosts file will be updated to allow your locally running service to resolve Docker service hostnames
+
+This configuration is necessary when you want to debug an individual service in your IDE while having it integrate with
+other services running in Docker containers.
+
+## Useful commands
+
+```bash
+docker compose -p link up -d <services>
+```
+
+`-p` gives a custom name to the stack of services
+`<services>` optionally specify individual services to start
+
+```bash
+docker compose -p link down --volumes
+```
+
+`--volumes` destroys and persisted data, including SQL tables and kafka topics/data
