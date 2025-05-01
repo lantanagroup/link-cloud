@@ -57,9 +57,9 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task<List<FacilityConfigModel>> GetAllFacilities(CancellationToken cancellationToken = default)
         {
-            using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
+            using var activity = ServiceActivitySource.Instance.StartActivity("Get Facilities By Filters Query");
 
-            return await _facilityConfigurationRepo.GetAllAsync();
+            return await _facilityConfigurationRepo.GetAllAsync(cancellationToken);
 
         }
 
