@@ -8,8 +8,9 @@ import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
-import com.lantanagroup.link.validation.providers.LinkRemoteTermServiceValidation;
+import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.UnknownCodeSystemWarningValidationSupport;
+import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.*;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -26,13 +27,13 @@ import java.util.concurrent.ForkJoinPool;
 public class ValidationService {
     private final FhirValidator fhirValidator;
 
-    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig) throws IOException {
+    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig, ValidationCacheService validationCacheService) throws IOException {
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
                 new SnapshotGeneratingValidationSupport(fhirContext));
 
-        loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain);
+        loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain, validationCacheService);
 
         CachingValidationSupport cachingValidationSupport = new CachingValidationSupport(validationSupportChain);
         IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
@@ -42,15 +43,15 @@ public class ValidationService {
         fhirValidator.setExecutorService(ForkJoinPool.commonPool());
     }
 
-    private static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain) {
+    private static void loadTerminologyValidationSupport(FhirContext fhirContext, LinkConfig linkConfig, ValidationSupportChain validationSupportChain, ValidationCacheService validationCacheService) {
         if (linkConfig.getFhirTerminologyServiceUrl() != null && !linkConfig.getFhirTerminologyServiceUrl().isEmpty()) {
-            var remoteTerm = new LinkRemoteTermServiceValidation(fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
+            var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, linkConfig.getFhirTerminologyServiceUrl(), linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
         } else if (linkConfig.getTerminologyServiceUrl() != null && !linkConfig.getTerminologyServiceUrl().isEmpty()) {
             // RemoteTerminologyServiceValidationSupport expects the base url to be the root of a FHIR interface
             // Append /api/terminology/fhir to the terminology service URL since this is the link terminology service.
             String terminologyServiceUrl = (linkConfig.getTerminologyServiceUrl().endsWith("/") ? linkConfig.getTerminologyServiceUrl() : linkConfig.getTerminologyServiceUrl() + "/") + "api/terminology/fhir";
-            var remoteTerm = new LinkRemoteTermServiceValidation(fhirContext, terminologyServiceUrl, linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
+            var remoteTerm = new RemoteTermServiceValidation(validationCacheService, fhirContext, terminologyServiceUrl, linkConfig.getWhiteListCodeSystemRegex(), linkConfig.getWhiteListValueSetRegex());
             validationSupportChain.addValidationSupport(remoteTerm);
         } else {
             var commonCodeSystemsTerminologyService = new CommonCodeSystemsTerminologyService(fhirContext);

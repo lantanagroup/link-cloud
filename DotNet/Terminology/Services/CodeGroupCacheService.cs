@@ -16,8 +16,7 @@ public class CodeGroupCacheService(
     IMemoryCache cache,
     IOptions<TerminologyConfig> terminologyConfig)
 {
-    private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions()
-        .SetSlidingExpiration(TimeSpan.FromMinutes(60)); // Adjust expiration as needed
+    private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
 

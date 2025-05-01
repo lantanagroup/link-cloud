@@ -30,19 +30,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class LinkRemoteTermServiceValidation extends BaseValidationSupport implements IValidationSupport {
-    private static final Logger ourLog = LoggerFactory.getLogger(LinkRemoteTermServiceValidation.class);
+public class RemoteTermServiceValidation extends BaseValidationSupport implements IValidationSupport {
+    private static final Logger ourLog = LoggerFactory.getLogger(RemoteTermServiceValidation.class);
     private String myBaseUrl;
     private final List<Object> myClientInterceptors = new ArrayList();
     private List<String> whiteListCodeSystemRegex = new ArrayList<>();
     private List<String> whiteListValueSetRegex = new ArrayList<>();
+    private ValidationCacheService validationCacheService;
 
-    public LinkRemoteTermServiceValidation(FhirContext theFhirContext) {
+    public RemoteTermServiceValidation(FhirContext theFhirContext) {
         super(theFhirContext);
     }
 
-    public LinkRemoteTermServiceValidation(FhirContext theFhirContext, String theBaseUrl, List<String> whiteListCodeSystemRegex, List<String> whiteListValueSetRegex) {
+    public RemoteTermServiceValidation(ValidationCacheService validationCacheService, FhirContext theFhirContext, String theBaseUrl, List<String> whiteListCodeSystemRegex, List<String> whiteListValueSetRegex) {
         super(theFhirContext);
+        this.validationCacheService = validationCacheService;
         this.myBaseUrl = theBaseUrl;
         this.whiteListCodeSystemRegex = whiteListCodeSystemRegex;
         this.whiteListValueSetRegex = whiteListValueSetRegex;
@@ -53,7 +55,7 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
     }
 
     public IValidationSupport.CodeValidationResult validateCode(ValidationSupportContext theValidationSupportContext, ConceptValidationOptions theOptions, String theCodeSystem, String theCode, String theDisplay, String theValueSetUrl) {
-        return this.invokeRemoteValidateCode(theCodeSystem, theCode, theDisplay, theValueSetUrl, (IBaseResource)null);
+        return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, theValueSetUrl);
     }
 
     @Nullable
@@ -136,7 +138,7 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
                     }
                     break;
                 case "designation":
-                    IValidationSupport.ConceptDesignation conceptDesignation = this.createConceptDesignationR4(parameterComponent);
+                    IValidationSupport.ConceptDesignation conceptDesignation = this.createConceptDesignation(parameterComponent);
                     result.getDesignations().add(conceptDesignation);
                     break;
                 case "name":
@@ -207,7 +209,7 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
         return conceptProperty;
     }
 
-    private IValidationSupport.ConceptDesignation createConceptDesignationR4(org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent theParameterComponent) {
+    private IValidationSupport.ConceptDesignation createConceptDesignation(org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent theParameterComponent) {
         IValidationSupport.ConceptDesignation conceptDesignation = new IValidationSupport.ConceptDesignation();
 
         for(org.hl7.fhir.r4.model.Parameters.ParametersParameterComponent designationComponent : theParameterComponent.getPart()) {
@@ -262,7 +264,8 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
             }
         }
 
-        return this.fetchCodeSystem(theSystem, SummaryEnum.TRUE) != null;
+        IBaseResource codeSystem = this.fetchCodeSystem(theSystem, SummaryEnum.TRUE);
+        return codeSystem != null;
     }
 
     public boolean isValueSetSupported(ValidationSupportContext theValidationSupportContext, String theValueSetUrl) {
@@ -276,7 +279,8 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
             }
         }
 
-        return this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE) != null;
+        IBaseResource valueSet = this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE);
+        return valueSet != null;
     }
 
     public TranslateConceptResults translateConcept(IValidationSupport.TranslateCodeRequest theRequest) {
@@ -384,16 +388,6 @@ public class LinkRemoteTermServiceValidation extends BaseValidationSupport imple
 
             return params;
         }
-    }
-
-    public void setBaseUrl(String theBaseUrl) {
-        Validate.notBlank(theBaseUrl, "theBaseUrl must be provided", new Object[0]);
-        this.myBaseUrl = theBaseUrl;
-    }
-
-    public void addClientInterceptor(@Nonnull Object theClientInterceptor) {
-        Validate.notNull(theClientInterceptor, "theClientInterceptor must not be null", new Object[0]);
-        this.myClientInterceptors.add(theClientInterceptor);
     }
 }
 

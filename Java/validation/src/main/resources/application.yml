@@ -1,3 +1,7 @@
+logging:
+  level:
+    org.springframework.data.redis: DEBUG
+
 loki:
   enabled: false
   url: ''
@@ -15,10 +19,15 @@ springdoc:
   swagger-ui:
     enabled: false
 
-
 spring:
   application:
     name: ValidationService
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
   jackson:
     mapper:
       accept-case-insensitive-enums: true
@@ -49,6 +58,16 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 100MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj
+
+cache:
+  type: redis   # or "redis" and uncomment spring.data.redis properties
+  validate-code:
+    ttl: 3600
 
 secret-management:
   key-vault-uri: ''
