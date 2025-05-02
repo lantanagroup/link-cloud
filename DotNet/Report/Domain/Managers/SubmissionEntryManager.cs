@@ -6,8 +6,6 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
-using System.Threading;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -48,8 +46,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
-        Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
-        Task UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels);
+        Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
+        Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -169,7 +167,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        public async Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
+        public async Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         {
             var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSubmissionId, cancellationToken);
 
@@ -182,21 +180,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entry.ValidationStatus = ValidationStatus.Requested;
 
             await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
+
+            return entry;
         }
 
-        public async Task UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels)
+        public async Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels)
         {
-            foreach (var patientSub in patientSubmissionModels)
+            foreach (var entry in patientSubmissionModels)
             {
-                var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSub.Id);
-                if (entry != null)
-                {
-                    entry.Status = PatientSubmissionStatus.ReadyForValidation;
-                    entry.ValidationStatus = ValidationStatus.Requested;
+                entry.Status = PatientSubmissionStatus.ReadyForValidation;
+                entry.ValidationStatus = ValidationStatus.Requested;
 
-                    await _database.SubmissionEntryRepository.UpdateAsync(entry, CancellationToken.None);
-                }
-            }            
+                await _database.SubmissionEntryRepository.UpdateAsync(entry, CancellationToken.None);
+            }
+
+            return patientSubmissionModels;
         }
     }
 }
