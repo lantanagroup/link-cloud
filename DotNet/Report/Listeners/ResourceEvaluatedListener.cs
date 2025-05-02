@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
                                     _readyForValidationProducer.Produce(schedule, entry);
-                                    await patientSubEntryManager.UpdateStatusToValidationRequested(entry.Id!);
+                                    await patientSubEntryManager.UpdateStatusToValidationRequested(entry.Id);
                                 }
                             }
                             catch (DeadLetterException ex)
