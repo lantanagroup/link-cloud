@@ -265,7 +265,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         {
-            var patientSub = await _database.SubmissionEntryRepository.GetAsync(patientSubmissionId, cancellationToken);
+            var patientSub = (await _database.SubmissionEntryRepository.FindAsync(s => s.Id == patientSubmissionId, cancellationToken)).SingleOrDefault();
             
             if (patientSub == null)
             {
