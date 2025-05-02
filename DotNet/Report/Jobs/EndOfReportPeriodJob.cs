@@ -77,8 +77,8 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     if(needsValidation.Any())
                     {
-                        _readyForValidationProducer.Produce(schedule, needsValidation);
                         await _submissionEntryManager.UpdateStatusToValidationRequested(needsValidation.Select(s => s.Id).ToList());
+                        _readyForValidationProducer.Produce(schedule, needsValidation);
                     }
                 }
                 
