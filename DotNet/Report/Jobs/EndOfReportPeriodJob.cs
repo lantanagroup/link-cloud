@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     if(needsValidation.Any())
                     {
-                        _readyForValidationProducer.Produce(schedule, needsValidation);
+                        await _readyForValidationProducer.Produce(schedule, needsValidation);
                     }
                 }
                 
