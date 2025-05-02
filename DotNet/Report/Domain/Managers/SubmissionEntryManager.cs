@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
@@ -47,7 +48,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
         Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
-        Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels);
+        Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<string> patientSubmissionIds);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -184,8 +185,9 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return entry;
         }
 
-        public async Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels)
+        public async Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<string> patientSubmissionIds)
         {
+            var patientSubmissionModels = await _database.SubmissionEntryRepository.FindAsync(s => patientSubmissionIds.Contains(s.Id));
             foreach (var entry in patientSubmissionModels)
             {
                 entry.Status = PatientSubmissionStatus.ReadyForValidation;
