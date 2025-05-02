@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
         Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
-        Task UpdateStatusToValidationRequested(List<string> patientSubmissionIds);
+        Task UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
