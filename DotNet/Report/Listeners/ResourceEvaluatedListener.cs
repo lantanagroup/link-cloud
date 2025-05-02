@@ -101,7 +101,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             var scope = _serviceScopeFactory.CreateScope();
                             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
                             var measureReportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-                            var patientSubEntryManager = scope.ServiceProvider.GetRequiredService<SubmissionEntryManager>();
+                            var patientSubEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
 
                             try
                             {
