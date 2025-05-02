@@ -90,3 +90,67 @@ docker compose -p link down --volumes
 ```
 
 `--volumes` destroys and persisted data, including SQL tables and kafka topics/data
+
+## Admin UI and BFF Sequences
+
+Using separately deployed BFF with authentication:
+
+```mermaid
+ sequenceDiagram
+    participant UI
+    participant IdP
+    participant BFF
+
+    Note over UI: Configure UI to use OAuth2 via `oauth2` property
+    Note over UI: Configure UI to use `baseApiUrl` pointing to deployed BFF/api
+    Note over BFF: Configure BFF to allow JWT authentication
+
+    UI->>IdP: Redirect for authentication
+    IdP->>UI: Authenticate user and redirect back with access token
+    UI->>UI: Store access token in local storage
+    UI->>BFF: Request with Authorization Bearer token
+    BFF->>BFF: Validate token in request 
+```
+
+Using BFF configured with Keycloak:
+
+```mermaid
+ sequenceDiagram
+    participant UI
+    participant BFF
+    participant Keycloak
+
+    Note over Keycloak: Stand up Keycloak in Docker Compose
+    Note over Keycloak: Pre-load user (default@nhsnlink.org)
+
+    UI->>BFF: Redirect user to localhost:<bff>/api/login
+    BFF->>Keycloak: Redirect to Keycloak
+    Keycloak->>Keycloak: Authenticate user
+    Keycloak->>BFF: Redirect back with access token
+    BFF->>UI: Redirect back to localhost:4200 with cookie
+    UI->>BFF: Future requests automatically include cookie for auth 
+```
+
+BFF is accessed directly from Postman with a token:
+
+```mermaid
+ sequenceDiagram
+    participant Postman
+    participant BFF
+    participant AccountService
+
+    Note over BFF: Configure BFF to support JWT
+    Note over Postman: Configure Postman to acquire token from OAuth
+
+    Postman->>BFF: Request with "Authorization: Bearer <token>" header
+    BFF->>BFF: Validate token's issuer and verify signature
+    alt Cache enabled
+        BFF->>BFF: Check cache for user information
+    else Cache not enabled or user not in cache
+        BFF->>AccountService: Get user information
+        AccountService->>BFF: Return user information
+        BFF->>BFF: Cache user information
+    end
+    BFF->>BFF: Validate user permissions
+    BFF->>Postman: Perform requested action 
+```
