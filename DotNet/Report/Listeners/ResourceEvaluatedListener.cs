@@ -175,6 +175,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
+
                                     entry.Status = PatientSubmissionStatus.NotReportable;
                                 }
 
