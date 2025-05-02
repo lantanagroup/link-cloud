@@ -96,6 +96,7 @@ public sealed class SmokeTest : IAsyncLifetime
         var reportId = generateReportResponse["reportId"]?.ToString();
         Assert.False(string.IsNullOrWhiteSpace(reportId), $"Expected ReportId to be set but received {reportId}");
         
+
         var reportSubmitted = await this.CheckReportSubmissionStatusAsync(FacilityId, reportId);
         Assert.True(reportSubmitted, $"Expected report with id {reportId} to be submitted but it was not");
         
