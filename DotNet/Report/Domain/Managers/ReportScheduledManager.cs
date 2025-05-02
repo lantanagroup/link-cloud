@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
 
             if (scheduledReport is null)
-                throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
+                throw new InvalidOperationException($"Scheduled report with ID '{reportId}' not found.");
 
             var summary = _scheduledReportFactory.FromDomain(scheduledReport);
             if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;

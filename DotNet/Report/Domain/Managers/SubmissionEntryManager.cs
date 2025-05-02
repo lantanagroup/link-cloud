@@ -170,8 +170,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         public async Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         {
-            var patientSub = (await _database.SubmissionEntryRepository.FindAsync(s => s.Id == patientSubmissionId, cancellationToken)).SingleOrDefault();
-            
+            var patientSub = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSubmissionId, cancellationToken);
+
             if (patientSub == null)
             {
                 throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
