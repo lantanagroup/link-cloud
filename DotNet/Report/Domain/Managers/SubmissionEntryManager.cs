@@ -188,10 +188,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             foreach (var patientSub in patientSubmissionModels)
             {
-                patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
-                patientSub.ValidationStatus = ValidationStatus.Requested;
+                var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSub.Id);
+                if (entry != null)
+                {
+                    entry.Status = PatientSubmissionStatus.ReadyForValidation;
+                    entry.ValidationStatus = ValidationStatus.Requested;
 
-                await _database.SubmissionEntryRepository.UpdateAsync(patientSub, CancellationToken.None);
+                    await _database.SubmissionEntryRepository.UpdateAsync(entry, CancellationToken.None);
+                }
             }            
         }
     }
