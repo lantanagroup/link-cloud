@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using System.Linq.Expressions;
+using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -183,11 +184,14 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SubmissionEntryRepository.UpdateAsync(patientSub, cancellationToken);
         }
 
-        public async Task UpdateStatusToValidationRequested(List<string> patientSubmissionIds)
+        public async Task UpdateStatusToValidationRequested(List<MeasureReportSubmissionEntryModel> patientSubmissionModels)
         {
-            foreach (var patientSub in patientSubmissionIds)
+            foreach (var patientSub in patientSubmissionModels)
             {
-                await UpdateStatusToValidationRequested(patientSub);
+                patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
+                patientSub.ValidationStatus = ValidationStatus.Requested;
+
+                await _database.SubmissionEntryRepository.UpdateAsync(patientSub, CancellationToken.None);
             }            
         }
     }
