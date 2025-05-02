@@ -177,7 +177,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
             }
 
-            entry.Status = PatientSubmissionStatus.ReadyForValidation;
+            entry.Status = PatientSubmissionStatus.ValidationRequested;
             entry.ValidationStatus = ValidationStatus.Requested;
 
             await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
@@ -190,7 +190,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             var patientSubmissionModels = await _database.SubmissionEntryRepository.FindAsync(s => patientSubmissionIds.Contains(s.Id));
             foreach (var entry in patientSubmissionModels)
             {
-                entry.Status = PatientSubmissionStatus.ReadyForValidation;
+                entry.Status = PatientSubmissionStatus.ValidationRequested;
                 entry.ValidationStatus = ValidationStatus.Requested;
 
                 await _database.SubmissionEntryRepository.UpdateAsync(entry, CancellationToken.None);
