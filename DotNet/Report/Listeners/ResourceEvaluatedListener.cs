@@ -4,7 +4,6 @@ using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Models;
-using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
@@ -182,8 +181,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                 if (entry.Status == PatientSubmissionStatus.ReadyForValidation && entry.ValidationStatus != ValidationStatus.Requested)
                                 {
-                                    await submissionEntryManager.UpdateStatusToValidationRequested(entry.Id);
                                     _readyForValidationProducer.Produce(schedule, entry);
+                                    await submissionEntryManager.UpdateStatusToValidationRequested(entry.Id);
                                 }
                             }
                             catch (DeadLetterException ex)

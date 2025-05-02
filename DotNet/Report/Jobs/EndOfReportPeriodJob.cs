@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
@@ -14,10 +13,9 @@ namespace LantanaGroup.Link.Report.Jobs
     public class EndOfReportPeriodJob : IJob
     {
         private readonly ILogger<EndOfReportPeriodJob> _logger;
-        
+
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IDatabase _database;
-        private readonly ISubmissionEntryManager _submissionEntryManager;
 
         private readonly SubmitReportProducer _submitReportProducer;
         private readonly ReadyForValidationProducer _readyForValidationProducer;
@@ -27,7 +25,6 @@ namespace LantanaGroup.Link.Report.Jobs
             ILogger<EndOfReportPeriodJob> logger,
             ISchedulerFactory schedulerFactory,
             IDatabase database,
-            ISubmissionEntryManager submissionEntryManager,
             DataAcquisitionRequestedProducer dataAcqProducer,
             ReadyForValidationProducer readyForValidationProducer,
             SubmitReportProducer submitReportProducer)
@@ -38,7 +35,6 @@ namespace LantanaGroup.Link.Report.Jobs
             _dataAcqProducer = dataAcqProducer;
             _readyForValidationProducer = readyForValidationProducer;
             _submitReportProducer = submitReportProducer;
-            _submissionEntryManager = submissionEntryManager;
         }
 
 
@@ -77,7 +73,6 @@ namespace LantanaGroup.Link.Report.Jobs
 
                     if(needsValidation.Any())
                     {
-                        await _submissionEntryManager.UpdateStatusToValidationRequested(needsValidation.Select(s => s.Id).ToList());
                         _readyForValidationProducer.Produce(schedule, needsValidation);
                     }
                 }

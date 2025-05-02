@@ -48,7 +48,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
         Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
-        Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<string> patientSubmissionIds);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
@@ -183,20 +182,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
 
             return entry;
-        }
-
-        public async Task<List<MeasureReportSubmissionEntryModel>> UpdateStatusToValidationRequested(List<string> patientSubmissionIds)
-        {
-            var patientSubmissionModels = await _database.SubmissionEntryRepository.FindAsync(s => patientSubmissionIds.Contains(s.Id));
-            foreach (var entry in patientSubmissionModels)
-            {
-                entry.Status = PatientSubmissionStatus.ValidationRequested;
-                entry.ValidationStatus = ValidationStatus.Requested;
-
-                await _database.SubmissionEntryRepository.UpdateAsync(entry, CancellationToken.None);
-            }
-
-            return patientSubmissionModels;
         }
     }
 }
