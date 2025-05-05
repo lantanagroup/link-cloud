@@ -48,12 +48,6 @@ public class CensusPatientListManager : ICensusPatientListManager
 
     public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
     {
-        if (entity.Id == null)
-        {
-            entity.Id = Guid.NewGuid().ToString();
-            entity.CreateDate = DateTime.UtcNow;
-        }
-
         return await _patientListRepository.AddAsync(entity, cancellationToken);
     }
     public async Task<CensusPatientListEntity> UpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
