@@ -40,7 +40,7 @@ namespace NormalizationOperationTests
         }
 
         [Fact]
-        public async Task Integration_Location_Identifier_To_Type()
+        public async Task Integration_CopyPropertyOperation_Location_Identifier_To_Type()
         {
             var database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
 
@@ -64,8 +64,6 @@ namespace NormalizationOperationTests
                 IsDisabled = false,
                 ResourceTypes = ["Location"]
             });
-
-
 
             Assert.NotNull(result);
             Assert.True(result.Id != default);
