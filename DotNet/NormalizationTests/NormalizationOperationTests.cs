@@ -87,6 +87,9 @@ namespace NormalizationOperationTests
             var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
 
             Assert.NotNull(copyOperation);
+            Assert.NotNull(copyOperation.SourceFhirPath);
+            Assert.NotNull(copyOperation.TargetFhirPath);
+
             copyOperation.Execute(location);
 
             Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
