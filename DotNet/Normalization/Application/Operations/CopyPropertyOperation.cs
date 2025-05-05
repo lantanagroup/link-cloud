@@ -22,20 +22,36 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             TargetFhirPath = targetFhirPath;
         }
 
-        public DomainResource Execute(DomainResource domainResource)
-        { 
-            CopyFhirPathValue(domainResource, SourceFhirPath, TargetFhirPath);
-
-            return domainResource;
-        }
-
-        public void CopyFhirPathValue(Resource resource, string sourceFhirPath, string targetFhirPath)
+        /// <summary>
+        /// Copies a value from sourceFhirPath to targetFhirPath on a deep copy of the input resource.
+        /// Returns the processed deep copy only if no exceptions occur; otherwise, throws the exception.
+        /// The original resource remains unchanged.
+        /// </summary>
+        /// <param name="resource">The input DomainResource.</param>
+        /// <returns>The processed deep copy of the resource.</returns>
+        /// <exception cref="ArgumentException">Thrown if inputs are invalid.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if FHIRPath resolution or type issues occur.</exception>
+        public DomainResource Execute(DomainResource resource)
         {
-            if (resource == null || string.IsNullOrEmpty(sourceFhirPath) || string.IsNullOrEmpty(targetFhirPath))
+            if (resource == null || string.IsNullOrEmpty(SourceFhirPath) || string.IsNullOrEmpty(TargetFhirPath))
             {
                 throw new ArgumentException("Resource, SourceFhirPath, and TargetFhirPath must not be null or empty.");
             }
 
+            // Create a deep copy of the input resource
+            var resourceCopy = resource.DeepCopy() as DomainResource;
+            if (resourceCopy == null)
+            {
+                throw new InvalidOperationException("Failed to create a deep copy of the resource.");
+            }
+
+            // Perform the copy operation on the deep copy
+            CopyFhirPathValue(resourceCopy, SourceFhirPath, TargetFhirPath);
+            return resourceCopy;
+        }
+
+        private static void CopyFhirPathValue(Resource resource, string sourceFhirPath, string targetFhirPath)
+        {
             // Convert the resource to a navigable element for FHIRPath evaluation
             var scopedNode = resource.ToTypedElement();
 
@@ -80,7 +96,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
-        private void SetTargetValue(Resource resource, string targetFhirPath, object newValue)
+        private static void SetTargetValue(Resource resource, string targetFhirPath, object newValue)
         {
             // Split the FHIRPath to identify the parent path and property
             var pathParts = targetFhirPath.Split('.');
@@ -112,7 +128,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             // Evaluate the parent FHIRPath
             var scopedNode = resource.ToTypedElement();
-            var parentElements = string.IsNullOrEmpty(parentPath) ? [scopedNode] : scopedNode.Select(parentPath).ToList();
+            var parentElements = string.IsNullOrEmpty(parentPath) ? [ scopedNode ] : scopedNode.Select(parentPath).ToList();
 
             Base parentPoco;
             if (!parentElements.Any())
@@ -141,6 +157,17 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 throw new InvalidOperationException($"Property {propertyName} not found on parent type {parentPoco.GetType().Name}.");
             }
 
+            // Convert newValue to the appropriate FHIR type if necessary
+            object targetValue = newValue;
+            if (newValue is string strValue && property.PropertyType == typeof(FhirString))
+            {
+                targetValue = new FhirString(strValue);
+            }
+            else if (newValue is not Base && property.PropertyType.IsAssignableFrom(typeof(Base)))
+            {
+                throw new InvalidOperationException($"Cannot assign raw value of type {newValue.GetType().Name} to FHIR property {propertyName} of type {property.PropertyType.Name}.");
+            }
+
             // Handle single vs. list properties
             if (typeof(IList).IsAssignableFrom(property.PropertyType))
             {
@@ -163,29 +190,29 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     }
 
                     // Set the value at the specified index
-                    list[arrayIndex.Value] = newValue;
+                    list[arrayIndex.Value] = targetValue;
                 }
                 else
                 {
                     // If no index is specified, append or replace first
                     if (list.Count == 0)
                     {
-                        list.Add(newValue);
+                        list.Add(targetValue);
                     }
                     else
                     {
-                        list[0] = newValue;
+                        list[0] = targetValue;
                     }
                 }
             }
             else
             {
                 // Single value property
-                property.SetValue(parentPoco, newValue);
+                property.SetValue(parentPoco, targetValue);
             }
         }
 
-        private Base CreateParentStructure(Resource resource, string parentPath)
+        private static Base CreateParentStructure(Resource resource, string parentPath)
         {
             if (string.IsNullOrEmpty(parentPath))
             {

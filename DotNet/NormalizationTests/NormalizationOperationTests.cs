@@ -34,7 +34,7 @@ namespace NormalizationOperationTests
 
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            copyOperation.Execute(location);
+            location = (Location)copyOperation.Execute(location);
 
             Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
         }
@@ -90,7 +90,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            copyOperation.Execute(location);
+            location = (Location)copyOperation.Execute(location);
 
             Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
         }

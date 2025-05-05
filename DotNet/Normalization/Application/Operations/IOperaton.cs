@@ -1,4 +1,5 @@
-﻿using System.Runtime.Serialization;
+﻿using Hl7.Fhir.Model;
+using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
@@ -6,5 +7,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         [DataMember]
         OperationType OperationType { get; }
+
+        DomainResource Execute(DomainResource resource);
     }
 }
