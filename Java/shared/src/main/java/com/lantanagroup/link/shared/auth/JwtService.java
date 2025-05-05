@@ -143,7 +143,7 @@ public class JwtService {
             .setIssuer(this.authenticationConfig.getAuthority())
             .setAudience(Audiences)
             .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
-            .signWith(key, SignatureAlgorithm.HS256)
+            .signWith(key, SignatureAlgorithm.HS512)
             .compact();
   }
 
