@@ -9,8 +9,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 
+import io.jsonwebtoken.security.Keys;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
 
 @Component
 public class JwtService {
@@ -79,7 +82,8 @@ public class JwtService {
 
   //for retrieving any information from token we will need the secret key
   public Claims getAllClaimsFromToken (String token, String secret) {
-    return Jwts.parser().setSigningKey(secret.getBytes(StandardCharsets.UTF_8)).parseClaimsJws(token).getBody();
+    SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
   }
 
   //check if the token has expired
@@ -112,6 +116,7 @@ public class JwtService {
       throw new RuntimeException("authentication.authority is null");
     }
 
+    SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     return Jwts.builder().setHeaderParam("typ","JWT")
             .setClaims(claims)
             .setSubject(subject).
@@ -119,7 +124,8 @@ public class JwtService {
             .setIssuer(this.authenticationConfig.getAuthority())
             .setAudience(Audiences)
             .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
-            .signWith(SignatureAlgorithm.HS512, secret.getBytes(StandardCharsets.UTF_8)).compact();
+            .signWith(key, SignatureAlgorithm.HS256)
+            .compact();
   }
 
   //validate token
