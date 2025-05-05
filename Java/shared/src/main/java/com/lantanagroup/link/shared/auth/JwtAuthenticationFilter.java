@@ -43,6 +43,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   }
 
   @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getRequestURI();
+    return path.startsWith("/health") ||
+            path.startsWith("/swagger") ||
+            path.startsWith("/v3");
+  }
+
+  @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
     String secret;

@@ -40,12 +40,7 @@ This page and its references include documentation for Link's services and the f
 
 ### Development
 
-The following documentation is specific to development practices and tools used in the Link project.
-
-* [Authorization Policies](development/authorization_policies.md)
-* [API Guidance](development/api_guidance.md)
-* [Logging and Error Handling](development/logging_error_handling.md)
-* [Open Telemetry](./development/otel.md)
+Documentation for contributing to and developing in the Link project can be found [here](development/README.md).
 
 ### Service Swagger Specifications
 

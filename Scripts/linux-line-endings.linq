@@ -1,32 +1,6 @@
 <Query Kind="Statements" />
 
 /*
-    Line Endings Converter for Linux Compatibility
-    ----------------------------------------------
-    This script is designed to resolve line ending issues in files that cause errors
-    when executed or used in Linux environments. Common errors include `$'\r': command not found`
-    or unexpected syntax errors caused by Windows-style line endings (CRLF: \r\n).
-
-    The script performs the following tasks:
-    1. Reads the specified file (or files in a directory).
-    2. Converts Windows-style line endings (\r\n) to Unix-style line endings (\n).
-    3. Overwrites the original file, or optionally saves the converted content to a new file.
-
-    Usage:
-    - Update the `filePath` variable to specify the path of the file to be converted.
-    - Optionally, set the `fixedFilePath` variable to save the converted file as a new file
-      (if left as null, the original file will be overwritten).
-    - For batch processing, specify a directory in the batch version of the script and convert
-      all matching files (e.g., `.sh` files).
-
-    Notes:
-    - This conversion ensures compatibility with bash scripts and similar tools on Linux.
-    - Encoding is maintained as UTF-8 without a Byte Order Mark (BOM), as recommended for Linux compatibility.
-
-    Author: [Your Name]
-    Date: [Date Created]
-*/
-/*
     This script is designed to resolve line ending issues in files that cause errors
     when executed or used in Linux environments. Common errors include `$'\r': command not found`
     or unexpected syntax errors caused by Windows-style line endings (CRLF: \r\n).
