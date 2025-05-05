@@ -79,7 +79,7 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         return entity;
     }
 
-    public virtual void Delete(string id)
+    public virtual void Delete(object id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         _collection.DeleteOne(filter);
@@ -92,7 +92,7 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         await _collection.DeleteOneAsync(filter, cancellationToken);
     }
 
-    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    public virtual async Task DeleteAsync(object id, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
@@ -124,7 +124,7 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleAsync(cancellationToken);
     }
 
-    public virtual T Get(string id)
+    public virtual T Get(object id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         var result = _collection.Find(filter).FirstOrDefault();
@@ -180,7 +180,7 @@ public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseE
         await _collection.DeleteOneAsync(filter);
     }
 
-    public async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
+    public async Task<T> GetAsync(object id, CancellationToken cancellationToken = default)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         return await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
