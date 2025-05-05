@@ -30,6 +30,21 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Resources\Encounter.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\EvaluatedEncounter1.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Location.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\NormalizedEncounter.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\RawEncounter.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="TestResource.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
