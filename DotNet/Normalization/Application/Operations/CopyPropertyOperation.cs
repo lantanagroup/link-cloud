@@ -7,7 +7,6 @@ using System.Reflection;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
-
     public class CopyPropertyOperation : IOperation
     {
         public OperationType OperationType => OperationType.CopyProperty;
@@ -65,7 +64,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             // Take the first value (FHIRPath may return multiple values)
             var sourceValue = sourceValues.First();
-            var sourcePoco = (sourceValue as ITypedElement)?.ToPoco();
+            var sourcePoco = sourceValue?.ToPoco();
 
             if (sourcePoco == null)
             {

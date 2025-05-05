@@ -24,7 +24,9 @@ namespace NormalizationOperationTests
         public void Unit_Location_Identifier_To_Type()
         {
             var parser = new FhirJsonParser();
-            string location_text = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Resources\Location.txt"));
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
+            string location_text = File.ReadAllText(locationPath);
             var location = parser.Parse<Location>(location_text);
 
             if (location == null)
@@ -75,7 +77,9 @@ namespace NormalizationOperationTests
             Assert.True(fetched.Id != default);
 
             var parser = new FhirJsonParser();
-            string location_text = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Resources\Location.txt"));
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
+            string location_text = File.ReadAllText(locationPath);
             var location = parser.Parse<Location>(location_text);
 
             if (location == null)
