@@ -9,7 +9,7 @@ using Xunit;
 using Task = System.Threading.Tasks.Task;
 using RestSharp;
 
-public sealed class SmokeTest : IAsyncLifetime
+public sealed class AdhocReportingSmokeTest : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;
     
@@ -19,7 +19,7 @@ public sealed class SmokeTest : IAsyncLifetime
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
-    public SmokeTest(ITestOutputHelper output)
+    public AdhocReportingSmokeTest(ITestOutputHelper output)
     {
         this._output = output;
     }
@@ -46,6 +46,7 @@ public sealed class SmokeTest : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
