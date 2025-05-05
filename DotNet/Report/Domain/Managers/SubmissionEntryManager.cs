@@ -3,11 +3,10 @@ using LantanaGroup.Link.Report.Application.Factory;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Linq.Expressions;
-using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
 {
@@ -37,13 +36,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
         Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default);
 
-        Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(
-            Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
-            CancellationToken cancellationToken = default);
-
-        Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId,
-            CancellationToken cancellationToken = default);
-
         Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(
             Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber,
             CancellationToken cancellationToken = default);
@@ -55,22 +47,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<List<string>> GetMeasureReportResourceTypeList(
             string facilityId, string reportId, CancellationToken cancellationToken = default);
 
-        Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
-        Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds);
+        Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default);
     }
 
     public class SubmissionEntryManager : ISubmissionEntryManager
     {
 
         private readonly IDatabase _database;
-        private readonly ScheduledReportFactory _scheduledReportFactory;
         private readonly MeasureReportSummaryFactory _measureReportSummaryFactory;
         private readonly ResourceSummaryFactory _resourceSummaryFactory;
 
-        public SubmissionEntryManager(IDatabase database, ScheduledReportFactory scheduledReportFactory, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
+        public SubmissionEntryManager(IDatabase database, MeasureReportSummaryFactory measureReportSummaryFactory, ResourceSummaryFactory resourceSummaryFactory)
         {
             _database = database;
-            _scheduledReportFactory = scheduledReportFactory;
             _measureReportSummaryFactory = measureReportSummaryFactory;
             _resourceSummaryFactory = resourceSummaryFactory;
         }
@@ -78,91 +67,6 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         public async Task<bool> AnyAsync(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, CancellationToken cancellationToken = default)
         {
             return await _database.SubmissionEntryRepository.AnyAsync(predicate, cancellationToken);
-        }
-        
-        public async Task<PagedConfigModel<ScheduledReportListSummary>> GetScheduledReportSummaries(Expression<Func<ReportScheduleModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
-        {
-            var searchResults = await _database.ReportScheduledRepository.SearchAsync(
-                predicate, 
-                sortBy: sortBy,
-                sortOrder: sortOrder, 
-                pageSize: pageSize, pageNumber: pageNumber, cancellationToken);
-            
-            var summaries = searchResults.Item1.Select(_scheduledReportFactory.FromDomain).ToList();
-            
-            // Get Census and IP information from individual measure report entries
-            var uniqueReportIds = summaries.Select(x => x.Id).Distinct().ToList();
-            var reportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => uniqueReportIds.Contains(x.ReportScheduleId), cancellationToken); 
-            
-            foreach (var summary in summaries)
-            {
-                // Get the initial population count for each report
-                //TODO: Eventually may need to check validation results
-                if (!string.IsNullOrWhiteSpace(summary.Id))
-                    summary.InitialPopulationCount =
-                        reportEntries.Count(
-                            x => x.ReportScheduleId == summary.Id &&
-                                 x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                                 x.Status != PatientSubmissionStatus.NotReportable
-                        );
-                
-                // Get census information for each report
-                summary.CensusCount = reportEntries.Where(x => x.ReportScheduleId == summary.Id)
-                    .DistinctBy(x => x.PatientId).Count();
-            }
-            
-            return new PagedConfigModel<ScheduledReportListSummary>(summaries, searchResults.Item2);
-        }
-        
-        public async Task<ScheduledReportListSummary> GetScheduledReportSummary(string facilityId, string reportId, CancellationToken cancellationToken = default)
-        {
-           var scheduledReport = await _database.ReportScheduledRepository.SingleOrDefaultAsync(x => x.FacilityId == facilityId && x.Id == reportId, cancellationToken);
-           
-            if (scheduledReport is null)
-                throw new ArgumentNullException($"Scheduled report with ID {reportId} not found.");
-           
-            var summary = _scheduledReportFactory.FromDomain(scheduledReport);
-            if (string.IsNullOrWhiteSpace(summary?.Id)) return summary;
-            
-            //TODO: Eventually may need to check validation results
-            // Get individual measure report entries for this report
-            var measureReportEntries = await _database.SubmissionEntryRepository
-                .FindAsync(x => x.ReportScheduleId == reportId, cancellationToken); 
-
-            // Get the initial population count for each report
-            summary.InitialPopulationCount =
-                measureReportEntries.Count(
-                    x => x.ReportScheduleId == summary.Id &&
-                         x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                         x.Status != PatientSubmissionStatus.NotReportable
-                );
-            
-            // Get census information for each report
-            summary.CensusCount = measureReportEntries.Where(x => x.ReportScheduleId == summary.Id)
-                .DistinctBy(x => x.PatientId).Count();
-            
-            // Get the metrics for the scheduled report
-            var metrics = new ScheduledReportMetrics
-            {
-                MeasureIpCounts = measureReportEntries
-                    .Where(x => 
-                        x.ReportScheduleId == summary.Id &&
-                        x.Status != PatientSubmissionStatus.PendingEvaluation &&
-                        x.Status != PatientSubmissionStatus.NotReportable)
-                    .GroupBy(x => x.ReportType)
-                    .ToDictionary(x => MeasureNameShortener.ShortenMeasureName(x.Key), x => x.Count()),
-                ReportStatusCounts = measureReportEntries
-                    .GroupBy(x => x.Status)
-                    .ToDictionary(x => x.Key.ToString(), x => x.Count()),
-                ValidationStatusCounts = measureReportEntries
-                    .GroupBy(x => x.ValidationStatus)
-                    .ToDictionary(x => x.Key.ToString(), x => x.Count())
-            };
-        
-            summary.ReportMetrics = metrics;
-
-            return summary;
         }
         
         public async Task<PagedConfigModel<MeasureReportSummary>> GetMeasureReports(Expression<Func<MeasureReportSubmissionEntryModel, bool>> predicate, string sortBy, SortOrder sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken = default)
@@ -263,27 +167,21 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return await _database.SubmissionEntryRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        public async Task UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
+        public async Task<MeasureReportSubmissionEntryModel> UpdateStatusToValidationRequested(string patientSubmissionId, CancellationToken cancellationToken = default)
         {
-            var patientSub = await _database.SubmissionEntryRepository.GetAsync(patientSubmissionId, cancellationToken);
-            
-            if (patientSub == null)
+            var entry = await _database.SubmissionEntryRepository.SingleOrDefaultAsync(s => s.Id == patientSubmissionId, cancellationToken);
+
+            if (entry == null)
             {
                 throw new ArgumentException($"Patient Submission Entry with ID {patientSubmissionId} not found.");
             }
 
-            patientSub.Status = PatientSubmissionStatus.ReadyForValidation;
-            patientSub.ValidationStatus = ValidationStatus.Requested;
+            entry.Status = PatientSubmissionStatus.ValidationRequested;
+            entry.ValidationStatus = ValidationStatus.Requested;
 
-            await _database.SubmissionEntryRepository.UpdateAsync(patientSub, cancellationToken);
-        }
+            await _database.SubmissionEntryRepository.UpdateAsync(entry, cancellationToken);
 
-        public async Task UpdateStatusToValidationRequested(IEnumerable<string> patientSubmissionIds)
-        {
-            foreach (var patientSub in patientSubmissionIds)
-            {
-                await UpdateStatusToValidationRequested(patientSub);
-            }            
+            return entry;
         }
     }
 }
