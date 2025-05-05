@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Factories;
 
@@ -14,6 +13,7 @@ public class ReportableEventToQueryPlanTypeFactory
             ReportableEvent.EOM => Frequency.Monthly,
             ReportableEvent.EOW => Frequency.Weekly,
             ReportableEvent.EOD => Frequency.Daily,
+            ReportableEvent.Adhoc => Frequency.Discharge,
             _ => throw new ArgumentException("Invalid reportable event type")
 
         };

@@ -124,9 +124,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
     builder.Services.AddTransient<IAuditService, AuditService>();
 
+/*    builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+    {
+        options.SerializerOptions.PropertyNamingPolicy = null; // Preserve uppercase property names
+    });*/
+
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
+            options.JsonSerializerOptions.PropertyNamingPolicy = null;
             options.JsonSerializerOptions.Converters.Add(new NormalizationConverter());
         });
     builder.Services.AddHttpClient();
@@ -217,8 +223,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddKafka(kafkaHealthOptions);
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
     builder.Services.AddSwaggerGen(c =>
     {

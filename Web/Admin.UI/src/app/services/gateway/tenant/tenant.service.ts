@@ -1,7 +1,12 @@
 import { Injectable } from '@angular/core';
 import { ErrorHandlingService } from '../../error-handling.service';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { IFacilityConfigModel, IScheduledTaskModel, PagedFacilityConfigModel } from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {HttpClient, HttpErrorResponse, HttpParams} from '@angular/common/http';
+import {
+  IAdHocReportRequest,
+  IFacilityConfigModel,
+  IScheduledReportModel,
+  PagedFacilityConfigModel
+} from 'src/app/interfaces/tenant/facility-config-model.interface';
 import { Observable, catchError, map, tap, of } from 'rxjs';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { AppConfigService } from '../../app-config.service';
@@ -13,11 +18,12 @@ export class TenantService {
   constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
 
 
-  createFacility(facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      timeZone: timeZone,
+      scheduledReports: scheduledReports
     };
 
     return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility`, facility)
@@ -30,12 +36,13 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, scheduledTasks: IScheduledTaskModel[]): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
-      scheduledTasks: scheduledTasks
+      timeZone: timeZone,
+      scheduledReports: scheduledReports
     };
 
     return this.http.put<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/${id}`, facility)
@@ -64,9 +71,28 @@ export class TenantService {
     );
   }
 
+  getAllFacilities(): Observable<Record<string, string>> {
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
 
-  listFacilities(facilityId: string, facilityName: string): Observable<PagedFacilityConfigModel> {
-    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility?facilityId=${facilityId}&facilityName=${facilityName}`)
+
+  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
+
+    //javascript based paging is zero based, so increment page number by 1
+    pageNumber = pageNumber + 1;
+
+    const params = new HttpParams()
+      .set('facilityId', facilityId)
+      .set('facilityName', facilityName)
+      .set('sortBy', sortBy)
+      .set('sortOrder', sortOrder)
+      .set('pageSize', pageSize)
+      .set('pageNumber', pageNumber);
+
+    return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(
         tap(_ => console.log(`Fetched facilities.`)),
         map((response: PagedFacilityConfigModel) => {
@@ -75,6 +101,17 @@ export class TenantService {
           return response;
         }),
         catchError(this.handleError)
+      )
+  }
+
+  generateAdHocReport(facilityId: string, adHocReportRequest: IAdHocReportRequest ){
+    return this.http.post<IEntityCreatedResponse>(`${this.appConfigService.config?.baseApiUrl}/Facility/${facilityId}/AdHocReport`, adHocReportRequest)
+      .pipe(
+        tap(_ => console.log(`Request for adHoc reporting was sent.`)),
+        map((response: any) => {
+          return response;
+        }),
+        catchError((error) => this.errorHandler.handleError(error))
       )
   }
 

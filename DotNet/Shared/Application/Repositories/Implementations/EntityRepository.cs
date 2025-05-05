@@ -22,9 +22,14 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
+    public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Set<T>().AnyAsync(predicate, cancellationToken);
+    }
+
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
     {
-        entity.Id = Guid.NewGuid().ToString();
+        entity.Id ??= Guid.NewGuid().ToString();
 
         var result = (await _dbContext.Set<T>().AddAsync(entity, cancellationToken)).Entity;
 

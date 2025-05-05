@@ -1,0 +1,28 @@
+@use 'sass:map';
+@use '@angular/material' as mat;
+@include mat.core();
+
+
+html {
+  @include mat.theme((
+    color: mat.$azure-palette,
+    typography: Roboto,
+    density: 0
+  ));
+}
+
+*.blue-rose {
+   @include mat.theme((
+      color: (
+        theme-type: light,
+        primary: mat.$blue-palette,
+        tertiary: mat.$rose-palette,
+      ),
+      typography: Roboto,
+      density: 0
+    ))
+}
+
+
+
+

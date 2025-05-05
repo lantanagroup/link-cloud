@@ -29,7 +29,6 @@ import {
   IFacilityConfigModel,
   PagedFacilityConfigModel
 } from "../../../interfaces/tenant/facility-config-model.interface";
-import {throwError} from "rxjs";
 
 
 const listAnimation = trigger('listAnimation', [
@@ -83,10 +82,12 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   correlationId: string = '';
   facilityId: string = '';
-  facilities: IFacilityConfigModel[] = [];
+  facilities: Record<string, string> = {};
   auditEvents: AuditModel[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata;
-  intervalId!: NodeJS.Timer | null;
+  //intervalId!: NodeJS.Timer | null;
+
+  intervalId: ReturnType<typeof setInterval> | null | undefined; // Best practice
 
   consumersData: Map<string, string> = new Map();
 
@@ -236,9 +237,9 @@ export class IntegrationTestComponent implements OnInit, OnDestroy {
 
   async getFacilities() {
 
-    this.tenantService.listFacilities('', '').subscribe({
-      next: (facilities: PagedFacilityConfigModel) => {
-        this.facilities = facilities.records;
+    this.tenantService.getAllFacilities().subscribe({
+      next: (facilities: Record<string, string>) => {
+        this.facilities = facilities;
       },
       error: (err) => {
         console.error('Error fetching facilities:', err);

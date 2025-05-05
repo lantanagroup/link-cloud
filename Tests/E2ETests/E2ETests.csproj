@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+        <!--
+          Displays error on console in addition to the log file. Note that this feature comes with a performance impact.
+          For more information, visit https://learn.microsoft.com/dotnet/core/testing/unit-testing-platform-integration-dotnet-test#show-failure-per-test
+          -->
+        <TestingPlatformShowTestsFailure>true</TestingPlatformShowTestsFailure>
+        <RootNamespace>LantanaGroup.Link.Tests.E2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.11.4" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+        <PackageReference Include="Moq.AutoMock" Version="*-*" />
+        <PackageReference Include="coverlet.collector" Version="6.*">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="xunit" Version="2.9.0" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="RestSharp" Version="112.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="data\17ba069b-5738-4f14-9ccb-120860ec3dc2.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="test_data\smoke_test\concept-map.json" />
+      <None Remove="data\Patient-ACHMarch1.json" />
+      <EmbeddedResource Include="fhir_server_data\Patient-ACHMarch1.json" />
+      <None Remove="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
+      <EmbeddedResource Include="measures\NHSNdQMAcuteCareHospitalInitialPopulation.json" />
+      <None Remove="test_data\smoke-test-concept-map.json" />
+    </ItemGroup>
+
+</Project>

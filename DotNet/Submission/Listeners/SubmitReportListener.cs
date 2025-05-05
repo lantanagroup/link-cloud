@@ -12,16 +12,17 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Models;
+using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
-using System.Text.Json;
-using static LantanaGroup.Link.Submission.Listeners.SubmitReportListener;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Submission.KafkaProducers;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -42,6 +43,12 @@ namespace LantanaGroup.Link.Submission.Listeners
 
         private readonly ISubmissionServiceMetrics _submissionServiceMetrics;
 
+        private readonly FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+        private readonly FhirJsonSerializer _fhirSerializer = new FhirJsonSerializer();
+        private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _linkBearerServiceOptions;
+        private readonly ReportSubmittedProducer _reportSubmittedProducer;
+        private readonly PathNamingService _pathNamingService;
+
         private string Name => this.GetType().Name;
 
         public SubmitReportListener(ILogger<SubmitReportListener> logger,
@@ -52,7 +59,10 @@ namespace LantanaGroup.Link.Submission.Listeners
             IDeadLetterExceptionHandler<SubmitReportKey, SubmitReportValue> deadLetterExceptionHandler,
             IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, ICreateSystemToken createSystemToken,
             IOptions<ServiceRegistry> serviceRegistry,
-            ISubmissionServiceMetrics submissionServiceMetrics)
+            ISubmissionServiceMetrics submissionServiceMetrics,
+            IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions,
+            ReportSubmittedProducer reportSubmittedProducer,
+            PathNamingService pathNamingService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
@@ -76,33 +86,14 @@ namespace LantanaGroup.Link.Submission.Listeners
             _serviceRegistry = serviceRegistry?.Value ?? throw new ArgumentNullException(nameof(serviceRegistry));
 
             _submissionServiceMetrics = submissionServiceMetrics;
+            _linkBearerServiceOptions = linkBearerServiceOptions;
+            _reportSubmittedProducer = reportSubmittedProducer ?? throw new ArgumentNullException(nameof(reportSubmittedProducer));
+            _pathNamingService = pathNamingService ?? throw new ArgumentNullException(nameof(pathNamingService));
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
-        }
-
-        private string GetMeasureShortName(string measure)
-        {
-            // If a URL, may contain |0.1.2 representing the version at the end of the URL
-            // Remove it so that we're looking at the generic URL, not the URL specific to a measure version
-            string measureWithoutVersion = measure.Contains("|") ?
-                measure.Substring(0, measure.LastIndexOf("|", System.StringComparison.Ordinal)) :
-                measure;
-
-            var urlShortName = _submissionConfig.MeasureNames.FirstOrDefault(x => x.Url == measureWithoutVersion || x.MeasureId == measureWithoutVersion)?.ShortName;
-
-            if (!string.IsNullOrWhiteSpace(urlShortName))
-            {
-                return urlShortName;
-            }
-            else
-            {
-                _logger.LogError("Submission service configuration does not contain a short name for measure: " + measure);
-            }
-
-            return $"{measure.GetHashCode():X}";
         }
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
@@ -169,58 +160,21 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         $"{Name}: Aggregates is null or contains no elements.");
                                 }
 
-                                var httpClient = _httpClient.CreateClient();
-                                string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-
-                                #region Census Admitted Patient List
-                                string censusRequestUrl = $"{_serviceRegistry.CensusServiceApiUrl}/Census/{key.FacilityId}/history/admitted?startDate={key.StartDate.ToString(dtFormat)}&endDate={key.EndDate.ToString(dtFormat)}";
-
-                                //TODO: add method to get key that includes looking at redis for future use case
-                                if (_linkTokenServiceConfig.Value.SigningKey is null)
-                                    throw new Exception("Link Token Service Signing Key is missing.");
-
-                                //Add link token
-                                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 5).Result;
-                                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                                var censusResponse = await httpClient.GetAsync(censusRequestUrl, consumeCancellationToken);
-                                var censusContent = await censusResponse.Content.ReadAsStringAsync(consumeCancellationToken);
-
-                                if (!censusResponse.IsSuccessStatusCode)
-                                    throw new TransientException("Response from Census service is not successful: " + censusContent);
-
-                                List? admittedPatients;
-                                try
-                                {
-                                    admittedPatients =
-                                        System.Text.Json.JsonSerializer.Deserialize<Hl7.Fhir.Model.List>(
-                                            censusContent,
-                                            new JsonSerializerOptions().ForFhir());
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logger.LogError(ex, "Error deserializing admitted patients from Census service response.");
-                                    _logger.LogDebug("Census service response: " + censusContent);
-                                    throw new TransientException("Error deserializing admitted patients from Census service response: " + ex.Message + Environment.NewLine + ex.StackTrace, ex.InnerException);
-                                }
-                                #endregion
-
                                 Bundle otherResourcesBundle = new Bundle();
                                 otherResourcesBundle.Type = Bundle.BundleType.Collection;
 
-                                string measureShortNames = value.MeasureIds
-                                    .Select(GetMeasureShortName)
-                                    .Aggregate((a, b) => $"{a}+{b}");
-
-                                //Format: <nhsn-org-id>-<plus-separated-list-of-measure-ids>-<period-start>-<period-end?>-<timestamp>
-                                //Per 2153, don't build with the trailing timestamp
-                                dtFormat = "yyyyMMddTHHmmss";
-                                string submissionDirectory = Path.Combine(_submissionConfig.SubmissionDirectory,
-                                    $"{facilityId}-{measureShortNames}-{key.StartDate.ToString(dtFormat)}-{key.EndDate.ToString(dtFormat)}");
+                                string submissionDirectoryName = _pathNamingService.GetSubmissionDirectoryName(
+                                    facilityId.SanitizeAndRemove(),
+                                    value.MeasureIds,
+                                    key.StartDate,
+                                    key.EndDate,
+                                    value.ReportTrackingId);
+                                string submissionDirectory = Path.Combine(
+                                    _submissionConfig.SubmissionDirectory, 
+                                    submissionDirectoryName);
 
                                 string fileName;
                                 string contents;
-                                var fhirSerializer = new FhirJsonSerializer();
                                 try
                                 {
                                     if (Directory.Exists(submissionDirectory))
@@ -235,12 +189,13 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     Hl7.Fhir.Model.Device device = new Device();
                                     device.DeviceName.Add(new Device.DeviceNameComponent()
                                     {
-                                        Name = "Link"
+                                        Name = "NHSNLink"
                                     });
 
-                                    Assembly assembly = Assembly.GetExecutingAssembly();
-                                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                                    string? version = fvi?.FileVersion;
+                                    string? version = ServiceActivitySource.ProductVersion;
+
+                                    if (string.IsNullOrEmpty(version))
+                                        version = ServiceActivitySource.Instance.Version;
 
                                     (device.Version = new List<Device.VersionComponent>()).Add(new Device.VersionComponent
                                     {
@@ -249,7 +204,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     });
 
                                     fileName = "sending-device.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(device);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(device);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -259,7 +214,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #region Organization
 
                                     fileName = "sending-organization.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(value.Organization);
+                                    contents = await _fhirSerializer.SerializeToStringAsync(value.Organization);
 
                                     await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                         consumeCancellationToken);
@@ -267,22 +222,16 @@ namespace LantanaGroup.Link.Submission.Listeners
                                     #endregion
 
                                     #region Patient List
-
-                                    fileName = "patient-list.json";
-                                    contents = await fhirSerializer.SerializeToStringAsync(admittedPatients);
-
-                                    await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
-                                        consumeCancellationToken);
-
+                                    await WritePatientFhirList(value.PatientIds, submissionDirectory, key.StartDate, key.EndDate);
                                     #endregion
 
                                     #region Aggregates
 
                                     foreach (var aggregate in value.Aggregates)
                                     {
-                                        string measureShortName = this.GetMeasureShortName(aggregate.Measure);
+                                        string measureShortName = _pathNamingService.GetMeasureShortName(aggregate.Measure);
                                         fileName = $"aggregate-{measureShortName}.json";
-                                        contents = await fhirSerializer.SerializeToStringAsync(aggregate);
+                                        contents = await _fhirSerializer.SerializeToStringAsync(aggregate);
 
                                         await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents,
                                             consumeCancellationToken);
@@ -327,7 +276,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                                             var resultModel = await CreatePatientBundleFiles(submissionDirectory,
                                                 pid,
                                                 facilityId,
-                                                key.ReportScheduleId, consumeCancellationToken);
+                                                value.ReportTrackingId, consumeCancellationToken);
 
                                             patientFilesWritten.Add(resultModel.PatientFile);
                                             otherResourcesBag.Add(resultModel.OtherResources);
@@ -354,14 +303,20 @@ namespace LantanaGroup.Link.Submission.Listeners
                                 }
 
                                 fileName = "other-resources.json";
-                                contents = await fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
+                                contents = await _fhirSerializer.SerializeToStringAsync(otherResourcesBundle);
 
                                 await File.WriteAllTextAsync(submissionDirectory + "/" + fileName, contents, consumeCancellationToken);
 
                                 //Generate Metrics
-                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), key.ReportScheduleId, facilityId, key.StartDate, key.EndDate);
+                                await GenerateSubmissionMetrics(otherResourcesBundle, patientFilesWritten.ToList(), value.ReportTrackingId, facilityId, key.StartDate, key.EndDate);
 
                                 #endregion
+                                
+                                byte[] correlationIdBytes = result.Message.Headers.GetLastBytes(KafkaConstants.HeaderConstants.CorrelationId);
+                                string? correlationId = correlationIdBytes == null ? null : Encoding.UTF8.GetString(correlationIdBytes);
+                                
+                                _logger.LogInformation($"Submitted report for tenant {result.Message.Key.FacilityId} at {DateTime.UtcNow} with report tracking id {value.ReportTrackingId} and correlation id {correlationId}. Producing {nameof(KafkaTopic.ReportSubmitted)} message.");
+                                _reportSubmittedProducer.Produce(correlationId, result.Message.Key.FacilityId, result.Message.Key.StartDate, result.Message.Key.EndDate, value.ReportTrackingId);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -374,7 +329,6 @@ namespace LantanaGroup.Link.Submission.Listeners
                             catch (TimeoutException ex)
                             {
                                 var transientException = new TransientException(ex.Message, ex.InnerException);
-
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                             }
                             catch (Exception ex)
@@ -397,9 +351,12 @@ namespace LantanaGroup.Link.Submission.Listeners
                             throw new OperationCanceledException(ex.Error.Reason, ex);
                         }
 
-                        string facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
-
-                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+                        if (ex.ConsumerRecord != null)
+                        {
+                            string facilityId =
+                                KafkaHeaderHelper.GetExceptionFacilityId(ex.ConsumerRecord.Message.Headers);
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+                        }
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                         consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
@@ -417,6 +374,35 @@ namespace LantanaGroup.Link.Submission.Listeners
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+
+        protected async Task WritePatientFhirList(List<string> patientIds, string directory, DateTime startDate, DateTime endDate)
+        {
+            var admittedPatients = new List();
+            admittedPatients.Status = List.ListStatus.Current;
+            admittedPatients.Mode = ListMode.Snapshot;
+            admittedPatients.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patientIds)
+            {
+                admittedPatients.Entry.Add(new List.EntryComponent()
+                {
+                    Item = new ResourceReference(patient.StartsWith("Patient/") ? patient : "Patient/" + patient)
+                });
+            }
+
+            var fileName = "patient-list.json";
+            var contents = await _fhirSerializer.SerializeToStringAsync(admittedPatients);
+
+            await File.WriteAllTextAsync(directory + "/" + fileName, contents, CancellationToken.None);
         }
 
         protected async Task GenerateSubmissionMetrics(Bundle? otherResourcesBundle, List<PatientFile> patientFilesWritten, string reportId, string facilityId, DateTime startDate, DateTime endDate)
@@ -473,7 +459,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         public async Task GetBundleAndGenerateMetrics(PatientFile patientFile, string reportId, string facilityId, DateTime startDate, DateTime endDate)
         {
             string contents = await File.ReadAllTextAsync(patientFile.FilePath);
-            var bundle = JsonSerializer.Deserialize<Bundle>(contents, new JsonSerializerOptions().ForFhir());
+            var bundle = await _fhirJsonParser.ParseAsync<Bundle>(contents);                
 
             if (bundle == null)
                 return;
@@ -673,9 +659,9 @@ namespace LantanaGroup.Link.Submission.Listeners
         /// <returns></returns>
         private async Task<CreatePatientBundleResult> CreatePatientBundleFiles(string submissionDirectory, string patientId, string facilityId, string reportScheduleId, CancellationToken cancellationToken)
         {
+            _logger.LogDebug("Creating Patient Bundle for PatientId: {0}", patientId);
+            
             var returnModel = new CreatePatientBundleResult();
-
-            var options = new JsonSerializerOptions().ForFhir(ModelInfo.ModelInspector);
 
             var httpClient = _httpClient.CreateClient();
 
@@ -683,9 +669,24 @@ namespace LantanaGroup.Link.Submission.Listeners
             if (_linkTokenServiceConfig.Value.SigningKey is null)
                 throw new Exception("Link Token Service Signing Key is missing.");
 
-            //Add link token
-            var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (this._linkBearerServiceOptions == null || this._linkBearerServiceOptions.Value == null)
+            {
+                _logger.LogError("Link Bearer Service Options is missing.");
+                throw new Exception("Link bearer service options are missing.");
+            }
+
+            //Add link bearer token
+            if (!this._linkBearerServiceOptions.Value.AllowAnonymous)
+            {
+                var token = _createSystemToken.ExecuteAsync(_linkTokenServiceConfig.Value.SigningKey, 2).Result;
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            if (String.IsNullOrEmpty(_serviceRegistry.ReportServiceApiUrl))
+            {
+                _logger.LogError("Report Service API URL is missing from configuration.");
+                throw new Exception("Report Service API URL is missing from configuration.");
+            }
 
             string requestUrl = $"{_serviceRegistry.ReportServiceApiUrl.Trim('/')}/Report/Bundle/Patient?FacilityId={facilityId}&PatientId={patientId}&reportScheduleId={reportScheduleId}";
 
@@ -699,7 +700,8 @@ namespace LantanaGroup.Link.Submission.Listeners
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(cancellationToken)} | Query URL: {requestUrl}");
                 }
 
-                var patientSubmissionBundle = (PatientSubmissionModel?)await response.Content.ReadFromJsonAsync(typeof(PatientSubmissionModel), cancellationToken);
+                var strContent = await response.Content.ReadAsStringAsync();
+                var patientSubmissionBundle = JsonConvert.DeserializeObject<PatientSubmissionModel>(strContent);
 
                 if (patientSubmissionBundle == null || patientSubmissionBundle.PatientResources == null || patientSubmissionBundle.OtherResources == null)
                 {
@@ -710,15 +712,20 @@ namespace LantanaGroup.Link.Submission.Listeners
                                         patientSubmissionBundle.OtherResources: {patientSubmissionBundle?.OtherResources == null}");
                 }
 
-                returnModel.OtherResources = patientSubmissionBundle.OtherResources;
+                returnModel.OtherResources = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.OtherResources);
+                
+                //Deserialize to verify that the bundle is properly constructed - discard the result.
+                //Consider removing for performance reasons after we are sure this ser/des logic is stable.
+                _ = await _fhirJsonParser.ParseAsync<Bundle>(patientSubmissionBundle.PatientResources);
 
-                patientSubmissionBundle.PatientResources.Type = Bundle.BundleType.Collection;
                 string fileName = $"patient-{patientId}.json";
-                string contents = await new FhirJsonSerializer().SerializeToStringAsync(patientSubmissionBundle.PatientResources);
+                string contents = patientSubmissionBundle.PatientResources;
 
                 returnModel.PatientFile.PatientId = patientId;
                 returnModel.PatientFile.FilePath = submissionDirectory + "/" + fileName;
                 await File.WriteAllTextAsync(returnModel.PatientFile.FilePath, contents, cancellationToken);
+                
+                _logger.LogInformation("Created Patient Bundle for PatientId: {0} at {1}", patientId, returnModel.PatientFile.FilePath);
 
                 return returnModel;
             }

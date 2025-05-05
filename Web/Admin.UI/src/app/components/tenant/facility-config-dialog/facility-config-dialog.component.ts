@@ -56,12 +56,12 @@ export class FacilityConfigDialogComponent implements OnInit, AfterViewInit {
     this.formIsInvalid = formValidity;
   }
 
-  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {    
+  onSubmittedConfiguration(outcome: IEntityCreatedResponse) {
     if (outcome.id.length > 0) {
       this.dialogRef.close(outcome.message);
     }
     else {
-      this.snackBar.open(`Failed to create facility, see error for details.`, '', {
+      this.snackBar.open(`Failed to create/update facility, see error for details.`, '', {
         duration: 3500,
         panelClass: 'error-snackbar',
         horizontalPosition: 'end',
