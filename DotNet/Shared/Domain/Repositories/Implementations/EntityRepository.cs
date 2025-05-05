@@ -16,19 +16,14 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public T Add(T entity)
+        public async Task<T> AddAsync(T entity)
         {
-            throw new NotImplementedException();
+            return (await _dbContext.Set<T>().AddAsync(entity)).Entity;
         }
 
-        public Task<T> AddAsync(T entity)
+        public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
         {
-            throw new NotImplementedException();
-        }
-
-        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
-        {
-            throw new NotImplementedException();
+           return await _dbContext.Set<T>().AnyAsync(predicate);
         }
 
         public async Task CommitTransactionAsync()
@@ -72,14 +67,26 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             return await _dbContext.Set<T>().FindAsync(id);
         }
 
-        public Task<HealthCheckResult> HealthCheck(int eventId)
+        public async Task<HealthCheckResult> HealthCheck(int eventId)
         {
-            throw new NotImplementedException();
-        }
+            try
+            {
+                bool outcome = await _dbContext.Database.CanConnectAsync();
 
-        public Task RemoveAsync(T entity)
-        {
-            throw new NotImplementedException();
+                if (outcome)
+                {
+                    return HealthCheckResult.Healthy();
+                }
+                else
+                {
+                    return HealthCheckResult.Unhealthy();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                return HealthCheckResult.Unhealthy(exception: ex);
+            }
         }
 
         public async Task RollbackTransactionAsync()
@@ -92,9 +99,46 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             await _dbContext.SaveChangesAsync();
         }
 
-        public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
+        public async Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber)
         {
-            throw new NotImplementedException();
+
+            var query = _dbContext.Set<T>().AsNoTracking().AsQueryable();
+
+            if (predicate != null)
+            {
+                query = query.Where(predicate);
+            }
+
+            var count = await query.CountAsync();
+
+            if (sortOrder != null)
+            {
+                query = sortOrder switch
+                {
+                    SortOrder.Ascending => query.OrderBy(SetSortBy<T>(sortBy)),
+                    SortOrder.Descending => query.OrderByDescending(SetSortBy<T>(sortBy))
+                };
+            }
+
+            var results = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            PaginationMetadata metadata = new PaginationMetadata(pageSize, pageNumber, count);
+
+            var result = (results, metadata);
+
+            return result;
+        }
+
+        private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
+        {
+            var sortKey = sortBy?.ToLower() ?? "";
+            var parameter = Expression.Parameter(typeof(T), "p");
+            var sortExpression = Expression.Lambda<Func<T, object>>(Expression.Convert(Expression.Property(parameter, sortKey), typeof(object)), parameter);
+
+            return sortExpression;
         }
 
         public async Task<T> SingleAsync(Expression<Func<T, bool>> predicate)

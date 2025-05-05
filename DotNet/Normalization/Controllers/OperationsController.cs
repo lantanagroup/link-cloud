@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                if (!Enum.TryParse(operationType, out OperationType operation))
+                if (!Enum.TryParse(operationType, ignoreCase: true, out OperationType operation))
                 {
                     return BadRequest($"'{operationType}' is not a valid OperationType.");
                 }
@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DomainResource))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public IActionResult OperatonTest([FromBody] TestOperationModel model)
+        public IActionResult OperationTest([FromBody] TestOperationModel model)
         {
             try
             {
