@@ -162,6 +162,22 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 targetValue = new FhirString(strValue);
             }
+            else if (newValue is int intValue && property.PropertyType == typeof(Integer))
+            {
+                targetValue = new Integer(intValue);
+            }
+            else if (newValue is bool boolValue && property.PropertyType == typeof(FhirBoolean))
+            {
+                targetValue = new FhirBoolean(boolValue);
+            }
+            else if (newValue is decimal decValue && property.PropertyType == typeof(FhirDecimal))
+            {
+                targetValue = new FhirDecimal(decValue);
+            }
+            else if (newValue is DateTime dateValue && property.PropertyType == typeof(FhirDateTime))
+            {
+                targetValue = new FhirDateTime(dateValue);
+            }
             else if (newValue is not Base && property.PropertyType.IsAssignableFrom(typeof(Base)))
             {
                 throw new InvalidOperationException($"Cannot assign raw value of type {newValue.GetType().Name} to FHIR property {propertyName} of type {property.PropertyType.Name}.");
