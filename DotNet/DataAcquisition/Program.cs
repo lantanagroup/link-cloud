@@ -56,6 +56,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using FluentValidation;
 using DataAcquisition.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -139,6 +140,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add DbContext
     builder.Services.AddTransient<UpdateBaseEntityInterceptor>();
     builder.AddSQLServerEF_DataAcq();
+
+    //add quartz
+    builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
     builder.Services.AddHttpClient("FhirHttpClient")
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()

@@ -1,4 +1,6 @@
-﻿using DataAcquisition.Domain.Entities;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -167,6 +169,11 @@ public class DataAcquisitionDbContext : DbContext
         modelBuilder.Entity<ResourceReferenceType>()
             .Property(b => b.QueryPhase)
             .HasConversion<string>();
+
+
+        // Prefix and schema can be passed as parameters
+        // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
 
     }
 
