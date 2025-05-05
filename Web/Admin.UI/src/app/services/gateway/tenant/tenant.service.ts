@@ -71,6 +71,13 @@ export class TenantService {
     );
   }
 
+  getAllFacilities(): Observable<Record<string, string>> {
+    return this.http.get<Record<string, string>>(`${this.appConfigService.config?.baseApiUrl}/facility/list`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
 
   listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
 
