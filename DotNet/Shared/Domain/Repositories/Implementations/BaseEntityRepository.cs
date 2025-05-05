@@ -1,21 +1,21 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
-namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
-public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
+public class BaseEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEntity
 {
     protected readonly ILogger _logger;
 
     protected readonly DbContext _dbContext;
 
-    public EntityRepository(ILogger<EntityRepository<T>> logger, DbContext dbContext)
+    public BaseEntityRepository(ILogger<BaseEntityRepository<T>> logger, DbContext dbContext)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -58,7 +58,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
 
     }
 
-    public virtual async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    public virtual async Task DeleteAsync(object id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.Set<T>().FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
@@ -77,16 +77,16 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         var result = _dbContext.Set<T>().Add(entity).Entity;
 
         _dbContext.SaveChanges();
-        
+
         return result;
     }
 
-    public virtual T Get(string id)
+    public virtual T Get(object id)
     {
         return _dbContext.Set<T>().SingleOrDefault(o => o.Id == id);
     }
 
-    public virtual async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
+    public virtual async Task<T> GetAsync(object id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Set<T>().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
     }
@@ -105,7 +105,7 @@ public class EntityRepository<T> : IEntityRepository<T> where T : BaseEntity
         return entity;
     }
 
-    public virtual void Delete(string id)
+    public virtual void Delete(object id)
     {
         var entity = _dbContext.Set<T>().FirstOrDefault(g => g.Id == id);
 

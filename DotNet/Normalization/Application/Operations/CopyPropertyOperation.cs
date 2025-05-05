@@ -1,21 +1,16 @@
 ﻿using Hl7.Fhir.FhirPath;
-using Hl7.Fhir.Introspection;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Utility;
-using Hl7.Fhir.Validation;
 using Hl7.FhirPath;
-using NormalizationPOC.Helpers;
+using LantanaGroup.Link.Normalization.Application.Operations.Helpers;
 using System.Reflection;
-using System.Runtime.Intrinsics.Arm;
-using System.Runtime.Serialization;
-using NormalizationPOC.Interfaces;
 
-namespace NormalizationPOC.Operations
+namespace LantanaGroup.Link.Normalization.Application.Operations
 {
+
     public class CopyPropertyOperation : IOperation
     {
-        public string OperationType => "CopyProperty";
+        public OperationType OperationType => OperationType.CopyProperty;
         public string Name { get; private set; }
         public string SourceFhirPath { get; private set; }
         public string TargetFhirPath { get; private set; }
@@ -29,8 +24,8 @@ namespace NormalizationPOC.Operations
 
         public DomainResource Execute(DomainResource domainResource)
         {
-            var source = domainResource.Select(this.SourceFhirPath).FirstOrDefault();
-            var target = PropertyHelper.GetProperty(domainResource, this.TargetFhirPath);
+            var source = domainResource.Select(SourceFhirPath).FirstOrDefault();
+            var target = PropertyHelper.GetProperty(domainResource, TargetFhirPath);
 
             PropertyInfo propertyInfo = typeof(FhirString).GetProperty("Value");
             string source_string = (string)propertyInfo.GetValue(source);

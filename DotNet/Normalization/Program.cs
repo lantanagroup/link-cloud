@@ -18,8 +18,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Jobs;
@@ -40,6 +38,10 @@ using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Normalization.Domain.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -176,6 +178,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         }
     });
 
+    builder.Services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
+    builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
+    builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
+    builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+
+    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
+    builder.Services.AddTransient<IBaseEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
+    builder.Services.AddTransient<IBaseEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
+
     // Logging using Serilog
     builder.Logging.AddSerilog();
     Log.Logger = new LoggerConfiguration()
@@ -189,10 +200,6 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .CreateLogger();
 
     builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-
-    builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
-    builder.Services.AddTransient<IEntityRepository<NormalizationConfig>, NormalizationEntityRepository<NormalizationConfig>>();
-    builder.Services.AddTransient<IEntityRepository<RetryEntity>, NormalizationEntityRepository<RetryEntity>>();
 
     //Managers
     builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();

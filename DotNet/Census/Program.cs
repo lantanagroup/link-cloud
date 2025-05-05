@@ -18,8 +18,6 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -45,6 +43,8 @@ using LantanaGroup.Link.Census.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Health;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -149,10 +149,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IRetryEntityFactory, RetryEntityFactory>();
 
     //Repositories
-    builder.Services.AddTransient<IEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
-    builder.Services.AddTransient<IEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
-    builder.Services.AddTransient<IEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
-    builder.Services.AddScoped<IEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<CensusConfigEntity>, CensusEntityRepository<CensusConfigEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<CensusPatientListEntity>, CensusEntityRepository<CensusPatientListEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientCensusHistoricEntity>, CensusEntityRepository<PatientCensusHistoricEntity>>();
+    builder.Services.AddScoped<IBaseEntityRepository<RetryEntity>, CensusEntityRepository<RetryEntity>>();
 
     //Managers
     builder.Services.AddTransient<ICensusConfigManager, CensusConfigManager>();
