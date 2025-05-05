@@ -27,13 +27,14 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly PatientReportSubmissionBundler _patientReportSubmissionBundler;
         private readonly IDatabase _database;
         private readonly ISubmissionEntryManager _submissionEntryManager;
-
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager)
+        private readonly IReportScheduledManager _reportingScheduledManager;
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
             _submissionEntryManager = submissionEntryManager;
+            _reportingScheduledManager = reportingScheduledManager;
         }
 
         /// <summary>
@@ -170,7 +171,7 @@ namespace LantanaGroup.Link.Report.Controllers
                 }
 
                 var summaries =
-                    await _submissionEntryManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber,  HttpContext.RequestAborted);
+                    await _reportingScheduledManager.GetScheduledReportSummaries(predicate, "CreateDate", SortOrder.Descending, pageSize, pageNumber,  HttpContext.RequestAborted);
 
                 return Ok(summaries);
 
@@ -211,7 +212,7 @@ namespace LantanaGroup.Link.Report.Controllers
             try
             {
                 var summary =
-                    await _submissionEntryManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
+                    await _reportingScheduledManager.GetScheduledReportSummary(facilityId, reportId, HttpContext.RequestAborted);
                 
                 return Ok(summary);
 

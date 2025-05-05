@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Models;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
@@ -8,23 +9,27 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class ReadyForValidationProducer
     {
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IProducer<ReadyForValidationKey, ReadyForValidationValue> _readyForValidationProducer;
 
-        public ReadyForValidationProducer( IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer)
+        public ReadyForValidationProducer(IProducer<ReadyForValidationKey, ReadyForValidationValue> readyForValidationProducer, IServiceScopeFactory serviceScopeFactory)
         {
             _readyForValidationProducer = readyForValidationProducer;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
 
-        public void Produce(ReportScheduleModel schedule, IEnumerable<MeasureReportSubmissionEntryModel> needValidation)
+        public async Task Produce(ReportScheduleModel schedule, IEnumerable<MeasureReportSubmissionEntryModel> needValidation)
         {
+            var submissionEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+
             foreach (var entry in needValidation)
             {
-                Produce(schedule, entry);
+               await Produce(schedule, entry, submissionEntryManager);
             }
         }
 
-        public void Produce(ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry)
+        public async Task Produce(ReportScheduleModel schedule, MeasureReportSubmissionEntryModel entry, ISubmissionEntryManager? manager = null)
         {
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
@@ -47,6 +52,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 });
 
             _readyForValidationProducer.Flush();
+
+            if(manager == null)
+            {
+                manager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+            }
+
+            await manager.UpdateStatusToValidationRequested(entry.Id);
         }
     }
 }

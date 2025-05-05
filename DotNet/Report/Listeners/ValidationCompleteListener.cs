@@ -125,18 +125,15 @@ namespace LantanaGroup.Link.Report.Listeners
                                     await submissionEntryManager.UpdateAsync(entry, cancellationToken);
                                 }
 
-                                if (schedule.EndOfReportPeriodJobHasRun)
-                                {
-                                    var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId 
-                                                                                            && e.ReportScheduleId == schedule.Id 
-                                                                                            && e.Status != PatientSubmissionStatus.NotReportable 
-                                                                                            && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
+                                var allReady = !await submissionEntryManager.AnyAsync(e => e.FacilityId == schedule.FacilityId 
+                                                                                        && e.ReportScheduleId == schedule.Id 
+                                                                                        && e.Status != PatientSubmissionStatus.NotReportable 
+                                                                                        && e.Status != PatientSubmissionStatus.ValidationComplete, consumeCancellationToken);
 
-                                    if (allReady)
-                                    {
-                                        await _submitReportProducer.Produce(schedule);
-                                    }
-                                }
+                                if (allReady)
+                                {
+                                    await _submitReportProducer.Produce(schedule);
+                                }                                
                             }
                             catch (DeadLetterException ex)
                             {
