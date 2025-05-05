@@ -87,13 +87,42 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 // Handle complex source by deep copying
                 var copiedObject = sourceComplex.DeepCopy() as Base;
+
+                // Verify target can accept this type of complex object by checking the property type
+                var pathParts = targetFhirPath.Split('.');
+                if (pathParts.Length >= 2)
+                {
+                    var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
+                    var propertyName = pathParts.Last().Split('[')[0]; // Remove any array indexing
+                    
+                    var parentNode = resource.ToTypedElement().Select(parentPath).FirstOrDefault();
+                    if (parentNode != null)
+                    {
+                        var parentPoco = parentNode.ToPoco() as Base;
+                        var property = parentPoco?
+                            .GetType()
+                            .GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                        
+                        if (property != null
+                            && !property.PropertyType.IsAssignableFrom(copiedObject.GetType())
+                            && !(typeof(IList).IsAssignableFrom(property.PropertyType)
+                                 && property.PropertyType.GenericTypeArguments.Length > 0
+                                 && property.PropertyType.GenericTypeArguments[0]
+                                       .IsAssignableFrom(copiedObject.GetType())))
+                        {
+                            throw new InvalidOperationException(
+                                $"Target property {propertyName} of type {property.PropertyType.Name} " +
+                                $"cannot accept source object of type {copiedObject.GetType().Name}.");
+                        }
+                    }
+                }
+
                 SetTargetValue(resource, targetFhirPath, copiedObject);
             }
             else
             {
                 throw new InvalidOperationException("Source type is not supported.");
             }
-        }
 
         private static void SetTargetValue(Resource resource, string targetFhirPath, object newValue)
         {
