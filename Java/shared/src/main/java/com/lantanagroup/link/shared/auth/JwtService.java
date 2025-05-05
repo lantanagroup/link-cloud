@@ -11,6 +11,8 @@ import java.util.function.Function;
 
 import io.jsonwebtoken.security.Keys;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -92,6 +94,20 @@ public class JwtService {
     return expiration.before(new Date());
   }
 
+  public PrincipalUser getAdminUser() {
+    List<GrantedAuthority> authorities = List.of(
+            new SimpleGrantedAuthority(RolePrefix + LinkUserClaims_LinkAdministrator),
+            new SimpleGrantedAuthority(LinkSystemPermissions_IsLinkAdmin));
+    return new PrincipalUser(LinkUserClaims_LinkSystemAccount, authenticationConfig.getAdminEmail(), authorities);
+  }
+
+  public String generateInterServiceToken() {
+    if (authenticationConfig.isAnonymous()) {
+      return null;
+    }
+    return generateToken(getAdminUser(), authenticationConfig.getSigningKey());
+  }
+
   //generate token for user
   public String generateToken (PrincipalUser user, String secret) {
     Map<String, Object> claims = new HashMap<>();
@@ -114,6 +130,9 @@ public class JwtService {
     }
     if (StringUtils.isEmpty(this.authenticationConfig.getAuthority())) {
       throw new RuntimeException("authentication.authority is null");
+    }
+    if (StringUtils.isEmpty(secret)) {
+      throw new RuntimeException("Signing key is empty");
     }
 
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
