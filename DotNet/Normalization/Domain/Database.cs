@@ -22,6 +22,7 @@ namespace LantanaGroup.Link.Normalization.Domain
         
         public Database(NormalizationDbContext dbContext, IEntityRepository<Operation> operations, IEntityRepository<OperationSequence> operationSequences, IEntityRepository<ResourceType> resourceTypes, IEntityRepository<OperationResourceType> operationResourceTypeMaps)
         {
+            _dbContext = dbContext; 
             Operations = operations;
             OperationSequences = operationSequences;
             ResourceTypes = resourceTypes;
