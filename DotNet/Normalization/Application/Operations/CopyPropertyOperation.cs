@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 {
                     var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
                     var propertyName = pathParts.Last().Split('[')[0]; // Remove any array indexing
-                    
+
                     var parentNode = resource.ToTypedElement().Select(parentPath).FirstOrDefault();
                     if (parentNode != null)
                     {
@@ -102,7 +102,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                         var property = parentPoco?
                             .GetType()
                             .GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                        
+
                         if (property != null
                             && !property.PropertyType.IsAssignableFrom(copiedObject.GetType())
                             && !(typeof(IList).IsAssignableFrom(property.PropertyType)
@@ -123,6 +123,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 throw new InvalidOperationException("Source type is not supported.");
             }
+        }
 
         private static void SetTargetValue(Resource resource, string targetFhirPath, object newValue)
         {
