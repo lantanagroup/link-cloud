@@ -1,9 +1,4 @@
-﻿using Hl7.Fhir.FhirPath;
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
-using Hl7.FhirPath;
-using LantanaGroup.Link.Normalization.Application.Operations.Helpers;
-using System.Reflection;
+﻿using Hl7.Fhir.Model;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
@@ -23,15 +18,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         }
 
         public DomainResource Execute(DomainResource domainResource)
-        {
-            var source = domainResource.Select(SourceFhirPath).FirstOrDefault();
-            var target = PropertyHelper.GetProperty(domainResource, TargetFhirPath);
-
-            PropertyInfo propertyInfo = typeof(FhirString).GetProperty("Value");
-            string source_string = (string)propertyInfo.GetValue(source);
-
-            PropertyInfo targetProperty = target.GetType().GetProperty("Value");
-            targetProperty.SetValue(target, source_string);
+        { 
+            CopyPropertyOperationHelper.CopyFhirPathValue(domainResource, SourceFhirPath, TargetFhirPath);
 
             return domainResource;
         }
