@@ -45,6 +45,38 @@ If you want to run the tests using the Docker Compose infrastructure, ensure the
    docker-compose up
    ```
 
+### Configuring
+
+The `TestConfig` class supports configurable properties that are sourced from environment variables. Environment 
+variables can be specified on the host machine (i.e. Windows > Start > "Edit environment variables for your account")
+or they can be specified in a `.runsettings` file in the root of the repository.
+
+| Environment Variable                                | Description                                                                                                                                | Default Value                |
+|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| EXTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where the tests are being executed                                                                           | http://localhost:6157/fhir   |
+| INTERNAL_FHIR_SERVER_BASE_URL                       | Base URL for FHIR server from where link services are deployed/running (i.e. within the docker network)                                    | http://fhir-server:8080/fhir |
+| ADMIN_BFF_BASE_URL                                  | Base URL for Admin BFF service API                                                                                                         | http://localhost:8063/api    |
+| ADHOC_REPORTING_SMOKE_<br/>TEST_MEASURE_BUNDLE_PATH | Path to the measure bundle file used in smoke tests                                                                                        | resource://...ACH...json     |
+| ADMINBFF_OAUTH_SHOULD_AUTHENTICATE                  | Flag to enable OAuth authentication for Admin BFF                                                                                          | false                        |
+| ADMINBFF_OAUTH_TOKEN_ENDPOINT                       | OAuth token endpoint URL for Admin BFF authentication                                                                                      |                              |
+| ADMINBFF_OAUTH_CLIENT_ID                            | OAuth client ID for Admin BFF authentication                                                                                               |                              |
+| ADMINBFF_OAUTH_USERNAME                             | Username for Admin BFF OAuth authentication                                                                                                |                              |
+| ADMINBFF_OAUTH_PASSWORD                             | Password for Admin BFF OAuth authentication                                                                                                |                              |
+| ADMINBFF_OAUTH_SCOPE                                | OAuth scope for Admin BFF authentication                                                                                                   |                              |
+| FHIRSERVER_OAUTH_SHOULD_AUTHENTICATE                | Flag to enable OAuth authentication for FHIR server                                                                                        | false                        |
+| FHIRSERVER_OAUTH_TOKEN_ENDPOINT                     | OAuth token endpoint URL for FHIR server authentication                                                                                    |                              |
+| FHIRSERVER_OAUTH_CLIENT_ID                          | OAuth client ID for FHIR server authentication                                                                                             |                              |
+| FHIRSERVER_OAUTH_USERNAME                           | Username for FHIR server OAuth authentication                                                                                              |                              |
+| FHIRSERVER_OAUTH_PASSWORD                           | Password for FHIR server OAuth authentication                                                                                              |                              |
+| FHIRSERVER_OAUTH_SCOPE                              | OAuth scope for FHIR server authentication                                                                                                 |                              |
+| FHIRSERVER_BASICAUTH_SHOULD_AUTHENTICATE            | Whether to pass basic credentials as authentication to the FHIR server. If both OAUTH and BASICAUTH are specified, OAUTH takes precedence. | false                        | 
+| FHIRSERVER_BASICAUTH_USERNAME                       | Username for basic authentication with the FHIR server.                                                                                    |                              |
+| FHIRSERVER_BASICAUTH_PASSWORD                       | Password for basic authentication with the FHIR server.                                                                                    |                              |
+
+The default values/settings are configured to support running the BackendE2ETests within the docker environment as specified by the `/docker-compose.yml` file.
+
+> Note: If using the Rider IDE for development/testing, you need to configure the test settings in Rider to use `.runsettings` in the `Build, Execution, Deployment > Unit Testing > Test Runner > Test Settings` section.
+
 ## Test Data
 
 - Test data resides within the **E2ETests** project.
