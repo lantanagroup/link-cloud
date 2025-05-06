@@ -114,7 +114,7 @@ services:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
       - type: bind
-        source: create-dbs.sql
+        source: .docker/create-dbs.sql
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
@@ -228,7 +228,7 @@ services:
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
-       - ./kafka-client.properties:/etc/kafka-client.properties
+       - .docker/kafka-client.properties:/etc/kafka-client.properties
      environment:
       KAFKA_BROKER_ID: "1"
       KAFKA_CFG_NODE_ID: "1"
@@ -261,7 +261,7 @@ services:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
     volumes:
-      - ./kafka-client.properties:/etc/kafka-client.properties
+      - .docker/kafka-client.properties:/etc/kafka-client.properties
       - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
       - ./topics.txt:/topics.txt
     depends_on:
