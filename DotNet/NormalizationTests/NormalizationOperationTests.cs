@@ -202,8 +202,8 @@ namespace NormalizationOperationTests
             Assert.Equal(resource.Identifier[0].Value, resource.Name[0].Family);
         }
 
-        //[Fact]
-        private async Task Integration_CopyPropertyOperation_Observation_Identifier_To_ValueQuanitty_Update_TargetElement()
+        [Fact]
+        public async Task Integration_CopyPropertyOperation_Observation_Identifier_To_ValueQuanitty_Update_TargetElement()
         {
             var operation = new CopyPropertyOperation("Copy Observation Identifier to ValueQuantity", "valueQuantity.value", "component.valueQuantity.value");
 
