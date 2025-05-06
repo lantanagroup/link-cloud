@@ -71,6 +71,9 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 throw new InvalidOperationException("Source value could not be resolved to a FHIR object.");
             }
 
+            // Evaluate the target FHIRPath to locate the target element(s)
+            var targetElements = scopedNode.Select(targetFhirPath).ToList();
+
             // Handle primitive and complex types
             if (sourcePoco is PrimitiveType sourcePrimitive)
             {
@@ -80,8 +83,27 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     throw new InvalidOperationException("Source primitive value is null.");
                 }
 
-                // Set the primitive value at the target path, creating structure if needed
-                SetTargetValue(resource, targetFhirPath, sourcePrimitive.ObjectValue);
+                if (targetElements.Any())
+                {
+                    // Copy the source value to each existing target element
+                    foreach (var targetElement in targetElements)
+                    {
+                        var targetPoco = targetElement.ToPoco();
+                        if (targetPoco is PrimitiveType targetPrimitive)
+                        {
+                            targetPrimitive.ObjectValue = sourcePrimitive.ObjectValue;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Target element at {targetFhirPath} is not a primitive type.");
+                        }
+                    }
+                }
+                else
+                {
+                    // No target elements exist; create the structure and set the value
+                    SetTargetValue(resource, targetFhirPath, sourcePrimitive.ObjectValue);
+                }
             }
             else if (sourcePoco is Base sourceComplex)
             {
@@ -117,7 +139,48 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     }
                 }
 
-                SetTargetValue(resource, targetFhirPath, copiedObject);
+                if (targetElements.Any())
+                {
+                    // Copy the complex object to each existing target element
+                    foreach (var targetElement in targetElements)
+                    {
+                        var targetParentPath = targetElement.Location; // Get the parent path of the target element
+                        var targetParentParts = targetParentPath.Split('.');
+                        var targetPropertyName = targetParentParts.Last().Split('[')[0];
+                        var targetParentPathWithoutProperty = string.Join(".", targetParentParts.Take(targetParentParts.Length - 1));
+                        var targetParentElements = scopedNode.Select(targetParentPathWithoutProperty).ToList();
+
+                        if (targetParentElements.Any())
+                        {
+                            var targetParentPoco = targetParentElements.First().ToPoco() as Base;
+                            if (targetParentPoco != null)
+                            {
+                                var targetProperty = targetParentPoco.GetType().GetProperty(targetPropertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                                if (targetProperty != null)
+                                {
+                                    if (typeof(IList).IsAssignableFrom(targetProperty.PropertyType))
+                                    {
+                                        var list = targetProperty.GetValue(targetParentPoco) as IList;
+                                        if (list != null)
+                                        {
+                                            var index = int.Parse(targetParentParts.Last().Split('[')[1].TrimEnd(']'));
+                                            list[index] = copiedObject;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        targetProperty.SetValue(targetParentPoco, copiedObject);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // No target elements exist; create the structure and set the value
+                    SetTargetValue(resource, targetFhirPath, copiedObject);
+                }
             }
             else
             {
@@ -157,7 +220,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             // Evaluate the parent FHIRPath
             var scopedNode = resource.ToTypedElement();
-            var parentElements = string.IsNullOrEmpty(parentPath) ? [ scopedNode ] : scopedNode.Select(parentPath).ToList();
+            var parentElements = string.IsNullOrEmpty(parentPath) ? [scopedNode] : scopedNode.Select(parentPath).ToList();
 
             Base parentPoco;
             if (!parentElements.Any())
