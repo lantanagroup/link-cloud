@@ -9,4 +9,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AuthenticationConfig {
     private String authority;
     private boolean isAnonymous = false;
+    private String adminEmail = "";
+    private String signingKey;
 }
