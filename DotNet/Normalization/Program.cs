@@ -1,25 +1,33 @@
 using Azure.Identity;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Interfaces;
-
+using LantanaGroup.Link.Normalization.Application.Managers;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Serializers;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.Managers;
+using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,14 +42,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using System.Reflection;
-using LantanaGroup.Link.Normalization.Application.Managers;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
-using Confluent.Kafka;
-using LantanaGroup.Link.Shared.Application.Health;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
-using LantanaGroup.Link.Normalization.Domain.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -203,6 +204,9 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Managers
     builder.Services.AddTransient<INormalizationConfigManager, NormalizationConfigManager>();
+    builder.Services.AddTransient<IDatabase, Database>();
+    builder.Services.AddTransient<IOperationManager, OperationManager>();
+    builder.Services.AddTransient<IOperationQueries, OperationQueries>();
 
     builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
@@ -217,7 +221,7 @@ static void RegisterServices(WebApplicationBuilder builder)
          builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
 
-    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
+    if (false && consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
