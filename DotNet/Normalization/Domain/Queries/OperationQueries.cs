@@ -42,10 +42,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             ModifyDate = o.ModifyDate,
                             OperationJson = o.OperationJson,
                             OperationType = o.OperationType,
-                            CreateDate = o.CreateDate
+                            CreateDate = o.CreateDate,                           
                         };
 
-            if (!model.Id.HasValue)
+            if (model.Id.HasValue)
             {
                 query = query.Where(q => q.Id == model.Id);
             }

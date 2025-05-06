@@ -28,6 +28,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 throw new InvalidOperationException("No Resource Types Found.");
             }
+
             else if(resourceTypes.Count != model.ResourceTypes.Count)
             {
                 throw new InvalidOperationException("Not all provided Resource Types were found.");
@@ -40,15 +41,19 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 FacilityId = model.FacilityId,
                 Description = model.Description,
                 IsDisabled = model.IsDisabled,
-                OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
-                {
-                    ResourceTypeId = t.Id
-                }).ToList(),
                 CreateDate = DateTime.UtcNow,
                 ModifyDate = null
             };
 
             await _database.Operations.AddAsync(operation);
+            await _database.SaveChangesAsync();
+
+            operation.OperationResourceTypes = resourceTypes.Select(t => new OperationResourceType()
+            {
+                OperationId = operation.Id,
+                ResourceTypeId = t.Id
+            }).ToList();
+
             await _database.SaveChangesAsync();
 
             return await _operationQueries.Get(operation.Id, operation.FacilityId);

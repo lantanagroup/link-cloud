@@ -7,9 +7,16 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
+using Task = System.Threading.Tasks.Task;
 
 namespace NormalizationTests
 {
+    [CollectionDefinition("IntegrationTest")]
+    public class DatabaseCollection : ICollectionFixture<IntegrationTestFixture>
+    {
+        // This class is a marker for the collection
+    }
+
     public class IntegrationTestFixture : IDisposable
     {
         public ServiceProvider ServiceProvider { get; private set; }
@@ -33,6 +40,19 @@ namespace NormalizationTests
 
             // Build the service provider
             ServiceProvider = services.BuildServiceProvider();
+
+            using var scope = ServiceProvider.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            InitializeDatabase(database).GetAwaiter().GetResult();
+        }
+
+        private async Task InitializeDatabase(IDatabase database)
+        {
+            // Add required ResourceTypes
+            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Location" });
+            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Patient" });
+            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Observation" });
+            await database.SaveChangesAsync();
         }
 
         public T GetService<T>() => ServiceProvider.GetService<T>();
