@@ -57,7 +57,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 // If still null, try the original resource
                 if (targetValue == null)
                 {
-                    DebugPrint($"Failed to extract value from copy. Trying original resource for FHIRPath {sourceFhirPath}.");
                     var originalScopedNode = originalResource.ToTypedElement();
                     targetValue = ExtractValueFromFhirPath(originalScopedNode, sourceFhirPath);
                     if (targetValue == null)
@@ -128,20 +127,16 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
         private object ExtractValueFromFhirPath(ITypedElement scopedNode, string fhirPath)
         {
-            DebugPrint($"Evaluating FHIRPath {fhirPath} on resource: {scopedNode.GetType().Name}");
             var values = scopedNode.Select(fhirPath).ToList();
             if (!values.Any())
             {
-                DebugPrint($"FHIRPath {fhirPath} returned no values. Resource structure: {scopedNode.ToString()}");
                 return null;
             }
 
             var value = values.First();
-            DebugPrint($"Resolved value at FHIRPath {fhirPath}: {value?.ToString() ?? "null"}");
             var poco = value?.ToPoco();
             if (poco == null)
             {
-                DebugPrint($"Failed to resolve value at FHIRPath {fhirPath} to a FHIR object.");
                 return null;
             }
 
@@ -149,37 +144,30 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 if (primitive.ObjectValue == null)
                 {
-                    DebugPrint($"Primitive value at FHIRPath {fhirPath} is null.");
                     return null;
                 }
-                DebugPrint($"Extracted primitive value: {primitive.ObjectValue}");
                 return primitive.ObjectValue;
             }
             else if (poco is Quantity quantity)
             {
                 if (quantity.Value == null)
                 {
-                    DebugPrint($"Quantity value at FHIRPath {fhirPath} is null.");
                     return null;
                 }
-                DebugPrint($"Extracted quantity value: {quantity.Value}");
                 return quantity.Value;
             }
             else if (poco is Base complex)
             {
-                DebugPrint($"Extracted complex value: {complex.ToString()}");
                 return complex.DeepCopy() as Base;
             }
             else
             {
-                DebugPrint($"Unsupported type {poco.GetType().Name} at FHIRPath {fhirPath}.");
                 return null;
             }
         }
 
         private object GetValueReflectively(object resource, string fhirPath)
         {
-            DebugPrint($"Attempting reflective access for FHIRPath {fhirPath} on resource type {resource?.GetType().Name}");
             var pathParts = fhirPath.Split('.');
             object current = resource;
 
@@ -208,35 +196,27 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
                 if (current == null)
                 {
-                    DebugPrint($"Cannot resolve property {mappedPropertyName} on null object at FHIRPath {fhirPath}.");
                     return null;
                 }
 
                 PropertyInfo property = null;
                 foreach (var name in possiblePropertyNames)
                 {
-                    DebugPrint($"Resolving property {name} on type {current.GetType().Name}");
                     property = current.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                     if (property != null)
                     {
-                        DebugPrint($"Found property {name} on type {current.GetType().Name}");
                         break;
                     }
                 }
 
                 if (property == null)
                 {
-                    // Debug all available properties
-                    var properties = current.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                    DebugPrint($"Property not found. Available properties on {current.GetType().Name}: {string.Join(", ", properties.Select(p => p.Name))}");
-                    DebugPrint($"Property {mappedPropertyName} not found on type {current.GetType().Name} at FHIRPath {fhirPath}.");
                     return null;
                 }
 
                 current = property.GetValue(current);
                 if (current == null)
                 {
-                    DebugPrint($"Value at {property.Name} is null at FHIRPath {fhirPath}.");
                     return null;
                 }
 
@@ -244,7 +224,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 {
                     if (list.Count <= arrayIndex.Value)
                     {
-                        DebugPrint($"Index {arrayIndex.Value} out of bounds for list {property.Name} at FHIRPath {fhirPath}.");
                         return null;
                     }
                     current = list[arrayIndex.Value];
@@ -254,7 +233,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             // Handle primitive values directly
             if (current is string || current is int || current is bool || current is decimal || current is DateTime)
             {
-                DebugPrint($"Reflectively extracted primitive value: {current}");
                 return current;
             }
             else if (current is Quantity quantity)
@@ -263,36 +241,18 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 if (valueProp != null)
                 {
                     var value = valueProp.GetValue(quantity);
-                    if (value == null)
-                    {
-                        DebugPrint($"Quantity value is null at FHIRPath {fhirPath}.");
-                    }
-                    else
-                    {
-                        DebugPrint($"Reflectively extracted quantity value: {value}");
-                    }
                     return value;
                 }
             }
             else if (current is PrimitiveType primitive)
             {
-                if (primitive.ObjectValue == null)
-                {
-                    DebugPrint($"Primitive value is null at FHIRPath {fhirPath}.");
-                }
-                else
-                {
-                    DebugPrint($"Reflectively extracted primitive value: {primitive.ObjectValue}");
-                }
                 return primitive.ObjectValue;
             }
             else if (current is Base complexValue)
             {
-                DebugPrint($"Reflectively extracted complex value: {complexValue.ToString()}");
                 return complexValue.DeepCopy() as Base;
             }
 
-            DebugPrint($"No value found reflectively at {fhirPath}. Final value type: {current?.GetType().Name ?? "null"}");
             return null;
         }
 
@@ -377,7 +337,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 }
 
                 var convertedValue = ConvertToFhirType(targetValue, propertyToSet.PropertyType, parentPoco, propertyName);
-                DebugPrint($"Assigning converted value of type {convertedValue?.GetType().Name ?? "null"} to property {propertyName} of type {propertyToSet.PropertyType.Name}");
                 propertyToSet.SetValue(parentPoco, convertedValue);
             }
         }
@@ -456,8 +415,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
 
             var convertedValue = ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName);
-            DebugPrint($"Assigning converted value of type {convertedValue?.GetType().Name ?? "null"} (original: {newValue?.GetType().Name ?? "null"}) to property {propertyName} of type {property.PropertyType.Name} at FHIRPath {targetFhirPath}");
-
             if (typeof(IList).IsAssignableFrom(property.PropertyType))
             {
                 var list = property.GetValue(parentPoco) as IList;
@@ -658,8 +615,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
         private object ConvertToFhirType(object newValue, Type propertyType, Base parentPoco, string propertyName)
         {
-            DebugPrint($"Converting value of type {newValue?.GetType().Name ?? "null"} to property type {propertyType.Name} for property {propertyName} on type {parentPoco?.GetType().Name}");
-
             if (newValue == null) return null;
 
             if (newValue is string strValue)
@@ -700,7 +655,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 throw new InvalidOperationException($"Cannot assign complex value of type {newValue.GetType().Name} to property of type {propertyType.Name}.");
             }
 
-            DebugPrint($"No conversion applied, returning original value of type {newValue.GetType().Name}.");
             return newValue;
         }
 
@@ -723,12 +677,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
 
             return inferredUrl;
-        }
-
-        private void DebugPrint(string message)
-        {
-            // Simple console output for debugging
-            Console.WriteLine($"[DEBUG] {message}");
         }
     }
 }
