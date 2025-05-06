@@ -221,7 +221,7 @@ static void RegisterServices(WebApplicationBuilder builder)
          builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
 
-    if (false && consumerSettings != null && !consumerSettings.DisableRetryConsumer)
+    if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
