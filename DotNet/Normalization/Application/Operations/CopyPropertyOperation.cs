@@ -48,10 +48,25 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             object targetValue = ExtractValueFromFhirPath(scopedNode, sourceFhirPath);
             if (targetValue == null)
             {
-                // Try reflective access for quantity or value paths
+                // Try reflective access on the resource copy
                 if (sourceFhirPath.Contains("Quantity") || sourceFhirPath.EndsWith("value") || sourceFhirPath.EndsWith("value.value"))
                 {
                     targetValue = GetValueReflectively(resource, sourceFhirPath);
+                }
+
+                // If still null, try the original resource
+                if (targetValue == null)
+                {
+                    DebugPrint($"Failed to extract value from copy. Trying original resource for FHIRPath {sourceFhirPath}.");
+                    var originalScopedNode = originalResource.ToTypedElement();
+                    targetValue = ExtractValueFromFhirPath(originalScopedNode, sourceFhirPath);
+                    if (targetValue == null)
+                    {
+                        if (sourceFhirPath.Contains("Quantity") || sourceFhirPath.EndsWith("value") || sourceFhirPath.EndsWith("value.value"))
+                        {
+                            targetValue = GetValueReflectively(originalResource, sourceFhirPath);
+                        }
+                    }
                 }
             }
 
@@ -113,48 +128,58 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
         private object ExtractValueFromFhirPath(ITypedElement scopedNode, string fhirPath)
         {
+            DebugPrint($"Evaluating FHIRPath {fhirPath} on resource: {scopedNode.GetType().Name}");
             var values = scopedNode.Select(fhirPath).ToList();
             if (!values.Any())
             {
-                DebugPrint($"FHIRPath {fhirPath} returned no values.");
+                DebugPrint($"FHIRPath {fhirPath} returned no values. Resource structure: {scopedNode.ToString()}");
                 return null;
             }
 
             var value = values.First();
+            DebugPrint($"Resolved value at FHIRPath {fhirPath}: {value?.ToString() ?? "null"}");
             var poco = value?.ToPoco();
             if (poco == null)
             {
-                throw new InvalidOperationException("Value could not be resolved to a FHIR object.");
+                DebugPrint($"Failed to resolve value at FHIRPath {fhirPath} to a FHIR object.");
+                return null;
             }
 
             if (poco is PrimitiveType primitive)
             {
                 if (primitive.ObjectValue == null)
                 {
-                    throw new InvalidOperationException("Primitive value is null.");
+                    DebugPrint($"Primitive value at FHIRPath {fhirPath} is null.");
+                    return null;
                 }
+                DebugPrint($"Extracted primitive value: {primitive.ObjectValue}");
                 return primitive.ObjectValue;
             }
             else if (poco is Quantity quantity)
             {
                 if (quantity.Value == null)
                 {
-                    throw new InvalidOperationException("Quantity value is null.");
+                    DebugPrint($"Quantity value at FHIRPath {fhirPath} is null.");
+                    return null;
                 }
+                DebugPrint($"Extracted quantity value: {quantity.Value}");
                 return quantity.Value;
             }
             else if (poco is Base complex)
             {
+                DebugPrint($"Extracted complex value: {complex.ToString()}");
                 return complex.DeepCopy() as Base;
             }
             else
             {
-                throw new InvalidOperationException($"Type {poco.GetType().Name} is not supported.");
+                DebugPrint($"Unsupported type {poco.GetType().Name} at FHIRPath {fhirPath}.");
+                return null;
             }
         }
 
         private object GetValueReflectively(object resource, string fhirPath)
         {
+            DebugPrint($"Attempting reflective access for FHIRPath {fhirPath} on resource type {resource?.GetType().Name}");
             var pathParts = fhirPath.Split('.');
             object current = resource;
 
@@ -177,18 +202,41 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     }
                 }
 
-                propertyName = MapFhirPathToPropertyName(propertyName, current.GetType());
-                var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                // Try both mapped and unmapped property names
+                string mappedPropertyName = MapFhirPathToPropertyName(propertyName, current?.GetType());
+                string[] possiblePropertyNames = { mappedPropertyName, propertyName, char.ToUpper(propertyName[0]) + propertyName.Substring(1) };
+
+                if (current == null)
+                {
+                    DebugPrint($"Cannot resolve property {mappedPropertyName} on null object at FHIRPath {fhirPath}.");
+                    return null;
+                }
+
+                PropertyInfo property = null;
+                foreach (var name in possiblePropertyNames)
+                {
+                    DebugPrint($"Resolving property {name} on type {current.GetType().Name}");
+                    property = current.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                    if (property != null)
+                    {
+                        DebugPrint($"Found property {name} on type {current.GetType().Name}");
+                        break;
+                    }
+                }
+
                 if (property == null)
                 {
-                    DebugPrint($"Property {propertyName} not found on type {current.GetType().Name}.");
+                    // Debug all available properties
+                    var properties = current.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                    DebugPrint($"Property not found. Available properties on {current.GetType().Name}: {string.Join(", ", properties.Select(p => p.Name))}");
+                    DebugPrint($"Property {mappedPropertyName} not found on type {current.GetType().Name} at FHIRPath {fhirPath}.");
                     return null;
                 }
 
                 current = property.GetValue(current);
                 if (current == null)
                 {
-                    DebugPrint($"Value at {propertyName} is null.");
+                    DebugPrint($"Value at {property.Name} is null at FHIRPath {fhirPath}.");
                     return null;
                 }
 
@@ -196,14 +244,20 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 {
                     if (list.Count <= arrayIndex.Value)
                     {
-                        DebugPrint($"Index {arrayIndex.Value} out of bounds for list {propertyName}.");
+                        DebugPrint($"Index {arrayIndex.Value} out of bounds for list {property.Name} at FHIRPath {fhirPath}.");
                         return null;
                     }
                     current = list[arrayIndex.Value];
                 }
             }
 
-            if (current is Quantity quantity)
+            // Handle primitive values directly
+            if (current is string || current is int || current is bool || current is decimal || current is DateTime)
+            {
+                DebugPrint($"Reflectively extracted primitive value: {current}");
+                return current;
+            }
+            else if (current is Quantity quantity)
             {
                 var valueProp = quantity.GetType().GetProperty("Value", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (valueProp != null)
@@ -211,7 +265,11 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     var value = valueProp.GetValue(quantity);
                     if (value == null)
                     {
-                        DebugPrint("Quantity value is null.");
+                        DebugPrint($"Quantity value is null at FHIRPath {fhirPath}.");
+                    }
+                    else
+                    {
+                        DebugPrint($"Reflectively extracted quantity value: {value}");
                     }
                     return value;
                 }
@@ -220,16 +278,21 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 if (primitive.ObjectValue == null)
                 {
-                    DebugPrint("Primitive value is null.");
+                    DebugPrint($"Primitive value is null at FHIRPath {fhirPath}.");
+                }
+                else
+                {
+                    DebugPrint($"Reflectively extracted primitive value: {primitive.ObjectValue}");
                 }
                 return primitive.ObjectValue;
             }
             else if (current is Base complexValue)
             {
+                DebugPrint($"Reflectively extracted complex value: {complexValue.ToString()}");
                 return complexValue.DeepCopy() as Base;
             }
 
-            DebugPrint($"No value found reflectively at {fhirPath}.");
+            DebugPrint($"No value found reflectively at {fhirPath}. Final value type: {current?.GetType().Name ?? "null"}");
             return null;
         }
 
@@ -544,7 +607,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             return fhirPathName switch
             {
-                "valueQuantity" => "ValueQuantity",
+                "valueQuantity" => "Value", // Adjusted mapping for Observation
                 "value" => "Value",
                 "code" => "Code",
                 "extension" => "Extension",
