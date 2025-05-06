@@ -256,5 +256,121 @@ namespace NormalizationOperationTests
                 Assert.Equal(120m, quantity.Value);
             });
         }
+
+        [Fact]
+        public async Task Integration_CopyPropertyOperation_Patient_NameToExtension_CreateTarget()
+        {
+            var operation = new CopyPropertyOperation(
+                "Copy Patient Name to Extension",
+                "name[0].given[0]",
+                "extension[0].valueString"
+            );
+
+            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<CopyPropertyOperation>(operation),
+                OperationType = OperationType.CopyProperty.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Copy Patient Name to Extension",
+                IsDisabled = false,
+                ResourceTypes = ["Patient"]
+            });
+
+            Assert.NotNull(result);
+            Assert.NotEqual(default(Guid), result.Id);
+
+            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var fetched = await queries.Get(result.Id);
+
+            Assert.NotNull(fetched);
+            Assert.NotEqual(default(Guid), fetched.Id);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Patient>(text);
+
+            Assert.NotNull(fetched.OperationJson);
+            var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
+
+            Assert.NotNull(copyOperation);
+            Assert.NotNull(copyOperation.SourceFhirPath);
+            Assert.NotNull(copyOperation.TargetFhirPath);
+
+            resource = (Patient)copyOperation.Execute(resource);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+
+            // Assert that the extension was created and set correctly
+            Assert.NotEmpty(resource.Extension);
+            var extension = resource.Extension.FirstOrDefault(e => e.Url == "http://example.org/fhir/extension/Patient-GivenName");
+            Assert.NotNull(extension);
+            Assert.IsType<FhirString>(extension.Value);
+            Assert.Equal("John", ((FhirString)extension.Value).Value);
+        }
+
+        [Fact]
+        public async Task Integration_CopyPropertyOperation_MedicationRequest_DosageToNote_CreateTarget()
+        {
+            var operation = new CopyPropertyOperation(
+                "Copy MedicationRequest Dosage to Note",
+                "dosageInstruction[0].doseAndRate[0].dose.value",
+                "note[0].text"
+            );
+
+            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CopyProperty.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Copy MedicationRequest Dosage to Note",
+                IsDisabled = false,
+                ResourceTypes = ["MedicationRequest"]
+            });
+
+            Assert.NotNull(result);
+            Assert.NotEqual(default(Guid), result.Id);
+
+            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var fetched = await queries.Get(result.Id);
+
+            Assert.NotNull(fetched);
+            Assert.NotEqual(default(Guid), fetched.Id);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "MedicationRequest.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<MedicationRequest>(text);
+
+            Assert.NotNull(fetched.OperationJson);
+            var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
+
+            Assert.NotNull(copyOperation);
+            Assert.NotNull(copyOperation.SourceFhirPath);
+            Assert.NotNull(copyOperation.TargetFhirPath);
+
+            resource = (MedicationRequest)copyOperation.Execute(resource);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+
+            // Assert that the note was created and set correctly
+            Assert.NotEmpty(resource.Note);
+            Assert.Equal(1, resource.Note.Count);
+            var note = resource.Note[0];
+            Assert.NotNull(note.Text);
+            Assert.Equal("325", note.Text);
+        }
     }
 }
