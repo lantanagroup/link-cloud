@@ -6,22 +6,25 @@ using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
 using NormalizationTests;
 using System.Text.Json;
+using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace NormalizationOperationTests
 {
     public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
     {
+        private readonly ITestOutputHelper _output;
         private readonly IntegrationTestFixture _fixture;
 
-        public NormalizationOperationTests(IntegrationTestFixture fixture)
+        public NormalizationOperationTests(IntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
+            _output = output;
         }
 
 
         [Fact]
-        public void Unit_Location_Identifier_To_Type()
+        public async Task Unit_Location_Identifier_To_Type()
         {
             var parser = new FhirJsonParser();
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -37,6 +40,13 @@ namespace NormalizationOperationTests
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
             location = (Location)copyOperation.Execute(location);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(location_text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(location));
 
             Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
         }
@@ -95,6 +105,13 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.TargetFhirPath);
 
             location = (Location)copyOperation.Execute(location);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(location_text);
+
+            _output.WriteLine("Modified: ");            
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(location));
 
             Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
         }
