@@ -4,6 +4,9 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using System.Collections;
 using System.Reflection;
+using System.Linq;
+using System;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
@@ -13,6 +16,20 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         public string Name { get; private set; }
         public string SourceFhirPath { get; private set; }
         public string TargetFhirPath { get; private set; }
+
+        //Explicit mapping of FHIR resource name to C# Properties
+        private static readonly Dictionary<string, string> FhirPathToPropertyMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            //{ "valuequantity", "Value" },
+            //{ "onsetdatetime", "Onset" },
+            //{ "dosagequantity", "Dose" },
+            //{ "valuestring", "Value" }
+        };
+
+        //Commonly, a FHIR resource name will have its type or a descriptor at the end, which is subsequently lost 
+        //when it is instantiated into a C# object model, ie ValueQuantity is actually just Value on the Resource object.
+        //If the provided mapping does not directly match a property, these suffixes will be stripped to attempt a match.
+        private static readonly string[] CommonFhirSuffixes = { "DateTime", "Quantity", "String", "Boolean", "Decimal", "Integer", "Code" };
 
         public CopyPropertyOperation(string name, string sourceFhirPath, string targetFhirPath)
         {
@@ -170,14 +187,13 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     }
                 }
 
-                // Try both mapped and unmapped property names
-                string mappedPropertyName = MapFhirPathToPropertyName(propertyName, current?.GetType());
-                string[] possiblePropertyNames = { mappedPropertyName, propertyName, char.ToUpper(propertyName[0]) + propertyName.Substring(1) };
-
                 if (current == null)
                 {
                     return null;
                 }
+
+                // Get possible property names
+                var possiblePropertyNames = MapFhirPathToPropertyName(propertyName, current.GetType());
 
                 PropertyInfo property = null;
                 foreach (var name in possiblePropertyNames)
@@ -214,6 +230,14 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             if (current is string || current is int || current is bool || current is decimal || current is DateTime)
             {
                 return current;
+            }
+            else if (current is FhirDateTime fhirDateTime)
+            {
+                if (fhirDateTime.Value == null)
+                {
+                    return null;
+                }
+                return fhirDateTime.Value;
             }
             else if (current is Quantity quantity)
             {
@@ -262,7 +286,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 {
                     var part = pathParts[i];
                     (propertyName, arrayIndex) = ParseFhirPathPart(part);
-                    propertyName = MapFhirPathToPropertyName(propertyName, parentPoco?.GetType());
+                    propertyName = MapFhirPathToPropertyName(propertyName, parentPoco?.GetType()).First();
 
                     var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                     if (property == null)
@@ -386,7 +410,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 throw new InvalidOperationException($"Could not create parent structure for {parentPath}.");
             }
 
-            propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType());
+            propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType()).First();
 
             var property = parentPoco.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             if (property == null)
@@ -448,7 +472,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             foreach (var part in pathParts)
             {
                 var (propertyName, arrayIndex) = ParseFhirPathPart(part);
-                propertyName = MapFhirPathToPropertyName(propertyName, current.GetType());
+                propertyName = MapFhirPathToPropertyName(propertyName, current.GetType()).First();
 
                 var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (property == null)
@@ -512,7 +536,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
             var propertyName = pathParts.Last().Split('[')[0];
-            propertyName = MapFhirPathToPropertyName(propertyName, null);
+            propertyName = MapFhirPathToPropertyName(propertyName, null).First();
 
             var parentNode = scopedNode.Select(parentPath).FirstOrDefault();
             if (parentNode != null)
@@ -530,27 +554,44 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
-        private string MapFhirPathToPropertyName(string fhirPathName, Type parentType)
+        private IEnumerable<string> MapFhirPathToPropertyName(string fhirPathName, Type parentType)
         {
-            if (parentType == typeof(Extension) && fhirPathName.Equals("valueString", StringComparison.OrdinalIgnoreCase))
+            // Normalize the FHIR path name to lowercase for comparison
+            string normalizedFhirPathName = fhirPathName.ToLower();
+
+            // Check for explicit mapping
+            if (FhirPathToPropertyMappings.TryGetValue(normalizedFhirPathName, out string mappedName))
             {
-                return "Value";
+                yield return mappedName;
             }
 
-            if (fhirPathName.Equals("doseQuantity", StringComparison.OrdinalIgnoreCase))
+            // Special case for Extension type
+            if (parentType == typeof(Extension) && normalizedFhirPathName == "valuestring")
             {
-                return "Dose";
+                yield return "Value";
             }
 
-            return fhirPathName switch
+            // Generate possible property names using heuristics
+            // 1. Original FHIR path name in PascalCase
+            yield return char.ToUpper(fhirPathName[0]) + (fhirPathName.Length > 1 ? fhirPathName.Substring(1) : string.Empty);
+
+            // 2. Remove common FHIR suffixes and convert to PascalCase
+            string baseName = fhirPathName;
+            foreach (var suffix in CommonFhirSuffixes)
             {
-                "onsetDateTime" => "Onset",
-                "valueQuantity" => "Value", // Adjusted mapping for Observation
-                "value" => "Value",
-                "code" => "Code",
-                "extension" => "Extension",
-                _ => char.ToUpper(fhirPathName[0]) + fhirPathName.Substring(1) // Default to PascalCase
-            };
+                if (baseName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    baseName = baseName.Substring(0, baseName.Length - suffix.Length);
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(baseName))
+            {
+                yield return char.ToUpper(baseName[0]) + (baseName.Length > 1 ? baseName.Substring(1) : string.Empty);
+            }
+
+            // 3. Original FHIR path name as-is
+            yield return fhirPathName;
         }
 
         private (string propertyName, int? arrayIndex) ParseFhirPathPart(string part)
