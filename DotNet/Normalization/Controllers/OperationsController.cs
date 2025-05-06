@@ -79,6 +79,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var operationImplementation = model.Operation.OperationType switch
                 {
                     OperationType.CopyProperty => (CopyPropertyOperation)model.Operation,
+                    //TODO: Fill in other operations
                     _ => null
                 };
 
