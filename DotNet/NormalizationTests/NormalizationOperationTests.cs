@@ -372,5 +372,61 @@ namespace NormalizationOperationTests
             Assert.NotNull(note.Text);
             Assert.Equal("325", note.Text);
         }
+
+        [Fact]
+        public async Task Integration_CopyPropertyOperation_Condition_OnsetToCode_UpdateTarget()
+        {
+            var operation = new CopyPropertyOperation(
+                "Copy Condition Onset to Code Text",
+                "onsetDateTime",
+                "code.text"
+            );
+
+            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            {
+                OperationJson = JsonSerializer.Serialize<object>(operation),
+                OperationType = OperationType.CopyProperty.ToString(),
+                FacilityId = null,
+                Description = "Integration Test Copy Condition Onset to Code Text",
+                IsDisabled = false,
+                ResourceTypes = ["Condition"]
+            });
+
+            Assert.NotNull(result);
+            Assert.NotEqual(default(Guid), result.Id);
+
+            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var fetched = await queries.Get(result.Id);
+
+            Assert.NotNull(fetched);
+            Assert.NotEqual(default(Guid), fetched.Id);
+
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Condition.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Condition>(text);
+
+            Assert.NotNull(fetched.OperationJson);
+            var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
+
+            Assert.NotNull(copyOperation);
+            Assert.NotNull(copyOperation.SourceFhirPath);
+            Assert.NotNull(copyOperation.TargetFhirPath);
+
+            resource = (Condition)copyOperation.Execute(resource);
+
+            _output.WriteLine("Original: ");
+            _output.WriteLine(text);
+
+            _output.WriteLine("Modified: ");
+            FhirJsonSerializer serializer = new FhirJsonSerializer();
+            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+
+            // Assert that the code.text was updated correctly
+            Assert.NotNull(resource.Code);
+            Assert.NotNull(resource.Code.Text);
+            Assert.Equal("2023-05-01T10:00:00Z", resource.Code.Text);
+        }
     }
 }

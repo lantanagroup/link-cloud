@@ -2,9 +2,7 @@
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
-using System;
 using System.Collections;
-using System.Linq;
 using System.Reflection;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
@@ -48,25 +46,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             object targetValue = ExtractValueFromFhirPath(scopedNode, sourceFhirPath);
             if (targetValue == null)
             {
-                // Try reflective access on the resource copy
-                if (sourceFhirPath.Contains("Quantity") || sourceFhirPath.EndsWith("value") || sourceFhirPath.EndsWith("value.value"))
-                {
-                    targetValue = GetValueReflectively(resource, sourceFhirPath);
-                }
-
-                // If still null, try the original resource
-                if (targetValue == null)
-                {
-                    var originalScopedNode = originalResource.ToTypedElement();
-                    targetValue = ExtractValueFromFhirPath(originalScopedNode, sourceFhirPath);
-                    if (targetValue == null)
-                    {
-                        if (sourceFhirPath.Contains("Quantity") || sourceFhirPath.EndsWith("value") || sourceFhirPath.EndsWith("value.value"))
-                        {
-                            targetValue = GetValueReflectively(originalResource, sourceFhirPath);
-                        }
-                    }
-                }
+                targetValue = GetValueReflectively(resource, sourceFhirPath);
             }
 
             if (targetValue == null)
@@ -564,6 +544,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             return fhirPathName switch
             {
+                "onsetDateTime" => "Onset",
                 "valueQuantity" => "Value", // Adjusted mapping for Observation
                 "value" => "Value",
                 "code" => "Code",

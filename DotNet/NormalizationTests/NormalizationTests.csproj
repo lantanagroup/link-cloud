@@ -30,6 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Resources\Condition.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\Encounter.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

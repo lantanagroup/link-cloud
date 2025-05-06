@@ -53,6 +53,7 @@ namespace NormalizationTests
             await database.ResourceTypes.AddAsync(new ResourceType { Name = "Patient" });
             await database.ResourceTypes.AddAsync(new ResourceType { Name = "Observation" });
             await database.ResourceTypes.AddAsync(new ResourceType { Name = "MedicationRequest" });
+            await database.ResourceTypes.AddAsync(new ResourceType { Name = "Condition" });
             await database.SaveChangesAsync();
         }
 
