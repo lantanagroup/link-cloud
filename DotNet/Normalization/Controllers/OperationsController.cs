@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,11 +19,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
     {
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
+        private readonly ITenantApiService _tenantApiService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
+            _tenantApiService = tenantApiService;
         }
 
         [HttpGet("")]
@@ -86,6 +89,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if(operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
+                }
+
+                if(!string.IsNullOrEmpty(model.FacilityId))
+                {
+                   var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);   
+                    
+                    if(!exists)
+                    {
+                        return BadRequest("No Facility exists for the provided FacilityId.");
+                    }
                 }
 
                 var operation = await _operationManager.CreateOperation(new CreateOperationModel()
@@ -179,6 +192,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (operationImplementation == null)
                 {
                     return BadRequest("Operation did not match any existing Operation Types.");
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    var exists = await _tenantApiService.CheckFacilityExists(model.FacilityId);
+
+                    if (!exists)
+                    {
+                        return BadRequest("No Facility exists for the provided FacilityId.");
+                    }
                 }
 
                 var operation = await _operationManager.UpdateOperation(new UpdateOperationModel()
