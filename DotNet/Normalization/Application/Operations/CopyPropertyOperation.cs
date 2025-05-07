@@ -4,9 +4,6 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using System.Collections;
 using System.Reflection;
-using System.Linq;
-using System;
-using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {

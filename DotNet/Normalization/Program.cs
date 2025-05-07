@@ -208,6 +208,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IOperationManager, OperationManager>();
     builder.Services.AddTransient<IOperationQueries, OperationQueries>();
 
+    builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new OperationConverter());
+    });
+
     builder.Services.AddTransient<INormalizationService, NormalizationService>();
 
     builder.Services.AddTransient<IJobFactory, JobFactory>();
