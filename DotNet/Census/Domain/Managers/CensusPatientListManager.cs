@@ -16,11 +16,7 @@ public interface ICensusPatientListManager
     Task<List<CensusPatientListEntity>> GetPatientListForFacility(string facilityId, bool activeOnly, CancellationToken cancellationToken = default);
 
     Task<CensusPatientListEntity> GetPatientByPatientId(string facilityId, string patientId,
-        CancellationToken cancellationToken = default);
-
-    Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity,
-        CancellationToken cancellationToken = default);
-    
+        CancellationToken cancellationToken = default); 
 }
 
 public class CensusPatientListManager : ICensusPatientListManager
@@ -32,18 +28,6 @@ public class CensusPatientListManager : ICensusPatientListManager
     {
         _logger = logger;
         _patientListRepository = patientListRepository;
-    }
-
-    public async Task<CensusPatientListEntity> AddOrUpdateAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
-    {
-        if (entity.Id != null)
-        {
-            return await UpdateAsync(entity, cancellationToken);
-        }
-        else
-        {
-            return await AddAsync(entity, cancellationToken);
-        }
     }
 
     public async Task<CensusPatientListEntity> AddAsync(CensusPatientListEntity entity, CancellationToken cancellationToken = default)
