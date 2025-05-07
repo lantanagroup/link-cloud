@@ -135,21 +135,6 @@ namespace NormalizationOperationTests
             string location_text = File.ReadAllText(locationPath);
             var location = parser.Parse<Location>(location_text);
 
-            PostOperationModel model = new PostOperationModel()
-            {
-                ResourceTypes = ["Location"],
-                Operation = operation,
-                Description = "Description For Daniel Son, The God King",
-                FacilityId = null,
-            };
-
-            var options = new JsonSerializerOptions
-            {
-                Converters = { new OperationConverter() }
-            };
-
-            _output.WriteLine(JsonSerializer.Serialize(model, options));
-
             Assert.NotNull(fetched.OperationJson);
             var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
 
