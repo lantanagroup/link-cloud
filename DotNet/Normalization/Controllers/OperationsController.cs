@@ -129,17 +129,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (model.Operation == null)
                 {
-                    return BadRequest("PostOperationModel.Operation cannot be null.");
+                    return BadRequest("TestOperationModel.Operation cannot be null.");
                 }
 
                 if (string.IsNullOrEmpty(model.ResourceType))
                 {
-                    return BadRequest("PostOperationModel.ResourceType cannot be null or empty.");
+                    return BadRequest("TestOperationModel.ResourceType cannot be null or empty.");
                 }
 
                 if (model.Resource == null)
                 {
-                    return BadRequest("PostOperationModel.Resource cannot be null.");
+                    return BadRequest("TestOperationModel.Resource cannot be null.");
                 }
 
                 var operationImplementation = model.Operation.OperationType switch
@@ -175,12 +175,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
             {
                 if (model.Operation == null)
                 {
-                    return BadRequest("PostOperationModel.Operation cannot be null.");
+                    return BadRequest("PutOperationModel.Operation cannot be null.");
                 }
 
                 if (model.ResourceTypes == null || model.ResourceTypes.Count == 0)
                 {
-                    return BadRequest("PostOperationModel.ResourceTypes cannot be null or empty.");
+                    return BadRequest("PutOperationModel.ResourceTypes cannot be null or empty.");
                 }
 
                 var operationImplementation = model.Operation.OperationType switch
