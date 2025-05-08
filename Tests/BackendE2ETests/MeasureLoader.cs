@@ -20,14 +20,14 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
 
     private async Task<string> GetMeasureBundleJsonAsync()
     {
-        if (TestConfig.MeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        if (TestConfig.AdhocReportingSmokeTestMeasureBundleLocation.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
-            var filePath = TestConfig.MeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
+            var filePath = TestConfig.AdhocReportingSmokeTestMeasureBundleLocation.Replace("file://", "", StringComparison.OrdinalIgnoreCase);
             return await File.ReadAllTextAsync(filePath);
         }
-        else if (TestConfig.MeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
+        else if (TestConfig.AdhocReportingSmokeTestMeasureBundleLocation.StartsWith("resource://", StringComparison.OrdinalIgnoreCase))
         {
-            var resourceName = TestConfig.MeasureBundleLocation
+            var resourceName = TestConfig.AdhocReportingSmokeTestMeasureBundleLocation
                 .Replace("resource://", "", StringComparison.OrdinalIgnoreCase);
             await using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
             
@@ -37,20 +37,20 @@ public class MeasureLoader(RestClient adminBffClient, ITestOutputHelper output)
             using var reader = new StreamReader(stream);
             return await reader.ReadToEndAsync();
         }
-        else if (TestConfig.MeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                 TestConfig.MeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        else if (TestConfig.AdhocReportingSmokeTestMeasureBundleLocation.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 TestConfig.AdhocReportingSmokeTestMeasureBundleLocation.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             var client = new RestClient();
-            var request = new RestRequest(TestConfig.MeasureBundleLocation, Method.Get);
+            var request = new RestRequest(TestConfig.AdhocReportingSmokeTestMeasureBundleLocation, Method.Get);
             var response = await client.ExecuteAsync(request);
 
             if (!response.IsSuccessful)
-                throw new Exception($"Failed to fetch bundle from {TestConfig.MeasureBundleLocation}: {response.ErrorMessage}");
+                throw new Exception($"Failed to fetch bundle from {TestConfig.AdhocReportingSmokeTestMeasureBundleLocation}: {response.ErrorMessage}");
 
             return response.Content;
         }
 
-        throw new NotSupportedException($"Unsupported path type: {TestConfig.MeasureBundleLocation}");
+        throw new NotSupportedException($"Unsupported path type: {TestConfig.AdhocReportingSmokeTestMeasureBundleLocation}");
     }
 
     private async Task GetMeasureBundleAsync()

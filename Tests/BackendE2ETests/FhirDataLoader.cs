@@ -4,9 +4,35 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using RestSharp;
 
-public class FhirDataLoader(string fhirServerBaseUrl)
+public class FhirDataLoader
 {
     private readonly List<string> _createdResources = new List<string>();
+    private string? _authorization;
+    private RestClient _restClient;
+
+    public FhirDataLoader(string fhirServerBaseUrl)
+    {
+        this._restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
+        this.GetAuthorization();
+    }
+
+    private void GetAuthorization()
+    {
+        if (!TestConfig.FhirServerOAuth.ShouldAuthenticate &&
+            !TestConfig.FhirServerBasicAuth.ShouldAuthenticate) return;
+        
+        Console.WriteLine("Authenticating to load data on FHIR server...");
+            
+        if (TestConfig.FhirServerOAuth.ShouldAuthenticate)
+        {
+            // Get a token for the user
+            this._authorization = "Bearer " + AuthHelper.GetBearerToken(TestConfig.FhirServerOAuth);
+        }
+        else if (TestConfig.FhirServerBasicAuth.ShouldAuthenticate)
+        {
+            this._authorization = "Basic " + AuthHelper.GetBasicAuthorization(TestConfig.FhirServerBasicAuth);
+        }
+    }
 
     public async Task LoadEmbeddedTransactionBundles()
     {
@@ -14,8 +40,6 @@ public class FhirDataLoader(string fhirServerBaseUrl)
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
                                     .Where(name => name.Contains(".fhir_server_data.") && name.EndsWith(".json"));
-
-        var client = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
 
         foreach (var resourceName in resourceNames)
         {
@@ -25,9 +49,13 @@ public class FhirDataLoader(string fhirServerBaseUrl)
 
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
+            
+            if (!string.IsNullOrEmpty(this._authorization))
+                request.AddHeader("Authorization", this._authorization);
+            
             request.AddStringBody(bundleJson, DataFormat.Json);
 
-            var response = await client.ExecuteAsync(request);
+            var response = await this._restClient.ExecuteAsync(request);
 
             Console.WriteLine($"Posted {resourceName} => Status: {response.StatusCode}");
 
@@ -75,15 +103,18 @@ public class FhirDataLoader(string fhirServerBaseUrl)
     public void DeleteResourcesWithExpunge()
     {
         Console.WriteLine("Removing data from FHIR server...");
-        var client = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
 
         foreach (var resource in this._createdResources)
         {
             var request = new RestRequest($"{resource}", Method.Delete);
             request.AddHeader("Content-Type", "application/fhir+json");
+            
+            if (!string.IsNullOrEmpty(this._authorization))
+                request.AddHeader("Authorization", this._authorization);
+            
             request.AddQueryParameter("_expunge", "true");
 
-            var response = client.Execute(request);
+            var response = this._restClient.Execute(request);
 
             Console.WriteLine($"Expunging {resource} => Status: {response.StatusCode}");
 

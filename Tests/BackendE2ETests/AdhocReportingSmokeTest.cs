@@ -9,23 +9,27 @@ using Xunit;
 using Task = System.Threading.Tasks.Task;
 using RestSharp;
 
-public sealed class SmokeTest : IAsyncLifetime
+public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLifetime
 {
-    private readonly ITestOutputHelper _output;
-    
     private const string FacilityId = "smoke-test-facility";
     private const int PollingIntervalSeconds = 5;
     private const int MaxRetryCount = 15;
     private static readonly RestClient AdminBffClient = new RestClient(TestConfig.AdminBffBase);
     private static readonly FhirDataLoader FhirDataLoader = new FhirDataLoader(TestConfig.ExternalFhirServerBase);
 
-    public SmokeTest(ITestOutputHelper output)
-    {
-        this._output = output;
-    }
-
     public async Task InitializeAsync()
     {
+        if (TestConfig.AdminBffOAuth.ShouldAuthenticate)
+        {
+            // Get a token for the user
+            string token = AuthHelper.GetBearerToken(TestConfig.AdminBffOAuth);
+            
+            if (string.IsNullOrEmpty(token))
+                throw new InvalidOperationException("Could not get token for user");
+            
+            AdminBffClient.AddDefaultHeader("Authorization", "Bearer " + token);
+        }
+
         // Load data onto FHIR server
         await FhirDataLoader.LoadEmbeddedTransactionBundles();
 
@@ -46,10 +50,11 @@ public sealed class SmokeTest : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "SmokeTest")]
     public async Task ExecuteSmokeTest()
     {
         // Get and load measure definition into measureeval and validation
-        var measureLoader = new MeasureLoader(AdminBffClient, _output);
+        var measureLoader = new MeasureLoader(AdminBffClient, output);
         await measureLoader.LoadAsync();
 
         await this.CreateFacilityAsync(measureLoader.MeasureId);
@@ -171,7 +176,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task InitializeValidationArtifacts()
     {
-        _output.WriteLine("Initializing validation artifacts...");
+        output.WriteLine("Initializing validation artifacts...");
         var request = new RestRequest("validation/artifact/$initialize", Method.Post);
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
@@ -179,7 +184,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task InitializeValidationCategories()
     {
-        _output.WriteLine("Initializing validation categories...");
+        output.WriteLine("Initializing validation categories...");
         var request = new RestRequest("validation/category/$initialize", Method.Post);
         var response = await AdminBffClient.ExecuteAsync(request);
         Assert.True(response.StatusCode == System.Net.HttpStatusCode.OK, $"Expected HTTP 200 OK but received {response.StatusCode}: {response.Content}");
@@ -187,7 +192,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task<RestResponse> CreateFacilityAsync(string? measure)
     {
-        _output.WriteLine("Creating facility...");
+        output.WriteLine("Creating facility...");
         var request = new RestRequest("/Facility", Method.Post);
         request.AddHeader("Content-Type", "application/json");
 
@@ -215,7 +220,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task CreateNormalizationConfig()
     {
-        _output.WriteLine("Creating normalization config...");
+        output.WriteLine("Creating normalization config...");
         var request = new RestRequest("normalization", Method.Post);
         var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.E2ETests.test_data.smoke_test.concept-map.json");
 
@@ -272,7 +277,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task CreateQueryConfig()
     {
-        _output.WriteLine("Creating query config...");
+        output.WriteLine("Creating query config...");
         var request = new RestRequest($"data/fhirQueryConfiguration", Method.Post);
         var body = new JObject
         {
@@ -287,7 +292,7 @@ public sealed class SmokeTest : IAsyncLifetime
 
     private async Task CreateQueryPlan(string? measureId, string ehrDescription)
     {
-        _output.WriteLine("Creating query plan...");
+        output.WriteLine("Creating query plan...");
         var request = new RestRequest($"data/{FacilityId}/QueryPlan", Method.Post);
 
         var body = new JObject
@@ -429,42 +434,42 @@ public sealed class SmokeTest : IAsyncLifetime
             DeleteFacilityQueryConfig()
         );
         
-        _output.WriteLine("Deleting facility...");
+        output.WriteLine("Deleting facility...");
         var deleteFacilityRequest = new RestRequest($"/Facility/{FacilityId}", Method.Delete);
         var deleteFacilityResponse = await AdminBffClient.ExecuteAsync(deleteFacilityRequest);
 
         if (deleteFacilityResponse.StatusCode != HttpStatusCode.NoContent)
-            _output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
+            output.WriteLine($"Expected HTTP 204 No Content for facility deletion but received {deleteFacilityResponse.StatusCode}: {deleteFacilityResponse.Content}");
     }
 
     private async Task DeleteFacilityNormalization()
     {
-        _output.WriteLine("Deleting facility normalization...");
+        output.WriteLine("Deleting facility normalization...");
         var deleteNormalizationRequest = new RestRequest($"/normalization/{FacilityId}", Method.Delete);
         var deleteNormalizationResponse = await AdminBffClient.ExecuteAsync(deleteNormalizationRequest);
 
         if (deleteNormalizationResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
+            output.WriteLine($"Expected HTTP 202 Accepted for normalization deletion but received {deleteNormalizationResponse.StatusCode}: {deleteNormalizationResponse.Content}");
     }
 
     private async Task DeleteFacilityQueryPlan()
     {
-        _output.WriteLine("Deleting facility query plan...");
+        output.WriteLine("Deleting facility query plan...");
         var deleteQueryPlanRequest = new RestRequest($"/data/{FacilityId}/QueryPlan", Method.Delete);
         var deleteQueryPlanResponse = await AdminBffClient.ExecuteAsync(deleteQueryPlanRequest);
 
         if (deleteQueryPlanResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 202 Accepted for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
+            output.WriteLine($"Expected HTTP 202 Accepted for query plan deletion but received {deleteQueryPlanResponse.StatusCode}: {deleteQueryPlanResponse.Content}");
     }
 
     private async Task DeleteFacilityQueryConfig()
     {
-        _output.WriteLine("Deleting facility query config...");
+        output.WriteLine("Deleting facility query config...");
         var deleteQueryConfigRequest = new RestRequest($"/data/{FacilityId}/fhirQueryConfiguration", Method.Delete);
         var deleteQueryConfigResponse = await AdminBffClient.ExecuteAsync(deleteQueryConfigRequest);
 
         if (deleteQueryConfigResponse.StatusCode != HttpStatusCode.Accepted)
-            _output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
+            output.WriteLine($"Expected HTTP 202 Accepted for query config deletion but received {deleteQueryConfigResponse.StatusCode}: {deleteQueryConfigResponse.Content}");
     }
     
     #endregion
@@ -492,19 +497,19 @@ public sealed class SmokeTest : IAsyncLifetime
                     var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
                     
                     if (foundReport == null)
-                        _output.WriteLine("Report not found, yet.");
+                        output.WriteLine("Report not found, yet.");
                     else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
                         return true;
                     else
-                        _output.WriteLine("Report not submitted, yet.");
+                        output.WriteLine("Report not submitted, yet.");
                 }
             }
 
-            _output.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            output.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
             await Task.Delay(PollingIntervalSeconds * 1000); // Wait for 5 seconds before the next retry.
         }
 
-        _output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
+        output.WriteLine($"Report {reportId} was not submitted after {MaxRetryCount} retries.");
         return false; // Return false if the loop completes without finding the submitted report.
     }
 }

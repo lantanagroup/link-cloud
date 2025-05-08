@@ -114,7 +114,7 @@ services:
       LINK_DB_PASS: ${LINK_DB_PASS}
     volumes:
       - type: bind
-        source: create-dbs.sql
+        source: .docker/create-dbs.sql
         target: /create-dbs.sql
     command: bash -c "/opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P ${LINK_DB_PASS} -i /create-dbs.sql"
     depends_on:
@@ -160,7 +160,7 @@ services:
     restart: always
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./docker-compose.collector.yml:/etc/otel-collector-config.yaml
+      - .docker/collector.yml:/etc/otel-collector-config.yaml
     ports:
       - "1888:1888"   # pprof extension
       - "8888:8888"   # Prometheus metrics exposed by the collector
@@ -177,7 +177,7 @@ services:
       - "9090:9090"
     container_name: prometheus
     volumes:
-      - ./docker-compose.prometheus.yml:/etc/prometheus/prometheus.yml
+      - .docker/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
@@ -191,7 +191,7 @@ services:
     container_name: tempo
     hostname: tempo
     volumes:
-      - ./docker-compose.tempo.yml:/etc/tempo.yaml
+      - .docker/tempo.yml:/etc/tempo.yaml
     ports:
       - "3200:3200"
       - "4417:4417"
@@ -212,7 +212,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
-      - ./docker-compose.grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
+      - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
     networks:
       - link-nw
       
@@ -228,7 +228,7 @@ services:
      container_name: kafka-broker
      volumes:
        - kafka_data:/bitnami
-       - ./kafka-client.properties:/etc/kafka-client.properties
+       - .docker/kafka-client.properties:/etc/kafka-client.properties
      environment:
       KAFKA_BROKER_ID: "1"
       KAFKA_CFG_NODE_ID: "1"
@@ -261,7 +261,7 @@ services:
     image: confluentinc/cp-kafka:6.1.1
     container_name: kafka-init
     volumes:
-      - ./kafka-client.properties:/etc/kafka-client.properties
+      - .docker/kafka-client.properties:/etc/kafka-client.properties
       - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
       - ./topics.txt:/topics.txt
     depends_on:
