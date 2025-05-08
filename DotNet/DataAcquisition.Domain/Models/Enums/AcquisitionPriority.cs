@@ -9,9 +9,9 @@ namespace DataAcquisition.Domain.Models.Enums;
 public enum AcquisitionPriority
 {
     [StringValue("Normal")]
-    Normal,
+    Normal = 2,
     [StringValue("High")]
-    High,
+    High = 1,
     [StringValue("Critical")]
-    Critical
+    Critical = 0
 }

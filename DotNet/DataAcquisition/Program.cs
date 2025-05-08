@@ -57,6 +57,7 @@ using LantanaGroup.Link.DataAcquisition.Application.Validators;
 using FluentValidation;
 using DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
+using Confluent.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -240,7 +241,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(
         builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    
+    builder.Services.RegisterKafkaProducer<Null, ReadyToAcquire>(
+        builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
+
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();

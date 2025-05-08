@@ -1,8 +1,10 @@
 ﻿using DataAcquisition.Domain;
 using DataAcquisition.Domain.Entities;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using DataAcquisition.Domain.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
@@ -16,6 +18,7 @@ public interface IDataAcquisitionLogManager
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<(List<DataAcquisitionLog>, PaginationMetadata)> GetByFacilityIdAsync(string facilityId, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
     Task<(List<DataAcquisitionLog>, PaginationMetadata)> SearchAsync(Expression<Func<DataAcquisitionLog, bool>> predicate, int page, int pageSize, string sortBy, SortOrder sortOrder, CancellationToken cancellationToken = default);
+    Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default);
 }
 
 public class DataAcquisitionLogManager : IDataAcquisitionLogManager
@@ -83,7 +86,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         if (existingLog == null)
         {
-            throw new NotFoundException($"Data acquisition log with ID {log.Id} not found.");
+            throw new DomainEntityNotFoundException($"Data acquisition log with ID {log.Id} not found.");
         }
 
         existingLog.Priority = log.Priority;
@@ -108,5 +111,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         return await _database.DataAcquisitionLogRepository.UpdateAsync(existingLog, cancellationToken);
 
+    }
+
+    public async Task<List<DataAcquisitionLog>> GetPendingRequests(CancellationToken cancellationToken = default)
+    {
+
+        var resultSet = await _database.DataAcquisitionLogRepository.FindAsync(x => x.Status == RequestStatus.Pending && x.ExecutionDate >= DateTime.UtcNow, cancellationToken);
+        return resultSet.OrderBy(x => x.Priority).ToList();
     }
 }
