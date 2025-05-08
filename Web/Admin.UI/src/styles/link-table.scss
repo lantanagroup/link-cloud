@@ -68,6 +68,16 @@
     color: #4b5563; 
   }
 
+  .table-cell div.main-value {
+    font-weight: 400;
+  }
+
+  .table-cell div.sub-value {
+    font-weight: 300;
+    color: #5f6672; 
+    margin-top: .5em;
+  }
+
   // Search Filter Bar
 
   .filter-bar {       

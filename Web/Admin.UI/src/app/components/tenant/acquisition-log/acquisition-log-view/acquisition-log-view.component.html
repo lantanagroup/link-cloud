@@ -1,0 +1,78 @@
+<div class="content">
+    <div style="width: 100%; display: flex; justify-content: flex-end;">
+        <button class="link-button light btn-lg" (click)="navBack()">
+          <fa-icon [icon]="faArrowLeft"></fa-icon>
+          Back
+        </button>
+    </div>
+    <div class="table-container">         
+        <table class="link-table" *ngIf="acquisitionLogs.length > 0; else noRowsTemplate">
+            <thead class="table-head">
+                <tr>
+                    <th scope="col" class="header-column">
+                        <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
+                    </th>
+                    <th scope="col" class="header-column">Patient Id</th>
+                    <th scope="col" class="header-column">Facility</th>
+                    <th scope="col" class="header-column">Priority</th>
+                    <th scope="col" class="header-column">Resource</th>
+                    <th scope="col" class="header-column">Fhir Version</th>
+                    <th scope="col" class="header-column">Query Phase</th>
+                    <th scope="col" class="header-column">Query Type</th>    
+                    <th scope="col" class="header-column">Scheduled</th>                        
+                    <th scope="col" class="header-column">Status</th>
+                    <th scope="col" class="header-column">
+                        <span class="sr-only">Edit</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="table-body">
+                <ng-container *ngFor="let log of acquisitionLogs">
+                    <tr  @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
+                        <td class="table-cell">                    
+                            <input *ngIf="log.status !== 'Processing' && log.status !== 'Completed'" type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600">
+                            <svg *ngIf="log.status === 'Processing'" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="absolute left-4 top-1/2 -mt-2 h-5 w-5 animate-spin">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                        </td>
+                        <td class="data-col table-cell select-all">{{log.patientId}}</td>
+                        <td class="data-col table-cell">{{log.facilityId}}</td>
+                        <td class="data-col table-cell">{{log.priority}}</td>
+                        <td class="data-col table-cell">
+                            <div class="main-value ">{{log.resourceTypes.toString()}}</div>
+                            <div class="sub-value" *ngIf="log?.queryType != 'BulkDataRequest'">{{log.resourceId}}</div>                                        
+                        </td>
+                        <td class="data-col table-cell">{{log.fhirVersion}}</td>
+                        <td class="data-col table-cell">{{log.queryPhase}}</td>
+                        <td class="data-col table-cell">{{log.queryType}}</td> 
+                        <td class="data-col table-cell">{{log.scheduledDate | date:'shortDate'}}</td>                               
+                        <td class="table-cell">
+                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset" 
+                                [ngClass]="{
+                                    'status-pending': log.status === 'Pending',
+                                    'status-processing': log.status === 'Processing',
+                                    'status-completed': log.status === 'Completed'
+                                }"
+                            >{{log.status}}</span>                            
+                        </td>
+                        <td class="table-cell">
+                            <!-- <app-query-log-row-command [queryLogId]="log.id" (queryLogAddedToQueue)="handleLogScheduled($event)"></app-query-log-row-command> -->
+                        </td>
+                    </tr>                                    
+                </ng-container>                                
+            </tbody>
+        </table>           
+    </div>
+</div>
+
+
+<ng-template #noRowsTemplate>
+    <div class="flex flex-col items-center justify-center p-8 text-gray-500 bg-gray-50 border border-gray-200 rounded-lg shadow-md">
+        <svg class="h-12 w-12 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M4.293 6.293a1 1 0 011.414 0L12 12.586l6.293-6.293a1 1 0 011.414 1.414L13.414 14l6.293 6.293a1 1 0 01-1.414 1.414L12 15.414l-6.293 6.293a1 1 0 01-1.414-1.414L10.586 14 4.293 7.707a1 1 0 010-1.414z" />
+        </svg>          
+        <p class="text-lg font-medium">No Acquisition Logs Found</p>
+        <p class="text-sm mt-2">Currently, there are no completed or pending Acquisition Logs.</p>
+    </div>
+</ng-template>

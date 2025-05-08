@@ -1,0 +1,55 @@
+@use '../styles/core.scss';
+@use '../styles/link-table.scss';
+
+.priority-high {
+    background-color: rgb(161, 112, 3, .7);
+}
+
+    .priority-high > td.data-col , 
+    .priority-high > td.data-col > div {
+        color: #FFFFFF;
+    }    
+
+    .priority-high > td.priority-col,
+    .priority-high > td.data-col > div.log-resource-type {
+        font-weight: 900;
+    }
+
+.priority-critical {
+  background-color: rgb(161, 3, 14, .7);
+}
+
+    .priority-critical > td.data-col, 
+        .priority-critical > td.data-col > div {
+            color: #FFFFFF;
+        }
+
+    .priority-critical > td.priority-col,
+    .priority-critical > td.data-col > div.log-resource-type {
+        font-weight: 900;
+    }
+
+
+.status-pending {
+    background-color: #eef2ff; 
+    color: #4338ca;            
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2); 
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+}
+    
+.status-processing {
+    background-color: #fffbeb; 
+    color: #d97706;            
+    border: 1px solid rgba(202, 138, 4, 0.2);
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+}
+    
+.status-completed {
+    background-color: #ecfdf5; 
+    color: #047857;            
+    box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+}
