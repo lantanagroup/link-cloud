@@ -80,6 +80,7 @@ namespace LantanaGroup.Link.Report.Listeners
                         {
                             if (result == null)
                             {
+                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
                                 consumer.Commit();
                                 return;
                             }
@@ -122,26 +123,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                 ReportScheduleModel? reportSchedule;
                                 if (existing != null) 
                                 {
-                                    if (existing.FacilityId != facilityId)
-                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId}. Cannot schedule for facility {facilityId}.");
-                                    
-                                    if (existing.ReportStartDate != startDate)
-                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with start date {existing.ReportStartDate}. Cannot schedule for start date {startDate}.");
-                                    
-                                    if (existing.ReportEndDate != endDate)
-                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with end date {existing.ReportEndDate}. Cannot schedule for end date {endDate}.");
-                                    
-                                    if (existing.Frequency != frequency)
-                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with frequency {existing.Frequency}. Cannot schedule for frequency {frequency}.");
-                                    
-                                    if (existing.ReportTypes != reportTypes)
-                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with report types {existing.ReportTypes}. Cannot schedule for report types {reportTypes}.");
-                                    
-                                    _logger.LogWarning($"Report with id {reportId} already exists... Re-scheduling report for facility {facilityId} with start date {startDate} and end date {endDate} and frequency {frequency} and report types {reportTypes}.");
-                                    reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
-
-                                    await MeasureReportScheduleService.RescheduleJob(reportSchedule,
-                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                    _logger.LogError($"Report with id {reportId} already exists. Creating dead letter for event/message.");
+                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
                                 }
                                 else
                                 {

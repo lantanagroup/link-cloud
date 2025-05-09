@@ -482,6 +482,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     /// <returns>A Task<bool> indicating if the report is submitted.</returns>
     public async Task<bool> CheckReportSubmissionStatusAsync(string facilityId, string reportId)
     {
+        output.WriteLine($"Checking report submission status for report {reportId}...");
+        
         for (var retry = 0; retry < MaxRetryCount; retry++)
         {
             var request = new RestRequest($"/Report/summaries?facilityId={facilityId}", Method.Get);
@@ -497,15 +499,22 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
                     var foundReport = records.FirstOrDefault(r => r["id"]?.ToString() == reportId);
                     
                     if (foundReport == null)
+                    {
                         output.WriteLine("Report not found, yet.");
+                    }
                     else if (bool.Parse(foundReport["submitted"]?.ToString() ?? "false"))
+                    {
+                        output.WriteLine("Report submitted.");
                         return true;
+                    }
                     else
+                    {
                         output.WriteLine("Report not submitted, yet.");
+                    }
                 }
             }
 
-            output.WriteLine($"Report {reportId} is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
+            output.WriteLine($"Report is not submitted. Retrying in {PollingIntervalSeconds} seconds...");
             await Task.Delay(PollingIntervalSeconds * 1000); // Wait for 5 seconds before the next retry.
         }
 
