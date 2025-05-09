@@ -1,17 +1,22 @@
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.SqlServer.Server;
 using NormalizationTests;
+using System.Reflection;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace NormalizationOperationTests
 {
-    [Collection("DatabaseCollection")]
+    [Collection("IntegrationTest")]
     public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
     {
         private readonly ITestOutputHelper _output;
@@ -42,7 +47,7 @@ namespace NormalizationOperationTests
 
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            location = (Location)_operationService.Execute(copyOperation, location);
+            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
@@ -95,7 +100,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)_operationService.Execute(copyOperation, location);
+            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
@@ -143,7 +148,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)_operationService.Execute(copyOperation, location);
+            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
@@ -191,7 +196,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)_operationService.Execute(copyOperation, resource);
+            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -239,7 +244,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Observation)_operationService.Execute(copyOperation, resource);
+            resource = (Observation)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -258,12 +263,12 @@ namespace NormalizationOperationTests
         }
 
         [Fact]
-        public async Task Integration_CopyPropertyOperation_Patient_NameToExtension_CreateTarget()
+        public async Task Integration_CopyPropertyOperation_Patient_NameToText_CreateTarget()
         {
             var operation = new CopyPropertyOperation(
-                "Copy Patient Name to Extension",
+                "Copy Patient Given Name to Name Text",
                 "name[0].given[0]",
-                "extension[0].valueString"
+                "name[0].text"
             );
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel
@@ -271,7 +276,7 @@ namespace NormalizationOperationTests
                 OperationJson = JsonSerializer.Serialize<CopyPropertyOperation>(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
                 FacilityId = null,
-                Description = "Integration Test Copy Patient Name to Extension",
+                Description = "Integration Test Copy Patient Name to Text",
                 IsDisabled = false,
                 ResourceTypes = ["Patient"]
             });
@@ -297,7 +302,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)_operationService.Execute(copyOperation, resource);
+            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -306,12 +311,10 @@ namespace NormalizationOperationTests
             FhirJsonSerializer serializer = new FhirJsonSerializer();
             _output.WriteLine(await serializer.SerializeToStringAsync(resource));
 
-            // Assert that the extension was created and set correctly
-            Assert.NotEmpty(resource.Extension);
-            var extension = resource.Extension.FirstOrDefault(e => e.Url == "http://example.org/fhir/extension/Patient-GivenName");
-            Assert.NotNull(extension);
-            Assert.IsType<FhirString>(extension.Value);
-            Assert.Equal("John", ((FhirString)extension.Value).Value);
+            // Assert that the name text was set correctly
+            Assert.NotEmpty(resource.Name);
+            Assert.NotNull(resource.Name[0].Text);
+            Assert.Equal("John", resource.Name[0].Text);
         }
 
         [Fact]
@@ -354,7 +357,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)_operationService.Execute(copyOperation, resource);
+            resource = (MedicationRequest)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -411,7 +414,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Condition)_operationService.Execute(copyOperation, resource);
+            resource = (Condition)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -470,7 +473,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Encounter)_operationService.Execute(copyOperation, resource);
+            resource = (Encounter)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -528,7 +531,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)_operationService.Execute(copyOperation, resource);
+            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -586,7 +589,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)_operationService.Execute(copyOperation, resource);
+            resource = (MedicationRequest)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -646,7 +649,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (AllergyIntolerance)_operationService.Execute(copyOperation, resource);
+            resource = (AllergyIntolerance)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -707,7 +710,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (DiagnosticReport)_operationService.Execute(copyOperation, resource);
+            resource = (DiagnosticReport)await _operationService.EnqueueOperationAsync(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -720,6 +723,109 @@ namespace NormalizationOperationTests
             Assert.NotNull(resource.Code);
             Assert.NotNull(resource.Code.Text);
             Assert.Equal(((FhirDateTime)resource.Effective).ToString(), resource.Code.Text);
+        }
+
+        [Fact]
+        public async Task Integration_CopyPropertyOperation_MultipleOperations_Queue()
+        {
+            // Create a sample Patient resource
+            var parser = new FhirJsonParser();
+            string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
+            string text = File.ReadAllText(resourcePath);
+            var resource = parser.Parse<Patient>(text);
+
+            // Define multiple operations
+            var operations = new List<CopyPropertyOperation>
+            {
+                new CopyPropertyOperation(
+                    "Copy Given Name to Name Text",
+                    "name[0].given[0]",
+                    "name[0].text"
+                ),
+                new CopyPropertyOperation(
+                    "Copy Family Name to Identifier",
+                    "name[0].family",
+                    "identifier[1].value"
+                ),
+                new CopyPropertyOperation(
+                    "Copy Identifier to Name Family",
+                    "identifier[0].value",
+                    "name[0].family"
+                )
+            };
+
+            // Create operations in the database
+            var operationIds = new List<Guid>();
+            foreach (var op in operations)
+            {
+                var result = await _operationManager.CreateOperation(new CreateOperationModel()
+                {
+                    OperationJson = JsonSerializer.Serialize<object>(op),
+                    OperationType = OperationType.CopyProperty.ToString(),
+                    FacilityId = null,
+                    Description = $"Integration Test Multiple Operations - {op.Name}",
+                    IsDisabled = false,
+                    ResourceTypes = ["Patient"]
+                });
+
+                Assert.NotNull(result);
+                Assert.True(result.Id != default);
+                operationIds.Add(result.Id);
+            }
+
+            // Fetch and enqueue operations
+            var tasks = new List<Task<DomainResource>>();
+            var fetchedOperations = new List<CopyPropertyOperation>();
+            foreach (var id in operationIds)
+            {
+                var fetched = await _operationQueries.Get(id);
+                Assert.NotNull(fetched);
+                Assert.True(fetched.Id != default);
+
+                Assert.NotNull(fetched.OperationJson);
+                var copyOperation = JsonSerializer.Deserialize<CopyPropertyOperation>(fetched.OperationJson);
+
+                Assert.NotNull(copyOperation);
+                Assert.NotNull(copyOperation.SourceFhirPath);
+                Assert.NotNull(copyOperation.TargetFhirPath);
+
+                fetchedOperations.Add(copyOperation);
+                tasks.Add(_operationService.EnqueueOperationAsync(copyOperation, resource));
+            }
+
+            // Wait for all operations to complete
+            var results = await Task.WhenAll(tasks);
+
+            // Verify results for each operation
+            for (int i = 0; i < results.Length; i++)
+            {
+                var modifiedResource = (Patient)results[i];
+                var operation = fetchedOperations[i];
+
+                _output.WriteLine($"Modified Resource for operation '{operation.Name}': ");
+                FhirJsonSerializer serializer = new FhirJsonSerializer();
+                _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
+
+                if (operation.Name == "Copy Given Name to Name Text")
+                {
+                    Assert.NotEmpty(modifiedResource.Name);
+                    Assert.NotNull(modifiedResource.Name[0].Text);
+                    Assert.Equal("John", modifiedResource.Name[0].Text);
+                }
+                else if (operation.Name == "Copy Family Name to Identifier")
+                {
+                    Assert.True(modifiedResource.Identifier.Count >= 2);
+                    Assert.NotNull(modifiedResource.Identifier[1].Value);
+                    Assert.Equal("Smith", modifiedResource.Identifier[1].Value);
+                }
+                else if (operation.Name == "Copy Identifier to Name Family")
+                {
+                    Assert.NotEmpty(modifiedResource.Name);
+                    Assert.NotNull(modifiedResource.Name[0].Family);
+                    Assert.Equal(modifiedResource.Identifier[0].Value, modifiedResource.Name[0].Family);
+                }
+            }
         }
     }
 }

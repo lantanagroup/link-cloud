@@ -10,7 +10,7 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
     /// <summary>
-    /// A background service that executes copy operations on FHIR resources asynchronously.
+    /// A background service that executes copy operations on FHIR resources asynchronously via a queue.
     /// </summary>
     public class CopyPropertyOperationService : BackgroundService
     {
@@ -56,7 +56,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <param name="operation">The copy operation to execute.</param>
         /// <param name="resource">The FHIR resource to operate on.</param>
         /// <returns>A task that completes with the modified resource.</returns>
-        public Task<DomainResource> EnqueueOperationAsync(CopyPropertyOperation operation, DomainResource resource)
+        public async Task<DomainResource> EnqueueOperationAsync(CopyPropertyOperation operation, DomainResource resource)
         {
             if (operation == null)
             {
@@ -67,9 +67,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 throw new ArgumentNullException(nameof(resource));
             }
 
+            Console.WriteLine($"Enqueuing operation: {operation.Name}");
             var tcs = new TaskCompletionSource<DomainResource>();
             _operationQueue.Enqueue((operation, resource, tcs));
-            return tcs.Task;
+
+            // Add timeout to prevent hanging
+            return await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
         /// <summary>
@@ -78,14 +81,19 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <param name="stoppingToken">Cancellation token to stop the service.</param>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Console.WriteLine("CopyPropertyOperationService started.");
             while (!stoppingToken.IsCancellationRequested)
             {
                 if (_operationQueue.TryDequeue(out var item))
                 {
+                    Console.WriteLine($"Processing operation: {item.Operation.Name}");
                     try
                     {
-                        var result = Execute(item.Operation, item.Resource);
-                        item.Result.SetResult(result);
+                        var resourceCopy = item.Resource.DeepCopy() as DomainResource
+                            ?? throw new InvalidOperationException($"Failed to create a deep copy of the resource of type {item.Resource.GetType().Name}.");
+                        CopyFhirPathValue(resourceCopy, item.Operation.SourceFhirPath, item.Operation.TargetFhirPath, item.Resource);
+                        item.Result.SetResult(resourceCopy);
+                        Console.WriteLine($"Completed operation: {item.Operation.Name}");
                     }
                     catch (Exception ex)
                     {
@@ -95,39 +103,10 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 }
                 else
                 {
-                    await Task.Delay(100, stoppingToken);
+                    await Task.Delay(10, stoppingToken);
                 }
             }
-        }
-
-        /// <summary>
-        /// Executes a copy operation on the provided FHIR resource synchronously.
-        /// </summary>
-        /// <param name="operation">The copy operation to execute.</param>
-        /// <param name="resource">The FHIR resource to operate on.</param>
-        /// <returns>A new resource with the copied value.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when operation or resource is null.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when the operation cannot be completed.</exception>
-        public DomainResource Execute(CopyPropertyOperation operation, DomainResource resource)
-        {
-            if (operation == null)
-            {
-                throw new ArgumentNullException(nameof(operation));
-            }
-            if (resource == null)
-            {
-                throw new ArgumentNullException(nameof(resource));
-            }
-            if (string.IsNullOrEmpty(operation.SourceFhirPath) || string.IsNullOrEmpty(operation.TargetFhirPath))
-            {
-                throw new ArgumentException("SourceFhirPath and TargetFhirPath must not be null or empty.");
-            }
-
-            var resourceCopy = resource.DeepCopy() as DomainResource
-                ?? throw new InvalidOperationException($"Failed to create a deep copy of the resource of type {resource.GetType().Name}.");
-
-            CopyFhirPathValue(resourceCopy, operation.SourceFhirPath, operation.TargetFhirPath, resource);
-            return resourceCopy;
+            Console.WriteLine("CopyPropertyOperationService stopped.");
         }
 
         // Per-resource FHIRPath cache (cleared after each operation)
@@ -142,22 +121,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 ?? GetValueReflectively(resource, sourceFhirPath)
                 ?? throw new InvalidOperationException($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.");
 
-            // Check if target exists
-            bool targetExists;
-            try
-            {
-                if (!_fhirPathCache.TryGetValue(targetFhirPath, out var targetElements))
-                {
-                    targetElements = scopedNode.Select(targetFhirPath).ToList();
-                    _fhirPathCache[targetFhirPath] = targetElements;
-                }
-                targetExists = targetElements.Any();
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to evaluate target FHIRPath '{targetFhirPath}' for resource type {resource.TypeName}: {ex.Message}", ex);
-            }
-
             if ((targetValues is string || targetValues is int || targetValues is bool || targetValues is decimal || targetValues is DateTime) // Is primitive
                 || (targetValues is IList valueList && valueList.Cast<object>().All(v => v is string || v is int || v is bool || v is decimal || v is DateTime))) // or is list of primitives
             {
@@ -167,8 +130,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 }
                 else
                 {
-                    SetValueViaFhirPath(resource, targetFhirPath, targetValues, scopedNode, sourceFhirPath, originalResource);
-                    if (!targetExists)
+                    var resolvedViaFhirPath = SetValueViaFhirPath(resource, targetFhirPath, targetValues, scopedNode, sourceFhirPath, originalResource);
+                    if (!resolvedViaFhirPath)
                     {
                         SetTargetValue(resource, targetFhirPath, targetValues, sourceFhirPath, originalResource);
                     }
@@ -179,8 +142,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 var copiedObject = complexValue.DeepCopy() as Base;
                 ValidateComplexTypeCompatibility(scopedNode, targetFhirPath, copiedObject);
 
-                SetValueViaFhirPath(resource, targetFhirPath, copiedObject, scopedNode, sourceFhirPath, originalResource);
-                if (!targetExists)
+                var resolvedViaFhirPath = SetValueViaFhirPath(resource, targetFhirPath, copiedObject, scopedNode, sourceFhirPath, originalResource);
+                if(!resolvedViaFhirPath)
                 {
                     SetTargetValue(resource, targetFhirPath, copiedObject, sourceFhirPath, originalResource);
                 }
@@ -359,7 +322,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             return null;
         }
 
-        private void SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, string sourceFhirPath, DomainResource originalResource)
+        private bool SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, string sourceFhirPath, DomainResource originalResource)
         {
             try
             {
@@ -371,7 +334,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
                 if (!targetElements.Any())
                 {
-                    return;
+                    return false;
                 }
 
                 foreach (var targetElement in targetElements)
@@ -406,10 +369,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                             {
                                 var itemType = property.PropertyType.GenericTypeArguments[0];
                                 var newItem = Activator.CreateInstance(itemType);
-                                if (newItem is Extension ext)
-                                {
-                                    ext.Url = InferExtensionUrl(originalResource, sourceFhirPath, targetFhirPath);
-                                }
                                 list.Add(newItem);
                             }
                             current = list[arrayIndex.Value];
@@ -417,6 +376,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                         else
                         {
                             current = property.GetValue(current);
+                            if (current == null && i < pathParts.Length - 1)
+                            {
+                                var newInstance = Activator.CreateInstance(property.PropertyType);
+                                property.SetValue(current, newInstance);
+                                current = newInstance;
+                            }
                         }
 
                         if (i == pathParts.Length - 2)
@@ -459,6 +424,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 throw new InvalidOperationException($"Failed to evaluate target FHIRPath '{targetFhirPath}' for resource type {resource.TypeName}: {ex.Message}", ex);
             }
+
+            return true;
         }
 
         private void SetComponentValuesReflectively(DomainResource resource, object targetValue, string targetFhirPath)
@@ -608,10 +575,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                         {
                             var itemType = property.PropertyType.GenericTypeArguments[0];
                             var newItem = Activator.CreateInstance(itemType);
-                            if (newItem is Extension ext)
-                            {
-                                ext.Url = InferExtensionUrl(originalResource, sourceFhirPath, targetFhirPath);
-                            }
                             list.Add(newItem);
                         }
                         list[arrayIndex.Value] = convertedValue;
@@ -665,10 +628,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     while (list.Count <= (arrayIndex ?? 0))
                     {
                         var newItem = Activator.CreateInstance(itemType);
-                        if (newItem is Extension ext)
-                        {
-                            ext.Url = InferExtensionUrl(originalResource, sourceFhirPath, targetFhirPath);
-                        }
                         list.Add(newItem);
                     }
 
@@ -679,14 +638,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     var value = property.GetValue(current) as Base;
                     if (value == null)
                     {
-                        if (property.PropertyType == typeof(Extension))
-                        {
-                            value = new Extension { Url = InferExtensionUrl(originalResource, sourceFhirPath, targetFhirPath) };
-                        }
-                        else
-                        {
-                            value = Activator.CreateInstance(property.PropertyType) as Base;
-                        }
+                        value = Activator.CreateInstance(property.PropertyType) as Base;
                         property.SetValue(current, value);
                     }
                     current = value;
@@ -759,15 +711,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 yield return mappedName;
             }
 
-            if (parentType == typeof(Extension) && normalizedFhirPathName == "valuestring")
-            {
-                if (parentType != null)
-                {
-                    _propertyNameCache[(parentType, fhirPathName)] = "Value";
-                }
-                yield return "Value";
-            }
-
             var pascalCase = char.ToUpper(fhirPathName[0]) + (fhirPathName.Length > 1 ? fhirPathName.Substring(1) : string.Empty);
             yield return pascalCase;
 
@@ -823,7 +766,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 if (propertyType == typeof(FhirString)) return new FhirString(strValue);
                 if (propertyType == typeof(string)) return strValue;
                 if (propertyType == typeof(Code)) return new Code(strValue);
-                if (propertyType == typeof(DataType) && parentPoco is Extension) return new FhirString(strValue);
             }
             else if (newValue is int intValue)
             {
@@ -874,19 +816,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
 
             return newValue;
-        }
-
-        private string InferExtensionUrl(DomainResource resource, string sourceFhirPath, string targetFhirPath)
-        {
-            string resourceType = resource.TypeName;
-            string sourceProperty = sourceFhirPath.Split('.').Last().Split('[')[0];
-            sourceProperty = char.ToUpper(sourceProperty[0]) + sourceProperty.Substring(1);
-            string inferredUrl = $"http://example.org/fhir/extension/{resourceType}-{sourceProperty}";
-            if (sourceProperty.Equals("Given", StringComparison.OrdinalIgnoreCase))
-            {
-                inferredUrl = $"http://example.org/fhir/extension/{resourceType}-GivenName";
-            }
-            return inferredUrl;
         }
     }
 }

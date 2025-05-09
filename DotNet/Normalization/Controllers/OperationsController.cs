@@ -124,7 +124,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DomainResource))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public IActionResult OperationTest([FromBody] TestOperationModel model)
+        public async Task<IActionResult> OperationTest([FromBody] TestOperationModel model)
         {
             try
             {
@@ -154,8 +154,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                var resource = _copyPropertyOperationService.Execute(operationImplementation, model.Resource);
-
+                var resource = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, model.Resource);
 
                 return Ok(resource);
                 
