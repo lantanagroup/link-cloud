@@ -4,13 +4,18 @@
     box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
 
+.table-container.no-border {
+    border: none;
+    box-shadow: none;
+}
+
 .link-table {
     background-color: #fff;
     min-width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
   }
-  
+
   .link-table th, .link-table td {
     padding: 1rem;
     text-align: left;
@@ -73,7 +78,7 @@
   }
 
   .table-cell div.sub-value {
-    font-weight: 300;
+    font-weight: 200;
     color: #5f6672; 
     margin-top: .5em;
   }
