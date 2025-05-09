@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.KafkaProducers;
 
@@ -55,18 +56,18 @@ public class ReportScheduledProducer(
             {
                 _logger.LogDebug(
                     "Report scheduled event successfully produced. Report tracking ID: {ReportTrackingId}, Facility ID: {FacilityId}",
-                    reportTrackingId, facilityId);
+                    reportTrackingId.SanitizeAndRemove(), facilityId.SanitizeAndRemove());
                 return true;
             }
 
             _logger.LogWarning(
                 "Report scheduled event not persisted properly. Status: {Status}, Report tracking ID: {ReportTrackingId}",
-                deliveryResult.Status, reportTrackingId);
+                deliveryResult.Status, reportTrackingId.SanitizeAndRemove());
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error producing report scheduled event for facility {FacilityId}", facilityId);
+            _logger.LogError(ex, "Error producing report scheduled event for facility {FacilityId}", facilityId.SanitizeAndRemove());
             return false;
         }
     }
