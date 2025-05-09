@@ -1,14 +1,10 @@
-using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
 using NormalizationTests;
-using System.Reflection;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
