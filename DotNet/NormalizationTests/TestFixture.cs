@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Normalization.Domain;
+﻿using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
@@ -37,6 +38,8 @@ namespace NormalizationTests
             services.AddScoped<IDatabase, Database>();
             services.AddScoped<IOperationManager, OperationManager>();
             services.AddScoped<IOperationQueries, OperationQueries>();
+
+            services.AddSingleton<CopyPropertyOperationService>();
 
             // Build the service provider
             ServiceProvider = services.BuildServiceProvider();

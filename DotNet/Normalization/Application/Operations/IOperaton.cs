@@ -7,7 +7,5 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
     {
         [DataMember]
         OperationType OperationType { get; }
-
-        DomainResource Execute(DomainResource resource);
     }
 }

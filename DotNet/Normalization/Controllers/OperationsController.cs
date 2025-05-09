@@ -20,12 +20,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
         private readonly ITenantApiService _tenantApiService;
-
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService)
+        private readonly CopyPropertyOperationService _copyPropertyOperationService;
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
             _tenantApiService = tenantApiService;
+            _copyPropertyOperationService = copyPropertyService;
         }
 
         [HttpGet("")]
@@ -153,7 +154,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                var resource = operationImplementation.Execute(model.Resource);
+                var resource = _copyPropertyOperationService.Execute(operationImplementation, model.Resource);
 
 
                 return Ok(resource);

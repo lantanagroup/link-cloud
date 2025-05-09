@@ -1,5 +1,4 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
@@ -19,13 +18,17 @@ namespace NormalizationOperationTests
         private readonly IntegrationTestFixture _fixture;
         private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
+        private readonly IOperationQueries _operationQueries;
+        private readonly CopyPropertyOperationService _operationService;
 
         public NormalizationOperationTests(IntegrationTestFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;
             _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
-            _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();            
+            _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
+            _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
+            _operationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
         }
 
         [Fact]
@@ -39,7 +42,7 @@ namespace NormalizationOperationTests
 
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            location = (Location)copyOperation.Execute(location);
+            location = (Location)_operationService.Execute(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
@@ -53,7 +56,7 @@ namespace NormalizationOperationTests
 
         [Fact]
         public async Task Integration_CopyPropertyOperation_Location_Identifier_To_Type_Create_TargetElement()
-        {           
+        {
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
@@ -69,8 +72,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -93,12 +95,12 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)copyOperation.Execute(location);
+            location = (Location)_operationService.Execute(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
 
-            _output.WriteLine("Modified: ");            
+            _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
             _output.WriteLine(await serializer.SerializeToStringAsync(location));
 
@@ -107,7 +109,7 @@ namespace NormalizationOperationTests
 
         [Fact]
         public async Task Integration_CopyPropertyOperation_Location_Identifier_To_Type_Update_TargetElement()
-        {            
+        {
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
@@ -123,8 +125,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -142,7 +143,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)copyOperation.Execute(location);
+            location = (Location)_operationService.Execute(copyOperation, location);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
@@ -172,8 +173,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -191,7 +191,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)copyOperation.Execute(resource);
+            resource = (Patient)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -221,8 +221,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -240,7 +239,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Observation)copyOperation.Execute(resource);
+            resource = (Observation)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -267,7 +266,7 @@ namespace NormalizationOperationTests
                 "extension[0].valueString"
             );
 
-            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize<CopyPropertyOperation>(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -280,8 +279,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.NotEqual(default(Guid), result.Id);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default(Guid), fetched.Id);
@@ -299,7 +297,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)copyOperation.Execute(resource);
+            resource = (Patient)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -325,7 +323,7 @@ namespace NormalizationOperationTests
                 "note[0].text"
             );
 
-            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize<object>(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -338,8 +336,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.NotEqual(default(Guid), result.Id);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default(Guid), fetched.Id);
@@ -357,7 +354,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)copyOperation.Execute(resource);
+            resource = (MedicationRequest)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -383,7 +380,7 @@ namespace NormalizationOperationTests
                 "code.text"
             );
 
-            var result = await _fixture.ServiceProvider.GetRequiredService<IOperationManager>().CreateOperation(new CreateOperationModel
+            var result = await _operationManager.CreateOperation(new CreateOperationModel
             {
                 OperationJson = JsonSerializer.Serialize<object>(operation),
                 OperationType = OperationType.CopyProperty.ToString(),
@@ -396,8 +393,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.NotEqual(default(Guid), result.Id);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.NotEqual(default(Guid), fetched.Id);
@@ -415,7 +411,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Condition)copyOperation.Execute(resource);
+            resource = (Condition)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -452,8 +448,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -475,7 +470,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Encounter)copyOperation.Execute(resource);
+            resource = (Encounter)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -512,8 +507,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -534,7 +528,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)copyOperation.Execute(resource);
+            resource = (Patient)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -571,8 +565,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -593,7 +586,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)copyOperation.Execute(resource);
+            resource = (MedicationRequest)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -630,8 +623,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -654,7 +646,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (AllergyIntolerance)copyOperation.Execute(resource);
+            resource = (AllergyIntolerance)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
@@ -691,8 +683,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(result);
             Assert.True(result.Id != default);
 
-            var queries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            var fetched = await queries.Get(result.Id);
+            var fetched = await _operationQueries.Get(result.Id);
 
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
@@ -716,7 +707,7 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (DiagnosticReport)copyOperation.Execute(resource);
+            resource = (DiagnosticReport)_operationService.Execute(copyOperation, resource);
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
