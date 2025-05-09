@@ -109,9 +109,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             Console.WriteLine("CopyPropertyOperationService stopped.");
         }
 
-        // Per-resource FHIRPath cache (cleared after each operation)
-        private readonly Dictionary<string, List<ITypedElement>> _fhirPathCache = new Dictionary<string, List<ITypedElement>>();
-
         private void CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath, DomainResource originalResource)
         {
             var scopedNode = resource.ToTypedElement();
@@ -151,20 +148,13 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 throw new InvalidOperationException($"Source type {targetValues.GetType().Name} is not supported at source FHIRPath: {sourceFhirPath}.");
             }
-
-            _fhirPathCache.Clear(); // Clear cache after operation
         }
 
         private object ExtractValueFromFhirPath(ITypedElement scopedNode, string fhirPath)
         {
             try
             {
-                if (!_fhirPathCache.TryGetValue(fhirPath, out var values))
-                {
-                    values = scopedNode.Select(fhirPath).ToList();
-                    _fhirPathCache[fhirPath] = values;
-                }
-
+                var values = scopedNode.Select(fhirPath).ToList();
                 if (!values.Any())
                 {
                     return null;
@@ -306,12 +296,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         {
             try
             {
-                if (!_fhirPathCache.TryGetValue(targetFhirPath, out var targetElements))
-                {
-                    targetElements = scopedNode.Select(targetFhirPath).ToList();
-                    _fhirPathCache[targetFhirPath] = targetElements;
-                }
-
+                var targetElements = scopedNode.Select(targetFhirPath).ToList();
                 if (!targetElements.Any())
                 {
                     return false;
@@ -653,13 +638,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 var propertyName = pathParts.Last().Split('[')[0];
                 propertyName = MapFhirPathToPropertyName(propertyName, null).First();
 
-                List<ITypedElement> parentNodes;
-                if (!_fhirPathCache.TryGetValue(parentPath, out parentNodes))
-                {
-                    parentNodes = scopedNode.Select(parentPath).ToList();
-                    _fhirPathCache[parentPath] = parentNodes;
-                }
-
+                var parentNodes = scopedNode.Select(parentPath).ToList();
                 var parentNode = parentNodes.FirstOrDefault();
                 if (parentNode != null)
                 {
