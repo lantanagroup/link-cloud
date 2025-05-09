@@ -1,5 +1,8 @@
-﻿namespace LantanaGroup.Link.Normalization.Application.Models.Operations
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace LantanaGroup.Link.Normalization.Application.Models.Operations
 {
+    [ExcludeFromCodeCoverage]
     public class UpdateOperationModel
     {
         public required Guid Id { get; set; }

@@ -1,7 +1,9 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Operations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations
 {
+    [ExcludeFromCodeCoverage]
     public class OperationSearchModel
     {
         public Guid? Id { get; set; }
