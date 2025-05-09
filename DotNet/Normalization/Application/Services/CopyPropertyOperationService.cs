@@ -2,9 +2,15 @@
 using Hl7.Fhir.FhirPath;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
+using Microsoft.Extensions.Hosting;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
@@ -124,19 +130,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             if ((targetValues is string || targetValues is int || targetValues is bool || targetValues is decimal || targetValues is DateTime) // Is primitive
                 || (targetValues is IList valueList && valueList.Cast<object>().All(v => v is string || v is int || v is bool || v is decimal || v is DateTime))) // or is list of primitives
             {
-                if (targetFhirPath.Contains("component") && (targetFhirPath.EndsWith("value") || targetFhirPath.EndsWith("value.value")))
+                var resolvedViaFhirPath = SetValueViaFhirPath(resource, targetFhirPath, targetValues, scopedNode, sourceFhirPath, originalResource);
+                if (!resolvedViaFhirPath)
                 {
-                    SetComponentValuesReflectively(resource, targetValues, targetFhirPath);
-                }
-                else
-                {
-                    var resolvedViaFhirPath = SetValueViaFhirPath(resource, targetFhirPath, targetValues, scopedNode, sourceFhirPath, originalResource);
-                    if (!resolvedViaFhirPath)
+                    if (!ResolveAndSetValueReflectively(resource, targetFhirPath, targetValues))
                     {
-                        if (!ResolveAndSetValueReflectively(resource, targetFhirPath, targetValues))
-                        {
-                            CreateAndSetTargetElement(resource, targetFhirPath, targetValues, sourceFhirPath, originalResource);
-                        }
+                        CreateAndSetTargetElement(resource, targetFhirPath, targetValues, sourceFhirPath, originalResource);
                     }
                 }
             }
@@ -461,7 +460,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                         if (targetValue is IList valueList && typeof(IList).IsAssignableFrom(property.PropertyType))
                         {
                             var vList = (IList)Activator.CreateInstance(property.PropertyType);
-                            foreach (var item in vList)
+                            foreach (var item in valueList)
                             {
                                 var convertedItem = ConvertToFhirType(item, property.PropertyType.GenericTypeArguments[0], parentPoco, property.Name);
                                 vList.Add(convertedItem);
@@ -519,104 +518,6 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             {
                 Console.WriteLine($"Failed to resolve and set value reflectively for FHIRPath '{targetFhirPath}': {ex.Message}");
                 return false;
-            }
-        }
-
-        private void SetComponentValuesReflectively(DomainResource resource, object targetValue, string targetFhirPath)
-        {
-            var componentsProperty = FhirMetadataRegistry.GetProperty(resource.GetType(), "Component")
-                ?? throw new InvalidOperationException($"Component property not found on resource type {resource.GetType().Name} for FHIRPath {targetFhirPath}.");
-
-            var components = componentsProperty.GetValue(resource) as IList;
-            if (components == null)
-            {
-                components = (IList)Activator.CreateInstance(componentsProperty.PropertyType);
-                componentsProperty.SetValue(resource, components);
-            }
-
-            if (components.Count == 0)
-            {
-                throw new InvalidOperationException($"No components exist to set values on for FHIRPath {targetFhirPath} in resource type {resource.TypeName}.");
-            }
-
-            var values = targetValue is IList list ? list.Cast<object>().ToList() : new[] { targetValue }.ToList();
-
-            // If a single value, apply it to all components
-            if (values.Count == 1)
-            {
-                var singleValue = values[0];
-                if (!(singleValue is decimal || singleValue is int))
-                {
-                    throw new InvalidOperationException($"Target value of type {singleValue.GetType().Name} is not compatible with Quantity.value for FHIRPath {targetFhirPath}.");
-                }
-
-                var convertedValue = singleValue is int i ? (decimal)i : (decimal)singleValue;
-
-                foreach (var component in components)
-                {
-                    var valueProperty = FhirMetadataRegistry.GetProperty(component.GetType(), "Value");
-                    if (valueProperty == null)
-                    {
-                        continue;
-                    }
-
-                    var currentValue = valueProperty.GetValue(component);
-                    if (currentValue is Quantity quantity)
-                    {
-                        var valueProp = FhirMetadataRegistry.GetProperty(quantity.GetType(), "Value");
-                        if (valueProp != null)
-                        {
-                            valueProp.SetValue(quantity, convertedValue);
-                        }
-                    }
-                    else
-                    {
-                        quantity = new Quantity { Value = convertedValue };
-                        valueProperty.SetValue(component, quantity);
-                    }
-                }
-            }
-            else
-            {
-                // Multiple values: map to components, creating new ones if needed
-                for (int componentIndex = 0; componentIndex < values.Count; componentIndex++)
-                {
-                    var value = values[componentIndex];
-                    if (!(value is decimal || value is int))
-                    {
-                        throw new InvalidOperationException($"Target value of type {value.GetType().Name} is not compatible with Quantity.value for FHIRPath {targetFhirPath}.");
-                    }
-
-                    if (componentIndex >= components.Count)
-                    {
-                        var itemType = componentsProperty.PropertyType.GenericTypeArguments[0];
-                        var newComponent = Activator.CreateInstance(itemType);
-                        components.Add(newComponent);
-                    }
-
-                    var component = components[componentIndex];
-                    var valueProperty = FhirMetadataRegistry.GetProperty(component.GetType(), "Value");
-                    if (valueProperty == null)
-                    {
-                        continue;
-                    }
-
-                    var currentValue = valueProperty.GetValue(component);
-                    if (currentValue is Quantity quantity)
-                    {
-                        var valueProp = FhirMetadataRegistry.GetProperty(quantity.GetType(), "Value");
-                        if (valueProp != null)
-                        {
-                            var convertedValue = value is int i ? (decimal)i : (decimal)value;
-                            valueProp.SetValue(quantity, convertedValue);
-                        }
-                    }
-                    else
-                    {
-                        quantity = new Quantity { Value = value is int i ? (decimal)i : (decimal)value };
-                        valueProperty.SetValue(component, quantity);
-                    }
-                }
             }
         }
 

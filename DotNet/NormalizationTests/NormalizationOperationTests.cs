@@ -7,7 +7,6 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.SqlServer.Server;
 using NormalizationTests;
 using System.Reflection;
 using System.Text.Json;
@@ -209,9 +208,9 @@ namespace NormalizationOperationTests
         }
 
         [Fact]
-        public async Task Integration_CopyPropertyOperation_Observation_Identifier_To_ValueQuanitty_Update_TargetElement()
+        public async Task Integration_CopyPropertyOperation_Observation_ValueToCodeText_Update_TargetElement()
         {
-            var operation = new CopyPropertyOperation("Copy Observation Identifier to ValueQuantity", "valueQuantity.value", "component.valueQuantity.value");
+            var operation = new CopyPropertyOperation("Copy Observation Value to Code Text", "valueQuantity.value", "code.text");
 
             var result = await _operationManager.CreateOperation(new CreateOperationModel()
             {
@@ -253,13 +252,9 @@ namespace NormalizationOperationTests
             FhirJsonSerializer serializer = new FhirJsonSerializer();
             _output.WriteLine(await serializer.SerializeToStringAsync(resource));
 
-            // Assert that the target values match the source
-            Assert.All(resource.Component, component =>
-            {
-                Assert.IsType<Quantity>(component.Value);
-                var quantity = (Quantity)component.Value;
-                Assert.Equal(120m, quantity.Value);
-            });
+            Assert.NotNull(resource.Code);
+            Assert.NotNull(resource.Code.Text);
+            Assert.Equal(resource.Value.First().Value.ToString(), resource.Code.Text);
         }
 
         [Fact]
