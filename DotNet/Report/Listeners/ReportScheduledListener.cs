@@ -105,11 +105,39 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportId = value.ReportTrackingId;
 
                                 // Check if this already exists
-                                var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportId, consumeCancellationToken);
+                                ReportScheduleModel? existing = null;
+
+                                if (!string.IsNullOrEmpty(reportId))
+                                {
+                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
+                                    existing = await measureReportScheduledManager.SingleOrDefaultAsync(
+                                        x => x.Id == reportId, consumeCancellationToken);
+                                }
+                                else
+                                {
+                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
+                                    reportId = Guid.NewGuid().ToString();
+                                }
 
                                 ReportScheduleModel? reportSchedule;
-                                if(existing != null) 
+                                if (existing != null) 
                                 {
+                                    if (existing.FacilityId != facilityId)
+                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId}. Cannot schedule for facility {facilityId}.");
+                                    
+                                    if (existing.ReportStartDate != startDate)
+                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with start date {existing.ReportStartDate}. Cannot schedule for start date {startDate}.");
+                                    
+                                    if (existing.ReportEndDate != endDate)
+                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with end date {existing.ReportEndDate}. Cannot schedule for end date {endDate}.");
+                                    
+                                    if (existing.Frequency != frequency)
+                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with frequency {existing.Frequency}. Cannot schedule for frequency {frequency}.");
+                                    
+                                    if (existing.ReportTypes != reportTypes)
+                                        throw new DeadLetterException($"Report with id {reportId} already exists for facility {existing.FacilityId} with report types {existing.ReportTypes}. Cannot schedule for report types {reportTypes}.");
+                                    
+                                    _logger.LogWarning($"Report with id {reportId} already exists... Re-scheduling report for facility {facilityId} with start date {startDate} and end date {endDate} and frequency {frequency} and report types {reportTypes}.");
                                     reportSchedule = await measureReportScheduledManager.UpdateAsync(existing, consumeCancellationToken);
 
                                     await MeasureReportScheduleService.RescheduleJob(reportSchedule,
@@ -117,6 +145,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 }
                                 else
                                 {
+                                    _logger.LogInformation($"Report with id {reportId} does not exist... Creating.");
                                     reportSchedule = new ReportScheduleModel
                                     {
                                         Id = reportId,
