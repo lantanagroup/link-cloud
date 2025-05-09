@@ -7,6 +7,9 @@ using System.Reflection;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
+    /// <summary>
+    /// An operation to copy a value from a source FHIRPath to a target FHIRPath on a FHIR resource.
+    /// </summary>
     public class CopyPropertyOperation : IOperation
     {
         public OperationType OperationType => OperationType.CopyProperty;
@@ -14,59 +17,67 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         public string SourceFhirPath { get; private set; }
         public string TargetFhirPath { get; private set; }
 
-        //Explicit mapping of FHIR resource name to C# Properties
+        // Explicit mapping of FHIR resource name to C# Properties
         private static readonly Dictionary<string, string> FhirPathToPropertyMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            //{ "valuequantity", "Value" },
-            //{ "onsetdatetime", "Onset" },
-            //{ "dosagequantity", "Dose" },
-            //{ "valuestring", "Value" }
         };
 
-        //Commonly, a FHIR resource name will have its type or a descriptor at the end, which is subsequently lost 
-        //when it is instantiated into a C# object model, ie ValueQuantity is actually just Value on the Resource object.
-        //If the provided mapping does not directly match a property, these suffixes will be stripped to attempt a match.
+        // Common FHIR suffixes to strip when mapping FHIRPath to property names
         private static readonly string[] CommonFhirSuffixes = { "DateTime", "Quantity", "String", "Boolean", "Decimal", "Integer", "Code" };
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CopyPropertyOperation"/> class.
+        /// </summary>
+        /// <param name="name">The name of the operation.</param>
+        /// <param name="sourceFhirPath">The source FHIRPath expression.</param>
+        /// <param name="targetFhirPath">The target FHIRPath expression.</param>
         public CopyPropertyOperation(string name, string sourceFhirPath, string targetFhirPath)
         {
-            Name = name;
-            SourceFhirPath = sourceFhirPath;
-            TargetFhirPath = targetFhirPath;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            SourceFhirPath = sourceFhirPath ?? throw new ArgumentNullException(nameof(sourceFhirPath));
+            TargetFhirPath = targetFhirPath ?? throw new ArgumentNullException(nameof(targetFhirPath));
         }
 
+        /// <summary>
+        /// Executes the copy operation on the provided FHIR resource.
+        /// </summary>
+        /// <param name="resource">The FHIR resource to operate on.</param>
+        /// <returns>A new resource with the copied value.</returns>
+        /// <exception cref="ArgumentException">Thrown when resource or FHIRPaths are invalid.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the operation cannot be completed.</exception>
         public DomainResource Execute(DomainResource resource)
         {
-            if (resource == null || string.IsNullOrEmpty(SourceFhirPath) || string.IsNullOrEmpty(TargetFhirPath))
+            if (resource == null)
             {
-                throw new ArgumentException("Resource, SourceFhirPath, and TargetFhirPath must not be null or empty.");
+                throw new ArgumentException("Resource must not be null.", nameof(resource));
+            }
+            if (string.IsNullOrEmpty(SourceFhirPath) || string.IsNullOrEmpty(TargetFhirPath))
+            {
+                throw new ArgumentException("SourceFhirPath and TargetFhirPath must not be null or empty.");
             }
 
-            var resourceCopy = resource.DeepCopy() as DomainResource;
-            if (resourceCopy == null)
-            {
-                throw new InvalidOperationException("Failed to create a deep copy of the resource.");
-            }
+            var resourceCopy = resource.DeepCopy() as DomainResource
+                ?? throw new InvalidOperationException($"Failed to create a deep copy of the resource of type {resource.GetType().Name}.");
 
             CopyFhirPathValue(resourceCopy, SourceFhirPath, TargetFhirPath, resource);
             return resourceCopy;
         }
 
+        /// <summary>
+        /// Copies a value from the source FHIRPath to the target FHIRPath on the resource.
+        /// </summary>
+        /// <param name="resource">The resource to modify.</param>
+        /// <param name="sourceFhirPath">The source FHIRPath.</param>
+        /// <param name="targetFhirPath">The target FHIRPath.</param>
+        /// <param name="originalResource">The original resource for context.</param>
         private void CopyFhirPathValue(DomainResource resource, string sourceFhirPath, string targetFhirPath, DomainResource originalResource)
         {
             var scopedNode = resource.ToTypedElement();
 
             // Extract source value
-            object targetValue = ExtractValueFromFhirPath(scopedNode, sourceFhirPath);
-            if (targetValue == null)
-            {
-                targetValue = GetValueReflectively(resource, sourceFhirPath);
-            }
-
-            if (targetValue == null)
-            {
-                throw new InvalidOperationException($"No values found at source FHIRPath: {sourceFhirPath}");
-            }
+            object targetValue = ExtractValueFromFhirPath(scopedNode, sourceFhirPath)
+                ?? GetValueReflectively(resource, sourceFhirPath)
+                ?? throw new InvalidOperationException($"No values found at source FHIRPath: {sourceFhirPath} for resource type {resource.TypeName}.");
 
             // Check if target exists
             bool targetExists = scopedNode.Select(targetFhirPath).Any();
@@ -76,7 +87,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 // Prioritize SetComponentValuesReflectively for component targets
                 if (targetFhirPath.Contains("component") && (targetFhirPath.EndsWith("value") || targetFhirPath.EndsWith("value.value")))
                 {
-                    SetComponentValuesReflectively(resource, targetValue);
+                    SetComponentValuesReflectively(resource, targetValue, targetFhirPath);
                 }
                 else
                 {
@@ -102,7 +113,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
             else
             {
-                throw new InvalidOperationException($"Source type {targetValue.GetType().Name} is not supported.");
+                throw new InvalidOperationException($"Source type {targetValue.GetType().Name} is not supported at source FHIRPath: {sourceFhirPath}.");
             }
 
             // Verify that component values were set for component targets
@@ -113,12 +124,18 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     if (observation.Component == null || !observation.Component.Any() ||
                         observation.Component.Any(c => c.Value is Quantity q && q.Value != (targetValue is int i ? (decimal)i : (decimal)targetValue)))
                     {
-                        throw new InvalidOperationException($"Failed to set value at target FHIRPath: {targetFhirPath}");
+                        throw new InvalidOperationException($"Failed to set value at target FHIRPath: {targetFhirPath} for resource type {resource.TypeName}.");
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// Extracts a value from the specified FHIRPath.
+        /// </summary>
+        /// <param name="scopedNode">The scoped node to query.</param>
+        /// <param name="fhirPath">The FHIRPath expression.</param>
+        /// <returns>The extracted value, or null if not found.</returns>
         private object ExtractValueFromFhirPath(ITypedElement scopedNode, string fhirPath)
         {
             var values = scopedNode.Select(fhirPath).ToList();
@@ -128,7 +145,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
 
             var value = values.First();
-            var poco = value?.ToPoco();
+            if (value == null)
+            {
+                return null;
+            }
+
+            var poco = value.ToPoco();
             if (poco == null)
             {
                 return null;
@@ -136,19 +158,11 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             if (poco is PrimitiveType primitive)
             {
-                if (primitive.ObjectValue == null)
-                {
-                    return null;
-                }
-                return primitive.ObjectValue;
+                return primitive.ObjectValue ?? null;
             }
             else if (poco is Quantity quantity)
             {
-                if (quantity.Value == null)
-                {
-                    return null;
-                }
-                return quantity.Value;
+                return quantity.Value ?? null;
             }
             else if (poco is Base complex)
             {
@@ -160,6 +174,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
+        /// <summary>
+        /// Retrieves a value reflectively from the resource using the FHIRPath.
+        /// </summary>
+        /// <param name="resource">The resource to query.</param>
+        /// <param name="fhirPath">The FHIRPath expression.</param>
+        /// <returns>The retrieved value, or null if not found.</returns>
         private object GetValueReflectively(object resource, string fhirPath)
         {
             var pathParts = fhirPath.Split('.');
@@ -230,19 +250,14 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
             else if (current is FhirDateTime fhirDateTime)
             {
-                if (fhirDateTime.Value == null)
-                {
-                    return null;
-                }
-                return fhirDateTime.Value;
+                return fhirDateTime.Value ?? null;
             }
             else if (current is Quantity quantity)
             {
                 var valueProp = quantity.GetType().GetProperty("Value", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (valueProp != null)
                 {
-                    var value = valueProp.GetValue(quantity);
-                    return value;
+                    return valueProp.GetValue(quantity);
                 }
             }
             else if (current is PrimitiveType primitive)
@@ -257,6 +272,14 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             return null;
         }
 
+        /// <summary>
+        /// Sets a value at the target FHIRPath using FHIRPath evaluation.
+        /// </summary>
+        /// <param name="resource">The resource to modify.</param>
+        /// <param name="targetFhirPath">The target FHIRPath.</param>
+        /// <param name="targetValue">The value to set.</param>
+        /// <param name="scopedNode">The scoped node for FHIRPath evaluation.</param>
+        /// <param name="originalResource">The original resource for context.</param>
         private void SetValueViaFhirPath(DomainResource resource, string targetFhirPath, object targetValue, ITypedElement scopedNode, DomainResource originalResource)
         {
             var targetElements = scopedNode.Select(targetFhirPath).ToList();
@@ -267,11 +290,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             foreach (var targetElement in targetElements)
             {
-                var targetPath = targetElement.Location;
-                if (string.IsNullOrEmpty(targetPath))
-                {
-                    throw new InvalidOperationException($"Target element at {targetFhirPath} does not have a valid location.");
-                }
+                var targetPath = targetElement.Location
+                    ?? throw new InvalidOperationException($"Target element at FHIRPath {targetFhirPath} does not have a valid location for resource type {resource.TypeName}.");
 
                 var pathParts = targetPath.Split('.').Skip(1).ToArray();
                 object current = resource;
@@ -285,11 +305,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     (propertyName, arrayIndex) = ParseFhirPathPart(part);
                     propertyName = MapFhirPathToPropertyName(propertyName, parentPoco?.GetType()).First();
 
-                    var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                    if (property == null)
-                    {
-                        throw new InvalidOperationException($"Property {propertyName} not found on type {current.GetType().Name}.");
-                    }
+                    var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                        ?? throw new InvalidOperationException($"Property {propertyName} not found on type {current.GetType().Name} for FHIRPath {targetFhirPath}.");
 
                     if (typeof(IList).IsAssignableFrom(property.PropertyType) && arrayIndex.HasValue)
                     {
@@ -318,23 +335,21 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
                     if (i == pathParts.Length - 2)
                     {
-                        parentPoco = current as Base;
-                        if (parentPoco == null)
-                        {
-                            throw new InvalidOperationException($"Parent object at {string.Join(".", pathParts.Take(i + 1))} is not a Base type.");
-                        }
+                        parentPoco = current as Base
+                            ?? throw new InvalidOperationException($"Parent object at {string.Join(".", pathParts.Take(i + 1))} is not a Base type for FHIRPath {targetFhirPath}.");
                     }
                 }
 
                 if (parentPoco == null || propertyName == null)
                 {
-                    throw new InvalidOperationException($"Could not resolve parent or property for target path {targetPath}.");
+                    throw new InvalidOperationException($"Could not resolve parent or property for target path {targetPath} in resource type {resource.TypeName}.");
                 }
 
-                var propertyToSet = parentPoco.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (propertyToSet == null || !propertyToSet.CanWrite)
+                var propertyToSet = parentPoco.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? throw new InvalidOperationException($"Property {propertyName} not found on type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
+                if (!propertyToSet.CanWrite)
                 {
-                    throw new InvalidOperationException($"Property {propertyName} on type {parentPoco.GetType().Name} is not writable.");
+                    throw new InvalidOperationException($"Property {propertyName} on type {parentPoco.GetType().Name} is not writable for FHIRPath {targetFhirPath}.");
                 }
 
                 var convertedValue = ConvertToFhirType(targetValue, propertyToSet.PropertyType, parentPoco, propertyName);
@@ -342,13 +357,16 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
-        private void SetComponentValuesReflectively(DomainResource resource, object targetValue)
+        /// <summary>
+        /// Sets component values reflectively for Observation resources.
+        /// </summary>
+        /// <param name="resource">The resource to modify.</param>
+        /// <param name="targetValue">The value to set.</param>
+        /// <param name="targetFhirPath">The target FHIRPath for error reporting.</param>
+        private void SetComponentValuesReflectively(DomainResource resource, object targetValue, string targetFhirPath)
         {
-            var componentsProperty = resource.GetType().GetProperty("Component", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (componentsProperty == null)
-            {
-                throw new InvalidOperationException("Component property not found on resource.");
-            }
+            var componentsProperty = resource.GetType().GetProperty("Component", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                ?? throw new InvalidOperationException($"Component property not found on resource type {resource.GetType().Name} for FHIRPath {targetFhirPath}.");
 
             var components = componentsProperty.GetValue(resource) as IList;
             if (components == null)
@@ -359,12 +377,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
             if (components.Count == 0)
             {
-                throw new InvalidOperationException("No components exist to set values on.");
+                throw new InvalidOperationException($"No components exist to set values on for FHIRPath {targetFhirPath} in resource type {resource.TypeName}.");
             }
 
             if (!(targetValue is decimal || targetValue is int))
             {
-                throw new InvalidOperationException($"Target value of type {targetValue.GetType().Name} is not compatible with Quantity.value.");
+                throw new InvalidOperationException($"Target value of type {targetValue.GetType().Name} is not compatible with Quantity.value for FHIRPath {targetFhirPath}.");
             }
 
             foreach (var component in components)
@@ -388,12 +406,19 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
+        /// <summary>
+        /// Sets a value at the target FHIRPath, creating parent structures if necessary.
+        /// </summary>
+        /// <param name="resource">The resource to modify.</param>
+        /// <param name="targetFhirPath">The target FHIRPath.</param>
+        /// <param name="newValue">The value to set.</param>
+        /// <param name="originalResource">The original resource for context.</param>
         private void SetTargetValue(Resource resource, string targetFhirPath, object newValue, DomainResource originalResource)
         {
             var pathParts = targetFhirPath.Split('.');
             if (pathParts.Length < 2)
             {
-                throw new InvalidOperationException($"Target FHIRPath {targetFhirPath} is too short to resolve parent and property.");
+                throw new InvalidOperationException($"Target FHIRPath {targetFhirPath} is too short to resolve parent and property in resource type {resource.TypeName}.");
             }
 
             var parentPath = string.Join(".", pathParts.Take(pathParts.Length - 1));
@@ -401,19 +426,13 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             int? arrayIndex = null;
 
             (propertyName, arrayIndex) = ParseFhirPathPart(propertyName);
-            var parentPoco = CreateParentStructure(resource, parentPath, originalResource);
-            if (parentPoco == null)
-            {
-                throw new InvalidOperationException($"Could not create parent structure for {parentPath}.");
-            }
+            var parentPoco = CreateParentStructure(resource, parentPath, originalResource)
+                ?? throw new InvalidOperationException($"Could not create parent structure for {parentPath} in resource type {resource.TypeName}.");
 
             propertyName = MapFhirPathToPropertyName(propertyName, parentPoco.GetType()).First();
 
-            var property = parentPoco.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (property == null)
-            {
-                throw new InvalidOperationException($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
-            }
+            var property = parentPoco.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                ?? throw new InvalidOperationException($"Property {propertyName} not found on parent type {parentPoco.GetType().Name} for FHIRPath {targetFhirPath}.");
 
             var convertedValue = ConvertToFhirType(newValue, property.PropertyType, parentPoco, propertyName);
             if (typeof(IList).IsAssignableFrom(property.PropertyType))
@@ -457,6 +476,13 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
         }
 
+        /// <summary>
+        /// Creates the parent structure for the target FHIRPath.
+        /// </summary>
+        /// <param name="resource">The resource to modify.</param>
+        /// <param name="parentPath">The parent FHIRPath.</param>
+        /// <param name="originalResource">The original resource for context.</param>
+        /// <returns>The parent Base object.</returns>
         private Base CreateParentStructure(Resource resource, string parentPath, DomainResource originalResource)
         {
             if (string.IsNullOrEmpty(parentPath))
@@ -471,11 +497,8 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 var (propertyName, arrayIndex) = ParseFhirPathPart(part);
                 propertyName = MapFhirPathToPropertyName(propertyName, current.GetType()).First();
 
-                var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (property == null)
-                {
-                    throw new InvalidOperationException($"Property {propertyName} not found on type {current.GetType().Name}.");
-                }
+                var property = current.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? throw new InvalidOperationException($"Property {propertyName} not found on type {current.GetType().Name} for parent path {parentPath}.");
 
                 if (typeof(IList).IsAssignableFrom(property.PropertyType))
                 {
@@ -519,13 +542,19 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 
                 if (current == null)
                 {
-                    throw new InvalidOperationException($"Failed to create or access object at path part {part}.");
+                    throw new InvalidOperationException($"Failed to create or access object at path part {part} for parent path {parentPath}.");
                 }
             }
 
             return current;
         }
 
+        /// <summary>
+        /// Validates that a complex type is compatible with the target FHIRPath.
+        /// </summary>
+        /// <param name="scopedNode">The scoped node for FHIRPath evaluation.</param>
+        /// <param name="targetFhirPath">The target FHIRPath.</param>
+        /// <param name="copiedObject">The copied complex object.</param>
         private void ValidateComplexTypeCompatibility(ITypedElement scopedNode, string targetFhirPath, Base copiedObject)
         {
             var pathParts = targetFhirPath.Split('.');
@@ -546,14 +575,19 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                       property.PropertyType.GenericTypeArguments[0].IsAssignableFrom(copiedObject.GetType())))
                 {
                     throw new InvalidOperationException(
-                        $"Target property {propertyName} of type {property.PropertyType.Name} cannot accept source object of type {copiedObject.GetType().Name}.");
+                        $"Target property {propertyName} of type {property.PropertyType.Name} cannot accept source object of type {copiedObject.GetType().Name} for FHIRPath {targetFhirPath}.");
                 }
             }
         }
 
+        /// <summary>
+        /// Maps a FHIRPath name to possible C# property names.
+        /// </summary>
+        /// <param name="fhirPathName">The FHIRPath name.</param>
+        /// <param name="parentType">The parent type for context.</param>
+        /// <returns>An enumerable of possible property names.</returns>
         private IEnumerable<string> MapFhirPathToPropertyName(string fhirPathName, Type parentType)
         {
-            // Normalize the FHIR path name to lowercase for comparison
             string normalizedFhirPathName = fhirPathName.ToLower();
 
             // Check for explicit mapping
@@ -568,11 +602,10 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 yield return "Value";
             }
 
-            // Generate possible property names using heuristics
-            // 1. Original FHIR path name in PascalCase
+            // Original FHIR path name in PascalCase
             yield return char.ToUpper(fhirPathName[0]) + (fhirPathName.Length > 1 ? fhirPathName.Substring(1) : string.Empty);
 
-            // 2. Remove common FHIR suffixes and convert to PascalCase
+            // Remove common FHIR suffixes and convert to PascalCase
             string baseName = fhirPathName;
             foreach (var suffix in CommonFhirSuffixes)
             {
@@ -587,10 +620,15 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 yield return char.ToUpper(baseName[0]) + (baseName.Length > 1 ? baseName.Substring(1) : string.Empty);
             }
 
-            // 3. Original FHIR path name as-is
+            // Original FHIR path name as-is
             yield return fhirPathName;
         }
 
+        /// <summary>
+        /// Parses a FHIRPath part into property name and array index.
+        /// </summary>
+        /// <param name="part">The FHIRPath part.</param>
+        /// <returns>A tuple containing the property name and optional array index.</returns>
         private (string propertyName, int? arrayIndex) ParseFhirPathPart(string part)
         {
             if (part.Contains("[") && part.EndsWith("]"))
@@ -610,6 +648,12 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             return (part, null);
         }
 
+        /// <summary>
+        /// Checks if a value is assignable to a property.
+        /// </summary>
+        /// <param name="property">The property info.</param>
+        /// <param name="value">The value to check.</param>
+        /// <returns>True if assignable, false otherwise.</returns>
         private bool IsAssignableToProperty(PropertyInfo property, object value)
         {
             var propertyType = property.PropertyType;
@@ -632,6 +676,14 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                    (propertyType == typeof(DataType) && value is string && property.DeclaringType == typeof(Extension));
         }
 
+        /// <summary>
+        /// Converts a value to the appropriate FHIR type for the target property.
+        /// </summary>
+        /// <param name="newValue">The value to convert.</param>
+        /// <param name="propertyType">The target property type.</param>
+        /// <param name="parentPoco">The parent FHIR object.</param>
+        /// <param name="propertyName">The property name.</param>
+        /// <returns>The converted value.</returns>
         private object ConvertToFhirType(object newValue, Type propertyType, Base parentPoco, string propertyName)
         {
             if (newValue == null) return null;
@@ -669,32 +721,39 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                 if (propertyType == typeof(FhirString)) return new FhirString(dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
                 if (propertyType == typeof(string)) return dateValue.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
             }
+            else if (newValue is CodeableConcept codeableConcept && propertyType == typeof(CodeableConcept))
+            {
+                return codeableConcept.DeepCopy() as CodeableConcept;
+            }
+            else if (newValue is Coding coding && propertyType == typeof(Coding))
+            {
+                return coding.DeepCopy() as Coding;
+            }
             else if (newValue is Base complexValue && !propertyType.IsAssignableFrom(complexValue.GetType()))
             {
-                throw new InvalidOperationException($"Cannot assign complex value of type {newValue.GetType().Name} to property of type {propertyType.Name}.");
+                throw new InvalidOperationException($"Cannot assign complex value of type {newValue.GetType().Name} to property {propertyName} of type {propertyType.Name}.");
             }
 
             return newValue;
         }
 
+        /// <summary>
+        /// Infers an extension URL based on the resource and FHIRPaths.
+        /// </summary>
+        /// <param name="resource">The resource for context.</param>
+        /// <param name="sourceFhirPath">The source FHIRPath.</param>
+        /// <param name="targetFhirPath">The target FHIRPath.</param>
+        /// <returns>The inferred extension URL.</returns>
         private string InferExtensionUrl(DomainResource resource, string sourceFhirPath, string targetFhirPath)
         {
-            // Get the resource type
             string resourceType = resource.TypeName;
-
-            // Extract the source property from SourceFhirPath
             string sourceProperty = sourceFhirPath.Split('.').Last().Split('[')[0];
-            sourceProperty = char.ToUpper(sourceProperty[0]) + sourceProperty.Substring(1); // PascalCase
-
-            // Construct a context-specific URL
+            sourceProperty = char.ToUpper(sourceProperty[0]) + sourceProperty.Substring(1);
             string inferredUrl = $"http://example.org/fhir/extension/{resourceType}-{sourceProperty}";
-
-            // For specific cases, map properties to meaningful names
             if (sourceProperty.Equals("Given", StringComparison.OrdinalIgnoreCase))
             {
                 inferredUrl = $"http://example.org/fhir/extension/{resourceType}-GivenName";
             }
-
             return inferredUrl;
         }
     }
