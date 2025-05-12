@@ -199,8 +199,13 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
                     return null;
                 }
 
-                var pocos = values.Where(v => v != null).Select(v => v.ToPoco()).Where(p => p != null).ToList();
-                if (!pocos.Any())
+                var pocos = values
+                    .Where(v => v != null)
+                    .Select(v => v.ToPoco())
+                    .Where(p => p != null)
+                    .ToList();
+                // Check if we had values but failed to convert any to POCOs
+                if (!pocos.Any() && values.Any())
                 {
                     return null;
                 }
