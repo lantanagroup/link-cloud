@@ -85,10 +85,24 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
             }
 
             _logger.LogInformation("Enqueuing operation: {OperationName}", operation.Name);
-            var tcs = new TaskCompletionSource<DomainResource>();
+-           var tcs = new TaskCompletionSource<DomainResource>();
++           var tcs = new TaskCompletionSource<DomainResource>(
++               TaskCreationOptions.RunContinuationsAsynchronously);
             _operationQueue.Enqueue((operation, resource, tcs));
 
-            return await tcs.Task.WaitAsync(_operationTimeout);
+-           return await tcs.Task.WaitAsync(_operationTimeout);
++           try
++           {
++               return await tcs.Task.WaitAsync(_operationTimeout, CancellationToken.None);
++           }
++           catch (TimeoutException tex)
++           {
++               _logger.LogWarning(tex,
++                   "Copy operation '{OperationName}' timed out after {Timeout}.",
++                   operation.Name, _operationTimeout);
++               throw new OperationCanceledException(
++                   $"Copy operation '{operation.Name}' timed out after {_operationTimeout}.", tex);
++           }
         }
 
         /// <summary>
