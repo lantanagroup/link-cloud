@@ -116,11 +116,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docker", "Docker", "{1A8B2E
 		kafka-client.properties = kafka-client.properties
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackendE2ETests", "Tests\BackendE2ETests\BackendE2ETests.csproj", "{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackendE2ETests", "Tests\BackendE2ETests\BackendE2ETests.csproj", "{2F7CB3EA-297A-4240-AB54-874EA5A75FD3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{554985B2-5CA6-49D3-8F07-08080C4EACEA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedTests", "DotNet\SharedTests\SharedTests.csproj", "{B409C886-429B-4DF2-9F32-00347FDAF99B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharedTests", "DotNet\SharedTests\SharedTests.csproj", "{B409C886-429B-4DF2-9F32-00347FDAF99B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

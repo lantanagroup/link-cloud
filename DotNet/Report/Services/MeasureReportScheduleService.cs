@@ -31,7 +31,7 @@ namespace LantanaGroup.Link.Report.Services
 
             // find all reports that have not been submitted yet
             var reportSchedules =
-                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun ||  (s.EndOfReportPeriodJobHasRun && s.SubmitReportDateTime == null), cancellationToken);
+                await _database.ReportScheduledRepository.FindAsync(s => !s.EndOfReportPeriodJobHasRun, cancellationToken);
 
             foreach (var reportSchedule in reportSchedules)
             {

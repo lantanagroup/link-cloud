@@ -867,11 +867,16 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
         /// <param name="fhirPath">The FHIRPath expression to validate.</param>
         /// <param name="paramName">The parameter name for error reporting.</param>
         /// <exception cref="ArgumentException">Thrown if the FHIRPath is invalid.</exception>
-        private void ValidateFhirPath(string fhirPath, string paramName)
+        public void ValidateFhirPath(string fhirPath, string paramName)
         {
-            if (string.IsNullOrEmpty(fhirPath) || !fhirPath.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '[' || c == ']'))
+            try
             {
-                throw new ArgumentException($"Invalid FHIRPath expression: {fhirPath}", paramName);
+                var compiler = new FhirPathCompiler();
+                compiler.Compile(fhirPath);
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException($"Invalid FHIRPath expression: {fhirPath}", paramName, ex);
             }
         }
 

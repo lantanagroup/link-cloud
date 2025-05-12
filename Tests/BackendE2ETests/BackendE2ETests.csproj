@@ -16,7 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Hl7.Fhir.R4" Version="5.11.4" />
+        <PackageReference Include="Hl7.Fhir.R4" Version="5.11.6" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
         <PackageReference Include="Moq.AutoMock" Version="*-*" />
         <PackageReference Include="coverlet.collector" Version="6.*">
