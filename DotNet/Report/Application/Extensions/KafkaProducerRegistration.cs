@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using Grpc.Core;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
