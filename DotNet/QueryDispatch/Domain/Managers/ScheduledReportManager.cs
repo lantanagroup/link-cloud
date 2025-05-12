@@ -3,8 +3,8 @@ using KellermanSoftware.CompareNetObjects;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using QueryDispatch.Application.Settings;
 
@@ -19,8 +19,8 @@ namespace QueryDispatch.Domain.Managers
 
     public class ScheduledReportManager : IScheduledReportManager
     {
-        IEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
-        IEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
+        IBaseEntityRepository<ScheduledReportEntity> _scheduledReportRepository;
+        IBaseEntityRepository<QueryDispatchConfigurationEntity> _queryDispatchRepository;
 
         private readonly ILogger<QueryDispatchConfigurationManager> _logger;
         private readonly IProducer<string, AuditEventMessage> _producer;

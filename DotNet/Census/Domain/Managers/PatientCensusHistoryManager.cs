@@ -1,7 +1,7 @@
 ﻿using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 
 namespace LantanaGroup.Link.Census.Domain.Managers;
@@ -15,11 +15,11 @@ public interface IPatientCensusHistoryManager
 public class PatientCensusHistoryManager : IPatientCensusHistoryManager
 {
     private readonly ILogger<PatientCensusHistoryManager> _logger;
-    private readonly IEntityRepository<PatientCensusHistoricEntity> _censusHistoryRepository;
+    private readonly IBaseEntityRepository<PatientCensusHistoricEntity> _censusHistoryRepository;
     private readonly ITenantApiService _tenantApiService;
 
     public PatientCensusHistoryManager(ILogger<PatientCensusHistoryManager> logger,
-        IEntityRepository<PatientCensusHistoricEntity> censusHistoryRepository, ITenantApiService tenantApiService)
+        IBaseEntityRepository<PatientCensusHistoricEntity> censusHistoryRepository, ITenantApiService tenantApiService)
     {
         _logger = logger;
         _censusHistoryRepository = censusHistoryRepository;

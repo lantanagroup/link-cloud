@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
@@ -86,7 +86,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
 
-                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IEntityRepository<ScheduledReportEntity>>();
+                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
 
                                     ReportScheduledValue value = consumeResult.Message.Value;
 

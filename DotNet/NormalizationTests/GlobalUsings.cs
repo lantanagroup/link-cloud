@@ -1,1 +1,9 @@
 global using Xunit;
+global using Hl7.Fhir.Introspection;
+global using Hl7.Fhir.Model;
+global using Hl7.Fhir.Serialization;
+global using Hl7.Fhir.Utility;
+global using Hl7.Fhir.Validation;
+global using Hl7.FhirPath;
+global using System.Data;
+global using System.Reflection;
