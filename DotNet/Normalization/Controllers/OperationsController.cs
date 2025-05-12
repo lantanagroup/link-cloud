@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         }
 
         [HttpPost("test")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DomainResource))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperationResult))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> OperationTest([FromBody] TestOperationModel model)
@@ -158,10 +158,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 FhirJsonParser _fhirJsonParser = new FhirJsonParser();
                 var domainResource = (DomainResource)_fhirJsonParser.Parse(model.Resource);
 
-                var resource = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, domainResource);
+                var result = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, domainResource);
 
-                return Ok(resource);
-                
+                if(result.SuccessCode == OperationStatus.Success)
+                {
+                    return Ok(result);
+                }
+                else
+                {
+                    return Problem(result.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }                
             }
             catch (Exception ex)
             {

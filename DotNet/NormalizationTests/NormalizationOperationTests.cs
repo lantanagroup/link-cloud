@@ -1,15 +1,17 @@
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
-using NormalizationTests;
+using System.Reflection;
 using System.Text.Json;
 using Xunit.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
-namespace NormalizationOperationTests
+namespace NormalizationTests
 {
     [Collection("IntegrationTest")]
     public class NormalizationOperationTests : IClassFixture<IntegrationTestFixture>
@@ -42,16 +44,19 @@ namespace NormalizationOperationTests
 
             CopyPropertyOperation copyOperation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
 
-            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var result = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            Assert.Equal(OperationStatus.Success, result.SuccessCode);
+
+            var modifiedLocation = (Location)result.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(location));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
 
-            Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
+            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
         }
 
         [Fact]
@@ -95,16 +100,19 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedLocation = (Location)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(location));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
 
-            Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
+            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
         }
 
         [Fact]
@@ -143,16 +151,19 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            location = (Location)await _operationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, location);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedLocation = (Location)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(location_text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(location));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedLocation));
 
-            Assert.Equal(location.Identifier[0].Value, location.Type[0].Coding[0].Code);
+            Assert.Equal(location.Identifier[0].Value, modifiedLocation.Type[0].Coding[0].Code);
         }
 
         [Fact]
@@ -191,16 +202,19 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Patient)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            Assert.Equal(resource.Identifier[0].Value, resource.Name[0].Family);
+            Assert.Equal(resource.Identifier[0].Value, modifiedResource.Name[0].Family);
         }
 
         [Fact]
@@ -239,18 +253,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Observation)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Observation)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            Assert.NotNull(resource.Code);
-            Assert.NotNull(resource.Code.Text);
-            Assert.Equal(resource.Value.First().Value.ToString(), resource.Code.Text);
+            Assert.NotNull(modifiedResource.Code);
+            Assert.NotNull(modifiedResource.Code.Text);
+            Assert.Equal(resource.Value.First().Value.ToString(), modifiedResource.Code.Text);
         }
 
         [Fact]
@@ -293,19 +310,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Patient)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the name text was set correctly
-            Assert.NotEmpty(resource.Name);
-            Assert.NotNull(resource.Name[0].Text);
-            Assert.Equal("John", resource.Name[0].Text);
+            Assert.NotEmpty(modifiedResource.Name);
+            Assert.NotNull(modifiedResource.Name[0].Text);
+            Assert.Equal("John", modifiedResource.Name[0].Text);
         }
 
         [Fact]
@@ -348,19 +367,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (MedicationRequest)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the note was created and set correctly
-            Assert.NotEmpty(resource.Note);
-            Assert.Equal(1, resource.Note.Count);
-            var note = resource.Note[0];
+            Assert.NotEmpty(modifiedResource.Note);
+            Assert.Equal(1, modifiedResource.Note.Count);
+            var note = modifiedResource.Note[0];
             Assert.NotNull(note.Text);
             Assert.Equal("325", note.Text);
         }
@@ -405,19 +426,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Condition)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Condition)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the code.text was updated correctly
-            Assert.NotNull(resource.Code);
-            Assert.NotNull(resource.Code.Text);
-            Assert.Equal("2023-05-01T10:00:00Z", resource.Code.Text);
+            Assert.NotNull(modifiedResource.Code);
+            Assert.NotNull(modifiedResource.Code.Text);
+            Assert.Equal("2023-05-01T10:00:00Z", modifiedResource.Code.Text);
         }
 
         [Fact]
@@ -453,7 +476,6 @@ namespace NormalizationOperationTests
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            // Validate resource structure
             Assert.NotNull(resource.Period);
             Assert.NotNull(resource.Period.StartElement);
 
@@ -464,19 +486,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Encounter)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Encounter)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the target value matches the source
-            Assert.NotEmpty(resource.ReasonCode);
-            Assert.NotNull(resource.ReasonCode[0].Text);
-            Assert.Equal(resource.Period.StartElement.ToString(), resource.ReasonCode[0].Text);
+            Assert.NotEmpty(modifiedResource.ReasonCode);
+            Assert.NotNull(modifiedResource.ReasonCode[0].Text);
+            Assert.Equal(resource.Period.StartElement.ToString(), modifiedResource.ReasonCode[0].Text);
         }
 
         [Fact]
@@ -512,7 +536,6 @@ namespace NormalizationOperationTests
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Patient>(text);
 
-            // Validate resource structure
             Assert.NotNull(resource.BirthDateElement);
 
             Assert.NotNull(fetched.OperationJson);
@@ -522,19 +545,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (Patient)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (Patient)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the target value matches the source
-            Assert.NotEmpty(resource.Name);
-            Assert.NotNull(resource.Name[0].Text);
-            Assert.Equal(resource.BirthDateElement.ToString(), resource.Name[0].Text);
+            Assert.NotEmpty(modifiedResource.Name);
+            Assert.NotNull(modifiedResource.Name[0].Text);
+            Assert.Equal(resource.BirthDateElement.ToString(), modifiedResource.Name[0].Text);
         }
 
         [Fact]
@@ -570,7 +595,6 @@ namespace NormalizationOperationTests
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<MedicationRequest>(text);
 
-            // Validate resource structure
             Assert.NotNull(resource.AuthoredOnElement);
 
             Assert.NotNull(fetched.OperationJson);
@@ -580,19 +604,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (MedicationRequest)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (MedicationRequest)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the target value matches the source
-            Assert.NotEmpty(resource.Note);
-            Assert.NotNull(resource.Note[0].Text);
-            Assert.Equal(resource.AuthoredOnElement.ToString(), resource.Note[0].Text);
+            Assert.NotEmpty(modifiedResource.Note);
+            Assert.NotNull(modifiedResource.Note[0].Text);
+            Assert.Equal(resource.AuthoredOnElement.ToString(), modifiedResource.Note[0].Text);
         }
 
         [Fact]
@@ -628,7 +654,6 @@ namespace NormalizationOperationTests
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<AllergyIntolerance>(text);
 
-            // Validate resource structure
             Assert.NotNull(resource.ClinicalStatus);
             Assert.NotEmpty(resource.ClinicalStatus.Coding);
             Assert.NotNull(resource.ClinicalStatus.Coding[0].Code);
@@ -640,19 +665,21 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (AllergyIntolerance)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (AllergyIntolerance)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the target value matches the source
-            Assert.NotEmpty(resource.Reaction);
-            Assert.NotNull(resource.Reaction[0].Description);
-            Assert.Equal(resource.ClinicalStatus.Coding[0].Code, resource.Reaction[0].Description);
+            Assert.NotEmpty(modifiedResource.Reaction);
+            Assert.NotNull(modifiedResource.Reaction[0].Description);
+            Assert.Equal(resource.ClinicalStatus.Coding[0].Code, modifiedResource.Reaction[0].Description);
         }
 
         [Fact]
@@ -688,7 +715,6 @@ namespace NormalizationOperationTests
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<DiagnosticReport>(text);
 
-            // Validate resource structure
             Assert.NotNull(resource.Effective);
             Assert.True(resource.Effective is FhirDateTime, "The DiagnosticReport resource effective field must be a FhirDateTime.");
             var effectiveDateTime = resource.Effective as FhirDateTime;
@@ -701,32 +727,32 @@ namespace NormalizationOperationTests
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            resource = (DiagnosticReport)await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _operationService.EnqueueOperationAsync(copyOperation, resource);
+            Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+            var modifiedResource = (DiagnosticReport)operationResult.Resource;
 
             _output.WriteLine("Original: ");
             _output.WriteLine(text);
 
             _output.WriteLine("Modified: ");
             FhirJsonSerializer serializer = new FhirJsonSerializer();
-            _output.WriteLine(await serializer.SerializeToStringAsync(resource));
+            _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
-            // Assert that the target value matches the source
-            Assert.NotNull(resource.Code);
-            Assert.NotNull(resource.Code.Text);
-            Assert.Equal(((FhirDateTime)resource.Effective).ToString(), resource.Code.Text);
+            Assert.NotNull(modifiedResource.Code);
+            Assert.NotNull(modifiedResource.Code.Text);
+            Assert.Equal(((FhirDateTime)resource.Effective).ToString(), modifiedResource.Code.Text);
         }
 
         [Fact]
         public async Task Integration_CopyPropertyOperation_MultipleOperations_Queue()
         {
-            // Create a sample Patient resource
             var parser = new FhirJsonParser();
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Patient>(text);
 
-            // Define multiple operations
             var operations = new List<CopyPropertyOperation>
             {
                 new CopyPropertyOperation(
@@ -746,7 +772,6 @@ namespace NormalizationOperationTests
                 )
             };
 
-            // Create operations in the database
             var operationIds = new List<Guid>();
             foreach (var op in operations)
             {
@@ -765,8 +790,7 @@ namespace NormalizationOperationTests
                 operationIds.Add(result.Id);
             }
 
-            // Fetch and enqueue operations
-            var tasks = new List<Task<DomainResource>>();
+            var tasks = new List<Task<OperationResult>>();
             var fetchedOperations = new List<CopyPropertyOperation>();
             foreach (var id in operationIds)
             {
@@ -785,13 +809,14 @@ namespace NormalizationOperationTests
                 tasks.Add(_operationService.EnqueueOperationAsync(copyOperation, resource));
             }
 
-            // Wait for all operations to complete
             var results = await Task.WhenAll(tasks);
 
-            // Verify results for each operation
             for (int i = 0; i < results.Length; i++)
             {
-                var modifiedResource = (Patient)results[i];
+                var operationResult = results[i];
+                Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
+
+                var modifiedResource = (Patient)operationResult.Resource;
                 var operation = fetchedOperations[i];
 
                 _output.WriteLine($"Modified Resource for operation '{operation.Name}': ");
