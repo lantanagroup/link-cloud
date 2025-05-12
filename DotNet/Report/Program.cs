@@ -25,11 +25,11 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Repositories.Implementations;
-using LantanaGroup.Link.Shared.Application.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -149,12 +149,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>, KafkaProducerFactory<ReportSubmittedKey, ReportSubmittedValue>>();
 
     // Add repositories
-    builder.Services.AddTransient<IEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
-    builder.Services.AddTransient<IEntityRepository<MeasureReportSubmissionEntryModel>, MongoEntityRepository<MeasureReportSubmissionEntryModel>>();
-    builder.Services.AddTransient<IEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
-    builder.Services.AddTransient<IEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
-    builder.Services.AddTransient<IEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
-    builder.Services.AddSingleton<IEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportScheduleModel>, MongoEntityRepository<ReportScheduleModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<MeasureReportSubmissionEntryModel>, MongoEntityRepository<MeasureReportSubmissionEntryModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<ReportModel>, MongoEntityRepository<ReportModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<SharedResourceModel>, MongoEntityRepository<SharedResourceModel>>();
+    builder.Services.AddTransient<IBaseEntityRepository<PatientResourceModel>, MongoEntityRepository<PatientResourceModel>>();
+    builder.Services.AddSingleton<IBaseEntityRepository<RetryEntity>, MongoEntityRepository<RetryEntity>>();
     builder.Services.AddTransient<IDatabase, Database>();
     
     //Add Managers

@@ -1,9 +1,9 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using LantanaGroup.Link.Shared.Application.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Attributes;
 using LantanaGroup.Link.Shared.Domain.Entities;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,9 +12,9 @@ using MongoDB.Driver;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace LantanaGroup.Link.Shared.Application.Repositories.Implementations;
+namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 
-public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntity
+public class MongoEntityRepository<T> : IBaseEntityRepository<T> where T : BaseEntity
 {
     private readonly ILogger<MongoEntityRepository<T>> _logger;
     protected readonly IMongoCollection<T> _collection;
@@ -58,7 +58,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
             throw;
         }
 
-        return entity;  
+        return entity;
     }
 
     public virtual async Task<T> AddAsync(T entity, CancellationToken cancellationToken = default)
@@ -79,20 +79,20 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         return entity;
     }
 
-    public virtual void Delete(string id)
+    public virtual void Delete(object id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         _collection.DeleteOne(filter);
     }
 
-    public virtual async System.Threading.Tasks.Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
+    public virtual async Task DeleteAsync(T entity, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;
         var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
         await _collection.DeleteOneAsync(filter, cancellationToken);
     }
 
-    public virtual async System.Threading.Tasks.Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    public virtual async Task DeleteAsync(object id, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return;
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
@@ -106,7 +106,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
 
     public virtual async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) ?? (T)null;
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).FirstOrDefaultAsync(cancellationToken) ?? null;
     }
 
     public virtual async Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
@@ -116,7 +116,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
 
     public virtual async Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleOrDefaultAsync(cancellationToken) ?? (T)null;
+        return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleOrDefaultAsync(cancellationToken) ?? null;
     }
 
     public virtual async Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
@@ -124,7 +124,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         return await (await _collection.FindAsync(predicate, cancellationToken: cancellationToken)).SingleAsync(cancellationToken);
     }
 
-    public virtual T Get(string id)
+    public virtual T Get(object id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         var result = _collection.Find(filter).FirstOrDefault();
@@ -174,13 +174,13 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         return entity;
     }
 
-    public async System.Threading.Tasks.Task RemoveAsync(T entity)
+    public async Task RemoveAsync(T entity)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, entity.Id);
         await _collection.DeleteOneAsync(filter);
     }
 
-    public async Task<T> GetAsync(string id, CancellationToken cancellationToken = default)
+    public async Task<T> GetAsync(object id, CancellationToken cancellationToken = default)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);
         return await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
@@ -207,7 +207,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         if (pageSize < 1) throw new ArgumentException("Page size must be greater than 0.", nameof(pageSize));
 
         var count = await _collection.CountDocumentsAsync<T>(predicate, cancellationToken: cancellationToken);
-        
+
         var skip = (pageNumber - 1) * pageSize;
         var query = _collection.Find(predicate).Skip(skip).Limit(pageSize);
 
@@ -221,7 +221,7 @@ public class MongoEntityRepository<T> : IEntityRepository<T> where T : BaseEntit
         }
 
         var result = await query.ToListAsync(cancellationToken);
-        
+
         var metadata = new PaginationMetadata(pageSize, pageNumber, count);
 
         return (result, metadata);
