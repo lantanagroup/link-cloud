@@ -30,15 +30,13 @@ namespace LantanaGroup.Link.Report.Controllers
         private readonly IDatabase _database;
         private readonly ISubmissionEntryManager _submissionEntryManager;
         private readonly IReportScheduledManager _reportingScheduledManager;
-        private readonly ReportScheduledProducer _reportScheduledProducer;
-        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager, ReportScheduledProducer reportScheduledProducer)
+        public ReportController(ILogger<ReportController> logger, PatientReportSubmissionBundler patientReportSubmissionBundler, IDatabase database, ISubmissionEntryManager submissionEntryManager, IReportScheduledManager reportingScheduledManager)
         {
             _logger = logger;
             _patientReportSubmissionBundler = patientReportSubmissionBundler;
             _database = database;
             _submissionEntryManager = submissionEntryManager;
             _reportingScheduledManager = reportingScheduledManager;
-            _reportScheduledProducer = reportScheduledProducer;
         }
 
         /// <summary>
@@ -479,42 +477,6 @@ namespace LantanaGroup.Link.Report.Controllers
                 _logger.LogError(ex, "Exception in ReportController.GetReportValidationStatuses");
                 return Problem("An error occurred while retrieving validation statuses.",
                     statusCode: (int)HttpStatusCode.InternalServerError);
-            }
-        }
-
-        /// <summary>
-        /// Schedules a new report based on the provided configuration
-        /// </summary>
-        /// <param name="facilityId"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        [HttpPost("schedule")]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> ScheduleReport([FromQuery] string facilityId, [FromBody] ReportScheduledValue value)
-        {
-            if (string.IsNullOrWhiteSpace(facilityId))
-                return BadRequest("Parameter facilityId cannot be null or empty");
-
-            if (value == null)
-                return BadRequest("Request body cannot be null");
-            
-            if (!value.IsValid())
-                return Problem("Request body is not valid");
-            
-            try
-            {
-                // Generate a unique tracking ID for this report schedule
-                string reportTrackingId = Guid.NewGuid().ToString();
-                
-                await _reportScheduledProducer.Produce(reportTrackingId, facilityId, value.StartDate, value.EndDate, value.ReportTypes, value.Frequency);
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Exception in ReportController.ScheduleReport");
-                return Problem("An error occurred while scheduling the report.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
         }
     }

@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using Grpc.Core;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -46,12 +45,5 @@ public static class KafkaProducerRegistration
         };
         var evaluationRequestedProducer = new KafkaProducerFactory<string, EvaluationRequestedValue>(kafkaConnection).CreateProducer(evaluationRequestedConfig);
         services.AddSingleton(evaluationRequestedProducer);
-
-        var reportScheduledConfig = new ProducerConfig()
-        {
-            ClientId = "Report_ReportScheduled"
-        };
-        var reportScheduledProducer = new KafkaProducerFactory<string, ReportScheduledValue>(kafkaConnection).CreateProducer(reportScheduledConfig);
-        services.AddSingleton(reportScheduledProducer);
     }
 }

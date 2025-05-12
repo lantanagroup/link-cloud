@@ -256,7 +256,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<ReadyForValidationProducer>();
     builder.Services.AddTransient<DataAcquisitionRequestedProducer>();
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
-    builder.Services.AddTransient<ReportScheduledProducer>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
