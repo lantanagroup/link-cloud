@@ -321,13 +321,14 @@ namespace LantanaGroup.Link.Tenant.Services
             reportTypes.AddRange(facility.ScheduledReports.Monthly);
             reportTypes.AddRange(facility.ScheduledReports.Daily);
             reportTypes.AddRange(facility.ScheduledReports.Weekly);
-
+           
             HashSet<string> duplicates = FindDuplicates(reportTypes);
             if (duplicates.Count > 0)
             {
                 _logger.LogError("Duplicate entries found: " + string.Join(", ", duplicates));
                 throw new ApplicationException("Duplicate entries found: " + string.Join(", ", duplicates));
             }
+
             // validate report types exist
             foreach (var reportType in reportTypes)
             {
