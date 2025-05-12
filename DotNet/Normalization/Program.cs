@@ -223,7 +223,8 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<IConditionalTransformationEvaluationService, ConditionalTransformationEvaluationService>();
 
-    builder.Services.AddHostedService<CopyPropertyOperationService>();
+    builder.Services.AddSingleton<CopyPropertyOperationService>();
+    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
 
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {

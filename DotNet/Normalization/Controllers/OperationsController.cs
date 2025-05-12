@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
@@ -138,7 +139,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("TestOperationModel.ResourceType cannot be null or empty.");
                 }
 
-                if (model.Resource == null)
+                if (string.IsNullOrEmpty(model.Resource))
                 {
                     return BadRequest("TestOperationModel.Resource cannot be null.");
                 }
@@ -154,7 +155,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                var resource = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, model.Resource);
+                FhirJsonParser _fhirJsonParser = new FhirJsonParser();
+                var domainResource = (DomainResource)_fhirJsonParser.Parse(model.Resource);
+
+                var resource = await _copyPropertyOperationService.EnqueueOperationAsync(operationImplementation, domainResource);
 
                 return Ok(resource);
                 

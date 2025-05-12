@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         public IOperation? Operation { get; set; }
         [Required]
         [DataMember]
-        public DomainResource? Resource { get; set; }
+        public string? Resource { get; set; }
 
     }
 }

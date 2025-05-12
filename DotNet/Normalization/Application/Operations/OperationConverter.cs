@@ -8,7 +8,7 @@ public class OperationConverter : JsonConverter<IOperation>
     {
         using (JsonDocument doc = JsonDocument.ParseValue(ref reader))
         {
-            if (!doc.RootElement.TryGetProperty("operationType", out JsonElement typeElement))
+            if (!doc.RootElement.TryGetProperty("OperationType", out JsonElement typeElement))
             {
                 throw new JsonException("Missing operationType property.");
             }
