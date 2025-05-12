@@ -494,6 +494,15 @@ namespace LantanaGroup.Link.Report.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> ScheduleReport([FromQuery] string facilityId, [FromBody] ReportScheduledValue value)
         {
+            if (string.IsNullOrWhiteSpace(facilityId))
+                return BadRequest("Parameter facilityId cannot be null or empty");
+
+            if (value == null)
+                return BadRequest("Request body cannot be null");
+            
+            if (!value.IsValid())
+                return Problem("Request body is not valid");
+            
             try
             {
                 // Generate a unique tracking ID for this report schedule
