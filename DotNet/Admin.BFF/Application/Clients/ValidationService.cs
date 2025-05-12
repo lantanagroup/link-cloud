@@ -43,10 +43,16 @@ public class ValidationService
         try
         {
             var response = await _client.GetAsync($"health", cancellationToken);
-            var healthResult = await response.Content.ReadFromJsonAsync<LinkServiceHealthReport>(cancellationToken: cancellationToken);
-            if (healthResult is not null) healthResult.Service = "Validation";
 
-            return healthResult;
+            //TODO: update when further functionality within the java services have been added
+            if (response.IsSuccessStatusCode)
+            {
+                return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Healthy };
+            }
+            else
+            {
+                return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Unhealthy };
+            }
         }
         catch (Exception ex)
         {
