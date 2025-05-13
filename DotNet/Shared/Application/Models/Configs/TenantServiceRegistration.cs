@@ -4,7 +4,7 @@ public class TenantServiceRegistration
 {
     private string? _tenantServiceUrl { get; set; }
 
-    public string TenantServiceUrl
+    public string? TenantServiceUrl
     {
         get
         {
