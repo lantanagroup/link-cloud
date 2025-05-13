@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Utilities;
+﻿using DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,4 +19,17 @@ public enum QueryPhase
     Polling,
     [StringValue("Monitoring")]
     Monitoring
+}
+
+public static class QueryPhaseUtilities
+{
+    public static QueryPhase ToDomain(string queryPlanType)
+    {
+        return queryPlanType switch
+        {
+            "Initial" => QueryPhase.Initial,
+            "Supplemental" => QueryPhase.Supplemental,
+            _ => throw new ArgumentOutOfRangeException(nameof(queryPlanType), queryPlanType, null)
+        };
+    }
 }

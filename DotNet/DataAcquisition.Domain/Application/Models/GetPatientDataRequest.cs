@@ -1,5 +1,5 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models
 {

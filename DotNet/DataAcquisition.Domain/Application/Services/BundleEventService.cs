@@ -1,11 +1,12 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 

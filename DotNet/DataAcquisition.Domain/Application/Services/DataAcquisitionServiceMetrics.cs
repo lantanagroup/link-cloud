@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 using System.Diagnostics.Metrics;

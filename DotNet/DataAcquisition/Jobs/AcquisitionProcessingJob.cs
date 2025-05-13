@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
@@ -12,16 +11,12 @@ namespace LantanaGroup.Link.DataAcquisition.Jobs;
 public class AcquisitionProcessingJob : IJob
 {
     private readonly ILogger<AcquisitionProcessingJob> _logger;
-    private readonly IReadFhirCommand _readFhirCommand;
-    private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<string, ReadyToAcquire> _readyToAcquireProducer;
     protected readonly ITransientExceptionHandler<Null, ReadyToAcquire> _transientExceptionHandler;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
-        IReadFhirCommand readFhirCommand,
-        ISearchFhirCommand searchFhirCommand,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<string, ReadyToAcquire> readyToAcquireProducer,
         ITransientExceptionHandler<Null, ReadyToAcquire> transientExceptionHandler)

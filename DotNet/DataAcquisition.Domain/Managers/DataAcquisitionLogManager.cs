@@ -7,7 +7,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
-namespace LantanaGroup.Link.DataAcquisition.Application.Managers;
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IDataAcquisitionLogManager
 {
@@ -91,6 +91,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         existingLog.Priority = log.Priority;
         existingLog.PatientId = log.PatientId;
+        existingLog.ResourceId = log.ResourceId;
         existingLog.FhirVersion = log.FhirVersion;
         existingLog.QueryType = log.QueryType;
         existingLog.QueryPhase = log.QueryPhase;

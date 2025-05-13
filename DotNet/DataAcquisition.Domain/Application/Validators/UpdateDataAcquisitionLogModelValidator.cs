@@ -1,6 +1,5 @@
 using FluentValidation;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Validators
 {

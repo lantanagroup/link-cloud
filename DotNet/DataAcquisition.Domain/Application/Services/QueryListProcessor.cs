@@ -1,17 +1,18 @@
 ﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.DataAcquisition.Application.Factories.QueryFactories;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ReferenceQuery;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Application.Services.FhirApi;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;

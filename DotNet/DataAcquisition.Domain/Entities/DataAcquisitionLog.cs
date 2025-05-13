@@ -12,6 +12,7 @@ public class DataAcquisitionLog : BaseEntityExtended
     public string FacilityId { get; set; }
     public AcquisitionPriority Priority { get; set; }
     public string? PatientId { get; set; }
+    public string? ResourceId { get; set; }
     public string? CorrelationId { get; set; } = default;
     public string? FhirVersion { get; set; }
     public FhirQueryType? QueryType { get; set; }

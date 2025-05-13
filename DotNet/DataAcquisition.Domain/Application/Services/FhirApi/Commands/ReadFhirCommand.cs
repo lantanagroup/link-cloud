@@ -1,6 +1,7 @@
 ﻿using DataAcquisition.Domain.Extensions;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 

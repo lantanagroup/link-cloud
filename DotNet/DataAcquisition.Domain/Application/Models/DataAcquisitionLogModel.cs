@@ -8,6 +8,7 @@ public class DataAcquisitionLogModel
     public string FacilityId { get; set; }
     public AcquisitionPriorityModel Priority { get; set; }
     public string PatientId { get; set; }
+    public string? ResourceId { get; set; }
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }

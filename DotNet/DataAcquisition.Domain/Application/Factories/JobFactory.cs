@@ -1,5 +1,6 @@
 ﻿using Quartz.Spi;
 using Quartz;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 

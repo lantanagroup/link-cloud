@@ -1,8 +1,8 @@
 ﻿using DataAcquisition.Domain;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LinqKit;
-using System.Linq;
+using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Managers;

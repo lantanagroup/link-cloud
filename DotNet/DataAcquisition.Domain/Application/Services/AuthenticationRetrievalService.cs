@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Services.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Services;
 

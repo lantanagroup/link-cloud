@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Models;
-using LantanaGroup.Link.DataAcquisition.Services.Interfaces;
-using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.DataAcquisition.Domain.Services.Interfaces;
 using System.Net.Http.Headers;
 using System.Text;
 

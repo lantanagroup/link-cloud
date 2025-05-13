@@ -3,13 +3,7 @@ using DataAcquisition.Domain.Models.Enums;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.DataAcquisition.Application.Factories.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Application.Managers;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Factory.ParameterQuery;
 using LantanaGroup.Link.DataAcquisition.Application.Repositories;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
@@ -23,6 +17,13 @@ using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using DAEnums = LantanaGroup.Link.DataAcquisition.Domain.Models.Enums;
 using System.Diagnostics;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ParameterQuery;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using Microsoft.Extensions.Logging;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Application.Domain.Factories.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.Auth;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 

@@ -9,3 +9,5 @@ public enum QueryPlanType
     Initial, 
     Supplemental
 }
+
+

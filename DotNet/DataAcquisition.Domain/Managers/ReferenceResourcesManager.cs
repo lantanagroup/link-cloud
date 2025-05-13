@@ -1,5 +1,6 @@
 ﻿using DataAcquisition.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;
 
@@ -7,6 +8,7 @@ public interface IReferenceResourcesManager
 {
     Task<ReferenceResources> AddAsync(ReferenceResources referenceResources, CancellationToken cancellationToken = default);
     Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default);
+    Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -24,6 +26,11 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         CancellationToken cancellationToken = default)
     {
         return await _database.ReferenceResourcesRepository.AddAsync(referenceResources, cancellationToken); 
+    }
+
+    public async Task<ReferenceResources> GetByResourceIdAndFacilityId(string resourceId, string facilityId, CancellationToken cancellationToken = default)
+    {
+       return await _database.ReferenceResourcesRepository.FirstOrDefaultAsync(x => x.FacilityId == facilityId && x.ResourceId == resourceId, cancellationToken); 
     }
 
     public async Task<List<ReferenceResources>> GetReferenceResourcesForListOfIds(List<string> ids, string facilityId, CancellationToken cancellationToken = default)

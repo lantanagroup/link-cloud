@@ -1,8 +1,9 @@
 ﻿
 using DataAcquisition.Domain;
-using LantanaGroup.Link.DataAcquisition.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Application.Repositories;

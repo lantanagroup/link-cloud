@@ -17,6 +17,7 @@ public class FhirQuery : BaseEntityExtended
     public List<ResourceReferenceType> ResourceReferenceTypes { get; set; }
     public int? Paged { get; set; }
     public string? MeasureId { get; set; }
+    public bool? isReference { get; set; } = false;
     public DataAcquisitionLog DataAcquisitionLog { get; set; }
     public string DataAcquisitionLogId { get; set; }
 
