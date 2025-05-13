@@ -1,3 +1,5 @@
+using Xunit.Abstractions;
+
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 using System.Reflection;
@@ -8,7 +10,7 @@ public class FhirDataLoader
 {
     private readonly List<string> _createdResources = new List<string>();
     private string? _authorization;
-    private RestClient _restClient;
+    private readonly RestClient _restClient;
 
     public FhirDataLoader(string fhirServerBaseUrl)
     {
@@ -34,9 +36,9 @@ public class FhirDataLoader
         }
     }
 
-    public async Task LoadEmbeddedTransactionBundles()
+    public async Task LoadEmbeddedTransactionBundles(ITestOutputHelper output)
     {
-        Console.WriteLine("Loading data onto FHIR server...");
+        output.WriteLine("Loading data onto FHIR server...");
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
                                     .Where(name => name.Contains(".fhir_server_data.") && name.EndsWith(".json"));
@@ -57,11 +59,11 @@ public class FhirDataLoader
 
             var response = await this._restClient.ExecuteAsync(request);
 
-            Console.WriteLine($"Posted {resourceName} => Status: {response.StatusCode}");
+            output.WriteLine($"Posted {resourceName} => Status: {response.StatusCode}");
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
-                Console.WriteLine("Failed response: " + response.Content);
+                output.WriteLine("Failed response: " + response.Content);
                 continue;
             }
 
@@ -80,7 +82,7 @@ public class FhirDataLoader
 
                         if (status == null || !status.StartsWith("20"))
                         {
-                            Console.WriteLine("Failed response for index " + entries.IndexOf(entry) + ": " + responseNode);
+                            output.WriteLine("Failed response for index " + entries.IndexOf(entry) + ": " + responseNode);
                         }
 
                         if (!string.IsNullOrEmpty(location))
@@ -95,14 +97,14 @@ public class FhirDataLoader
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error parsing response for " + resourceName + ": " + ex.Message);
+                output.WriteLine("Error parsing response for " + resourceName + ": " + ex.Message);
             }
         }
     }
     
-    public void DeleteResourcesWithExpunge()
+    public void DeleteResourcesWithExpunge(ITestOutputHelper output)
     {
-        Console.WriteLine("Removing data from FHIR server...");
+        output.WriteLine("Removing data from FHIR server...");
 
         foreach (var resource in this._createdResources)
         {
@@ -116,11 +118,11 @@ public class FhirDataLoader
 
             var response = this._restClient.Execute(request);
 
-            Console.WriteLine($"Expunging {resource} => Status: {response.StatusCode}");
+            output.WriteLine($"Expunging {resource} => Status: {response.StatusCode}");
 
             if (!response.IsSuccessful)
             {
-                Console.WriteLine($"Failed to expunge {resource}: {response.Content}");
+                output.WriteLine($"Failed to expunge {resource}: {response.Content}");
             }
         }
     }

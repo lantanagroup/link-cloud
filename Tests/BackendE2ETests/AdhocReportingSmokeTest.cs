@@ -31,7 +31,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         }
 
         // Load data onto FHIR server
-        await FhirDataLoader.LoadEmbeddedTransactionBundles();
+        await FhirDataLoader.LoadEmbeddedTransactionBundles(output);
 
         // Initialize validation artifacts and categories
         await InitializeValidationArtifacts();
@@ -40,13 +40,22 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
 
     public async Task DisposeAsync()
     {
+        output.WriteLine("Cleaning up...\n");
+        
         // Clear all data from the FHIR server
-        FhirDataLoader.DeleteResourcesWithExpunge();
+        if (TestConfig.CleanupSmokeTestData)
+            FhirDataLoader.DeleteResourcesWithExpunge(output);
 
-        // TODO: Delete report
+        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveReport)
+        {
+            // TODO: Delete report
+        }
 
         // Cleanup
-        await DeleteFacility();
+        if (TestConfig.AdhocReportingSmokeTestConfig.RemoveFacilityConfig)
+        {
+            await DeleteFacility();
+        }
     }
 
     [Fact]
@@ -77,10 +86,10 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         var body = new
         {
             BypassSubmission = false,
-            StartDate = "2025-03-01T00:00:00Z",
-            EndDate = "2025-03-24T23:59:59.99Z",
+            TestConfig.AdhocReportingSmokeTestConfig.StartDate,
+            TestConfig.AdhocReportingSmokeTestConfig.EndDate,
             ReportTypes = new[] { measureId },
-            PatientIds = new[] { "Patient-ACHMarch1" }
+            TestConfig.AdhocReportingSmokeTestConfig.PatientIds
         };
         request.AddJsonBody(body);
         
@@ -131,6 +140,8 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         // Confirm that there is a file called "patient-Patient-ACHMarch1.json"
         Assert.True(downloadedResources.ContainsKey($"patient-Patient-ACHMarch1.json"), $"Expected report to include patient-{reportId}.json but it was not");
         // TODO: Validate that it is correct
+
+        output.WriteLine("Done generating and validating report.");
     }
     
     private async Task<Dictionary<string, Object>> DownloadReport(string reportId)
@@ -143,9 +154,19 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
         Assert.True(response.ContentType?.Contains("application/zip"), $"Expected Content-Type to be application/zip but received {response.ContentType}");
         
         var responseDictionary = new Dictionary<string, Object>();
+
+        if (!string.IsNullOrEmpty(TestConfig.SmokeTestDownloadPath) && response.RawBytes != null)
+        {
+            if (!Directory.Exists(TestConfig.SmokeTestDownloadPath))
+                Directory.CreateDirectory(TestConfig.SmokeTestDownloadPath);
+            
+            var downloadPath = Path.Combine(TestConfig.SmokeTestDownloadPath, "adhoc-reporting-smoke-test-submission.zip");
+            await File.WriteAllBytesAsync(downloadPath, response.RawBytes);
+            output.WriteLine($"Report downloaded to {downloadPath}");
+        }
     
         // Open the ZIP archive and extract in memory
-        using var zipStream = new MemoryStream(response.RawBytes ?? Array.Empty<byte>());
+        using var zipStream = new MemoryStream(response.RawBytes ?? []);
         using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read);
         var jsonParser = new Hl7.Fhir.Serialization.FhirJsonParser();
     
@@ -222,7 +243,7 @@ public sealed class AdhocReportingSmokeTest(ITestOutputHelper output) : IAsyncLi
     {
         output.WriteLine("Creating normalization config...");
         var request = new RestRequest("normalization", Method.Post);
-        var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.E2ETests.test_data.smoke_test.concept-map.json");
+        var conceptMapJson = TestConfig.GetEmbeddedResourceContent("LantanaGroup.Link.Tests.BackendE2ETests.test_data.smoke_test.concept-map.json");
 
         // Construct the request body with dynamic facilityId
         var body = new JObject
