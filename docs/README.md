@@ -50,10 +50,10 @@ flowchart
     ValidationComplete --> R
 
     %% Define a reusable style
-    classDef service fill:#aaf,stroke:#333,stroke-width:2px;
-    classDef event fill:#afa,stroke:#333,stroke-width:2px;
-    classDef external fill:#f99,stroke:#333,stroke-width:2px;
-    classDef persistence fill:#ddd,stroke:#333,stroke-width:2px;
+    classDef service fill:#aaf,stroke:#333,stroke-width:2px,color:#000;
+    classDef event fill:#afa,stroke:#333,stroke-width:2px,color:#000;
+    classDef external fill:#f99,stroke:#333,stroke-width:2px,color:#000;
+    classDef persistence fill:#ddd,stroke:#333,stroke-width:2px,color:#000;
 
     %% Apply the class to multiple nodes
     class N,S,Validation,ME,CQL,C,DA,Tenant,R service;
