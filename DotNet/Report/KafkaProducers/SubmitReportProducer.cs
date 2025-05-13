@@ -44,11 +44,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            if(facilityConfig == null)
-            {
-                throw new InvalidOperationException("No Facility Config found in call to Tenant Service");
-            }
-
             var organization = FhirHelperMethods.CreateOrganization(facilityConfig.FacilityName, schedule.FacilityId, ReportConstants.BundleSettings.SubmittingOrganizationProfile, ReportConstants.BundleSettings.OrganizationTypeSystem,
                                                                     ReportConstants.BundleSettings.CdcOrgIdSystem, ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl, ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
 
