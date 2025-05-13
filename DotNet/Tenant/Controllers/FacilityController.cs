@@ -227,6 +227,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             FacilityConfig dest = new FacilityConfig()
             {
+                Id = facility.Id,
                 FacilityId = facility.FacilityId,
                 FacilityName = facility.FacilityName,
                 TimeZone = facility.TimeZone,
