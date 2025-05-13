@@ -14,6 +14,7 @@ using LantanaGroup.Link.Tenant.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Trace;
 using Quartz;
@@ -224,12 +225,18 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return NotFound($"Facility with Id: {facilityId} Not Found");
             }
 
-            FacilityConfig? dest = null;
-
-            using (ServiceActivitySource.Instance.StartActivity("Map Result"))
+            FacilityConfig dest = new FacilityConfig()
             {
-                dest = _mapperModelToDto.Map<FacilityConfigModel, FacilityConfig>(facility);
-            }
+                FacilityId = facility.FacilityId,
+                FacilityName = facility.FacilityName,
+                TimeZone = facility.TimeZone,
+                ScheduledReports = new TenantScheduledReportConfig()
+                {
+                    Monthly = facility.ScheduledReports.Monthly,
+                    Weekly = facility.ScheduledReports.Weekly,
+                    Daily = facility.ScheduledReports.Daily
+                }
+            };
 
             return Ok(dest);
         }
