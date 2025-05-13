@@ -1,9 +1,9 @@
 ﻿using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.Tenant.Models
+namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
     [DataContract]
-    public class FacilityConfigDto
+    public class FacilityConfig
     {
         [DataMember]
         public string? Id { get; set; }
@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Tenant.Models
         [DataMember]
         public string? FacilityName { get; set; }
         public string TimeZone { get; set; }
-        public ScheduledReportDto ScheduledReports { get; set; } = null!;
+        public TenantScheduledReportConfig ScheduledReports { get; set; } = null!;
 
     }
 }
